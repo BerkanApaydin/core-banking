@@ -67,15 +67,21 @@ public class PlaceTransferUseCase {
         // Validate transfer domain rules and create the Transfer aggregate root
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, request.senderIban(), request.receiverIban(), amount);
 
+        // Save initially as PENDING
+        Transfer savedTransfer = saveTransferPort.save(transfer);
+
         // Perform balance updates and locking inside Account module
         accountInternalService.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-        // Save Transfer
-        Transfer savedTransfer = saveTransferPort.save(transfer);
+        // Complete the transfer
+        savedTransfer.complete();
 
-        logAuditAndPublishEvent(savedTransfer, request.senderIban(), request.receiverIban());
+        // Save the updated COMPLETED transfer
+        Transfer completedTransfer = saveTransferPort.save(savedTransfer);
 
-        return TransferResponse.from(savedTransfer, request.senderIban(), request.receiverIban());
+        logAuditAndPublishEvent(completedTransfer, request.senderIban(), request.receiverIban());
+
+        return TransferResponse.from(completedTransfer, request.senderIban(), request.receiverIban());
     }
 
     private void validateAccountsActive(AccountInfo sender, AccountInfo receiver, String senderIban, String receiverIban) {

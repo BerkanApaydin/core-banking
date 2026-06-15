@@ -33,7 +33,14 @@ public class Transfer {
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount) {
-        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.COMPLETED, LocalDateTime.now());
+        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now());
+    }
+
+    public void complete() {
+        if (this.status != TransferStatus.PENDING) {
+            throw new IllegalStateException("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: " + this.status);
+        }
+        this.status = TransferStatus.COMPLETED;
     }
 
     public Long getId() {

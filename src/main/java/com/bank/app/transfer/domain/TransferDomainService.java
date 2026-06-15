@@ -26,6 +26,8 @@ public class TransferDomainService {
         sender.debit(amount);
         receiver.credit(amount);
 
+        transfer.complete();
+
         return transfer;
     }
 

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 
@@ -78,7 +79,12 @@ class PlaceTransferUseCaseTest {
         assertEquals(2L, response.receiverAccountId());
 
         verify(accountInternalService).debitAndCredit(eq(1L), eq(2L), any(Money.class));
-        verify(saveTransferPort).save(any(Transfer.class));
+        
+        ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
+        verify(saveTransferPort, times(2)).save(transferCaptor.capture());
+        assertEquals(TransferStatus.PENDING, transferCaptor.getAllValues().get(0).getStatus());
+        assertEquals(TransferStatus.COMPLETED, transferCaptor.getAllValues().get(1).getStatus());
+
         verify(eventPublisher).publishEvent(any(TransferCompletedEvent.class));
     }
 
@@ -101,7 +107,9 @@ class PlaceTransferUseCaseTest {
 
         assertThrows(AccessDeniedException.class, () -> placeTransferUseCase.execute(request));
 
-        verify(saveTransferPort, never()).save(any(Transfer.class));
+        ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
+        verify(saveTransferPort, times(1)).save(transferCaptor.capture());
+        assertEquals(TransferStatus.PENDING, transferCaptor.getValue().getStatus());
     }
 
     @Test
