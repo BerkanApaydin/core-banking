@@ -55,9 +55,13 @@ class TransferControllerIntegrationTest {
         @MockitoBean
         private SecurityUtils securityUtils;
 
+        @Autowired
+        private com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo idempotencyKeyRepo;
+
         @BeforeEach
         void setUp() {
                 Locale.setDefault(Locale.of("tr", "TR"));
+                idempotencyKeyRepo.deleteAll();
                 transferRepo.deleteAll();
                 accountRepo.deleteAll();
                 userRepository.deleteAll();
@@ -275,5 +279,106 @@ class TransferControllerIntegrationTest {
                                 .param("page", "0")
                                 .param("size", "200")) // size is capped at 100
                                 .andExpect(status().isOk());
+        }
+
+        @Test
+        void shouldPerformTransferSuccessfullyWhenIdempotencyKeyIsBlank() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("200.00"),
+                                Money.Currency.TRY);
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Idempotency-Key", "   ")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id", notNullValue()));
+        }
+
+        @Test
+        void shouldReturnForbiddenWhenIdempotencyKeyProvidedButNotLoggedIn() throws Exception {
+                when(securityUtils.getCurrentUsername()).thenReturn(Optional.empty());
+
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("100.00"),
+                                Money.Currency.TRY);
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Idempotency-Key", "some-key")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        void shouldFailRequestAndCleanIdempotencyKeyOnException() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("2000.00"), // balance is 1000.00, will fail
+                                Money.Currency.TRY);
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Idempotency-Key", "fail-key-123")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+                
+                // If it cleaned up successfully, we should be able to run it again (it won't be pending or completed)
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Idempotency-Key", "fail-key-123")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldReturnConflictWhenIdempotencyKeyIsPending() throws Exception {
+                idempotencyKeyRepo.save(new com.bank.app.common.persistence.IdempotencyKeyJpaEntity(
+                                "u1_pending-key", "PENDING", null, LocalDateTime.now()));
+
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("100.00"),
+                                Money.Currency.TRY);
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Idempotency-Key", "pending-key")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.message", is("Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.")));
+        }
+
+        @Test
+        void shouldGetTransferDetailSuccessfully() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("200.00"),
+                                Money.Currency.TRY);
+
+                String responseJson = mockMvc.perform(post("/api/v1/transfers")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andReturn().getResponse().getContentAsString();
+
+                Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
+
+                mockMvc.perform(get("/api/v1/transfers/" + transferId))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.id", is(transferId)))
+                                .andExpect(jsonPath("$.amount", is(200.00)))
+                                .andExpect(jsonPath("$.currency", is("TRY")))
+                                .andExpect(jsonPath("$.senderAccountId", notNullValue()))
+                                .andExpect(jsonPath("$.receiverAccountId", notNullValue()))
+                                .andExpect(jsonPath("$.status", notNullValue()))
+                                .andExpect(jsonPath("$.createdAt", notNullValue()));
         }
 }

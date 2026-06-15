@@ -142,4 +142,15 @@ class AccountControllerIntegrationTest {
                 .andExpect(jsonPath("$.iban", is("TR290006200000000000000888")))
                 .andExpect(jsonPath("$.ownerName", is("Fatma Demir")));
     }
+
+    @Test
+    void shouldListAccountsSuccessfully() throws Exception {
+        accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
+                new BigDecimal("2000.00"), "TRY", true));
+
+        mockMvc.perform(get("/api/v1/accounts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].iban", is("TR290006200000000000000888")))
+                .andExpect(jsonPath("$[0].ownerName", is("Fatma Demir")));
+    }
 }

@@ -144,4 +144,9 @@ class GenerateTransferReportUseCaseTest {
             () -> generateTransferReportUseCase.execute(criteria));
         assertEquals("Rapor aralığı en fazla 12 ay olabilir.", exception.getMessage());
     }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenCriteriaIsNull() {
+        assertThrows(NullPointerException.class, () -> generateTransferReportUseCase.execute(null));
+    }
 }

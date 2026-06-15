@@ -87,4 +87,9 @@ class GetTransferHistoryUseCaseTest {
 
         assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
     }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
+        assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
+    }
 }

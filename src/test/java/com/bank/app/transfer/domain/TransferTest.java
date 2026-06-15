@@ -55,5 +55,22 @@ class TransferTest {
         assertThrows(NullPointerException.class, () ->
                 new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, null));
     }
+
+    @Test
+    void shouldCompletePendingTransferSuccessfully() {
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        assertEquals(TransferStatus.PENDING, transfer.getStatus());
+
+        transfer.complete();
+
+        assertEquals(TransferStatus.COMPLETED, transfer.getStatus());
+    }
+
+    @Test
+    void shouldThrowIllegalStateExceptionWhenCompletingNonPendingTransfer() {
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+
+        assertThrows(IllegalStateException.class, transfer::complete);
+    }
 }
 

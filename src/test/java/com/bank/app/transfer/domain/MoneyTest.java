@@ -80,5 +80,24 @@ class MoneyTest {
         assertThrows(CurrencyMismatchException.class, () -> m1.isGreaterThan(m2));
         assertThrows(CurrencyMismatchException.class, () -> m1.isGreaterThanOrEqual(m2));
     }
+
+    @Test
+    void shouldThrowIllegalArgumentExceptionWhenNegative() {
+        assertThrows(IllegalArgumentException.class, () -> new Money(new BigDecimal("-10.00"), Money.Currency.TRY));
+    }
+
+    @Test
+    void shouldCreateMoneyFromBigDecimal() {
+        Money money = Money.of(new BigDecimal("100.00"), Money.Currency.TRY);
+        assertEquals(new BigDecimal("100.00"), money.amount());
+        assertEquals(Money.Currency.TRY, money.currency());
+    }
+
+    @Test
+    void shouldThrowCurrencyMismatchExceptionOnSubtractionOfDifferentCurrencies() {
+        Money m1 = Money.of("100.00", Money.Currency.TRY);
+        Money m2 = Money.of("50.00", Money.Currency.USD);
+        assertThrows(CurrencyMismatchException.class, () -> m1.subtract(m2));
+    }
 }
 

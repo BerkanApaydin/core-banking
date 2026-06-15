@@ -146,4 +146,22 @@ class PlaceTransferUseCaseTest {
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
         verify(accountInternalService, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
+
+    @Test
+    void shouldThrowAccountNotActiveExceptionWhenReceiverIsPassive() {
+        TransferRequest request = new TransferRequest(
+                "TR290006200000000000000111",
+                "TR290006200000000000000222",
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", false); // passive
+
+        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
+        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+
+        assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
+        verify(accountInternalService, never()).debitAndCredit(anyLong(), anyLong(), any());
+    }
 }

@@ -82,4 +82,9 @@ class CancelTransferUseCaseTest {
         assertThrows(IllegalArgumentException.class, () -> cancelTransferUseCase.execute(10L));
         verifyNoInteractions(accountInternalService);
     }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
+        assertThrows(NullPointerException.class, () -> cancelTransferUseCase.execute(null));
+    }
 }

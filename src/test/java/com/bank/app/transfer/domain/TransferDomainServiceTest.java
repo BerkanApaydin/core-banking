@@ -5,6 +5,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.SameAccountTransferException;
+import com.bank.app.common.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -53,6 +54,30 @@ class TransferDomainServiceTest {
                 transferDomainService.execute(account, null, amount));
         assertThrows(NullPointerException.class, () ->
                 transferDomainService.execute(account, account, null));
+    }
+
+    @Test
+    void shouldThrowSameAccountTransferExceptionWhenIdsAreEqualButIbansAreDifferent() {
+        assertThrows(SameAccountTransferException.class, () ->
+                transferDomainService.execute(1L, "TR1", Money.Currency.TRY,
+                        1L, "TR2", Money.Currency.TRY,
+                        Money.of("100.00", Money.Currency.TRY)));
+    }
+
+    @Test
+    void shouldThrowCurrencyMismatchExceptionWhenSenderCurrencyMismatchesAmountCurrency() {
+        assertThrows(CurrencyMismatchException.class, () ->
+                transferDomainService.execute(1L, "TR1", Money.Currency.USD,
+                        2L, "TR2", Money.Currency.TRY,
+                        Money.of("100.00", Money.Currency.TRY)));
+    }
+
+    @Test
+    void shouldThrowCurrencyMismatchExceptionWhenReceiverCurrencyMismatchesAmountCurrency() {
+        assertThrows(CurrencyMismatchException.class, () ->
+                transferDomainService.execute(1L, "TR1", Money.Currency.TRY,
+                        2L, "TR2", Money.Currency.USD,
+                        Money.of("100.00", Money.Currency.TRY)));
     }
 }
 

@@ -173,4 +173,27 @@ class CreateAccountUseCaseTest {
         assertThrows(AccessDeniedException.class, () -> createAccountUseCase.execute(request));
         verify(saveAccountPort, never()).save(any(Account.class));
     }
+
+    @Test
+    void shouldThrowExceptionWhenAccountNotFoundAfterSave() {
+        CreateAccountRequest request = new CreateAccountRequest(
+                100L,
+                "TR290006200000000000000123",
+                "Ali Veli",
+                new BigDecimal("500.00"),
+                Money.Currency.TRY);
+
+        Iban iban = new Iban(request.iban());
+        when(loadAccountPort.findByIban(iban))
+                .thenReturn(Optional.empty()) // Mükerrer IBAN yok
+                .thenReturn(Optional.empty()); // Kayıttan sonra getirme başarısız
+
+        com.bank.app.common.exception.AccountNotFoundException exception = assertThrows(
+                com.bank.app.common.exception.AccountNotFoundException.class,
+                () -> createAccountUseCase.execute(request)
+        );
+
+        assertEquals("Hesap bulunamadı. IBAN: TR290006200000000000000123", exception.getMessage());
+        verify(saveAccountPort).save(any(Account.class));
+    }
 }

@@ -156,4 +156,30 @@ class GetAccountUseCaseTest {
 
         assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
     }
+
+    @Test
+    void shouldGetAllAccountsSuccessfully() {
+        Account account = new Account(
+                1L,
+                100L,
+                new Iban("TR290006200000000000000123"),
+                "Ali Veli",
+                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
+                true);
+
+        when(loadAccountPort.findByUserId(100L)).thenReturn(Collections.singletonList(account));
+
+        java.util.List<AccountResponse> results = getAccountUseCase.getAll();
+
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals("TR290006200000000000000123", results.get(0).iban());
+    }
+
+    @Test
+    void shouldThrowAccessDeniedExceptionWhenNotLoggedInOnGetAll() {
+        SecurityContextHolder.clearContext();
+
+        assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getAll());
+    }
 }

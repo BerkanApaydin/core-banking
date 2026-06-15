@@ -10,6 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 
 import org.springframework.core.env.Environment;
 import static org.mockito.Mockito.*;
@@ -109,6 +110,18 @@ class JwtServiceTest {
         String token = jwtService.generateToken(user);
 
         assertThrows(ExpiredJwtException.class, () -> jwtService.extractUsername(token));
+    }
+
+    @Test
+    void shouldReturnFalseWhenTokenIsExpiredButNoExceptionThrown() {
+        JwtService spyService = spy(jwtService);
+        DummyUserDetails userDetails = new DummyUserDetails("john_doe");
+
+        doReturn("john_doe")
+            .doReturn(new Date(System.currentTimeMillis() - 10000))
+            .when(spyService).extractClaim(eq("expired_token"), any());
+
+        assertFalse(spyService.isTokenValid("expired_token", userDetails));
     }
 
     private static class DummyUserDetails implements UserDetails {

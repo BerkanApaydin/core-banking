@@ -66,4 +66,78 @@ class JpaTransferRepositoryTest {
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
         verify(springDataRepo).save(any(TransferJpaEntity.class));
     }
+
+    @Test
+    void shouldThrowExceptionWhenSaveReturnsNull() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(null);
+
+        assertThrows(IllegalStateException.class, () -> repository.save(domainTransfer));
+    }
+
+    @Test
+    void shouldFindBySenderAccountIdSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+
+        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(java.util.List.of(entity1, entity2));
+
+        var result = repository.findBySenderAccountId(100L);
+
+        assertEquals(2, result.size());
+        assertEquals(100L, result.get(0).getSenderAccountId());
+        assertEquals(100L, result.get(1).getSenderAccountId());
+        verify(springDataRepo).findBySenderAccountId(100L);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindBySenderAccountIdNotFound() {
+        when(springDataRepo.findBySenderAccountId(999L)).thenReturn(java.util.List.of());
+
+        var result = repository.findBySenderAccountId(999L);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findBySenderAccountId(999L);
+    }
+
+    @Test
+    void shouldFindBySenderAccountIdAndCreatedAtBetweenSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(java.util.List.of(entity1, entity2));
+
+        var result = repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
+
+        assertEquals(2, result.size());
+        assertEquals(100L, result.get(0).getSenderAccountId());
+        assertEquals(100L, result.get(1).getSenderAccountId());
+        verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindBySenderAccountIdAndCreatedAtBetweenNotFound() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(999L, start, end)).thenReturn(java.util.List.of());
+
+        var result = repository.findBySenderAccountIdAndCreatedAtBetween(999L, start, end);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetween(999L, start, end);
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void shouldThrowExceptionWhenSavingNullTransfer() {
+        assertThrows(IllegalStateException.class, () -> repository.save(null));
+    }
 }

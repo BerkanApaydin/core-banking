@@ -32,8 +32,9 @@ public class BankApplication {
     }
 
     @Bean
-    @Profile("!prod")
-    public CommandLineRunner initData(SpringDataAccountRepo accountRepo, UserRepository userRepo, PasswordEncoder passwordEncoder) {
+    @Profile("!prod & !test")
+    public CommandLineRunner initData(SpringDataAccountRepo accountRepo, UserRepository userRepo,
+            PasswordEncoder passwordEncoder) {
         return args -> {
             if (userRepo.count() == 0) {
                 log.info("Veritabanı örnek kullanıcı verileriyle tohumlanıyor...");
@@ -41,14 +42,12 @@ public class BankApplication {
                         null,
                         "ahmet",
                         passwordEncoder.encode("ahmet123"),
-                        "ROLE_USER"
-                ));
+                        "ROLE_USER"));
                 userRepo.save(new UserJpaEntity(
                         null,
                         "ayse",
                         passwordEncoder.encode("ayse123"),
-                        "ROLE_USER"
-                ));
+                        "ROLE_USER"));
             }
 
             if (accountRepo.count() == 0) {
@@ -66,8 +65,7 @@ public class BankApplication {
                         "Ahmet Yılmaz",
                         new BigDecimal("1000.00"),
                         "TRY",
-                        true
-                ));
+                        true));
 
                 accountRepo.save(new AccountJpaEntity(
                         null,
@@ -76,8 +74,7 @@ public class BankApplication {
                         "Ayşe Demir",
                         new BigDecimal("500.00"),
                         "TRY",
-                        true
-                ));
+                        true));
 
                 accountRepo.save(new AccountJpaEntity(
                         null,
@@ -86,8 +83,7 @@ public class BankApplication {
                         "Ahmet Yılmaz (Dolar Hesabı)",
                         new BigDecimal("2000.00"),
                         "USD",
-                        true
-                ));
+                        true));
 
                 log.info("Tohumlama tamamlandı.");
             } else {

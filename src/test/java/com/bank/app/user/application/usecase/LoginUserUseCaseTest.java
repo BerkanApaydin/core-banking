@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 
 import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -45,6 +46,8 @@ class LoginUserUseCaseTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         User user = new User(100L, "testuser", "hashed", "ROLE_USER");
 
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(mock(Authentication.class));
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.of(user));
 
         AuthResponse response = loginUserUseCase.execute(request);
@@ -62,6 +65,8 @@ class LoginUserUseCaseTest {
     void shouldThrowExceptionWhenUserNotFound() {
         AuthRequest request = new AuthRequest("testuser", "password");
 
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(mock(Authentication.class));
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> 
