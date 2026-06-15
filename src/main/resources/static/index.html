@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity Bank - Dijital Bankacılık</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Gradients -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <!-- Authentication Container -->
+    <div class="auth-container" id="auth-container">
+        <div class="auth-card glass-panel">
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 40px; height: 40px;">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <div class="logo-text" style="text-align: left;">
+                        <span class="logo-main" style="font-size: 1.5rem;">ANTIGRAVITY</span>
+                        <span class="logo-sub">BANK</span>
+                    </div>
+                </div>
+                <h2 class="auth-title">Hoş Geldiniz</h2>
+                <p class="auth-subtitle">İşlemlerinize devam etmek için lütfen giriş yapın.</p>
+            </div>
+
+            <!-- Auth Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="tab-login-btn">Giriş Yap</button>
+                <button class="auth-tab-btn" id="tab-register-btn">Kayıt Ol</button>
+            </div>
+
+            <!-- Form Wrapper -->
+            <div class="auth-form-wrapper">
+                <!-- Login Form -->
+                <form id="login-form">
+                    <div class="form-group">
+                        <label class="form-label">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="login-username" placeholder="Kullanıcı adınızı girin" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Şifre</label>
+                        <input type="password" class="form-control" id="login-password" placeholder="Şifrenizi girin" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-login-submit">
+                        <span>Giriş Yap</span>
+                        <span class="spinner d-none" id="login-spinner"></span>
+                    </button>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="d-none">
+                    <div class="form-group">
+                        <label class="form-label">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="register-username" placeholder="Yeni kullanıcı adı belirleyin" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Şifre</label>
+                        <input type="password" class="form-control" id="register-password" placeholder="Güçlü bir şifre belirleyin" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-register-submit">
+                        <span>Hesap Oluştur ve Kaydol</span>
+                        <span class="spinner d-none" id="register-spinner"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="app-container d-none" id="app-container">
+        <!-- Navigation Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-main">ANTIGRAVITY</span>
+                    <span class="logo-sub">BANK</span>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-target="accounts-section">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
+                        <rect x="3" y="3" width="7" height="9" rx="1"/>
+                        <rect x="14" y="3" width="7" height="5" rx="1"/>
+                        <rect x="14" y="12" width="7" height="9" rx="1"/>
+                        <rect x="3" y="16" width="7" height="5" rx="1"/>
+                    </svg>
+                    Hesaplarım
+                </button>
+                <button class="nav-item" data-target="transfer-section">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
+                        <path d="M17 3L21 7L17 11M7 21L3 17L7 13"/>
+                        <path d="M3 17H21M21 7H3"/>
+                    </svg>
+                    Para Transferi
+                </button>
+                <button class="nav-item" data-target="reports-section">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                    Analiz & Rapor
+                </button>
+            </nav>
+            <!-- User Profile Area -->
+            <div class="user-profile" id="user-profile-badge">
+                <div class="user-info">
+                    <span class="user-name" id="display-username">Kullanıcı</span>
+                    <span class="user-role">Müşteri</span>
+                </div>
+                <button class="btn-logout" id="btn-logout">Çıkış Yap</button>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <main class="app-main">
+            <!-- Alert Center -->
+            <div id="alert-container" class="alert-container"></div>
+
+            <!-- SECTION 1: ACCOUNTS -->
+            <section id="accounts-section" class="tab-content active">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Hesap Yönetimi</h1>
+                        <p class="section-subtitle">Aktif banka hesaplarınızı görüntüleyin ve yenilerini oluşturun.</p>
+                    </div>
+                    <button class="btn btn-primary btn-add-account" id="open-create-modal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Yeni Hesap Aç
+                    </button>
+                </div>
+
+                <div class="accounts-grid" id="accounts-list">
+                    <!-- Dynamic Account Cards will be loaded here -->
+                    <div class="card card-skeleton"></div>
+                    <div class="card card-skeleton"></div>
+                    <div class="card card-skeleton"></div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: TRANSFER -->
+            <section id="transfer-section" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Para Transferi</h1>
+                        <p class="section-subtitle">Hesaplarınız arasında veya diğer IBAN'lara güvenli ve anında transfer yapın.</p>
+                    </div>
+                </div>
+
+                <div class="transfer-container">
+                    <div class="transfer-card glass-panel">
+                        <form id="transfer-form">
+                            <!-- Sender Selection -->
+                            <div class="form-group">
+                                <label class="form-label">Gönderici Hesap</label>
+                                <div class="custom-select-wrapper">
+                                    <select class="form-control" id="sender-account-select" required>
+                                        <option value="" disabled selected>Gönderici seçin</option>
+                                    </select>
+                                </div>
+                                <div id="sender-balance-indicator" class="balance-indicator"></div>
+                            </div>
+
+                            <!-- Swap Button -->
+                            <div class="transfer-divider">
+                                <button type="button" class="btn-swap" id="btn-swap-accounts" title="Hesapları Değiştir">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8v12M17 20l-4-4M17 20l4-4"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Receiver Selection -->
+                            <div class="form-group">
+                                <label class="form-label">Alıcı Hesap Türü</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="receiver-type" value="registered" checked>
+                                        <span>Kayıtlı Hesap</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="receiver-type" value="manual">
+                                        <span>Manuel IBAN Gir</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="receiver-registered-group">
+                                <label class="form-label">Alıcı Hesap</label>
+                                <div class="custom-select-wrapper">
+                                    <select class="form-control" id="receiver-account-select">
+                                        <option value="" disabled selected>Alıcı seçin</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group d-none" id="receiver-manual-group">
+                                <label class="form-label">Alıcı IBAN</label>
+                                <input type="text" class="form-control" id="receiver-iban-input" placeholder="TR000000000000000000000000" maxlength="26">
+                            </div>
+
+                            <!-- Amount & Currency -->
+                            <div class="form-row">
+                                <div class="form-group col-8">
+                                    <label class="form-label">Tutar</label>
+                                    <input type="number" step="0.01" min="0.01" class="form-control text-right" id="transfer-amount" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group col-4">
+                                    <label class="form-label">Para Birimi</label>
+                                    <select class="form-control" id="transfer-currency" required>
+                                        <option value="TRY">TRY</option>
+                                        <option value="USD">USD</option>
+                                        <option value="EUR">EUR</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Submit button -->
+                            <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-submit-transfer">
+                                <span id="btn-transfer-text">Gönderimi Tamamla</span>
+                                <span class="spinner d-none" id="btn-transfer-spinner"></span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Transfer info card -->
+                    <div class="transfer-info-panel">
+                        <div class="glass-panel info-card">
+                            <h3 class="info-title">İşlem Bilgilendirmesi</h3>
+                            <ul class="info-list">
+                                <li>
+                                    <span class="info-icon">⚡</span>
+                                    <span>Para transferleriniz <strong>FAST</strong> altyapısı ile 7/24 anında gerçekleşir.</span>
+                                </li>
+                                <li>
+                                    <span class="info-icon">🛡️</span>
+                                    <span>Güvenlik standartlarımız gereği, son <strong>24 saat</strong> içerisinde yapılan transferler iptal edilebilir.</span>
+                                </li>
+                                <li>
+                                    <span class="info-icon">💱</span>
+                                    <span>Hesaplar arası transferlerde para birimlerinin uyuşması gerekmektedir.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 3: REPORTS & HISTORY -->
+            <section id="reports-section" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Analiz & Hesap Detayı</h1>
+                        <p class="section-subtitle">Hesap hareketlerinizi inceleyin ve belirli tarihler arasında detaylı rapor üretin.</p>
+                    </div>
+                </div>
+
+                <div class="reports-layout">
+                    <!-- Sidebar Selector -->
+                    <div class="reports-sidebar glass-panel">
+                        <div class="form-group">
+                            <label class="form-label">İncelenecek Hesap</label>
+                            <select class="form-control" id="report-account-select" required>
+                                <option value="" disabled selected>Hesap seçin</option>
+                            </select>
+                        </div>
+
+                        <div class="report-tabs">
+                            <button class="report-tab-btn active" data-tab="history-tab">Hesap Hareketleri</button>
+                            <button class="report-tab-btn" data-tab="generator-tab">Rapor Üretici</button>
+                        </div>
+                    </div>
+
+                    <!-- Main Report Viewer -->
+                    <div class="reports-main glass-panel">
+                        <!-- TAB A: HISTORY -->
+                        <div id="history-tab" class="report-tab-content active">
+                            <div class="tab-header">
+                                <h3 class="tab-title">Son Hesap Hareketleri</h3>
+                            </div>
+                            <div class="history-list" id="transaction-history-list">
+                                <div class="empty-state">
+                                    <span class="empty-icon">📂</span>
+                                    <p>İşlem geçmişini görmek için soldan bir hesap seçin.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB B: GENERATOR -->
+                        <div id="generator-tab" class="report-tab-content">
+                            <div class="tab-header">
+                                <h3 class="tab-title">Tarih Bazlı Rapor Üretimi</h3>
+                            </div>
+
+                            <form id="report-filter-form" class="report-filter-form">
+                                <div class="form-row">
+                                    <div class="form-group col-6">
+                                        <label class="form-label">Başlangıç Tarihi</label>
+                                        <input type="datetime-local" class="form-control" id="report-start-date" required>
+                                    </div>
+                                    <div class="form-group col-6">
+                                        <label class="form-label">Bitiş Tarihi</label>
+                                        <input type="datetime-local" class="form-control" id="report-end-date" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-secondary mt-3">Raporu Oluştur</button>
+                            </form>
+
+                            <!-- Report Results -->
+                            <div id="report-results" class="report-results d-none">
+                                <div class="report-stats">
+                                    <div class="stat-card">
+                                        <span class="stat-label">Toplam İşlem</span>
+                                        <span class="stat-value" id="report-stat-count">0</span>
+                                    </div>
+                                    <div class="stat-card">
+                                        <span class="stat-label">Toplam Hacim</span>
+                                        <span class="stat-value" id="report-stat-volume">0.00 TRY</span>
+                                    </div>
+                                </div>
+
+                                <div class="report-table-wrapper">
+                                    <table class="report-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Tarih</th>
+                                                <th>Açıklama</th>
+                                                <th>Durum</th>
+                                                <th class="text-right">Tutar</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="report-table-body">
+                                            <!-- Dynamically filled -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: CREATE ACCOUNT -->
+    <div class="modal-overlay" id="create-account-modal">
+        <div class="modal-container glass-panel">
+            <div class="modal-header">
+                <h2 class="modal-title">Yeni Hesap Oluştur</h2>
+                <button class="modal-close" id="close-create-modal">&times;</button>
+            </div>
+            <form id="create-account-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Hesap Sahibi Adı</label>
+                        <input type="text" class="form-control" id="acc-owner-name" placeholder="Örn: Ahmet Yılmaz" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">IBAN Numarası</label>
+                        <input type="text" class="form-control" id="acc-iban" placeholder="TR000000000000000000000000" maxlength="26" required>
+                        <small class="form-help">"TR" ile başlayan 26 karakterli bir IBAN numarası girin.</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label class="form-label">Başlangıç Bakiyesi</label>
+                            <input type="number" step="0.01" min="0" class="form-control text-right" id="acc-balance" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label class="form-label">Para Birimi</label>
+                            <select class="form-control" id="acc-currency" required>
+                                <option value="TRY" selected>TRY</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link" id="btn-cancel-create">İptal</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-account">
+                        <span>Hesap Oluştur</span>
+                        <span class="spinner d-none" id="btn-account-spinner"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script loading -->
+    <script src="app.js"></script>
+</body>
+</html>

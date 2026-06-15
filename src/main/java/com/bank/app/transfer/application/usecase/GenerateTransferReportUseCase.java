@@ -1,0 +1,92 @@
+package com.bank.app.transfer.application.usecase;
+
+import com.bank.app.account.application.usecase.AccountInternalService;
+import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.dto.ReportCriteria;
+import com.bank.app.transfer.application.dto.TransferReportResponse;
+import com.bank.app.transfer.application.dto.TransferResponse;
+import com.bank.app.transfer.application.port.LoadTransferPort;
+import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.common.security.SecurityUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+@Service
+@Transactional(readOnly = true)
+public class GenerateTransferReportUseCase {
+
+    private final LoadTransferPort loadTransferPort;
+    private final AccountInternalService accountInternalService;
+    private final SecurityUtils securityUtils;
+
+    public GenerateTransferReportUseCase(LoadTransferPort loadTransferPort, 
+                                         AccountInternalService accountInternalService,
+                                         SecurityUtils securityUtils) {
+        this.loadTransferPort = loadTransferPort;
+        this.accountInternalService = accountInternalService;
+        this.securityUtils = securityUtils;
+    }
+
+    public TransferReportResponse execute(ReportCriteria criteria) {
+        Objects.requireNonNull(criteria, "Criteria null olamaz");
+        Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID null olamaz");
+        LocalDateTime startDate = Objects.requireNonNull(criteria.startDate(), "Start date null olamaz");
+        LocalDateTime endDate = Objects.requireNonNull(criteria.endDate(), "End date null olamaz");
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Başlangıç tarihi bitiş tarihinden sonra olamaz.");
+        }
+        if (startDate.plusMonths(12).isBefore(endDate)) {
+            throw new IllegalArgumentException("Rapor aralığı en fazla 12 ay olabilir.");
+        }
+
+        // Load account metadata through the internal service (decoupled from domain Account entity)
+        AccountInfo account = accountInternalService.getAccountInfo(accountId);
+
+        // Authorization check
+        securityUtils.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
+
+        List<Transfer> transfers = loadTransferPort.findHistoryBetween(
+            accountId,
+            startDate,
+            endDate
+        );
+
+        // Batch load account IBANs to avoid N+1 query problem
+        Set<Long> accountIds = transfers.stream()
+                .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> ibansMap = accountInternalService.getIbansForAccounts(accountIds);
+
+        List<TransferResponse> responseList = transfers.stream()
+            .map(transfer -> TransferResponse.from(
+                    transfer,
+                    ibansMap.get(transfer.getSenderAccountId()),
+                    ibansMap.get(transfer.getReceiverAccountId())
+            ))
+            .collect(Collectors.toList());
+
+        BigDecimal totalVolume = transfers.stream()
+            .map(t -> t.getAmount().amount())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new TransferReportResponse(
+            criteria.accountId(),
+            transfers.size(),
+            totalVolume,
+            account.currency(),
+            responseList
+        );
+    }
+}
