@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antigravity Bank - Dijital Bankacılık</title>
+    <title>X Bank - Dijital Bankacılık</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <!-- Background Gradients -->
     <div class="bg-glow bg-glow-1"></div>
@@ -20,11 +24,12 @@
         <div class="auth-card glass-panel">
             <div class="auth-header">
                 <div class="auth-logo">
-                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 40px; height: 40px;">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        style="width: 40px; height: 40px;">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                     </svg>
                     <div class="logo-text" style="text-align: left;">
-                        <span class="logo-main" style="font-size: 1.5rem;">ANTIGRAVITY</span>
+                        <span class="logo-main" style="font-size: 1.5rem;">X</span>
                         <span class="logo-sub">BANK</span>
                     </div>
                 </div>
@@ -44,11 +49,13 @@
                 <form id="login-form">
                     <div class="form-group">
                         <label class="form-label">Kullanıcı Adı</label>
-                        <input type="text" class="form-control" id="login-username" placeholder="Kullanıcı adınızı girin" required>
+                        <input type="text" class="form-control" id="login-username"
+                            placeholder="Kullanıcı adınızı girin" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Şifre</label>
-                        <input type="password" class="form-control" id="login-password" placeholder="Şifrenizi girin" required>
+                        <input type="password" class="form-control" id="login-password" placeholder="Şifrenizi girin"
+                            required>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-login-submit">
                         <span>Giriş Yap</span>
@@ -60,11 +67,13 @@
                 <form id="register-form" class="d-none">
                     <div class="form-group">
                         <label class="form-label">Kullanıcı Adı</label>
-                        <input type="text" class="form-control" id="register-username" placeholder="Yeni kullanıcı adı belirleyin" required>
+                        <input type="text" class="form-control" id="register-username"
+                            placeholder="Yeni kullanıcı adı belirleyin" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Şifre</label>
-                        <input type="password" class="form-control" id="register-password" placeholder="Güçlü bir şifre belirleyin" required>
+                        <input type="password" class="form-control" id="register-password"
+                            placeholder="Güçlü bir şifre belirleyin" required>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-register-submit">
                         <span>Hesap Oluştur ve Kaydol</span>
@@ -81,37 +90,37 @@
         <header class="app-header">
             <div class="logo-area">
                 <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
                 <div class="logo-text">
-                    <span class="logo-main">ANTIGRAVITY</span>
+                    <span class="logo-main">X</span>
                     <span class="logo-sub">BANK</span>
                 </div>
             </div>
             <nav class="nav-menu">
                 <button class="nav-item active" data-target="accounts-section">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
-                        <rect x="3" y="3" width="7" height="9" rx="1"/>
-                        <rect x="14" y="3" width="7" height="5" rx="1"/>
-                        <rect x="14" y="12" width="7" height="9" rx="1"/>
-                        <rect x="3" y="16" width="7" height="5" rx="1"/>
+                        <rect x="3" y="3" width="7" height="9" rx="1" />
+                        <rect x="14" y="3" width="7" height="5" rx="1" />
+                        <rect x="14" y="12" width="7" height="9" rx="1" />
+                        <rect x="3" y="16" width="7" height="5" rx="1" />
                     </svg>
                     Hesaplarım
                 </button>
                 <button class="nav-item" data-target="transfer-section">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
-                        <path d="M17 3L21 7L17 11M7 21L3 17L7 13"/>
-                        <path d="M3 17H21M21 7H3"/>
+                        <path d="M17 3L21 7L17 11M7 21L3 17L7 13" />
+                        <path d="M3 17H21M21 7H3" />
                     </svg>
                     Para Transferi
                 </button>
                 <button class="nav-item" data-target="reports-section">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                        <polyline points="10 9 9 9 8 9"/>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <polyline points="10 9 9 9 8 9" />
                     </svg>
                     Analiz & Rapor
                 </button>
@@ -140,8 +149,8 @@
                     </div>
                     <button class="btn btn-primary btn-add-account" id="open-create-modal">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                            <line x1="12" y1="5" x2="12" y2="19"/>
-                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
                         Yeni Hesap Aç
                     </button>
@@ -160,7 +169,8 @@
                 <div class="section-header">
                     <div>
                         <h1 class="section-title">Para Transferi</h1>
-                        <p class="section-subtitle">Hesaplarınız arasında veya diğer IBAN'lara güvenli ve anında transfer yapın.</p>
+                        <p class="section-subtitle">Hesaplarınız arasında veya diğer IBAN'lara güvenli ve anında
+                            transfer yapın.</p>
                     </div>
                 </div>
 
@@ -180,9 +190,10 @@
 
                             <!-- Swap Button -->
                             <div class="transfer-divider">
-                                <button type="button" class="btn-swap" id="btn-swap-accounts" title="Hesapları Değiştir">
+                                <button type="button" class="btn-swap" id="btn-swap-accounts"
+                                    title="Hesapları Değiştir">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8v12M17 20l-4-4M17 20l4-4"/>
+                                        <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8v12M17 20l-4-4M17 20l4-4" />
                                     </svg>
                                 </button>
                             </div>
@@ -213,14 +224,16 @@
 
                             <div class="form-group d-none" id="receiver-manual-group">
                                 <label class="form-label">Alıcı IBAN</label>
-                                <input type="text" class="form-control" id="receiver-iban-input" placeholder="TR000000000000000000000000" maxlength="26">
+                                <input type="text" class="form-control" id="receiver-iban-input"
+                                    placeholder="TR000000000000000000000000" maxlength="26">
                             </div>
 
                             <!-- Amount & Currency -->
                             <div class="form-row">
                                 <div class="form-group col-8">
                                     <label class="form-label">Tutar</label>
-                                    <input type="number" step="0.01" min="0.01" class="form-control text-right" id="transfer-amount" placeholder="0.00" required>
+                                    <input type="number" step="0.01" min="0.01" class="form-control text-right"
+                                        id="transfer-amount" placeholder="0.00" required>
                                 </div>
                                 <div class="form-group col-4">
                                     <label class="form-label">Para Birimi</label>
@@ -233,7 +246,8 @@
                             </div>
 
                             <!-- Submit button -->
-                            <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-submit-transfer">
+                            <button type="submit" class="btn btn-primary btn-block btn-large mt-4"
+                                id="btn-submit-transfer">
                                 <span id="btn-transfer-text">Gönderimi Tamamla</span>
                                 <span class="spinner d-none" id="btn-transfer-spinner"></span>
                             </button>
@@ -247,11 +261,13 @@
                             <ul class="info-list">
                                 <li>
                                     <span class="info-icon">⚡</span>
-                                    <span>Para transferleriniz <strong>FAST</strong> altyapısı ile 7/24 anında gerçekleşir.</span>
+                                    <span>Para transferleriniz <strong>FAST</strong> altyapısı ile 7/24 anında
+                                        gerçekleşir.</span>
                                 </li>
                                 <li>
                                     <span class="info-icon">🛡️</span>
-                                    <span>Güvenlik standartlarımız gereği, son <strong>24 saat</strong> içerisinde yapılan transferler iptal edilebilir.</span>
+                                    <span>Güvenlik standartlarımız gereği, son <strong>24 saat</strong> içerisinde
+                                        yapılan transferler iptal edilebilir.</span>
                                 </li>
                                 <li>
                                     <span class="info-icon">💱</span>
@@ -268,7 +284,8 @@
                 <div class="section-header">
                     <div>
                         <h1 class="section-title">Analiz & Hesap Detayı</h1>
-                        <p class="section-subtitle">Hesap hareketlerinizi inceleyin ve belirli tarihler arasında detaylı rapor üretin.</p>
+                        <p class="section-subtitle">Hesap hareketlerinizi inceleyin ve belirli tarihler arasında detaylı
+                            rapor üretin.</p>
                     </div>
                 </div>
 
@@ -313,7 +330,8 @@
                                 <div class="form-row">
                                     <div class="form-group col-6">
                                         <label class="form-label">Başlangıç Tarihi</label>
-                                        <input type="datetime-local" class="form-control" id="report-start-date" required>
+                                        <input type="datetime-local" class="form-control" id="report-start-date"
+                                            required>
                                     </div>
                                     <div class="form-group col-6">
                                         <label class="form-label">Bitiş Tarihi</label>
@@ -370,17 +388,20 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label class="form-label">Hesap Sahibi Adı</label>
-                        <input type="text" class="form-control" id="acc-owner-name" placeholder="Örn: Ahmet Yılmaz" required>
+                        <input type="text" class="form-control" id="acc-owner-name" placeholder="Örn: Ahmet Yılmaz"
+                            required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">IBAN Numarası</label>
-                        <input type="text" class="form-control" id="acc-iban" placeholder="TR000000000000000000000000" maxlength="26" required>
+                        <input type="text" class="form-control" id="acc-iban" placeholder="TR000000000000000000000000"
+                            maxlength="26" required>
                         <small class="form-help">"TR" ile başlayan 26 karakterli bir IBAN numarası girin.</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group col-6">
                             <label class="form-label">Başlangıç Bakiyesi</label>
-                            <input type="number" step="0.01" min="0" class="form-control text-right" id="acc-balance" placeholder="0.00" required>
+                            <input type="number" step="0.01" min="0" class="form-control text-right" id="acc-balance"
+                                placeholder="0.00" required>
                         </div>
                         <div class="form-group col-6">
                             <label class="form-label">Para Birimi</label>
@@ -406,4 +427,5 @@
     <!-- Script loading -->
     <script src="app.js"></script>
 </body>
+
 </html>

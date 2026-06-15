@@ -26,7 +26,7 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${app.security.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}")
+    @Value("${app.security.cors.allowed-origins}")
     private List<String> allowedOrigins;
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -46,7 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/", "/index.html", "/app.js", "/style.css", "/favicon.ico",
                                 "/api/v1/auth/**",
-                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
+                                "/actuator/health/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

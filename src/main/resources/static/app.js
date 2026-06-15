@@ -28,14 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function showAlert(message, type = 'success') {
     const alert = document.createElement('div');
     alert.className = `alert alert-${type}`;
-    
+
     alert.innerHTML = `
         <span>${escapeHtml(message)}</span>
         <button class="alert-close">&times;</button>
     `;
-    
+
     alertContainer.appendChild(alert);
-    
+
     // Auto dismiss after 5s
     const timeout = setTimeout(() => {
         alert.style.opacity = '0';
@@ -43,7 +43,7 @@ function showAlert(message, type = 'success') {
         alert.style.transition = 'all 0.5s ease-out';
         setTimeout(() => alert.remove(), 500);
     }, 5000);
-    
+
     alert.querySelector('.alert-close').addEventListener('click', () => {
         clearTimeout(timeout);
         alert.remove();
@@ -76,9 +76,9 @@ function switchTab(tabId) {
             content.classList.remove('active');
         }
     });
-    
+
     activeTab = tabId;
-    
+
     // Special reload operations on tab switch
     if (tabId === 'accounts-section') {
         loadAccounts();
@@ -103,12 +103,12 @@ async function fetchApi(endpoint, options = {}) {
             ...options,
             headers
         });
-        
+
         if (response.status === 401) {
             logout();
             throw new Error('Oturum süreniz doldu, lütfen tekrar giriş yapın.');
         }
-        
+
         const text = await response.text();
         let data = null;
         if (text) {
@@ -134,11 +134,11 @@ async function fetchApi(endpoint, options = {}) {
 // --- Accounts Operations ---
 async function loadAccounts() {
     const listElement = document.getElementById('accounts-list');
-    
+
     try {
         accounts = await fetchApi('/accounts');
         listElement.innerHTML = '';
-        
+
         if (accounts.length === 0) {
             listElement.innerHTML = `
                 <div class="empty-state" style="grid-column: 1 / -1;">
@@ -148,15 +148,15 @@ async function loadAccounts() {
             `;
             return;
         }
-        
+
         accounts.forEach(acc => {
             const card = document.createElement('div');
             card.className = `card ${acc.active ? 'card-active' : 'card-inactive'}`;
-            
+
             card.innerHTML = `
                 <div class="card-header">
                     <div class="card-bank-info">
-                        <span class="card-bank-name">ANTIGRAVITY RETAIL</span>
+                        <span class="card-bank-name">X BANK RETAIL</span>
                         <span class="card-owner">${escapeHtml(acc.ownerName)}</span>
                     </div>
                     <div class="card-chip"></div>
@@ -175,7 +175,7 @@ async function loadAccounts() {
                     </span>
                 </div>
             `;
-            
+
             // Add click action to view history
             card.addEventListener('click', () => {
                 switchTab('reports-section');
@@ -183,7 +183,7 @@ async function loadAccounts() {
                 select.value = acc.id;
                 select.dispatchEvent(new Event('change'));
             });
-            
+
             listElement.appendChild(card);
         });
     } catch (err) {
@@ -219,7 +219,7 @@ function initModal() {
     openBtn.addEventListener('click', openModal);
     closeBtn.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
-    
+
     // Close modal if clicked overlay
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
@@ -240,7 +240,7 @@ function initModal() {
     // Handle Form Submit
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const ownerName = document.getElementById('acc-owner-name').value.trim();
         const iban = document.getElementById('acc-iban').value.trim();
         const balance = parseFloat(document.getElementById('acc-balance').value);
@@ -278,23 +278,23 @@ function populateTransferDropdowns() {
     const receiverSelect = document.getElementById('receiver-account-select');
     const currencySelect = document.getElementById('transfer-currency');
     const balanceIndicator = document.getElementById('sender-balance-indicator');
-    
+
     const prevSender = senderSelect.value;
     const prevReceiver = receiverSelect.value;
 
     senderSelect.innerHTML = '<option value="" disabled selected>Gönderici seçin</option>';
     receiverSelect.innerHTML = '<option value="" disabled selected>Alıcı seçin</option>';
-    
+
     const activeAccounts = accounts.filter(a => a.active);
-    
+
     activeAccounts.forEach(acc => {
         const optionContent = `${acc.ownerName} - ${formatIbanDisplay(acc.iban)} (${formatMoney(acc.balance)} ${acc.currency})`;
-        
+
         const optSender = document.createElement('option');
         optSender.value = acc.id;
         optSender.textContent = optionContent;
         senderSelect.appendChild(optSender);
-        
+
         const optReceiver = document.createElement('option');
         optReceiver.value = acc.id;
         optReceiver.textContent = optionContent;
@@ -318,7 +318,7 @@ function updateSenderBalance() {
     const select = document.getElementById('sender-account-select');
     const indicator = document.getElementById('sender-balance-indicator');
     const currencySelect = document.getElementById('transfer-currency');
-    
+
     const selectedAcc = accounts.find(a => a.id == select.value);
     if (selectedAcc) {
         indicator.textContent = `Limit: ${formatMoney(selectedAcc.balance)} ${selectedAcc.currency}`;
@@ -374,7 +374,7 @@ function initTransferForm() {
     swapBtn.addEventListener('click', () => {
         const temp = senderSelect.value;
         const receiverType = document.querySelector('input[name="receiver-type"]:checked').value;
-        
+
         if (receiverType === 'registered' && receiverSelect.value) {
             senderSelect.value = receiverSelect.value;
             receiverSelect.value = temp;
@@ -387,7 +387,7 @@ function initTransferForm() {
     // Form submission
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const senderId = senderSelect.value;
         const receiverType = document.querySelector('input[name="receiver-type"]:checked').value;
         const amount = parseFloat(document.getElementById('transfer-amount').value);
@@ -454,7 +454,7 @@ function initTransferForm() {
             form.reset();
             transferIdempotencyKey = crypto.randomUUID();
             document.getElementById('sender-balance-indicator').textContent = '';
-            
+
             // Reload accounts in background
             await loadAccounts();
         } catch (err) {
@@ -470,9 +470,9 @@ function initTransferForm() {
 function populateReportDropdown() {
     const reportSelect = document.getElementById('report-account-select');
     const prevVal = reportSelect.value;
-    
+
     reportSelect.innerHTML = '<option value="" disabled selected>Hesap seçin</option>';
-    
+
     accounts.forEach(acc => {
         const option = document.createElement('option');
         option.value = acc.id;
@@ -491,12 +491,12 @@ function initReportSection() {
     const tabBtns = document.querySelectorAll('.report-tab-btn');
     const tabContents = document.querySelectorAll('.report-tab-content');
     const reportFilterForm = document.getElementById('report-filter-form');
-    
+
     // Set default dates for report filters (last 30 days)
     const now = new Date();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(now.getDate() - 30);
-    
+
     document.getElementById('report-start-date').value = formatDateTimeLocal(thirtyDaysAgo);
     document.getElementById('report-end-date').value = formatDateTimeLocal(now);
 
@@ -511,7 +511,7 @@ function initReportSection() {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
+
             const target = btn.getAttribute('data-tab');
             tabContents.forEach(content => {
                 if (content.id === target) {
@@ -568,16 +568,16 @@ async function loadAccountHistory(accountId) {
         transfers.forEach(t => {
             const isOutgoing = t.senderIban === selectedAcc.iban;
             const isCancelled = t.status === 'CANCELLED';
-            
+
             const item = document.createElement('div');
             item.className = 'history-item';
-            
+
             // Icon Class
             let badgeClass = '';
             let badgeIcon = '';
             let amountClass = '';
             let prefix = '';
-            
+
             if (isCancelled) {
                 badgeClass = 'badge-cancelled-icon';
                 badgeIcon = '✖';
@@ -614,7 +614,7 @@ async function loadAccountHistory(accountId) {
                     ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">İptal Et</button>` : ''}
                 </div>
             `;
-            
+
             historyList.appendChild(item);
         });
     } catch (err) {
@@ -629,7 +629,7 @@ async function loadAccountHistory(accountId) {
 }
 
 // Exposed to global window scope so it can be called from dynamic HTML
-window.cancelTransfer = async function(transferId, accountId) {
+window.cancelTransfer = async function (transferId, accountId) {
     if (!confirm('Bu transfer işlemini iptal etmek ve parayı iade etmek istediğinize emin misiniz?')) {
         return;
     }
@@ -637,7 +637,7 @@ window.cancelTransfer = async function(transferId, accountId) {
     try {
         await fetchApi(`/transfers/${transferId}/cancel`, { method: 'POST' });
         showAlert('Para transferi başarıyla iptal edildi ve bakiyeler güncellendi.');
-        
+
         // Reload all data
         await loadAccounts();
         loadAccountHistory(accountId);
@@ -667,12 +667,12 @@ function renderReportResults(report) {
     } else {
         report.transfers.forEach(t => {
             const tr = document.createElement('tr');
-            
+
             const isCancelled = t.status === 'CANCELLED';
             const statusBadge = `<span class="card-status-badge ${isCancelled ? 'badge-inactive' : 'badge-active'}">
                 ${isCancelled ? 'İPTAL' : 'TAMAMLANDI'}
             </span>`;
-            
+
             tr.innerHTML = `
                 <td>${formatDate(t.createdAt)}</td>
                 <td>Gönderen ID: ${t.senderAccountId} &rarr; Alıcı ID: ${t.receiverAccountId}</td>
@@ -709,12 +709,12 @@ function formatIbanDisplay(iban) {
 
 function formatDate(dateString) {
     const d = new Date(dateString);
-    return d.toLocaleString('tr-TR', { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    return d.toLocaleString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
     });
 }
 
@@ -841,17 +841,17 @@ function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('username');
-    
+
     // Reset all forms
     document.getElementById('login-form').reset();
     document.getElementById('register-form').reset();
     document.getElementById('transfer-form').reset();
     document.getElementById('report-filter-form').reset();
     document.getElementById('create-account-form').reset();
-    
+
     // Close modal if open
     document.getElementById('create-account-modal').classList.remove('active');
-    
+
     // Reset dynamic UI lists & indicators
     document.getElementById('accounts-list').innerHTML = '';
     document.getElementById('transaction-history-list').innerHTML = '';
@@ -860,9 +860,9 @@ function logout() {
     document.getElementById('sender-account-select').innerHTML = '<option value="" disabled selected>Gönderici seçin</option>';
     document.getElementById('receiver-account-select').innerHTML = '<option value="" disabled selected>Alıcı seçin</option>';
     document.getElementById('report-account-select').innerHTML = '<option value="" disabled selected>Hesap seçin</option>';
-    
+
     // Reset active tab variable
     activeTab = 'accounts-section';
-    
+
     checkAuthStatus();
 }
