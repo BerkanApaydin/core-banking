@@ -11,6 +11,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
+import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Optional;
 
@@ -29,9 +30,12 @@ class LoginUserUseCaseTest {
     @BeforeEach
     void setUp() {
         authenticationManager = mock(AuthenticationManager.class);
-        jwtService = new JwtService();
+        Environment environment = mock(Environment.class);
+        when(environment.getActiveProfiles()).thenReturn(new String[]{});
+        jwtService = new JwtService(environment);
         ReflectionTestUtils.setField(jwtService, "secretKey", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L);
+        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
         loadUserPort = mock(LoadUserPort.class);
         loginUserUseCase = new LoginUserUseCase(authenticationManager, jwtService, loadUserPort);
     }

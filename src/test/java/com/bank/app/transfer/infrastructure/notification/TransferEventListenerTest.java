@@ -3,7 +3,7 @@ package com.bank.app.transfer.infrastructure.notification;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.SendNotificationPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ class TransferEventListenerTest {
         TransferEventListener listener = new TransferEventListener(List.of(notificationPort));
 
         Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
 
         listener.handleTransferCompleted(event);
 

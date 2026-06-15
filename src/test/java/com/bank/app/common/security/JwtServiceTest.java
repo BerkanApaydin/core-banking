@@ -11,19 +11,52 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.springframework.core.env.Environment;
+import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
 class JwtServiceTest {
 
     private JwtService jwtService;
+    private Environment environment;
     private final String defaultSecretKey = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
+        environment = mock(Environment.class);
+        when(environment.getActiveProfiles()).thenReturn(new String[]{});
+        jwtService = new JwtService(environment);
         ReflectionTestUtils.setField(jwtService, "secretKey", defaultSecretKey);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L); // 24 hours
+        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDefaultSecretAndProdProfile() {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
+        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+        assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDefaultSecretAndAllowDefaultSecretFalse() {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", false);
+        assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+    }
+
+    @Test
+    void shouldNotThrowExceptionWhenDefaultSecretAndAllowDefaultSecretTrueAndNotProd() {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+        assertDoesNotThrow(() -> jwtService.validateSecret());
+    }
+
+    @Test
+    void shouldNotThrowExceptionWhenCustomSecret() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
+        assertDoesNotThrow(() -> jwtService.validateSecret());
     }
 
     @Test

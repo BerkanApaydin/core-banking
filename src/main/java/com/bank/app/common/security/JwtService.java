@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.io.Decoders;
+import org.springframework.core.env.Environment;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,11 +30,18 @@ public class JwtService {
     @Value("${jwt.allow-default-secret:false}")
     private boolean allowDefaultSecret;
 
+    private final Environment environment;
+
+    public JwtService(Environment environment) {
+        this.environment = environment;
+    }
+
     @PostConstruct
     public void validateSecret() {
         String defaultSecret = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
-        if (defaultSecret.equals(secretKey) && !allowDefaultSecret) {
-            throw new IllegalStateException("Default JWT secret is not allowed in this environment. Please configure a secure JWT secret key.");
+        boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
+        if (defaultSecret.equals(secretKey) && (isProd || !allowDefaultSecret)) {
+            throw new IllegalStateException("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.");
         }
     }
 

@@ -1,13 +1,11 @@
 package com.bank.app.transfer.infrastructure.notification;
 
 import com.bank.app.transfer.application.port.SendNotificationPort;
-import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
@@ -21,9 +19,8 @@ public class TransferEventListener {
         this.notificationPorts = notificationPorts;
     }
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleTransferCompleted(TransferCompletedEvent event) {
+    @EventListener
+    public void handleTransferCompleted(AsyncTransferCompletedEvent event) {
         for (SendNotificationPort port : notificationPorts) {
             try {
                 port.notifyTransferCompleted(event.getTransfer());
