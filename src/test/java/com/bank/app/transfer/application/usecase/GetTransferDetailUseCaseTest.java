@@ -1,10 +1,10 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.exception.TransferNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -24,16 +24,16 @@ import static org.mockito.Mockito.*;
 class GetTransferDetailUseCaseTest {
 
     private LoadTransferPort loadTransferPort;
-    private AccountInternalService accountInternalService;
-    private SecurityUtils securityUtils;
+    private AccountOperationsPort accountOperationsPort;
+    private SecurityContextPort securityContextPort;
     private GetTransferDetailUseCase getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
         loadTransferPort = mock(LoadTransferPort.class);
-        accountInternalService = mock(AccountInternalService.class);
-        securityUtils = mock(SecurityUtils.class);
-        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountInternalService, securityUtils);
+        accountOperationsPort = mock(AccountOperationsPort.class);
+        securityContextPort = mock(SecurityContextPort.class);
+        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountOperationsPort, securityContextPort);
     }
 
     @Test
@@ -55,10 +55,10 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountInternalService.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(100L));
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
 
         TransferDetailResponse response = getTransferDetailUseCase.execute(transferId);
 
@@ -90,10 +90,10 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountInternalService.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(200L));
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(200L));
 
         TransferDetailResponse response = getTransferDetailUseCase.execute(transferId);
 
@@ -125,10 +125,10 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountInternalService.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(300L));
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Bu transferin detaylarını görme yetkiniz yok.", exception.getMessage());
@@ -158,7 +158,7 @@ class GetTransferDetailUseCaseTest {
         );
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
 
         assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
     }
@@ -181,8 +181,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountInternalService.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
 
         assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
     }
@@ -206,10 +206,10 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountInternalService.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountInternalService.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityUtils.getCurrentUserId()).thenReturn(Optional.empty());
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
     }

@@ -1,13 +1,14 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,17 +29,17 @@ import static org.mockito.Mockito.*;
 class GetTransferHistoryUseCaseTest {
 
     private LoadTransferPort loadTransferPort;
-    private AccountInternalService accountInternalService;
-    private SecurityUtils securityUtils;
+    private AccountOperationsPort accountOperationsPort;
+    private SecurityContextPort securityContextPort;
     private GetTransferHistoryUseCase getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
         loadTransferPort = mock(LoadTransferPort.class);
-        accountInternalService = mock(AccountInternalService.class);
-        securityUtils = new SecurityUtils();
-        getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountInternalService,
-                securityUtils);
+        accountOperationsPort = mock(AccountOperationsPort.class);
+        securityContextPort = new SecurityUtils();
+        getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationsPort,
+                securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
@@ -58,8 +59,8 @@ class GetTransferHistoryUseCaseTest {
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
-        when(accountInternalService.getAccountInfo(1L)).thenReturn(account);
-        when(accountInternalService.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
@@ -83,7 +84,7 @@ class GetTransferHistoryUseCaseTest {
                 Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        when(accountInternalService.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
 
         assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
     }

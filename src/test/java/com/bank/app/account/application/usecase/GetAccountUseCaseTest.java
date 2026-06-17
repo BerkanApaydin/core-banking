@@ -7,6 +7,7 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,14 +26,14 @@ import static org.mockito.Mockito.*;
 class GetAccountUseCaseTest {
 
     private LoadAccountPort loadAccountPort;
-    private SecurityUtils securityUtils;
+    private SecurityContextPort securityContextPort;
     private GetAccountUseCase getAccountUseCase;
 
     @BeforeEach
     void setUp() {
         loadAccountPort = mock(LoadAccountPort.class);
-        securityUtils = new SecurityUtils();
-        getAccountUseCase = new GetAccountUseCase(loadAccountPort, securityUtils);
+        securityContextPort = new SecurityUtils();
+        getAccountUseCase = new GetAccountUseCase(loadAccountPort, securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());

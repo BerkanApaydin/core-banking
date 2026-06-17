@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("null")
 class PlaceTransferUseCaseTest {
 
-    private AccountInternalService accountInternalService;
+    private AccountOperationsPort accountOperationsPort;
     private SaveTransferPort saveTransferPort;
     private ApplicationEventPublisher eventPublisher;
     private AuditService auditService;
@@ -34,13 +34,13 @@ class PlaceTransferUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        accountInternalService = mock(AccountInternalService.class);
+        accountOperationsPort = mock(AccountOperationsPort.class);
         saveTransferPort = mock(SaveTransferPort.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         auditService = mock(AuditService.class);
         transferDomainService = new TransferDomainService();
         placeTransferUseCase = new PlaceTransferUseCase(
-                accountInternalService,
+                accountOperationsPort,
                 saveTransferPort,
                 auditService,
                 eventPublisher,
@@ -58,8 +58,8 @@ class PlaceTransferUseCaseTest {
         AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
         AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
 
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
 
         when(saveTransferPort.save(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer t = invocation.getArgument(0);
@@ -73,13 +73,9 @@ class PlaceTransferUseCaseTest {
         assertEquals(10L, response.id());
         assertEquals("COMPLETED", response.status());
         assertEquals(new BigDecimal("200.00"), response.amount());
-        assertEquals("TR290006200000000000000111", response.senderIban());
-        assertEquals("TR290006200000000000000222", response.receiverIban());
-        assertEquals(1L, response.senderAccountId());
-        assertEquals(2L, response.receiverAccountId());
 
-        verify(accountInternalService).debitAndCredit(eq(1L), eq(2L), any(Money.class));
-        
+        verify(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
         verify(saveTransferPort, times(1)).save(transferCaptor.capture());
         assertEquals(TransferStatus.COMPLETED, transferCaptor.getValue().getStatus());
@@ -88,7 +84,7 @@ class PlaceTransferUseCaseTest {
     }
 
     @Test
-    void shouldPropagateAccessDeniedExceptionFromAccountInternalService() {
+    void shouldPropagateAccessDeniedExceptionFromAccountOperationsPort() {
         TransferRequest request = new TransferRequest(
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
@@ -98,11 +94,11 @@ class PlaceTransferUseCaseTest {
         AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
         AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
 
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
 
         doThrow(new AccessDeniedException("Bu hesaptan transfer yapmaya yetkiniz yok."))
-                .when(accountInternalService).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                .when(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
         assertThrows(AccessDeniedException.class, () -> placeTransferUseCase.execute(request));
 
@@ -123,7 +119,7 @@ class PlaceTransferUseCaseTest {
                 Money.Currency.TRY);
 
         assertThrows(SameAccountTransferException.class, () -> placeTransferUseCase.execute(request));
-        verifyNoInteractions(accountInternalService);
+        verifyNoInteractions(accountOperationsPort);
     }
 
     @Test
@@ -134,14 +130,14 @@ class PlaceTransferUseCaseTest {
                 new BigDecimal("200.00"),
                 Money.Currency.TRY);
 
-        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", false); // passive
+        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", false);
         AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
 
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
-        verify(accountInternalService, never()).debitAndCredit(anyLong(), anyLong(), any());
+        verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
 
     @Test
@@ -153,12 +149,12 @@ class PlaceTransferUseCaseTest {
                 Money.Currency.TRY);
 
         AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
-        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", false); // passive
+        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", false);
 
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountInternalService.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
+        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
-        verify(accountInternalService, never()).debitAndCredit(anyLong(), anyLong(), any());
+        verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
 }

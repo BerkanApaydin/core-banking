@@ -23,7 +23,7 @@ public class TransferEventListener {
     public void handleTransferCompleted(AsyncTransferCompletedEvent event) {
         for (SendNotificationPort port : notificationPorts) {
             try {
-                port.notifyTransferCompleted(event.getTransfer());
+                port.notifyTransferCompleted(event.transfer());
             } catch (Exception e) {
                 log.error("Failed to send notification via {}", port.getClass().getSimpleName(), e);
             }

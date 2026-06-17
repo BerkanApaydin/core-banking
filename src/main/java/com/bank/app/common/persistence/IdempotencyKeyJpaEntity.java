@@ -20,15 +20,23 @@ public class IdempotencyKeyJpaEntity {
     @Column(name = "response_body", length = 10000)
     private String responseBody;
 
+    @Column(name = "response_status")
+    private Integer responseStatus;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     public IdempotencyKeyJpaEntity() {}
 
     public IdempotencyKeyJpaEntity(String key, String status, String responseBody, LocalDateTime createdAt) {
+        this(key, status, responseBody, null, createdAt);
+    }
+
+    public IdempotencyKeyJpaEntity(String key, String status, String responseBody, Integer responseStatus, LocalDateTime createdAt) {
         this.key = key;
         this.status = status;
         this.responseBody = responseBody;
+        this.responseStatus = responseStatus;
         this.createdAt = createdAt;
     }
 
@@ -54,6 +62,14 @@ public class IdempotencyKeyJpaEntity {
 
     public void setResponseBody(String responseBody) {
         this.responseBody = responseBody;
+    }
+
+    public Integer getResponseStatus() {
+        return responseStatus;
+    }
+
+    public void setResponseStatus(Integer responseStatus) {
+        this.responseStatus = responseStatus;
     }
 
     public LocalDateTime getCreatedAt() {

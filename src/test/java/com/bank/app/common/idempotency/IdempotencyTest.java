@@ -129,10 +129,11 @@ class IdempotencyTest {
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
 
-        manager.completeRequest("key-1", "success-response");
+        manager.completeRequest("key-1", "success-response", 201);
 
         assertEquals("COMPLETED", entity.getStatus());
         assertEquals("success-response", entity.getResponseBody());
+        assertEquals(201, entity.getResponseStatus());
         verify(repo).save(entity);
     }
 

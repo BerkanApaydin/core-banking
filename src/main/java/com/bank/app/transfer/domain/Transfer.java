@@ -3,18 +3,17 @@ package com.bank.app.transfer.domain;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.exception.TransferAlreadyCancelledException;
 import com.bank.app.common.exception.TransferNotCancellableException;
-import org.springframework.lang.NonNull;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class Transfer {
 
     private final Long id;
-    @NonNull private final Long senderAccountId;
-    @NonNull private final Long receiverAccountId;
-    @NonNull private final Money amount;
-    @NonNull private TransferStatus status;
-    @NonNull private final LocalDateTime createdAt;
+    private final Long senderAccountId;
+    private final Long receiverAccountId;
+    private final Money amount;
+    private TransferStatus status;
+    private final LocalDateTime createdAt;
     private final Long version;
 
     public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
@@ -46,27 +45,22 @@ public class Transfer {
         return id;
     }
 
-    @NonNull
     public Long getSenderAccountId() {
         return senderAccountId;
     }
 
-    @NonNull
     public Long getReceiverAccountId() {
         return receiverAccountId;
     }
 
-    @NonNull
     public Money getAmount() {
         return amount;
     }
 
-    @NonNull
     public TransferStatus getStatus() {
         return status;
     }
 
-    @NonNull
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }

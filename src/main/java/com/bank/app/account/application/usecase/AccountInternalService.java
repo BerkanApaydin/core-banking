@@ -6,7 +6,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.exception.AccountNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,23 +22,20 @@ public class AccountInternalService {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final SecurityUtils securityUtils;
+    private final SecurityContextPort securityContextPort;
 
-    public AccountInternalService(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, SecurityUtils securityUtils) {
+    public AccountInternalService(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
+                                  SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.securityUtils = securityUtils;
+        this.securityContextPort = securityContextPort;
     }
 
     @Transactional(readOnly = true)
     public AccountInfo getAccountInfo(@NonNull Long accountId) {
         Account account = loadAccountPort.findById(accountId)
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
-        return new AccountInfo(
-                Objects.requireNonNull(account.getId()),
-                Objects.requireNonNull(account.getUserId()),
-                Objects.requireNonNull(account.getBalance().currency().name()),
-                account.isActive());
+        return toAccountInfo(account);
     }
 
     @Transactional(readOnly = true)
@@ -46,11 +43,7 @@ public class AccountInternalService {
         Iban iban = new Iban(ibanValue);
         Account account = loadAccountPort.findByIban(iban)
                 .orElseThrow(() -> new AccountNotFoundException(ibanValue));
-        return new AccountInfo(
-                Objects.requireNonNull(account.getId()),
-                Objects.requireNonNull(account.getUserId()),
-                Objects.requireNonNull(account.getBalance().currency().name()),
-                account.isActive());
+        return toAccountInfo(account);
     }
 
     @Transactional(readOnly = true)
@@ -67,8 +60,7 @@ public class AccountInternalService {
         Account sender = locked.sender();
         Account receiver = locked.receiver();
 
-        // Authorization check on sender account
-        securityUtils.checkUserAuthorization(sender.getUserId(), "Bu hesaptan transfer yapmaya yetkiniz yok.");
+        securityContextPort.checkUserAuthorization(sender.getUserId(), "Bu hesaptan transfer yapmaya yetkiniz yok.");
 
         sender.debit(amount);
         receiver.credit(amount);
@@ -83,14 +75,21 @@ public class AccountInternalService {
         Account sender = locked.sender();
         Account receiver = locked.receiver();
 
-        // Authorization check on sender account (since original sender cancels)
-        securityUtils.checkUserAuthorization(sender.getUserId(), "Bu transferi iptal etmeye yetkiniz yok.");
+        securityContextPort.checkUserAuthorization(sender.getUserId(), "Bu transferi iptal etmeye yetkiniz yok.");
 
         sender.credit(amount);
         receiver.debit(amount);
 
         saveAccountPort.save(sender);
         saveAccountPort.save(receiver);
+    }
+
+    private AccountInfo toAccountInfo(Account account) {
+        return new AccountInfo(
+                Objects.requireNonNull(account.getId()),
+                Objects.requireNonNull(account.getUserId()),
+                Objects.requireNonNull(account.getBalance().currency().name()),
+                account.isActive());
     }
 
     private LockedAccounts loadAccountsWithLockOrdered(@NonNull Long senderId, @NonNull Long receiverId) {

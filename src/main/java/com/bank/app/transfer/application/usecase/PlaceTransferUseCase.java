@@ -1,7 +1,5 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
@@ -9,16 +7,18 @@ import com.bank.app.common.exception.AccountNotActiveException;
 import com.bank.app.common.exception.SameAccountTransferException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferDomainService;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -26,18 +26,18 @@ import java.util.Objects;
 @Transactional
 public class PlaceTransferUseCase {
 
-    private final AccountInternalService accountInternalService;
+    private final AccountOperationsPort accountOperationsPort;
     private final SaveTransferPort saveTransferPort;
     private final AuditService auditService;
     private final ApplicationEventPublisher eventPublisher;
     private final TransferDomainService transferDomainService;
 
-    public PlaceTransferUseCase(AccountInternalService accountInternalService,
+    public PlaceTransferUseCase(AccountOperationsPort accountOperationsPort,
             SaveTransferPort saveTransferPort,
             AuditService auditService,
             ApplicationEventPublisher eventPublisher,
             TransferDomainService transferDomainService) {
-        this.accountInternalService = accountInternalService;
+        this.accountOperationsPort = accountOperationsPort;
         this.saveTransferPort = saveTransferPort;
         this.auditService = auditService;
         this.eventPublisher = eventPublisher;
@@ -56,24 +56,21 @@ public class PlaceTransferUseCase {
             throw new SameAccountTransferException(request.senderIban());
         }
 
-        // Fetch account basic info without lock first
-        AccountInfo senderInfo = accountInternalService.getAccountInfoForTransfer(request.senderIban());
-        AccountInfo receiverInfo = accountInternalService.getAccountInfoForTransfer(request.receiverIban());
+        AccountInfo senderInfo = accountOperationsPort.getAccountInfoForTransfer(request.senderIban());
+        AccountInfo receiverInfo = accountOperationsPort.getAccountInfoForTransfer(request.receiverIban());
 
         validateAccountsActive(senderInfo, receiverInfo, request.senderIban(), request.receiverIban());
 
         Money amount = new Money(request.amount(), request.currency());
 
-        // Perform balance updates and locking inside Account module FIRST
-        accountInternalService.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        // Domain kuralları bakiye hareketinden önce doğrulanır (fail-fast)
+        Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, request.senderIban(),
+                request.receiverIban(), amount);
 
-        // Validate transfer domain rules and create the Transfer aggregate root
-        Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, request.senderIban(), request.receiverIban(), amount);
+        accountOperationsPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-        // Complete the transfer
         transfer.complete();
 
-        // Save only once as COMPLETED
         Transfer completedTransfer = saveTransferPort.save(transfer);
 
         logAuditAndPublishEvent(completedTransfer, request.senderIban(), request.receiverIban());
@@ -90,7 +87,8 @@ public class PlaceTransferUseCase {
         }
     }
 
-    private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban, String receiverIban, Money amount) {
+    private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,
+            String receiverIban, Money amount) {
         return transferDomainService.execute(
                 sender.id(),
                 senderIban,
@@ -98,12 +96,10 @@ public class PlaceTransferUseCase {
                 receiver.id(),
                 receiverIban,
                 Money.Currency.valueOf(receiver.currency()),
-                amount
-        );
+                amount);
     }
 
     private void logAuditAndPublishEvent(Transfer savedTransfer, String senderIban, String receiverIban) {
-        // Audit log
         auditService.log(
                 AuditAction.TRANSFER_EXECUTED,
                 String.format(
@@ -111,7 +107,6 @@ public class PlaceTransferUseCase {
                         savedTransfer.getId(), senderIban, receiverIban,
                         savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
 
-        // Publish event to decouple notification sending
         eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
     }
 }

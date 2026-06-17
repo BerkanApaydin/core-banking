@@ -11,7 +11,7 @@ import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.exception.DuplicateIbanException;
 import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
@@ -23,20 +23,20 @@ public class CreateAccountUseCase {
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
     private final AuditService auditService;
-    private final SecurityUtils securityUtils;
+    private final SecurityContextPort securityContextPort;
 
-    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, AuditService auditService, SecurityUtils securityUtils) {
+    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, AuditService auditService, SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.auditService = auditService;
-        this.securityUtils = securityUtils;
+        this.securityContextPort = securityContextPort;
     }
 
     public AccountResponse execute(CreateAccountRequest request) {
         Objects.requireNonNull(request, "Request null olamaz");
         
         // Authorization check: User can only create accounts for themselves
-        securityUtils.checkUserAuthorization(request.userId(), "Başka bir kullanıcı adına hesap oluşturamazsınız.");
+        securityContextPort.checkUserAuthorization(request.userId(), "Başka bir kullanıcı adına hesap oluşturamazsınız.");
 
         Iban iban = new Iban(request.iban());
         if (loadAccountPort.findByIban(iban).isPresent()) {

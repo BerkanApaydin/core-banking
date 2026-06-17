@@ -1,13 +1,14 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
@@ -23,14 +24,14 @@ import java.lang.reflect.Type;
 public class IdempotencyAspect {
 
     private final IdempotencyManager idempotencyManager;
-    private final SecurityUtils securityUtils;
+    private final SecurityContextPort securityContextPort;
     private final ObjectMapper objectMapper;
 
     public IdempotencyAspect(IdempotencyManager idempotencyManager,
-                             SecurityUtils securityUtils,
+                             SecurityContextPort securityContextPort,
                              ObjectMapper objectMapper) {
         this.idempotencyManager = idempotencyManager;
-        this.securityUtils = securityUtils;
+        this.securityContextPort = securityContextPort;
         this.objectMapper = objectMapper;
     }
 
@@ -48,39 +49,41 @@ public class IdempotencyAspect {
             return joinPoint.proceed();
         }
 
-        String username = securityUtils.getCurrentUsername()
+        String username = securityContextPort.getCurrentUsername()
                 .orElseThrow(() -> new AccessDeniedException("Giriş yapmalısınız."));
         String key = username + "_" + idempotencyKeyHeader;
 
         IdempotencyManager.IdempotencyResult result = idempotencyManager.startRequest(key);
-        
+
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         Type returnType = method.getGenericReturnType();
-        
+
         Class<?> responseBodyClass = Object.class;
-        if (returnType instanceof ParameterizedType) {
-            ParameterizedType paramType = (ParameterizedType) returnType;
+        if (returnType instanceof ParameterizedType paramType) {
             Type[] actualTypeArguments = paramType.getActualTypeArguments();
-            if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class) {
-                responseBodyClass = (Class<?>) actualTypeArguments[0];
+            if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class<?> bodyClass) {
+                responseBodyClass = bodyClass;
             }
         }
 
         if (result.isCompleted()) {
             Object cachedResponse = objectMapper.readValue(result.responseBody(), responseBodyClass);
-            return ResponseEntity.ok(cachedResponse);
+            HttpStatusCode status = result.responseStatus() != null
+                    ? HttpStatusCode.valueOf(result.responseStatus())
+                    : HttpStatusCode.valueOf(200);
+            return ResponseEntity.status(status).body(cachedResponse);
         } else if (result.isPending()) {
-            throw new ConcurrentRequestException("error.concurrent_request", null, "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
+            throw new ConcurrentRequestException("error.concurrent_request", null,
+                    "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
         }
 
         try {
             Object responseObj = joinPoint.proceed();
-            if (responseObj instanceof ResponseEntity) {
-                ResponseEntity<?> responseEntity = (ResponseEntity<?>) responseObj;
+            if (responseObj instanceof ResponseEntity<?> responseEntity) {
                 if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
                     String jsonResponse = objectMapper.writeValueAsString(responseEntity.getBody());
-                    idempotencyManager.completeRequest(key, jsonResponse);
+                    idempotencyManager.completeRequest(key, jsonResponse, responseEntity.getStatusCode().value());
                 } else {
                     idempotencyManager.failRequest(key);
                 }

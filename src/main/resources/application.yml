@@ -2,6 +2,9 @@ spring:
   messages:
     basename: messages
     encoding: UTF-8
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
   datasource:
     url: jdbc:postgresql://localhost:5432/bank_db
     username: bank_user
@@ -18,6 +21,10 @@ spring:
     show-sql: false
   flyway:
     baseline-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
@@ -29,6 +36,7 @@ app:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
     rate-limit:
+      backend: ${RATE_LIMIT_BACKEND:caffeine}
       max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
       time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
   idempotency:
@@ -36,6 +44,10 @@ app:
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
   transfer:
     cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
+  outbox:
+    poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
+    max-retries: ${OUTBOX_MAX_RETRIES:5}
+    use-skip-locked: ${OUTBOX_USE_SKIP_LOCKED:true}
 
 management:
   endpoints:
@@ -44,7 +56,7 @@ management:
         include: health,info,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
 
 resilience4j:
   circuitbreaker:
@@ -57,4 +69,3 @@ resilience4j:
         minimumNumberOfCalls: 5
         waitDurationInOpenState: 5000
         failureRateThreshold: 50
-

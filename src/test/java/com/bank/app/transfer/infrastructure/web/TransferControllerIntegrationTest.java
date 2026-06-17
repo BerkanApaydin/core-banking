@@ -267,7 +267,7 @@ class TransferControllerIntegrationTest {
                                 .header("Idempotency-Key", "unique-key-123")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isOk()) // Returns cached response (HTTP 200)
+                                .andExpect(status().isCreated()) // Cached response preserves original HTTP 201
                                 .andExpect(jsonPath("$.amount", is(100.00)));
         }
 

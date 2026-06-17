@@ -53,7 +53,7 @@ class NotificationAdaptersTest {
 
         TransferEventListener listener = new TransferEventListener(ports);
         AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
-        assertEquals(transfer, event.getTransfer());
+        assertEquals(transfer, event.transfer());
 
         assertDoesNotThrow(() -> listener.handleTransferCompleted(event));
 

@@ -1,7 +1,7 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 class IdempotencyAspectTest {
 
     private IdempotencyManager idempotencyManager;
-    private SecurityUtils securityUtils;
+    private SecurityContextPort securityContextPort;
     private ObjectMapper objectMapper;
     private IdempotencyAspect aspect;
 
@@ -36,9 +36,9 @@ class IdempotencyAspectTest {
     @BeforeEach
     void setUp() {
         idempotencyManager = mock(IdempotencyManager.class);
-        securityUtils = mock(SecurityUtils.class);
+        securityContextPort = mock(SecurityContextPort.class);
         objectMapper = mock(ObjectMapper.class);
-        aspect = new IdempotencyAspect(idempotencyManager, securityUtils, objectMapper);
+        aspect = new IdempotencyAspect(idempotencyManager, securityContextPort, objectMapper);
 
         joinPoint = mock(ProceedingJoinPoint.class);
         methodSignature = mock(MethodSignature.class);
@@ -87,7 +87,7 @@ class IdempotencyAspectTest {
         when(attributes.getRequest()).thenReturn(servletRequest);
         RequestContextHolder.setRequestAttributes(attributes);
         when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityUtils.getCurrentUsername()).thenReturn(Optional.empty());
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> aspect.handleIdempotency(joinPoint, idempotent));
         verifyNoInteractions(idempotencyManager);
@@ -103,9 +103,9 @@ class IdempotencyAspectTest {
         when(attributes.getRequest()).thenReturn(servletRequest);
         RequestContextHolder.setRequestAttributes(attributes);
         when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
 
-        IdempotencyManager.IdempotencyResult cachedResult = IdempotencyManager.IdempotencyResult.completed("cached-json");
+        IdempotencyManager.IdempotencyResult cachedResult = IdempotencyManager.IdempotencyResult.completed("cached-json", 201);
         when(idempotencyManager.startRequest("user1_key-123")).thenReturn(cachedResult);
 
         Method method = TestController.class.getMethod("myMethod");
@@ -118,7 +118,7 @@ class IdempotencyAspectTest {
         assertTrue(result instanceof ResponseEntity);
         ResponseEntity<?> responseEntity = (ResponseEntity<?>) result;
         assertEquals("cached-response", responseEntity.getBody());
-        assertEquals(200, responseEntity.getStatusCode().value());
+        assertEquals(201, responseEntity.getStatusCode().value());
     }
 
     @Test
@@ -127,7 +127,7 @@ class IdempotencyAspectTest {
         when(attributes.getRequest()).thenReturn(servletRequest);
         RequestContextHolder.setRequestAttributes(attributes);
         when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
 
         IdempotencyManager.IdempotencyResult cachedResult = IdempotencyManager.IdempotencyResult.pending();
         when(idempotencyManager.startRequest("user1_key-123")).thenReturn(cachedResult);
@@ -144,7 +144,7 @@ class IdempotencyAspectTest {
         when(attributes.getRequest()).thenReturn(servletRequest);
         RequestContextHolder.setRequestAttributes(attributes);
         when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
 
         IdempotencyManager.IdempotencyResult newResult = IdempotencyManager.IdempotencyResult.newRequest();
         when(idempotencyManager.startRequest("user1_key-123")).thenReturn(newResult);
@@ -159,7 +159,7 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, idempotent);
 
         assertEquals(response, result);
-        verify(idempotencyManager).completeRequest("user1_key-123", "json-response");
+        verify(idempotencyManager).completeRequest("user1_key-123", "json-response", 200);
     }
 
     @Test
@@ -168,7 +168,7 @@ class IdempotencyAspectTest {
         when(attributes.getRequest()).thenReturn(servletRequest);
         RequestContextHolder.setRequestAttributes(attributes);
         when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
 
         IdempotencyManager.IdempotencyResult newResult = IdempotencyManager.IdempotencyResult.newRequest();
         when(idempotencyManager.startRequest("user1_key-123")).thenReturn(newResult);

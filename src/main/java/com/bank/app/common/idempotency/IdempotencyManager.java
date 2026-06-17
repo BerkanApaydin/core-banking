@@ -2,11 +2,11 @@ package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.lang.NonNull;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,31 +29,31 @@ public class IdempotencyManager {
             if ("PENDING".equals(entity.getStatus())) {
                 return IdempotencyResult.pending();
             } else {
-                return IdempotencyResult.completed(entity.getResponseBody());
+                return IdempotencyResult.completed(entity.getResponseBody(), entity.getResponseStatus());
             }
         }
         try {
-            IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity(key, "PENDING", null, LocalDateTime.now());
+            IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity(key, "PENDING", null, null, LocalDateTime.now());
             repo.saveAndFlush(entity);
             return IdempotencyResult.newRequest();
         } catch (Exception ex) {
-            // Constraint violation fallback
             IdempotencyKeyJpaEntity entity = repo.findById(key)
                     .orElseThrow(() -> new IllegalStateException("Conflict on idempotency key insertion", ex));
             if ("PENDING".equals(entity.getStatus())) {
                 return IdempotencyResult.pending();
             } else {
-                return IdempotencyResult.completed(entity.getResponseBody());
+                return IdempotencyResult.completed(entity.getResponseBody(), entity.getResponseStatus());
             }
         }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void completeRequest(@NonNull String key, String responseBody) {
+    public void completeRequest(@NonNull String key, String responseBody, int responseStatus) {
         Objects.requireNonNull(key, "Idempotency key null olamaz");
         repo.findById(key).ifPresent(entity -> {
             entity.setStatus("COMPLETED");
             entity.setResponseBody(responseBody);
+            entity.setResponseStatus(responseStatus);
             repo.save(entity);
         });
     }
@@ -64,19 +64,19 @@ public class IdempotencyManager {
         repo.deleteById(key);
     }
 
-    public record IdempotencyResult(Status status, String responseBody) {
+    public record IdempotencyResult(Status status, String responseBody, Integer responseStatus) {
         public enum Status { NEW, PENDING, COMPLETED }
 
         public static IdempotencyResult pending() {
-            return new IdempotencyResult(Status.PENDING, null);
+            return new IdempotencyResult(Status.PENDING, null, null);
         }
 
-        public static IdempotencyResult completed(String responseBody) {
-            return new IdempotencyResult(Status.COMPLETED, responseBody);
+        public static IdempotencyResult completed(String responseBody, Integer responseStatus) {
+            return new IdempotencyResult(Status.COMPLETED, responseBody, responseStatus);
         }
 
         public static IdempotencyResult newRequest() {
-            return new IdempotencyResult(Status.NEW, null);
+            return new IdempotencyResult(Status.NEW, null, null);
         }
 
         public boolean isCompleted() {

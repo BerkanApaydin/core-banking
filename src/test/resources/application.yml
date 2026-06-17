@@ -23,6 +23,7 @@ app:
     cors:
       allowed-origins: http://localhost:3000
     rate-limit:
+      backend: caffeine
       max-requests: 10
       time-window-ms: 10000
   idempotency:
@@ -30,4 +31,7 @@ app:
     expiration-hours: 24
   transfer:
     cancellation-window-hours: 24
+  outbox:
+    use-skip-locked: false
+    max-retries: 5
 

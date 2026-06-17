@@ -1,0 +1,77 @@
+package com.bank.app.architecture;
+
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchRule;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+
+/**
+ * O5 — Compile-time modül sınırı zorlaması (ArchUnit).
+ * Maven multi-module yerine paket düzeyinde bağımlılık kuralları uygulanır.
+ */
+class ArchitectureTest {
+
+    private static JavaClasses importedClasses;
+
+    @BeforeAll
+    static void importClasses() {
+        importedClasses = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.bank.app");
+    }
+
+    @Test
+    void domainShouldNotDependOnSpringOrInfrastructure() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..domain..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..",
+                        "..infrastructure..",
+                        "..jakarta.persistence..")
+                .allowEmptyShould(true);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void accountApplicationShouldNotDependOnTransferInfrastructure() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.account.application..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.transfer.infrastructure..");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void transferApplicationShouldNotDependOnAccountInfrastructure() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.transfer.application..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account.infrastructure..");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void transferApplicationShouldUseAccountOperationsPortNotInternalService() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.transfer.application..")
+                .should().dependOnClassesThat().haveSimpleName("AccountInternalService");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void useCasesShouldResideInApplicationLayer() {
+        ArchRule rule = classes()
+                .that().haveSimpleNameEndingWith("UseCase")
+                .should().resideInAPackage("..application..")
+                .allowEmptyShould(true);
+
+        rule.check(importedClasses);
+    }
+}

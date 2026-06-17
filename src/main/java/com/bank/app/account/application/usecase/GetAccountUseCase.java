@@ -5,7 +5,7 @@ import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.AccountNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +19,11 @@ import java.util.stream.Collectors;
 public class GetAccountUseCase {
 
     private final LoadAccountPort loadAccountPort;
-    private final SecurityUtils securityUtils;
+    private final SecurityContextPort securityContextPort;
 
-    public GetAccountUseCase(LoadAccountPort loadAccountPort, SecurityUtils securityUtils) {
+    public GetAccountUseCase(LoadAccountPort loadAccountPort, SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
-        this.securityUtils = securityUtils;
+        this.securityContextPort = securityContextPort;
     }
 
     public AccountResponse getById(Long id) {
@@ -44,7 +44,7 @@ public class GetAccountUseCase {
     }
 
     public List<AccountResponse> getAll() {
-        return securityUtils.getCurrentUserId()
+        return securityContextPort.getCurrentUserId()
             .map(userId -> loadAccountPort.findByUserId(userId).stream()
                 .map(AccountResponse::from)
                 .collect(Collectors.toList()))
@@ -52,6 +52,6 @@ public class GetAccountUseCase {
     }
 
     private void checkAuthorization(Account account) {
-        securityUtils.checkUserAuthorization(account.getUserId(), "Bu hesaba erişim yetkiniz yok.");
+        securityContextPort.checkUserAuthorization(account.getUserId(), "Bu hesaba erişim yetkiniz yok.");
     }
 }

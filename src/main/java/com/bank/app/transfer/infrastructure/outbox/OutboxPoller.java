@@ -1,16 +1,12 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
-import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
-import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.domain.Money;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,20 +15,25 @@ public class OutboxPoller {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPoller.class);
 
+    private final OutboxEventLockRepository lockRepository;
     private final SpringDataOutboxEventRepo outboxRepo;
-    private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final List<OutboxEventHandler> handlers;
 
-    public OutboxPoller(SpringDataOutboxEventRepo outboxRepo, ObjectMapper objectMapper, ApplicationEventPublisher eventPublisher) {
+    @Value("${app.outbox.max-retries:5}")
+    private int maxRetries;
+
+    public OutboxPoller(OutboxEventLockRepository lockRepository,
+                        SpringDataOutboxEventRepo outboxRepo,
+                        List<OutboxEventHandler> handlers) {
+        this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
-        this.objectMapper = objectMapper;
-        this.eventPublisher = eventPublisher;
+        this.handlers = handlers;
     }
 
-    @Scheduled(fixedDelay = 2000)
+    @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:2000}")
     @Transactional
     public void pollAndProcessEvents() {
-        List<OutboxEventJpaEntity> unprocessedEvents = outboxRepo.findTop10ByProcessedFalseOrderByCreatedAtAsc();
+        List<OutboxEventJpaEntity> unprocessedEvents = lockRepository.findAndLockUnprocessed(10);
         if (unprocessedEvents.isEmpty()) {
             return;
         }
@@ -40,32 +41,43 @@ public class OutboxPoller {
         log.debug("Found {} unprocessed outbox events", unprocessedEvents.size());
 
         for (OutboxEventJpaEntity event : unprocessedEvents) {
-            try {
-                if ("TransferCompletedEvent".equals(event.getEventType())) {
-                    OutboxEventListener.TransferEventPayload payload = objectMapper.readValue(
-                        event.getPayload(), 
-                        OutboxEventListener.TransferEventPayload.class
-                    );
-                    
-                    Transfer transfer = new Transfer(
-                        payload.transferId(),
-                        payload.senderAccountId(),
-                        payload.receiverAccountId(),
-                        new Money(payload.amount(), Money.Currency.valueOf(payload.currency())),
-                        TransferStatus.COMPLETED,
-                        event.getCreatedAt()
-                    );
-                    
-                    eventPublisher.publishEvent(new AsyncTransferCompletedEvent(transfer));
-                    
-                    event.setProcessed(true);
-                    event.setProcessedAt(LocalDateTime.now());
-                    outboxRepo.save(event);
-                    log.info("Successfully processed outbox event for transfer ID: {}", payload.transferId());
-                }
-            } catch (Exception e) {
-                log.error("Failed to process outbox event with id: {}", event.getId(), e);
-            }
+            processEvent(event);
         }
+    }
+
+    private void processEvent(OutboxEventJpaEntity event) {
+        try {
+            OutboxEventHandler handler = handlers.stream()
+                    .filter(h -> h.supports(event.getEventType()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No handler for event type: " + event.getEventType()));
+
+            handler.handle(event);
+
+            event.setProcessed(true);
+            event.setProcessedAt(LocalDateTime.now());
+            event.setLastError(null);
+            outboxRepo.save(event);
+            log.info("Successfully processed outbox event id: {}", event.getId());
+        } catch (Exception e) {
+            int nextRetry = event.getRetryCount() + 1;
+            event.setRetryCount(nextRetry);
+            event.setLastError(truncate(e.getMessage(), 2000));
+
+            if (nextRetry >= maxRetries) {
+                event.setDeadLetter(true);
+                log.error("Outbox event moved to dead letter after {} retries. id: {}", maxRetries, event.getId(), e);
+            } else {
+                log.warn("Failed to process outbox event id: {} (retry {}/{})", event.getId(), nextRetry, maxRetries, e);
+            }
+            outboxRepo.save(event);
+        }
+    }
+
+    private static String truncate(String message, int maxLength) {
+        if (message == null) {
+            return null;
+        }
+        return message.length() <= maxLength ? message : message.substring(0, maxLength);
     }
 }

@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.common.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
@@ -22,7 +22,7 @@ class CancelTransferUseCaseTest {
 
     private LoadTransferPort loadTransferPort;
     private SaveTransferPort saveTransferPort;
-    private AccountInternalService accountInternalService;
+    private AccountOperationsPort accountOperationsPort;
     private AuditService auditService;
     private CancelTransferUseCase cancelTransferUseCase;
 
@@ -30,9 +30,9 @@ class CancelTransferUseCaseTest {
     void setUp() {
         loadTransferPort = mock(LoadTransferPort.class);
         saveTransferPort = mock(SaveTransferPort.class);
-        accountInternalService = mock(AccountInternalService.class);
+        accountOperationsPort = mock(AccountOperationsPort.class);
         auditService = mock(AuditService.class);
-        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountInternalService, auditService, 24);
+        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationsPort, auditService, 24);
     }
 
     @Test
@@ -45,8 +45,7 @@ class CancelTransferUseCaseTest {
 
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
 
-        // Verify balance reversal was delegated to AccountInternalService
-        verify(accountInternalService).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
+        verify(accountOperationsPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
         verify(saveTransferPort).save(transfer);
     }
 
@@ -56,17 +55,17 @@ class CancelTransferUseCaseTest {
 
         assertThrows(TransferNotFoundException.class, () -> cancelTransferUseCase.execute(10L));
 
-        verifyNoInteractions(accountInternalService);
+        verifyNoInteractions(accountOperationsPort);
         verifyNoInteractions(saveTransferPort);
     }
 
     @Test
-    void shouldPropagateAccessDeniedExceptionFromAccountInternalService() {
+    void shouldPropagateAccessDeniedExceptionFromAccountOperationsPort() {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         doThrow(new AccessDeniedException("Bu transferi iptal etmeye yetkiniz yok."))
-                .when(accountInternalService).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
+                .when(accountOperationsPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
 
         assertThrows(AccessDeniedException.class, () -> cancelTransferUseCase.execute(10L));
 
@@ -80,7 +79,7 @@ class CancelTransferUseCaseTest {
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
 
         assertThrows(IllegalArgumentException.class, () -> cancelTransferUseCase.execute(10L));
-        verifyNoInteractions(accountInternalService);
+        verifyNoInteractions(accountOperationsPort);
     }
 
     @Test

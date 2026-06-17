@@ -1,11 +1,11 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +21,15 @@ import java.util.stream.Stream;
 public class GetTransferHistoryUseCase {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountInternalService accountInternalService;
-    private final SecurityUtils securityUtils;
+    private final AccountOperationsPort accountOperationsPort;
+    private final SecurityContextPort securityContextPort;
 
-    public GetTransferHistoryUseCase(LoadTransferPort loadTransferPort, 
-                                     AccountInternalService accountInternalService,
-                                     SecurityUtils securityUtils) {
+    public GetTransferHistoryUseCase(LoadTransferPort loadTransferPort,
+                                     AccountOperationsPort accountOperationsPort,
+                                     SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.accountInternalService = accountInternalService;
-        this.securityUtils = securityUtils;
+        this.accountOperationsPort = accountOperationsPort;
+        this.securityContextPort = securityContextPort;
     }
 
     public List<TransferResponse> execute(Long accountId) {
@@ -40,10 +40,9 @@ public class GetTransferHistoryUseCase {
         Objects.requireNonNull(accountId, "Account ID null olamaz");
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account = accountInternalService.getAccountInfo(accountId);
+        AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
 
-        // Authorization check
-        securityUtils.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
+        securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
 
         List<Transfer> transfers = loadTransferPort.findHistory(accountId, page, size);
 
@@ -53,7 +52,7 @@ public class GetTransferHistoryUseCase {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap = accountInternalService.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap = accountOperationsPort.getIbansForAccounts(accountIds);
 
         return transfers.stream()
                 .map(transfer -> TransferResponse.from(

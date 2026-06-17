@@ -32,9 +32,25 @@ public class OutboxEventJpaEntity {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    @Column(name = "dead_letter", nullable = false)
+    private boolean deadLetter;
+
+    @Column(name = "last_error", length = 2000)
+    private String lastError;
+
     public OutboxEventJpaEntity() {}
 
-    public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType, String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt) {
+    public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
+                                String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, processed, processedAt, 0, false, null);
+    }
+
+    public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
+                                String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt,
+                                int retryCount, boolean deadLetter, String lastError) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -43,6 +59,9 @@ public class OutboxEventJpaEntity {
         this.createdAt = createdAt;
         this.processed = processed;
         this.processedAt = processedAt;
+        this.retryCount = retryCount;
+        this.deadLetter = deadLetter;
+        this.lastError = lastError;
     }
 
     public String getId() {
@@ -107,5 +126,29 @@ public class OutboxEventJpaEntity {
 
     public void setProcessedAt(LocalDateTime processedAt) {
         this.processedAt = processedAt;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public boolean isDeadLetter() {
+        return deadLetter;
+    }
+
+    public void setDeadLetter(boolean deadLetter) {
+        this.deadLetter = deadLetter;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
     }
 }

@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.exception.TransferNotFoundException;
@@ -8,11 +8,11 @@ import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -22,18 +22,18 @@ public class CancelTransferUseCase {
 
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
-    private final AccountInternalService accountInternalService;
+    private final AccountOperationsPort accountOperationsPort;
     private final AuditService auditService;
     private final int cancellationWindowHours;
 
-    public CancelTransferUseCase(LoadTransferPort loadTransferPort, 
+    public CancelTransferUseCase(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
-                                 AccountInternalService accountInternalService,
+                                 AccountOperationsPort accountOperationsPort,
                                  AuditService auditService,
                                  @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
-        this.accountInternalService = accountInternalService;
+        this.accountOperationsPort = accountOperationsPort;
         this.auditService = auditService;
         this.cancellationWindowHours = cancellationWindowHours;
     }
@@ -55,16 +55,12 @@ public class CancelTransferUseCase {
             throw new IllegalArgumentException("Gönderici ve alıcı hesap aynı olamaz.");
         }
 
-        // Delegate reversing balances, locking, and authorization check to the Account module
-        accountInternalService.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
-
-        // Validate and update status in the domain model
         transfer.cancel(cancellationWindowHours);
 
-        // Persist Transfer status update
+        accountOperationsPort.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
+
         saveTransferPort.save(transfer);
 
-        // Audit log
         auditService.log(
             AuditAction.TRANSFER_CANCELLED,
             String.format("Transfer iptal edildi. Transfer ID: %d, Gönderici Hesaba Geri Yüklenen: %s %s, Alıcı Hesaptan Düşülen: %s %s",

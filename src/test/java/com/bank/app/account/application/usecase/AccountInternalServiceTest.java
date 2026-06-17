@@ -6,7 +6,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.exception.AccountNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,7 +33,7 @@ class AccountInternalServiceTest {
         private SaveAccountPort saveAccountPort;
 
         @Mock
-        private SecurityUtils securityUtils;
+        private SecurityContextPort securityContextPort;
 
         @InjectMocks
         private AccountInternalService accountInternalService;
@@ -85,7 +85,7 @@ class AccountInternalServiceTest {
 
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
-                doNothing().when(securityUtils).checkUserAuthorization(eq(100L), any());
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
                 accountInternalService.debitAndCredit(1L, 2L, new Money(new BigDecimal("100.00"), Money.Currency.TRY));
 
@@ -104,7 +104,7 @@ class AccountInternalServiceTest {
 
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(receiver));
-                doNothing().when(securityUtils).checkUserAuthorization(eq(200L), any());
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(200L), any());
 
                 accountInternalService.debitAndCredit(2L, 1L, new Money(new BigDecimal("100.00"), Money.Currency.TRY));
 
@@ -150,7 +150,7 @@ class AccountInternalServiceTest {
 
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
-                doNothing().when(securityUtils).checkUserAuthorization(eq(100L), any());
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
                 accountInternalService.reverseBalancesForCancellation(1L, 2L,
                                 new Money(new BigDecimal("200.00"), Money.Currency.TRY));
@@ -170,7 +170,7 @@ class AccountInternalServiceTest {
 
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(receiver));
-                doNothing().when(securityUtils).checkUserAuthorization(eq(200L), any());
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(200L), any());
 
                 accountInternalService.reverseBalancesForCancellation(2L, 1L,
                                 new Money(new BigDecimal("200.00"), Money.Currency.TRY));

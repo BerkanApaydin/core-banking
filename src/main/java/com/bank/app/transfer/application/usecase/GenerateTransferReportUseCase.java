@@ -1,13 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +25,15 @@ import java.util.stream.Stream;
 public class GenerateTransferReportUseCase {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountInternalService accountInternalService;
-    private final SecurityUtils securityUtils;
+    private final AccountOperationsPort accountOperationsPort;
+    private final SecurityContextPort securityContextPort;
 
-    public GenerateTransferReportUseCase(LoadTransferPort loadTransferPort, 
-                                         AccountInternalService accountInternalService,
-                                         SecurityUtils securityUtils) {
+    public GenerateTransferReportUseCase(LoadTransferPort loadTransferPort,
+                                         AccountOperationsPort accountOperationsPort,
+                                         SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.accountInternalService = accountInternalService;
-        this.securityUtils = securityUtils;
+        this.accountOperationsPort = accountOperationsPort;
+        this.securityContextPort = securityContextPort;
     }
 
     public TransferReportResponse execute(ReportCriteria criteria) {
@@ -50,10 +50,9 @@ public class GenerateTransferReportUseCase {
         }
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account = accountInternalService.getAccountInfo(accountId);
+        AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
 
-        // Authorization check
-        securityUtils.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
+        securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
 
         List<Transfer> transfers = loadTransferPort.findHistoryBetween(
             accountId,
@@ -67,7 +66,7 @@ public class GenerateTransferReportUseCase {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap = accountInternalService.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap = accountOperationsPort.getIbansForAccounts(accountIds);
 
         List<TransferResponse> responseList = transfers.stream()
             .map(transfer -> TransferResponse.from(

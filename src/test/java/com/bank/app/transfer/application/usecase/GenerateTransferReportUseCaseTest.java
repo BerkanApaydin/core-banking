@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
@@ -9,6 +9,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,22 +31,22 @@ import static org.mockito.Mockito.*;
 class GenerateTransferReportUseCaseTest {
 
     private LoadTransferPort loadTransferPort;
-    private AccountInternalService accountInternalService;
-    private SecurityUtils securityUtils;
+    private AccountOperationsPort accountOperationsPort;
+    private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
         loadTransferPort = mock(LoadTransferPort.class);
-        accountInternalService = mock(AccountInternalService.class);
-        securityUtils = new SecurityUtils();
-        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountInternalService,
-                securityUtils);
+        accountOperationsPort = mock(AccountOperationsPort.class);
+        securityContextPort = new SecurityUtils();
+        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountOperationsPort,
+                securityContextPort);
 
         // Mock account internal service info
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountInternalService.getAccountInfo(1L)).thenReturn(info);
-        when(accountInternalService.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222",
                 3L, "TR290006200000000000000333"));

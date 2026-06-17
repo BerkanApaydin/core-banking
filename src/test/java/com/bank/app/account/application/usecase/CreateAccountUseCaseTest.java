@@ -10,6 +10,7 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +32,7 @@ class CreateAccountUseCaseTest {
     private LoadAccountPort loadAccountPort;
     private SaveAccountPort saveAccountPort;
     private AuditService auditService;
-    private SecurityUtils securityUtils;
+    private SecurityContextPort securityContextPort;
     private CreateAccountUseCase createAccountUseCase;
 
     @BeforeEach
@@ -39,8 +40,8 @@ class CreateAccountUseCaseTest {
         loadAccountPort = mock(LoadAccountPort.class);
         saveAccountPort = mock(SaveAccountPort.class);
         auditService = mock(AuditService.class);
-        securityUtils = new SecurityUtils();
-        createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService, securityUtils);
+        securityContextPort = new SecurityUtils();
+        createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService, securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());

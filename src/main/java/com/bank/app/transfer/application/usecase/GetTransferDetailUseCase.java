@@ -1,9 +1,9 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
-import com.bank.app.account.application.usecase.AccountInternalService.AccountInfo;
+import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
 import com.bank.app.common.exception.TransferNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -18,15 +18,15 @@ import java.util.Objects;
 public class GetTransferDetailUseCase {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountInternalService accountInternalService;
-    private final SecurityUtils securityUtils;
+    private final AccountOperationsPort accountOperationsPort;
+    private final SecurityContextPort securityContextPort;
 
-    public GetTransferDetailUseCase(LoadTransferPort loadTransferPort, 
-                                     AccountInternalService accountInternalService,
-                                     SecurityUtils securityUtils) {
+    public GetTransferDetailUseCase(LoadTransferPort loadTransferPort,
+                                     AccountOperationsPort accountOperationsPort,
+                                     SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.accountInternalService = accountInternalService;
-        this.securityUtils = securityUtils;
+        this.accountOperationsPort = accountOperationsPort;
+        this.securityContextPort = securityContextPort;
     }
 
     public TransferDetailResponse execute(Long transferId) {
@@ -35,11 +35,10 @@ public class GetTransferDetailUseCase {
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo sender = accountInternalService.getAccountInfo(transfer.getSenderAccountId());
-        AccountInfo receiver = accountInternalService.getAccountInfo(transfer.getReceiverAccountId());
+        AccountInfo sender = accountOperationsPort.getAccountInfo(transfer.getSenderAccountId());
+        AccountInfo receiver = accountOperationsPort.getAccountInfo(transfer.getReceiverAccountId());
 
-        // Check authorization: User must be owner of sender OR receiver account
-        Long currentUserId = securityUtils.getCurrentUserId()
+        Long currentUserId = securityContextPort.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("Oturum bulunamadı."));
         if (!currentUserId.equals(sender.userId()) && !currentUserId.equals(receiver.userId())) {
             throw new AccessDeniedException("Bu transferin detaylarını görme yetkiniz yok.");

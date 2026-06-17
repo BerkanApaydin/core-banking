@@ -61,6 +61,7 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/cancel")
+    @Idempotent
     @Operation(summary = "Mevcut bir transferi iptal eder", description = "Gönderilen transfer ID'sine ait tamamlanmış işlemi 24 saat içinde iptal eder ve bakiyeleri iade eder.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
         cancelTransferUseCase.execute(id);
