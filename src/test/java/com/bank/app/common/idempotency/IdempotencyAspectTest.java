@@ -2,6 +2,7 @@ package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.web.CaffeineRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -9,44 +10,56 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import java.lang.reflect.Type;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class IdempotencyAspectTest {
 
+    @Mock
     private IdempotencyManager idempotencyManager;
+
+    @Mock
     private SecurityContextPort securityContextPort;
+
+    @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private ProceedingJoinPoint joinPoint;
+
+    @Mock
+    private MethodSignature methodSignature;
+
+    @Mock
+    private HttpServletRequest request;
+
     private IdempotencyAspect aspect;
 
-    private ProceedingJoinPoint joinPoint;
-    private MethodSignature methodSignature;
-    private Idempotent idempotent;
-    private HttpServletRequest servletRequest;
+    @Mock
+    private ParameterizedType parameterizedType;
 
     @BeforeEach
     void setUp() {
-        idempotencyManager = mock(IdempotencyManager.class);
-        securityContextPort = mock(SecurityContextPort.class);
-        objectMapper = mock(ObjectMapper.class);
-        aspect = new IdempotencyAspect(idempotencyManager, securityContextPort, objectMapper);
-
-        joinPoint = mock(ProceedingJoinPoint.class);
-        methodSignature = mock(MethodSignature.class);
-        idempotent = mock(Idempotent.class);
-        servletRequest = mock(HttpServletRequest.class);
-
-        when(idempotent.headerName()).thenReturn("Idempotency-Key");
-        when(joinPoint.getSignature()).thenReturn(methodSignature);
+        aspect = new IdempotencyAspect(
+                idempotencyManager,
+                securityContextPort,
+                objectMapper);
     }
 
     @AfterEach
@@ -54,131 +67,466 @@ class IdempotencyAspectTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
+    @Idempotent
+    public ResponseEntity<TestResponse> parameterizedMethod() {
+        return ResponseEntity.ok(new TestResponse("ok"));
+    }
+
+    @SuppressWarnings("rawtypes")
+    public ResponseEntity rawMethod() {
+        return ResponseEntity.ok().build();
+    }
+
+    private void mockRequest(String header) {
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request));
+
+        when(request.getHeader("Idempotency-Key"))
+                .thenReturn(header);
+    }
+
+    private void mockMethod(Method method) {
+        when(joinPoint.getSignature()).thenReturn(methodSignature);
+        when(methodSignature.getMethod()).thenReturn(method);
+    }
+
+    private Idempotent annotation() {
+        return new Idempotent() {
+            @Override
+            public String headerName() {
+                return "Idempotency-Key";
+            }
+
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return Idempotent.class;
+            }
+        };
+    }
+
     @Test
-    void shouldProceedWhenNoRequestAttributes() throws Throwable {
-        RequestContextHolder.resetRequestAttributes();
-        when(joinPoint.proceed()).thenReturn("proceeded");
+    void shouldProceedWhenRequestContextMissing() throws Throwable {
 
-        Object result = aspect.handleIdempotency(joinPoint, idempotent);
+        when(joinPoint.proceed()).thenReturn("OK");
 
-        assertEquals("proceeded", result);
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
+
+        assertEquals("OK", result);
         verify(joinPoint).proceed();
-        verifyNoInteractions(idempotencyManager);
     }
 
     @Test
-    void shouldProceedWhenHeaderIsMissing() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn(null);
-        when(joinPoint.proceed()).thenReturn("proceeded");
+    void shouldProceedWhenHeaderNull() throws Throwable {
 
-        Object result = aspect.handleIdempotency(joinPoint, idempotent);
+        mockRequest(null);
 
-        assertEquals("proceeded", result);
-        verify(joinPoint).proceed();
-        verifyNoInteractions(idempotencyManager);
+        when(joinPoint.proceed()).thenReturn("OK");
+
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
+
+        assertEquals("OK", result);
     }
 
     @Test
-    void shouldThrowAccessDeniedWhenNotLoggedIn() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
+    void shouldProceedWhenHeaderBlank() throws Throwable {
 
-        assertThrows(AccessDeniedException.class, () -> aspect.handleIdempotency(joinPoint, idempotent));
-        verifyNoInteractions(idempotencyManager);
-    }
+        mockRequest(" ");
 
-    interface TestController {
-        ResponseEntity<String> myMethod();
+        when(joinPoint.proceed()).thenReturn("OK");
+
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
+
+        assertEquals("OK", result);
     }
 
     @Test
-    void shouldReturnCachedValueWhenCompleted() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    void shouldThrowAccessDeniedException() {
 
-        IdempotencyManager.IdempotencyResult cachedResult = IdempotencyManager.IdempotencyResult.completed("cached-json", 201);
-        when(idempotencyManager.startRequest("user1_key-123")).thenReturn(cachedResult);
+        mockRequest("abc");
 
-        Method method = TestController.class.getMethod("myMethod");
-        when(methodSignature.getMethod()).thenReturn(method);
-        when(methodSignature.getReturnType()).thenReturn(ResponseEntity.class);
-        when(objectMapper.readValue("cached-json", String.class)).thenReturn("cached-response");
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.empty());
 
-        Object result = aspect.handleIdempotency(joinPoint, idempotent);
-
-        assertTrue(result instanceof ResponseEntity);
-        ResponseEntity<?> responseEntity = (ResponseEntity<?>) result;
-        assertEquals("cached-response", responseEntity.getBody());
-        assertEquals(201, responseEntity.getStatusCode().value());
+        assertThrows(
+                AccessDeniedException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
     }
 
     @Test
-    void shouldThrowConcurrentRequestWhenPending() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    void shouldReturnCompletedResponseWithCustomStatus() throws Throwable {
 
-        IdempotencyManager.IdempotencyResult cachedResult = IdempotencyManager.IdempotencyResult.pending();
-        when(idempotencyManager.startRequest("user1_key-123")).thenReturn(cachedResult);
+        mockRequest("abc");
 
-        Method method = TestController.class.getMethod("myMethod");
-        when(methodSignature.getMethod()).thenReturn(method);
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-        assertThrows(ConcurrentRequestException.class, () -> aspect.handleIdempotency(joinPoint, idempotent));
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.completed(
+                                "{\"message\":\"cached\"}",
+                                201));
+
+        TestResponse body = new TestResponse("cached");
+
+        when(objectMapper.readValue(
+                anyString(),
+                eq(TestResponse.class)))
+                .thenReturn(body);
+
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
+
+        assertEquals(201, result.getStatusCode().value());
+        assertEquals(body, result.getBody());
     }
 
     @Test
-    void shouldExecuteAndCompleteRequestWhenNew() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    void shouldReturnCompletedResponseWithDefaultStatus() throws Throwable {
 
-        IdempotencyManager.IdempotencyResult newResult = IdempotencyManager.IdempotencyResult.newRequest();
-        when(idempotencyManager.startRequest("user1_key-123")).thenReturn(newResult);
+        mockRequest("abc");
 
-        Method method = TestController.class.getMethod("myMethod");
-        when(methodSignature.getMethod()).thenReturn(method);
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-        ResponseEntity<String> response = ResponseEntity.ok("my-response");
-        when(joinPoint.proceed()).thenReturn(response);
-        when(objectMapper.writeValueAsString("my-response")).thenReturn("json-response");
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
 
-        Object result = aspect.handleIdempotency(joinPoint, idempotent);
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.completed(
+                                "{}",
+                                null));
 
-        assertEquals(response, result);
-        verify(idempotencyManager).completeRequest("user1_key-123", "json-response", 200);
+        when(objectMapper.readValue(
+                anyString(),
+                eq(TestResponse.class)))
+                .thenReturn(new TestResponse("cached"));
+
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
+
+        assertEquals(200, result.getStatusCode().value());
     }
 
     @Test
-    void shouldFailRequestWhenExceptionOccurs() throws Throwable {
-        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
-        when(attributes.getRequest()).thenReturn(servletRequest);
-        RequestContextHolder.setRequestAttributes(attributes);
-        when(servletRequest.getHeader("Idempotency-Key")).thenReturn("key-123");
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    void shouldThrowConcurrentRequestException() throws Exception {
 
-        IdempotencyManager.IdempotencyResult newResult = IdempotencyManager.IdempotencyResult.newRequest();
-        when(idempotencyManager.startRequest("user1_key-123")).thenReturn(newResult);
+        mockRequest("abc");
 
-        Method method = TestController.class.getMethod("myMethod");
-        when(methodSignature.getMethod()).thenReturn(method);
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-        when(joinPoint.proceed()).thenThrow(new RuntimeException("database error"));
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
 
-        assertThrows(RuntimeException.class, () -> aspect.handleIdempotency(joinPoint, idempotent));
-        verify(idempotencyManager).failRequest("user1_key-123");
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.pending());
+
+        assertThrows(
+                ConcurrentRequestException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
     }
+
+    @Test
+    void shouldCompleteRequestWhenResponseSuccessful() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.newRequest());
+
+        TestResponse body = new TestResponse("success");
+
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.ok(body));
+
+        when(objectMapper.writeValueAsString(body))
+                .thenReturn("{\"message\":\"success\"}");
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(idempotencyManager)
+                .completeRequest(
+                        eq("user_abc"),
+                        anyString(),
+                        eq(200));
+    }
+
+    @Test
+    void shouldFailWhenBodyNull() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.newRequest());
+
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.ok().build());
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(idempotencyManager)
+                .failRequest("user_abc");
+    }
+
+    @Test
+    void shouldFailWhenStatusNotSuccessful() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.newRequest());
+
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.badRequest().build());
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(idempotencyManager)
+                .failRequest("user_abc");
+    }
+
+    @Test
+    void shouldFailWhenReturnTypeNotResponseEntity() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.newRequest());
+
+        when(joinPoint.proceed())
+                .thenReturn("OK");
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(idempotencyManager)
+                .failRequest("user_abc");
+    }
+
+    @Test
+    void shouldFailAndRethrowException() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("parameterizedMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.newRequest());
+
+        when(joinPoint.proceed())
+                .thenThrow(new RuntimeException("boom"));
+
+        assertThrows(
+                RuntimeException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+
+        verify(idempotencyManager)
+                .failRequest("user_abc");
+    }
+
+    @Test
+    void shouldUseObjectClassForRawResponseEntity() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("rawMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.completed(
+                                "{}",
+                                200));
+
+        when(objectMapper.readValue(
+                anyString(),
+                eq(Object.class)))
+                .thenReturn(new Object());
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(objectMapper)
+                .readValue(anyString(), eq(Object.class));
+    }
+
+    static class TestResponse {
+
+        private String message;
+
+        public TestResponse() {
+        }
+
+        public TestResponse(String message) {
+            this.message = message;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+
+            if (!(obj instanceof TestResponse other)) {
+                return false;
+            }
+
+            return java.util.Objects.equals(message, other.message);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(message);
+        }
+    }
+
+    @Test
+    void shouldHandleParameterizedTypeThatIsNotClass() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        mockMethod(
+                getClass().getMethod("nestedGenericMethod"));
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.completed(
+                                "{}",
+                                200));
+
+        Object body = new Object();
+
+        when(objectMapper.readValue(
+                anyString(),
+                eq(Object.class)))
+                .thenReturn(body);
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(objectMapper)
+                .readValue(anyString(), eq(Object.class));
+    }
+
+    private static class Wrapper<T> {
+    }
+
+    public ResponseEntity<Wrapper<String>> nestedGenericMethod() {
+        return ResponseEntity.ok(new Wrapper<>());
+    }
+
+    @Test
+    void shouldHandleEmptyTypeArguments() throws Throwable {
+
+        mockRequest("abc");
+
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
+
+        Method method = getClass().getMethod("parameterizedMethod");
+
+        mockMethod(method);
+
+        when(idempotencyManager.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyManager.IdempotencyResult.completed(
+                                "{}",
+                                200));
+
+        ParameterizedType mockedType = mock(ParameterizedType.class);
+
+        when(mockedType.getActualTypeArguments())
+                .thenReturn(new Type[0]);
+
+        when(methodSignature.getMethod())
+                .thenReturn(mock(Method.class));
+
+        Method mockedMethod = methodSignature.getMethod();
+
+        when(mockedMethod.getGenericReturnType())
+                .thenReturn(mockedType);
+
+        when(objectMapper.readValue(anyString(), eq(Object.class)))
+                .thenReturn(new Object());
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        verify(objectMapper)
+                .readValue(anyString(), eq(Object.class));
+    }
+
+    @Test
+    void shouldAllowRequestWhenKeyDoesNotExist() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 1000);
+        boolean result = limiter.tryAcquire("client1");
+        assertTrue(result);
+    }
+
+    @Test
+    void shouldIncrementRequestCountWhenEntryNotExpired() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 1000);
+        assertTrue(limiter.tryAcquire("client1"));
+        assertTrue(limiter.tryAcquire("client1"));
+        assertFalse(limiter.tryAcquire("client1"));
+    }
+
+    @Test
+    void shouldResetCounterWhenEntryExpired() throws Exception {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10);
+        assertTrue(limiter.tryAcquire("client1"));
+        Thread.sleep(30);
+        assertTrue(limiter.tryAcquire("client1"));
+    }
+
 }

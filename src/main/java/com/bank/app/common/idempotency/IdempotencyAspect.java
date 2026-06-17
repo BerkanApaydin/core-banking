@@ -28,8 +28,8 @@ public class IdempotencyAspect {
     private final ObjectMapper objectMapper;
 
     public IdempotencyAspect(IdempotencyManager idempotencyManager,
-                             SecurityContextPort securityContextPort,
-                             ObjectMapper objectMapper) {
+            SecurityContextPort securityContextPort,
+            ObjectMapper objectMapper) {
         this.idempotencyManager = idempotencyManager;
         this.securityContextPort = securityContextPort;
         this.objectMapper = objectMapper;

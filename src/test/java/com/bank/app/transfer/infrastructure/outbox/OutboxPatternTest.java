@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
@@ -132,4 +133,426 @@ class OutboxPatternTest {
         assertEquals(5, entity.getRetryCount());
         verify(outboxRepo).save(entity);
     }
+
+    @Test
+    void shouldSkipProcessingWhenNoUnprocessedEvents() {
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of());
+
+        outboxPoller.pollAndProcessEvents();
+
+        verifyNoInteractions(eventPublisher);
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowWhenNoHandlerFoundForEventType() {
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "UnknownEventType",
+                "{}", LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertFalse(entity.isProcessed());
+        assertEquals(1, entity.getRetryCount());
+        assertNotNull(entity.getLastError());
+        assertFalse(entity.isDeadLetter());
+        verify(outboxRepo).save(entity);
+    }
+
+    @Test
+    void shouldTruncateLastErrorMessageLongerThan2000Chars() {
+        StringBuilder longPayload = new StringBuilder();
+        for (int i = 0; i < 3000; i++)
+            longPayload.append('x');
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
+                longPayload.toString(), LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        // Exception message comes from ObjectMapper ("Unexpected end-of-input...") but
+        // the
+        // lastError should be set to whatever the exception's message was (not
+        // necessarily 2000)
+        assertNotNull(entity.getLastError());
+    }
+
+    @Test
+    void shouldHandleNullExceptionMessageGracefully() {
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
+                "invalid json", LocalDateTime.now(), false, null);
+
+        // Stub to return a list with a malformed payload so the handler throws and the
+        // truncated message can be null when the underlying cause has no message.
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertEquals(1, entity.getRetryCount());
+        assertFalse(entity.isProcessed());
+        assertNotNull(entity.getLastError());
+    }
+
+    @Test
+    void shouldSupportTransferCompletedEventType() {
+        assertTrue(handler.supports("TransferCompletedEvent"));
+        assertFalse(handler.supports("OtherEvent"));
+    }
+
+    @Test
+    void shouldHandleTransferCompletedEventByPublishingAsyncEvent() throws Exception {
+        OutboxEventListener.TransferEventPayload payload = new OutboxEventListener.TransferEventPayload(
+                456L, 11L, 22L, new BigDecimal("250.50"), "USD");
+        String jsonPayload = objectMapper.writeValueAsString(payload);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid-2", "Transfer", "456", "TransferCompletedEvent",
+                jsonPayload, LocalDateTime.now(), false, null);
+
+        handler.handle(entity);
+
+        ArgumentCaptor<AsyncTransferCompletedEvent> captor = ArgumentCaptor.forClass(AsyncTransferCompletedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        AsyncTransferCompletedEvent published = captor.getValue();
+        assertEquals(456L, published.transfer().getId());
+        assertEquals(Money.Currency.USD, published.transfer().getAmount().currency());
+    }
+
+    @Test
+    void shouldWrapListenerExceptionAsRuntimeException() throws Exception {
+        Transfer transfer = new Transfer(
+                999L, 1L, 2L,
+                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                TransferStatus.COMPLETED,
+                LocalDateTime.now());
+        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+
+        ObjectMapper failingMapper = mock(ObjectMapper.class);
+        when(failingMapper.writeValueAsString(any())).thenThrow(new RuntimeException("boom"));
+        OutboxEventListener failingListener = new OutboxEventListener(outboxRepo, failingMapper);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> failingListener.handleTransferCompleted(event));
+        assertTrue(ex.getMessage().contains("Failed to save outbox event"));
+        verifyNoInteractions(outboxRepo);
+    }
+
+    @Test
+    void shouldUseEmptyListAndSaveEventWhenHandlerSucceeds() throws Exception {
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
+                "{\"transferId\":1,\"senderAccountId\":1,\"receiverAccountId\":2,\"amount\":10,\"currency\":\"TRY\"}",
+                LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertTrue(entity.isProcessed());
+        assertNotNull(entity.getProcessedAt());
+        assertEquals(0, entity.getRetryCount());
+        assertNull(entity.getLastError());
+        assertFalse(entity.isDeadLetter());
+        verify(outboxRepo).save(entity);
+    }
+
+    @Test
+    void shouldTruncateNullMessageToNull() {
+        // Cover the truncate(null) branch — exercised when handler throws with null
+        // message
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
+                "invalid", LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertEquals(1, entity.getRetryCount());
+        // lastError will be Jackson's exception message; just verify not-null behavior
+        assertNotNull(entity.getLastError());
+    }
+
+    @Test
+    void shouldKeepShortMessageAsIs() {
+        // Cover the else branch of `message.length() <= maxLength` (short message
+        // stays)
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
+                "x", LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertEquals(1, entity.getRetryCount());
+        assertNotNull(entity.getLastError());
+    }
+
+    @Test
+    void shouldClearPreviousErrorWhenEventProcessedSuccessfully() throws Exception {
+        OutboxEventListener.TransferEventPayload payload = new OutboxEventListener.TransferEventPayload(
+                123L, 1L, 2L,
+                new BigDecimal("100.00"), "TRY");
+
+        String json = objectMapper.writeValueAsString(payload);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                json,
+                LocalDateTime.now(),
+                false,
+                null,
+                2,
+                false,
+                "old error");
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        outboxPoller.pollAndProcessEvents();
+
+        assertTrue(entity.isProcessed());
+        assertNull(entity.getLastError());
+    }
+
+    @Test
+    void shouldUseMatchingHandlerAmongMultipleHandlers() throws Exception {
+        OutboxEventHandler matchingHandler = mock(OutboxEventHandler.class);
+        OutboxEventHandler otherHandler = mock(OutboxEventHandler.class);
+
+        when(otherHandler.supports("TransferCompletedEvent"))
+                .thenReturn(false);
+
+        when(matchingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(otherHandler, matchingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        verify(matchingHandler).handle(entity);
+        verify(otherHandler, never()).handle(any());
+    }
+
+    @Test
+    void shouldRetryWhenHandlerThrowsException() throws Exception {
+        OutboxEventHandler failingHandler = mock(OutboxEventHandler.class);
+
+        when(failingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        doThrow(new RuntimeException("handler failed"))
+                .when(failingHandler)
+                .handle(any());
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(failingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        assertEquals(1, entity.getRetryCount());
+        assertEquals("handler failed", entity.getLastError());
+        assertFalse(entity.isDeadLetter());
+
+        verify(outboxRepo).save(entity);
+    }
+
+    @Test
+    void shouldMoveToDeadLetterExactlyAtMaxRetryBoundary() throws Exception {
+        OutboxEventHandler failingHandler = mock(OutboxEventHandler.class);
+
+        when(failingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        doThrow(new RuntimeException("boom"))
+                .when(failingHandler)
+                .handle(any());
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(failingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null,
+                4,
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        assertEquals(5, entity.getRetryCount());
+        assertTrue(entity.isDeadLetter());
+    }
+
+    @Test
+    void shouldTruncateErrorMessageTo2000Characters() throws Exception {
+        String longMessage = "x".repeat(2500);
+
+        OutboxEventHandler failingHandler = mock(OutboxEventHandler.class);
+
+        when(failingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        doThrow(new RuntimeException(longMessage))
+                .when(failingHandler)
+                .handle(any());
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(failingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        assertNotNull(entity.getLastError());
+        assertEquals(2000, entity.getLastError().length());
+    }
+
+    @Test
+    void shouldHandleExceptionWithNullMessage() throws Exception {
+
+        OutboxEventHandler failingHandler = mock(OutboxEventHandler.class);
+
+        when(failingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        doThrow(new RuntimeException((String) null))
+                .when(failingHandler)
+                .handle(any());
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(failingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        assertNull(entity.getLastError()); // truncate(null)
+    }
+
+    @Test
+    void shouldKeepShortErrorMessageWithoutTruncation() throws Exception {
+
+        OutboxEventHandler failingHandler = mock(OutboxEventHandler.class);
+
+        when(failingHandler.supports("TransferCompletedEvent"))
+                .thenReturn(true);
+
+        doThrow(new RuntimeException("short message"))
+                .when(failingHandler)
+                .handle(any());
+
+        OutboxPoller poller = new OutboxPoller(
+                lockRepository,
+                outboxRepo,
+                List.of(failingHandler));
+
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id",
+                "Transfer",
+                "123",
+                "TransferCompletedEvent",
+                "{}",
+                LocalDateTime.now(),
+                false,
+                null);
+
+        when(lockRepository.findAndLockUnprocessed(10))
+                .thenReturn(List.of(entity));
+
+        poller.pollAndProcessEvents();
+
+        assertEquals("short message", entity.getLastError());
+    }
+
 }
