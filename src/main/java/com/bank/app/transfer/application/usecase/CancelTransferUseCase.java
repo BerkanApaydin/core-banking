@@ -7,6 +7,7 @@ import com.bank.app.common.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.retry.annotation.Backoff;
@@ -23,15 +24,18 @@ public class CancelTransferUseCase {
     private final SaveTransferPort saveTransferPort;
     private final AccountInternalService accountInternalService;
     private final AuditService auditService;
+    private final int cancellationWindowHours;
 
     public CancelTransferUseCase(LoadTransferPort loadTransferPort, 
                                  SaveTransferPort saveTransferPort,
                                  AccountInternalService accountInternalService,
-                                 AuditService auditService) {
+                                 AuditService auditService,
+                                 @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountInternalService = accountInternalService;
         this.auditService = auditService;
+        this.cancellationWindowHours = cancellationWindowHours;
     }
 
     @Retryable(
@@ -55,7 +59,7 @@ public class CancelTransferUseCase {
         accountInternalService.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
 
         // Validate and update status in the domain model
-        transfer.cancel();
+        transfer.cancel(cancellationWindowHours);
 
         // Persist Transfer status update
         saveTransferPort.save(transfer);

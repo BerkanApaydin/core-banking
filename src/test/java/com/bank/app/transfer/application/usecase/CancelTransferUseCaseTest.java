@@ -32,7 +32,7 @@ class CancelTransferUseCaseTest {
         saveTransferPort = mock(SaveTransferPort.class);
         accountInternalService = mock(AccountInternalService.class);
         auditService = mock(AuditService.class);
-        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountInternalService, auditService);
+        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountInternalService, auditService, 24);
     }
 
     @Test

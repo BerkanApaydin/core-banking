@@ -81,9 +81,8 @@ class PlaceTransferUseCaseTest {
         verify(accountInternalService).debitAndCredit(eq(1L), eq(2L), any(Money.class));
         
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
-        verify(saveTransferPort, times(2)).save(transferCaptor.capture());
-        assertEquals(TransferStatus.PENDING, transferCaptor.getAllValues().get(0).getStatus());
-        assertEquals(TransferStatus.COMPLETED, transferCaptor.getAllValues().get(1).getStatus());
+        verify(saveTransferPort, times(1)).save(transferCaptor.capture());
+        assertEquals(TransferStatus.COMPLETED, transferCaptor.getValue().getStatus());
 
         verify(eventPublisher).publishEvent(any(TransferCompletedEvent.class));
     }
@@ -107,9 +106,7 @@ class PlaceTransferUseCaseTest {
 
         assertThrows(AccessDeniedException.class, () -> placeTransferUseCase.execute(request));
 
-        ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
-        verify(saveTransferPort, times(1)).save(transferCaptor.capture());
-        assertEquals(TransferStatus.PENDING, transferCaptor.getValue().getStatus());
+        verifyNoInteractions(saveTransferPort);
     }
 
     @Test

@@ -16,7 +16,7 @@ class TransferTest {
     void shouldCancelTransferSuccessfullyWhenWithin24HoursAndCompleted() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(2));
         
-        transfer.cancel();
+        transfer.cancel(24);
         
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
     }
@@ -25,21 +25,21 @@ class TransferTest {
     void shouldThrowTransferAlreadyCancelledExceptionWhenAlreadyCancelled() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
         
-        assertThrows(TransferAlreadyCancelledException.class, transfer::cancel);
+        assertThrows(TransferAlreadyCancelledException.class, () -> transfer.cancel(24));
     }
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenStatusIsNotCompleted() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
         
-        assertThrows(TransferNotCancellableException.class, transfer::cancel);
+        assertThrows(TransferNotCancellableException.class, () -> transfer.cancel(24));
     }
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenOlderThan24Hours() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
         
-        assertThrows(TransferNotCancellableException.class, transfer::cancel);
+        assertThrows(TransferNotCancellableException.class, () -> transfer.cancel(24));
     }
 
     @Test

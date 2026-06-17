@@ -1,4 +1,4 @@
-package com.bank.app.common.outbox;
+package com.bank.app.transfer.infrastructure.outbox;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

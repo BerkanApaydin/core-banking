@@ -1,4 +1,4 @@
-package com.bank.app.common.outbox;
+package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;

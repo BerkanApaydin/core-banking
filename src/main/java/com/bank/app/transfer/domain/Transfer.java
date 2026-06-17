@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class Transfer {
-    private static final int CANCELLATION_WINDOW_HOURS = 24;
 
     private final Long id;
     @NonNull private final Long senderAccountId;
@@ -76,7 +75,7 @@ public class Transfer {
         return version;
     }
 
-    public void cancel() {
+    public void cancel(int cancellationWindowHours) {
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);
         }
@@ -87,11 +86,11 @@ public class Transfer {
                 "Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: " + this.status
             );
         }
-        if (this.createdAt.plusHours(CANCELLATION_WINDOW_HOURS).isBefore(LocalDateTime.now())) {
+        if (this.createdAt.plusHours(cancellationWindowHours).isBefore(LocalDateTime.now())) {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
-                new Object[]{this.createdAt, CANCELLATION_WINDOW_HOURS},
-                "Transfer üzerinden " + CANCELLATION_WINDOW_HOURS + " saat geçtiği için iptal edilemez. Oluşturulma zamanı: " + this.createdAt
+                new Object[]{this.createdAt, cancellationWindowHours},
+                "Transfer üzerinden " + cancellationWindowHours + " saat geçtiği için iptal edilemez. Oluşturulma zamanı: " + this.createdAt
             );
         }
         this.status = TransferStatus.CANCELLED;

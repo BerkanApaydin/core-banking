@@ -1,4 +1,4 @@
-package com.bank.app.common.security;
+package com.bank.app.common.web;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,7 +16,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldNotLimitNonMonitoredPath() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/accounts");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -30,7 +30,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldAllowUnderLimit() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/auth/login");
         request.setRemoteAddr("192.168.1.1");
@@ -45,7 +45,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldBlockOverLimit() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         FilterChain chain = mock(FilterChain.class);
 
         for (int i = 0; i < 10; i++) {
@@ -71,7 +71,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldParseXForwardedForSingleIp() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/transfers");
         request.addHeader("X-Forwarded-For", "203.0.113.195");
@@ -86,7 +86,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldParseXForwardedForMultipleIps() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/transfers");
         request.addHeader("X-Forwarded-For", "203.0.113.195, 70.41.3.18, 150.172.238.178");
@@ -101,7 +101,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldParseXForwardedForUnknown() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/transfers");
         request.addHeader("X-Forwarded-For", "unknown");
@@ -117,7 +117,7 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldParseXForwardedForEmpty() throws IOException, ServletException {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/transfers");
         request.addHeader("X-Forwarded-For", "");
@@ -134,9 +134,9 @@ class RateLimitingFilterTest {
     @Test
     @SuppressWarnings("unchecked")
     void shouldResetLimitWhenExpired() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
+        RateLimitingFilter filter = new RateLimitingFilter(10, 10000);
         
-        Class<?> infoClass = Class.forName("com.bank.app.common.security.RateLimitingFilter$RateLimitInfo");
+        Class<?> infoClass = Class.forName("com.bank.app.common.web.RateLimitingFilter$RateLimitInfo");
         java.lang.reflect.Constructor<?> constructor = infoClass.getDeclaredConstructor(int.class, long.class);
         constructor.setAccessible(true);
         Object expiredInfo = constructor.newInstance(5, -10000L); // count = 5, expired 10 seconds ago
@@ -170,7 +170,7 @@ class RateLimitingFilterTest {
 
     @Test
     void testRateLimitInfoExpiry() throws Exception {
-        Class<?> infoClass = Class.forName("com.bank.app.common.security.RateLimitingFilter$RateLimitInfo");
+        Class<?> infoClass = Class.forName("com.bank.app.common.web.RateLimitingFilter$RateLimitInfo");
         java.lang.reflect.Constructor<?> constructor = infoClass.getDeclaredConstructor(int.class, long.class);
         constructor.setAccessible(true);
         Object infoInstance = constructor.newInstance(1, -10000L); // duration is -10 seconds (expired)

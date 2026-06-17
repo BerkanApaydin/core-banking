@@ -1,4 +1,4 @@
-package com.bank.app.common.security;
+package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;

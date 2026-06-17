@@ -1,4 +1,4 @@
-package com.bank.app.common.security;
+package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
@@ -16,7 +16,7 @@ class IdempotencyTest {
     @Test
     void testCleanupExpiredKeys() {
         SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyCleanupScheduler scheduler = new IdempotencyCleanupScheduler(repo);
+        IdempotencyCleanupScheduler scheduler = new IdempotencyCleanupScheduler(repo, 24);
 
         when(repo.deleteByCreatedAtBefore(any(LocalDateTime.class))).thenReturn(5);
 

@@ -1,4 +1,4 @@
-package com.bank.app.common.outbox;
+package com.bank.app.transfer.infrastructure.outbox;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

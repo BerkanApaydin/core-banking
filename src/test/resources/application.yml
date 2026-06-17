@@ -22,4 +22,12 @@ app:
   security:
     cors:
       allowed-origins: http://localhost:3000
+    rate-limit:
+      max-requests: 10
+      time-window-ms: 10000
+  idempotency:
+    cleanup-cron: "0 0 * * * *"
+    expiration-hours: 24
+  transfer:
+    cancellation-window-hours: 24
 

@@ -1,4 +1,4 @@
-package com.bank.app.common.security;
+package com.bank.app.common.observability;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;

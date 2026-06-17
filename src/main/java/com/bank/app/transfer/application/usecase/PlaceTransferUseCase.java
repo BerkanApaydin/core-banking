@@ -64,20 +64,17 @@ public class PlaceTransferUseCase {
 
         Money amount = new Money(request.amount(), request.currency());
 
+        // Perform balance updates and locking inside Account module FIRST
+        accountInternalService.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+
         // Validate transfer domain rules and create the Transfer aggregate root
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, request.senderIban(), request.receiverIban(), amount);
 
-        // Save initially as PENDING
-        Transfer savedTransfer = saveTransferPort.save(transfer);
-
-        // Perform balance updates and locking inside Account module
-        accountInternalService.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
-
         // Complete the transfer
-        savedTransfer.complete();
+        transfer.complete();
 
-        // Save the updated COMPLETED transfer
-        Transfer completedTransfer = saveTransferPort.save(savedTransfer);
+        // Save only once as COMPLETED
+        Transfer completedTransfer = saveTransferPort.save(transfer);
 
         logAuditAndPublishEvent(completedTransfer, request.senderIban(), request.receiverIban());
 

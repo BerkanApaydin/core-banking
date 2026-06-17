@@ -21,14 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.security.access.AccessDeniedException;
-
-import com.bank.app.common.security.SecurityUtils;
-import com.bank.app.common.security.IdempotencyManager;
-import com.bank.app.common.security.IdempotencyManager.IdempotencyResult;
-import com.bank.app.common.exception.ConcurrentRequestException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bank.app.common.idempotency.Idempotent;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,60 +40,24 @@ public class TransferController {
     private final GetTransferHistoryUseCase getTransferHistoryUseCase;
     private final GenerateTransferReportUseCase generateTransferReportUseCase;
 
-    private final SecurityUtils securityUtils;
-    private final IdempotencyManager idempotencyManager;
-    private final ObjectMapper objectMapper;
-
     public TransferController(PlaceTransferUseCase placeTransferUseCase, 
                               CancelTransferUseCase cancelTransferUseCase,
                               GetTransferDetailUseCase getTransferDetailUseCase,
                               GetTransferHistoryUseCase getTransferHistoryUseCase,
-                              GenerateTransferReportUseCase generateTransferReportUseCase,
-                              SecurityUtils securityUtils,
-                              IdempotencyManager idempotencyManager,
-                              ObjectMapper objectMapper) {
+                              GenerateTransferReportUseCase generateTransferReportUseCase) {
         this.placeTransferUseCase = placeTransferUseCase;
         this.cancelTransferUseCase = cancelTransferUseCase;
         this.getTransferDetailUseCase = getTransferDetailUseCase;
         this.getTransferHistoryUseCase = getTransferHistoryUseCase;
         this.generateTransferReportUseCase = generateTransferReportUseCase;
-        this.securityUtils = securityUtils;
-        this.idempotencyManager = idempotencyManager;
-        this.objectMapper = objectMapper;
     }
 
     @PostMapping
+    @Idempotent
     @Operation(summary = "Para transferi gerçekleştirir", description = "Gönderici ve alıcı IBAN bilgileriyle para transfer işlemini başlatır ve kaydeder. Idempotency-Key başlığıyla tekrarlı istekler önlenebilir.")
-    public ResponseEntity<?> transfer(
-            @Valid @RequestBody TransferRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader) throws Exception {
-        
-        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
-            TransferResponse response = placeTransferUseCase.execute(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        }
-
-        String username = securityUtils.getCurrentUsername()
-                .orElseThrow(() -> new AccessDeniedException("Giriş yapmalısınız."));
-        String key = username + "_" + idempotencyKeyHeader;
-
-        IdempotencyResult result = idempotencyManager.startRequest(key);
-        if (result.isCompleted()) {
-            TransferResponse cachedResponse = objectMapper.readValue(result.responseBody(), TransferResponse.class);
-            return ResponseEntity.ok(cachedResponse);
-        } else if (result.isPending()) {
-            throw new ConcurrentRequestException("error.concurrent_request", null, "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
-        }
-
-        try {
-            TransferResponse response = placeTransferUseCase.execute(request);
-            String jsonResponse = objectMapper.writeValueAsString(response);
-            idempotencyManager.completeRequest(key, jsonResponse);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception ex) {
-            idempotencyManager.failRequest(key);
-            throw ex;
-        }
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
+        TransferResponse response = placeTransferUseCase.execute(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{id}/cancel")

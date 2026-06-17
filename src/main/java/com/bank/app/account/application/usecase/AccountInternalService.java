@@ -63,19 +63,9 @@ public class AccountInternalService {
     }
 
     public void debitAndCredit(@NonNull Long senderId, @NonNull Long receiverId, @NonNull Money amount) {
-        Account sender;
-        Account receiver;
-        if (senderId.compareTo(receiverId) < 0) {
-            sender = loadAccountPort.findByIdWithLock(senderId)
-                    .orElseThrow(() -> new AccountNotFoundException(senderId));
-            receiver = loadAccountPort.findByIdWithLock(receiverId)
-                    .orElseThrow(() -> new AccountNotFoundException(receiverId));
-        } else {
-            receiver = loadAccountPort.findByIdWithLock(receiverId)
-                    .orElseThrow(() -> new AccountNotFoundException(receiverId));
-            sender = loadAccountPort.findByIdWithLock(senderId)
-                    .orElseThrow(() -> new AccountNotFoundException(senderId));
-        }
+        LockedAccounts locked = loadAccountsWithLockOrdered(senderId, receiverId);
+        Account sender = locked.sender();
+        Account receiver = locked.receiver();
 
         // Authorization check on sender account
         securityUtils.checkUserAuthorization(sender.getUserId(), "Bu hesaptan transfer yapmaya yetkiniz yok.");
@@ -89,6 +79,21 @@ public class AccountInternalService {
 
     public void reverseBalancesForCancellation(@NonNull Long senderId, @NonNull Long receiverId,
             @NonNull Money amount) {
+        LockedAccounts locked = loadAccountsWithLockOrdered(senderId, receiverId);
+        Account sender = locked.sender();
+        Account receiver = locked.receiver();
+
+        // Authorization check on sender account (since original sender cancels)
+        securityUtils.checkUserAuthorization(sender.getUserId(), "Bu transferi iptal etmeye yetkiniz yok.");
+
+        sender.credit(amount);
+        receiver.debit(amount);
+
+        saveAccountPort.save(sender);
+        saveAccountPort.save(receiver);
+    }
+
+    private LockedAccounts loadAccountsWithLockOrdered(@NonNull Long senderId, @NonNull Long receiverId) {
         Account sender;
         Account receiver;
         if (senderId.compareTo(receiverId) < 0) {
@@ -102,16 +107,10 @@ public class AccountInternalService {
             sender = loadAccountPort.findByIdWithLock(senderId)
                     .orElseThrow(() -> new AccountNotFoundException(senderId));
         }
-
-        // Authorization check on sender account (since original sender cancels)
-        securityUtils.checkUserAuthorization(sender.getUserId(), "Bu transferi iptal etmeye yetkiniz yok.");
-
-        sender.credit(amount);
-        receiver.debit(amount);
-
-        saveAccountPort.save(sender);
-        saveAccountPort.save(receiver);
+        return new LockedAccounts(sender, receiver);
     }
+
+    private record LockedAccounts(Account sender, Account receiver) {}
 
     public record AccountInfo(@NonNull Long id, @NonNull Long userId, @NonNull String currency, boolean active) {
     }

@@ -28,6 +28,14 @@ app:
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
+    rate-limit:
+      max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
+      time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
+  idempotency:
+    cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
+    expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
+  transfer:
+    cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
 
 management:
   endpoints:
