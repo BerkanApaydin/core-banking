@@ -41,7 +41,7 @@ class TransferDomainServiceTest {
                                                 Money.Currency.TRY,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("Aynı hesaba transfer yapılamaz"));
+                assertEquals("Aynı hesaba transfer yapılamaz: TR1", ex.getMessage());
         }
 
         @Test
@@ -57,7 +57,7 @@ class TransferDomainServiceTest {
                                                 Money.Currency.TRY,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("tr123"));
+                assertEquals("Aynı hesaba transfer yapılamaz: tr123", ex.getMessage());
         }
 
         @Test
@@ -153,7 +153,7 @@ class TransferDomainServiceTest {
                                                 Money.Currency.TRY,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("Gönderici hesap para birimi"));
+                assertTrue(ex.getMessage().contains("Gönderici hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor"));
         }
 
         @Test
@@ -169,6 +169,6 @@ class TransferDomainServiceTest {
                                                 Money.Currency.USD,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("Alıcı hesap para birimi"));
+                assertTrue(ex.getMessage().contains("Alıcı hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor"));
         }
 }

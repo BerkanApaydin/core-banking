@@ -17,8 +17,7 @@ public class TransferDomainService {
         Objects.requireNonNull(receiverCurrency, "Alıcı para birimi null olamaz");
 
         if (senderIban.equalsIgnoreCase(receiverIban) || Objects.equals(senderId, receiverId)) {
-            throw new SameAccountTransferException(
-                "Aynı hesaba transfer yapılamaz: " + senderIban);
+            throw new SameAccountTransferException(senderIban);
         }
 
         if (senderCurrency != amount.currency()) {

@@ -14,6 +14,9 @@ import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,28 +31,19 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class GenerateTransferReportUseCaseTest {
 
-    private LoadTransferPort loadTransferPort;
-    private AccountOperationsPort accountOperationsPort;
+    @Mock private LoadTransferPort loadTransferPort;
+    @Mock private AccountOperationsPort accountOperationsPort;
     private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
-        loadTransferPort = mock(LoadTransferPort.class);
-        accountOperationsPort = mock(AccountOperationsPort.class);
         securityContextPort = new SecurityUtils();
         generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountOperationsPort,
                 securityContextPort);
-
-        // Mock account internal service info
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
-                1L, "TR290006200000000000000111",
-                2L, "TR290006200000000000000222",
-                3L, "TR290006200000000000000333"));
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
@@ -68,6 +62,13 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime start = LocalDateTime.now().minusDays(5);
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
+
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+                1L, "TR290006200000000000000111",
+                2L, "TR290006200000000000000222",
+                3L, "TR290006200000000000000333"));
 
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED,
                 start.plusDays(1));
@@ -96,6 +97,10 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+
         when(loadTransferPort.findHistoryBetween(1L, start, end))
                 .thenReturn(Collections.emptyList());
 
@@ -114,6 +119,9 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime start = LocalDateTime.now().minusDays(5);
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
+
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
 
         // Set up authentication for user ID 999 (not owner of sender account 100)
         CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());

@@ -73,8 +73,8 @@ class CreateAccountUseCaseTest {
                 true);
 
         when(loadAccountPort.findByIban(iban))
-                .thenReturn(Optional.empty()) // Mükerrer IBAN yok
-                .thenReturn(Optional.of(expectedAccount)); // Kayıttan sonra getirme işlemi
+                .thenReturn(Optional.empty())       // 1. çağrı: mükerrer IBAN kontrolü
+                .thenReturn(Optional.of(expectedAccount)); // 2. çağrı: kayıt sonrası yüklenen hesap
 
         AccountResponse response = createAccountUseCase.execute(request);
 
@@ -105,7 +105,7 @@ class CreateAccountUseCaseTest {
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> createAccountUseCase.execute(request));
-        assertNotNull(ex.getMessage());
+        assertEquals("Başka bir kullanıcı adına hesap oluşturamazsınız.", ex.getMessage());
         verify(saveAccountPort, never()).save(any(Account.class));
     }
 
@@ -152,7 +152,7 @@ class CreateAccountUseCaseTest {
         NullPointerException ex = assertThrows(NullPointerException.class, () -> {
             createAccountUseCase.execute(request);
         });
-        assertNotNull(ex.getMessage());
+        assertEquals("Para birimi boş olamaz", ex.getMessage());
 
         verify(saveAccountPort, never()).save(any(Account.class));
     }
@@ -161,7 +161,7 @@ class CreateAccountUseCaseTest {
     void shouldThrowNullPointerExceptionWhenRequestIsNull() {
         NullPointerException ex = assertThrows(NullPointerException.class,
                 () -> createAccountUseCase.execute(null));
-        assertNotNull(ex.getMessage());
+        assertEquals("Request null olamaz", ex.getMessage());
     }
 
     @Test
@@ -193,8 +193,8 @@ class CreateAccountUseCaseTest {
 
         Iban iban = new Iban(request.iban());
         when(loadAccountPort.findByIban(iban))
-                .thenReturn(Optional.empty()) // Mükerrer IBAN yok
-                .thenReturn(Optional.empty()); // Kayıttan sonra getirme başarısız
+                .thenReturn(Optional.empty())  // 1. çağrı: mükerrer IBAN kontrolü
+                .thenReturn(Optional.empty()); // 2. çağrı: kayıt sonrası bulunamadı
 
         com.bank.app.common.exception.AccountNotFoundException exception = assertThrows(
                 com.bank.app.common.exception.AccountNotFoundException.class,

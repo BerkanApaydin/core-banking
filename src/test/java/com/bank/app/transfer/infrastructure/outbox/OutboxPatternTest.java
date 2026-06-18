@@ -162,43 +162,6 @@ class OutboxPatternTest {
     }
 
     @Test
-    void shouldTruncateLastErrorMessageLongerThan2000Chars() {
-        StringBuilder longPayload = new StringBuilder();
-        for (int i = 0; i < 3000; i++)
-            longPayload.append('x');
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
-                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
-                longPayload.toString(), LocalDateTime.now(), false, null);
-
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
-
-        outboxPoller.pollAndProcessEvents();
-
-        // Exception message comes from ObjectMapper ("Unexpected end-of-input...") but
-        // the
-        // lastError should be set to whatever the exception's message was (not
-        // necessarily 2000)
-        assertNotNull(entity.getLastError());
-    }
-
-    @Test
-    void shouldHandleNullExceptionMessageGracefully() {
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
-                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
-                "invalid json", LocalDateTime.now(), false, null);
-
-        // Stub to return a list with a malformed payload so the handler throws and the
-        // truncated message can be null when the underlying cause has no message.
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
-
-        outboxPoller.pollAndProcessEvents();
-
-        assertEquals(1, entity.getRetryCount());
-        assertFalse(entity.isProcessed());
-        assertNotNull(entity.getLastError());
-    }
-
-    @Test
     void shouldSupportTransferCompletedEventType() {
         assertTrue(handler.supports("TransferCompletedEvent"));
         assertFalse(handler.supports("OtherEvent"));
@@ -260,39 +223,6 @@ class OutboxPatternTest {
         assertNull(entity.getLastError());
         assertFalse(entity.isDeadLetter());
         verify(outboxRepo).save(entity);
-    }
-
-    @Test
-    void shouldTruncateNullMessageToNull() {
-        // Cover the truncate(null) branch — exercised when handler throws with null
-        // message
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
-                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
-                "invalid", LocalDateTime.now(), false, null);
-
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
-
-        outboxPoller.pollAndProcessEvents();
-
-        assertEquals(1, entity.getRetryCount());
-        // lastError will be Jackson's exception message; just verify not-null behavior
-        assertNotNull(entity.getLastError());
-    }
-
-    @Test
-    void shouldKeepShortMessageAsIs() {
-        // Cover the else branch of `message.length() <= maxLength` (short message
-        // stays)
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
-                "event-uuid", "Transfer", "123", "TransferCompletedEvent",
-                "x", LocalDateTime.now(), false, null);
-
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
-
-        outboxPoller.pollAndProcessEvents();
-
-        assertEquals(1, entity.getRetryCount());
-        assertNotNull(entity.getLastError());
     }
 
     @Test

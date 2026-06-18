@@ -142,7 +142,7 @@ class GetAccountUseCaseTest {
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> getAccountUseCase.getById(1L));
-        assertTrue(ex.getMessage().contains("yetkiniz"));
+        assertEquals("Bu hesaba erişim yetkiniz yok.", ex.getMessage());
     }
 
     @Test
@@ -165,7 +165,7 @@ class GetAccountUseCaseTest {
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
-        assertTrue(ex.getMessage().contains("yetkiniz"));
+        assertEquals("Bu hesaba erişim yetkiniz yok.", ex.getMessage());
     }
 
     @Test

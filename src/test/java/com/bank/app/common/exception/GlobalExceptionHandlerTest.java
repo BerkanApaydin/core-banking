@@ -158,7 +158,7 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("eşzamanlı"));
+        assertEquals("İşlem sırasında eşzamanlı bir güncelleme çakışması oluştu. Lütfen tekrar deneyin.", response.getBody().message());
     }
 
     @Test
@@ -238,7 +238,7 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("bütünlük"));
+        assertTrue(response.getBody().message().contains("Veritabanı bütünlük kısıt ihlali"));
     }
 
     @Test
@@ -278,7 +278,7 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("not supported"));
+        assertTrue(response.getBody().message().contains("Request method 'PATCH' is not supported"));
     }
 
     @Test
@@ -289,7 +289,7 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("Sistemsel"));
+        assertEquals("Sistemsel bir hata oluştu. Lütfen teknik destek ile iletişime geçin.", response.getBody().message());
     }
 
     @Test

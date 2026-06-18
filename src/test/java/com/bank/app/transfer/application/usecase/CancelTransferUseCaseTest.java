@@ -56,7 +56,7 @@ class CancelTransferUseCaseTest {
 
         TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
                 () -> cancelTransferUseCase.execute(10L));
-        assertTrue(ex.getMessage().contains("10"));
+        assertEquals("Transfer bulunamadı. ID: 10", ex.getMessage());
 
         verifyNoInteractions(accountOperationsPort);
         verifyNoInteractions(saveTransferPort);
@@ -85,7 +85,7 @@ class CancelTransferUseCaseTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> cancelTransferUseCase.execute(10L));
-        assertTrue(ex.getMessage().contains("aynı"));
+        assertEquals("Gönderici ve alıcı hesap aynı olamaz.", ex.getMessage());
 
         verifyNoInteractions(accountOperationsPort);
     }
@@ -94,6 +94,6 @@ class CancelTransferUseCaseTest {
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
         NullPointerException ex = assertThrows(NullPointerException.class,
                 () -> cancelTransferUseCase.execute(null));
-        assertNotNull(ex.getMessage());
+        assertEquals("Transfer ID null olamaz", ex.getMessage());
     }
 }

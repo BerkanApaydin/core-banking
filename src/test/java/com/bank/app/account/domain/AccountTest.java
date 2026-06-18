@@ -30,7 +30,7 @@ class AccountTest {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("100.00", Money.Currency.TRY), true);
         InsufficientBalanceException ex = assertThrows(InsufficientBalanceException.class, () ->
                 account.debit(Money.of("101.00", Money.Currency.TRY)));
-        assertTrue(ex.getMessage().contains("yetersiz"));
+        assertTrue(ex.getMessage().contains("Bakiye yetersiz"));
     }
 
     @Test
@@ -38,10 +38,10 @@ class AccountTest {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), false);
         AccountNotActiveException ex1 = assertThrows(AccountNotActiveException.class, () ->
                 account.debit(Money.of("100.00", Money.Currency.TRY)));
-        assertTrue(ex1.getMessage().contains("aktif"));
+        assertTrue(ex1.getMessage().contains("Hesap aktif değil"));
         AccountNotActiveException ex2 = assertThrows(AccountNotActiveException.class, () ->
                 account.credit(Money.of("100.00", Money.Currency.TRY)));
-        assertTrue(ex2.getMessage().contains("aktif"));
+        assertTrue(ex2.getMessage().contains("Hesap aktif değil"));
     }
 
     @Test

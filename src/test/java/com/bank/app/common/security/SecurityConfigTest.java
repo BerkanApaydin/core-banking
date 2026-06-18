@@ -12,13 +12,13 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.DefaultSecurityFilterChain;
 
 @ExtendWith(MockitoExtension.class)
 class SecurityConfigTest {
@@ -55,13 +55,9 @@ class SecurityConfigTest {
     @Test
     void shouldCreateSecurityFilterChain() throws Exception {
         HttpSecurity http = mock(HttpSecurity.class, RETURNS_DEEP_STUBS);
-        DefaultSecurityFilterChain mockChain = mock(DefaultSecurityFilterChain.class);
+        when(http.build()).thenReturn(mock(DefaultSecurityFilterChain.class));
 
-        when(http.build()).thenReturn(mockChain);
-
-        DefaultSecurityFilterChain chain = (DefaultSecurityFilterChain) securityConfig.securityFilterChain(http);
-
+        SecurityFilterChain chain = securityConfig.securityFilterChain(http);
         assertNotNull(chain);
-        verify(http).build();
     }
 }

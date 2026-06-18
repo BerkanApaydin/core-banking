@@ -27,7 +27,7 @@ class TransferTest {
         
         TransferAlreadyCancelledException ex = assertThrows(TransferAlreadyCancelledException.class,
                 () -> transfer.cancel(24));
-        assertTrue(ex.getMessage().contains("zaten"));
+        assertEquals("Transfer zaten iptal edilmiş. ID: 1", ex.getMessage());
     }
 
     @Test
@@ -36,7 +36,7 @@ class TransferTest {
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
-        assertTrue(ex.getMessage().toLowerCase().contains("iptal"));
+        assertTrue(ex.getMessage().contains("Sadece tamamlanmış transferler iptal edilebilir"));
     }
 
     @Test
@@ -45,7 +45,7 @@ class TransferTest {
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
-        assertTrue(ex.getMessage().toLowerCase().contains("iptal"));
+        assertTrue(ex.getMessage().contains("saat geçtiği için iptal edilemez"));
     }
 
     @Test

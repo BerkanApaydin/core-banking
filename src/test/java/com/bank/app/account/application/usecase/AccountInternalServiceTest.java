@@ -42,22 +42,22 @@ class AccountInternalServiceTest {
         void shouldThrowExceptionWhenAccountNotFoundInGetAccountInfo() {
                 when(loadAccountPort.findById(999L)).thenReturn(Optional.empty());
 
-                AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
-                                () -> accountInternalService.getAccountInfo(999L));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                        () -> accountInternalService.getAccountInfo(999L));
 
-                assertTrue(exception.getMessage().contains("999"));
-                verify(loadAccountPort).findById(999L);
-        }
+        assertEquals("Hesap bulunamadı. ID: 999", exception.getMessage());
+        verify(loadAccountPort).findById(999L);
+    }
 
-        @Test
-        void shouldThrowExceptionWhenAccountNotFoundInGetAccountInfoForTransfer() {
-                when(loadAccountPort.findByIban(any(Iban.class))).thenReturn(Optional.empty());
+    @Test
+    void shouldThrowExceptionWhenAccountNotFoundInGetAccountInfoForTransfer() {
+        when(loadAccountPort.findByIban(any(Iban.class))).thenReturn(Optional.empty());
 
-                AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
-                                () -> accountInternalService.getAccountInfoForTransfer("TR290006200000000000000999"));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                        () -> accountInternalService.getAccountInfoForTransfer("TR290006200000000000000999"));
 
-                assertTrue(exception.getMessage().contains("TR290006200000000000000999"));
-                verify(loadAccountPort).findByIban(any(Iban.class));
+        assertEquals("Hesap bulunamadı. IBAN: TR290006200000000000000999", exception.getMessage());
+        verify(loadAccountPort).findByIban(any(Iban.class));
         }
 
         @Test
@@ -118,12 +118,12 @@ class AccountInternalServiceTest {
         void shouldThrowExceptionWhenSenderNotFoundInDebitAndCredit() {
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.empty());
 
-                AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
-                                () -> accountInternalService.debitAndCredit(1L, 2L,
-                                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
-                assertTrue(ex.getMessage().contains("1"));
+        AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
+                        () -> accountInternalService.debitAndCredit(1L, 2L,
+                                        new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+        assertEquals("Hesap bulunamadı. ID: 1", ex.getMessage());
 
-                verify(loadAccountPort).findByIdWithLock(1L);
+        verify(loadAccountPort).findByIdWithLock(1L);
                 verify(saveAccountPort, never()).save(any());
         }
 
@@ -135,10 +135,10 @@ class AccountInternalServiceTest {
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
-                AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
-                                () -> accountInternalService.debitAndCredit(1L, 2L,
-                                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
-                assertTrue(ex.getMessage().contains("2"));
+        AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
+                        () -> accountInternalService.debitAndCredit(1L, 2L,
+                                        new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+        assertEquals("Hesap bulunamadı. ID: 2", ex.getMessage());
 
                 verify(loadAccountPort).findByIdWithLock(1L);
                 verify(loadAccountPort).findByIdWithLock(2L);

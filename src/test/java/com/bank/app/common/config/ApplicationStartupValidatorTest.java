@@ -7,8 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,8 +45,8 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        org.assertj.core.api.Assertions.assertThat(exception.getMessage())
-                .contains("non-default JWT secret");
+        assertTrue(exception.getMessage().contains("non-default JWT secret"),
+                "Prod'da default JWT secret hata fırlatmalı");
     }
 
     @Test
@@ -88,8 +87,8 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        org.assertj.core.api.Assertions.assertThat(exception.getMessage())
-                .contains("secure database password");
+        assertTrue(exception.getMessage().contains("secure database password"),
+                "Prod'da boş DB şifresi uyarı vermeli");
     }
 
     @Test
