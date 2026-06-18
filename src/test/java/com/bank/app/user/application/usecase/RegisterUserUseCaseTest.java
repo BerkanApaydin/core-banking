@@ -6,6 +6,9 @@ import com.bank.app.user.application.port.SaveUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -14,18 +17,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class RegisterUserUseCaseTest {
 
-    private LoadUserPort loadUserPort;
-    private SaveUserPort saveUserPort;
-    private PasswordEncoder passwordEncoder;
+    @Mock private LoadUserPort loadUserPort;
+    @Mock private SaveUserPort saveUserPort;
+    @Mock private PasswordEncoder passwordEncoder;
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
     void setUp() {
-        loadUserPort = mock(LoadUserPort.class);
-        saveUserPort = mock(SaveUserPort.class);
-        passwordEncoder = mock(PasswordEncoder.class);
         registerUserUseCase = new RegisterUserUseCase(loadUserPort, saveUserPort, passwordEncoder);
     }
 

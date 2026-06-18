@@ -1,8 +1,11 @@
 package com.bank.app.common.security;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -17,11 +20,17 @@ import static org.mockito.Mockito.*;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.DefaultSecurityFilterChain;
 
+@ExtendWith(MockitoExtension.class)
 class SecurityConfigTest {
 
-    private final JwtAuthenticationFilter jwtAuthFilter = mock(JwtAuthenticationFilter.class);
-    private final UserDetailsService userDetailsService = mock(UserDetailsService.class);
-    private final SecurityConfig securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService);
+    @Mock private JwtAuthenticationFilter jwtAuthFilter;
+    @Mock private UserDetailsService userDetailsService;
+    private SecurityConfig securityConfig;
+
+    @BeforeEach
+    void setUp() {
+        securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService);
+    }
 
     @Test
     void shouldCreatePasswordEncoderBean() {

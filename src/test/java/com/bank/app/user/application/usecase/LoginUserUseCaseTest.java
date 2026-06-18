@@ -16,28 +16,30 @@ import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Optional;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@SuppressWarnings("null")
+@ExtendWith(MockitoExtension.class)
 class LoginUserUseCaseTest {
 
-    private AuthenticationManager authenticationManager;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private LoadUserPort loadUserPort;
     private JwtService jwtService;
-    private LoadUserPort loadUserPort;
     private LoginUserUseCase loginUserUseCase;
 
     @BeforeEach
     void setUp() {
-        authenticationManager = mock(AuthenticationManager.class);
         Environment environment = mock(Environment.class);
-        when(environment.getActiveProfiles()).thenReturn(new String[]{});
+        lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
         jwtService = new JwtService(environment);
         ReflectionTestUtils.setField(jwtService, "secretKey", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L);
         ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
-        loadUserPort = mock(LoadUserPort.class);
         loginUserUseCase = new LoginUserUseCase(authenticationManager, jwtService, loadUserPort);
     }
 
@@ -85,9 +87,10 @@ class LoginUserUseCaseTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
-        assertThrows(BadCredentialsException.class, () -> 
+        BadCredentialsException exception = assertThrows(BadCredentialsException.class, () -> 
                 loginUserUseCase.execute(request)
         );
+        assertEquals("Bad credentials", exception.getMessage());
 
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verifyNoInteractions(loadUserPort);

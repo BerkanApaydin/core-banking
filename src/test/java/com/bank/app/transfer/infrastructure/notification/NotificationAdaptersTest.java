@@ -7,6 +7,9 @@ import com.bank.app.common.domain.Money;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,15 +17,15 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class NotificationAdaptersTest {
 
-    private Transfer transfer;
+    @Mock private Transfer transfer;
 
     @BeforeEach
     void setUp() {
-        transfer = mock(Transfer.class);
-        when(transfer.getId()).thenReturn(1L);
-        when(transfer.getAmount()).thenReturn(new Money(BigDecimal.TEN, Money.Currency.TRY));
+        lenient().when(transfer.getId()).thenReturn(1L);
+        lenient().when(transfer.getAmount()).thenReturn(new Money(BigDecimal.TEN, Money.Currency.TRY));
     }
 
     @Test

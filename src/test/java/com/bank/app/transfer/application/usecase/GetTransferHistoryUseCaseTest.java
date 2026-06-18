@@ -13,6 +13,9 @@ import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,17 +29,16 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class GetTransferHistoryUseCaseTest {
 
-    private LoadTransferPort loadTransferPort;
-    private AccountOperationsPort accountOperationsPort;
+    @Mock private LoadTransferPort loadTransferPort;
+    @Mock private AccountOperationsPort accountOperationsPort;
     private SecurityContextPort securityContextPort;
     private GetTransferHistoryUseCase getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
-        loadTransferPort = mock(LoadTransferPort.class);
-        accountOperationsPort = mock(AccountOperationsPort.class);
         securityContextPort = new SecurityUtils();
         getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationsPort,
                 securityContextPort);
@@ -86,11 +88,13 @@ class GetTransferHistoryUseCaseTest {
 
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
 
-        assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
+        assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", exception.getMessage());
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
-        assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
+        NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
+        assertEquals("Account ID null olamaz", exception.getMessage());
     }
 }

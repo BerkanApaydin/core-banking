@@ -4,6 +4,9 @@ import com.bank.app.user.domain.User;
 import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -16,17 +19,17 @@ import org.springframework.core.env.Environment;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
 class JwtServiceTest {
 
+    @Mock private Environment environment;
     private JwtService jwtService;
-    private Environment environment;
     private final String defaultSecretKey = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
     @BeforeEach
     void setUp() {
-        environment = mock(Environment.class);
-        when(environment.getActiveProfiles()).thenReturn(new String[]{});
+        lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
         jwtService = new JwtService(environment);
         ReflectionTestUtils.setField(jwtService, "secretKey", defaultSecretKey);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L); // 24 hours
@@ -37,14 +40,16 @@ class JwtServiceTest {
     void shouldThrowExceptionWhenDefaultSecretAndProdProfile() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
         ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
-        assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+        IllegalStateException ex1 = assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.", ex1.getMessage());
     }
 
     @Test
     void shouldThrowExceptionWhenDefaultSecretAndAllowDefaultSecretFalse() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
         ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", false);
-        assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+        IllegalStateException ex2 = assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
+        assertTrue(ex2.getMessage().toLowerCase().contains("secret"));
     }
 
     @Test
@@ -109,7 +114,8 @@ class JwtServiceTest {
         User user = new User(100L, "john_doe", "password", "ROLE_USER");
         String token = jwtService.generateToken(user);
 
-        assertThrows(ExpiredJwtException.class, () -> jwtService.extractUsername(token));
+        ExpiredJwtException ex = assertThrows(ExpiredJwtException.class, () -> jwtService.extractUsername(token));
+        assertNotNull(ex.getMessage());
     }
 
     @Test

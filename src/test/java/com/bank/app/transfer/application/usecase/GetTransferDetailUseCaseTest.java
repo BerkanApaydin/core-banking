@@ -12,6 +12,9 @@ import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.domain.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -21,18 +24,16 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class GetTransferDetailUseCaseTest {
 
-    private LoadTransferPort loadTransferPort;
-    private AccountOperationsPort accountOperationsPort;
-    private SecurityContextPort securityContextPort;
+    @Mock private LoadTransferPort loadTransferPort;
+    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private SecurityContextPort securityContextPort;
     private GetTransferDetailUseCase getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
-        loadTransferPort = mock(LoadTransferPort.class);
-        accountOperationsPort = mock(AccountOperationsPort.class);
-        securityContextPort = mock(SecurityContextPort.class);
         getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountOperationsPort, securityContextPort);
     }
 
@@ -139,7 +140,8 @@ class GetTransferDetailUseCaseTest {
         Long transferId = 1L;
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.empty());
 
-        assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        assertEquals("Transfer bulunamadı. ID: " + transferId, exception.getMessage());
     }
 
     @Test
@@ -160,7 +162,8 @@ class GetTransferDetailUseCaseTest {
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
         when(accountOperationsPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
 
-        assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        assertEquals("Hesap bulunamadı. ID: " + senderAccountId, exception.getMessage());
     }
 
     @Test
@@ -184,7 +187,8 @@ class GetTransferDetailUseCaseTest {
         when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
 
-        assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        assertEquals("Hesap bulunamadı. ID: " + receiverAccountId, exception.getMessage());
     }
 
     @Test
@@ -211,11 +215,13 @@ class GetTransferDetailUseCaseTest {
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
-        assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
+        assertEquals("Oturum bulunamadı.", exception.getMessage());
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
-        assertThrows(NullPointerException.class, () -> getTransferDetailUseCase.execute(null));
+        NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferDetailUseCase.execute(null));
+        assertEquals("Transfer ID null olamaz", exception.getMessage());
     }
 }

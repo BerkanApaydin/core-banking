@@ -121,7 +121,8 @@ class GenerateTransferReportUseCaseTest {
                 Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        assertThrows(AccessDeniedException.class, () -> generateTransferReportUseCase.execute(criteria));
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> generateTransferReportUseCase.execute(criteria));
+        assertEquals("Bu hesabın raporunu oluşturma yetkiniz yok.", exception.getMessage());
     }
 
     @Test
@@ -148,6 +149,7 @@ class GenerateTransferReportUseCaseTest {
 
     @Test
     void shouldThrowNullPointerExceptionWhenCriteriaIsNull() {
-        assertThrows(NullPointerException.class, () -> generateTransferReportUseCase.execute(null));
+        NullPointerException exception = assertThrows(NullPointerException.class, () -> generateTransferReportUseCase.execute(null));
+        assertEquals("Criteria null olamaz", exception.getMessage());
     }
 }

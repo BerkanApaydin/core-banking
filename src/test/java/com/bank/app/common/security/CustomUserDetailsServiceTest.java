@@ -3,6 +3,9 @@ package com.bank.app.common.security;
 import com.bank.app.user.application.port.LoadUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -11,12 +14,16 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
+
+    @Mock private LoadUserPort loadUserPort;
+
+    private CustomUserDetailsService service;
 
     @Test
     void shouldLoadUserSuccessfully() {
-        LoadUserPort loadUserPort = mock(LoadUserPort.class);
-        CustomUserDetailsService service = new CustomUserDetailsService(loadUserPort);
+        service = new CustomUserDetailsService(loadUserPort);
         User user = new User(100L, "john", "pass", "ROLE_USER");
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));
@@ -32,11 +39,11 @@ class CustomUserDetailsServiceTest {
 
     @Test
     void shouldThrowUsernameNotFoundExceptionWhenUserNotFound() {
-        LoadUserPort loadUserPort = mock(LoadUserPort.class);
-        CustomUserDetailsService service = new CustomUserDetailsService(loadUserPort);
+        service = new CustomUserDetailsService(loadUserPort);
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.empty());
 
-        assertThrows(UsernameNotFoundException.class, () -> service.loadUserByUsername("john"));
+        UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class, () -> service.loadUserByUsername("john"));
+        assertEquals("User not found: john", exception.getMessage());
     }
 }
