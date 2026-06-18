@@ -8,6 +8,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class IbanTest {
 
     @Test
+    void shouldThrowNullPointerExceptionWhenValueIsNull() {
+        assertThrows(NullPointerException.class, () -> new Iban(null));
+    }
+
+    @Test
     void shouldCreateIbanWhenFormatIsValid() {
         String validIbanStr = "TR29 0006 2000 0000 0000 0001 11";
         Iban iban = new Iban(validIbanStr);

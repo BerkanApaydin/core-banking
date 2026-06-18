@@ -136,4 +136,28 @@ class IdempotencyTest {
 
         verify(repo).deleteById("key-1");
     }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenStartRequestWithNullKey() {
+        assertThrows(NullPointerException.class, () -> manager.startRequest(null));
+    }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenCompleteRequestWithNullKey() {
+        assertThrows(NullPointerException.class, () -> manager.completeRequest(null, "body", 200));
+    }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenFailRequestWithNullKey() {
+        assertThrows(NullPointerException.class, () -> manager.failRequest(null));
+    }
+
+    @Test
+    void shouldDoNothingWhenCompleteRequestForNonExistentKey() {
+        when(repo.findById("nonexistent")).thenReturn(Optional.empty());
+
+        manager.completeRequest("nonexistent", "body", 200);
+
+        verify(repo, never()).save(any());
+    }
 }

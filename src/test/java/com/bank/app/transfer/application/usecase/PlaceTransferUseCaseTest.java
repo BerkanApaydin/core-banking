@@ -17,8 +17,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -199,5 +203,18 @@ class PlaceTransferUseCaseTest {
         assertEquals(1L, response.senderAccountId());
         assertEquals(2L, response.receiverAccountId());
         assertEquals("TRY", response.currency());
+    }
+
+    @Test
+    void shouldHaveRetryableAnnotationOnExecuteMethod() throws Exception {
+        Method method = PlaceTransferUseCase.class.getMethod("execute", TransferRequest.class);
+        Retryable retryable = method.getAnnotation(Retryable.class);
+        assertNotNull(retryable, "execute method should be annotated with @Retryable");
+    }
+
+    @Test
+    void shouldHaveTransactionalAnnotationOnClass() {
+        Transactional transactional = PlaceTransferUseCase.class.getAnnotation(Transactional.class);
+        assertNotNull(transactional, "PlaceTransferUseCase should be annotated with @Transactional");
     }
 }

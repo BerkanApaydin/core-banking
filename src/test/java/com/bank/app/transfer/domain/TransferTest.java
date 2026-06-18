@@ -31,12 +31,21 @@ class TransferTest {
     }
 
     @Test
-    void shouldThrowTransferNotCancellableExceptionWhenStatusIsNotCompleted() {
+    void shouldThrowTransferNotCancellableExceptionWhenStatusIsFailed() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
         assertEquals("Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: FAILED", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowTransferNotCancellableExceptionWhenStatusIsPending() {
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+
+        TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
+                () -> transfer.cancel(24));
+        assertTrue(ex.getMessage().contains("Sadece tamamlanmış transferler iptal edilebilir"));
     }
 
     @Test
