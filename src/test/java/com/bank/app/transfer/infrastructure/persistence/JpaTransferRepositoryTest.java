@@ -17,17 +17,18 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import org.mockito.Answers;
+
 @ExtendWith(MockitoExtension.class)
 class JpaTransferRepositoryTest {
 
     @Mock private SpringDataTransferRepo springDataRepo;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private TransferMapper mapper;
 
-    private TransferMapper mapper;
     private JpaTransferRepository repository;
 
     @BeforeEach
     void setUp() {
-        mapper = new TransferMapper();
         repository = new JpaTransferRepository(springDataRepo, mapper);
     }
 
@@ -144,5 +145,209 @@ class JpaTransferRepositoryTest {
     @SuppressWarnings("null")
     void shouldThrowExceptionWhenSavingNullTransfer() {
         assertThrows(IllegalStateException.class, () -> repository.save(null));
+    }
+
+    @Test
+    void shouldFindByIdWithLockSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity jpaEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findByIdWithLock(10L)).thenReturn(Optional.of(jpaEntity));
+
+        Optional<Transfer> result = repository.findByIdWithLock(10L);
+
+        assertTrue(result.isPresent());
+        assertEquals(10L, result.get().getId());
+        verify(springDataRepo).findByIdWithLock(10L);
+    }
+
+    @Test
+    void shouldReturnEmptyWhenFindByIdWithLockNotFound() {
+        when(springDataRepo.findByIdWithLock(999L)).thenReturn(Optional.empty());
+
+        Optional<Transfer> result = repository.findByIdWithLock(999L);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findByIdWithLock(999L);
+    }
+
+    @Test
+    void shouldReturnEmptyWhenFindByIdNotFound() {
+        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+
+        Optional<Transfer> result = repository.findById(999L);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findById(999L);
+    }
+
+    @Test
+    void shouldFilterOutNullMappingsWhenFindBySenderAccountId() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(List.of(entity1, entity2));
+        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
+
+        var result = repository.findBySenderAccountId(100L);
+
+        assertEquals(1, result.size());
+        assertEquals(300L, result.getFirst().getReceiverAccountId());
+        verify(springDataRepo).findBySenderAccountId(100L);
+    }
+
+    @Test
+    void shouldFilterOutNullMappingsWhenFindBySenderAccountIdAndCreatedAtBetween() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
+        lenient().when(mapper.toDomain(entity2)).thenReturn(null);
+
+        var result = repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
+
+        assertEquals(1, result.size());
+        assertEquals(200L, result.getFirst().getReceiverAccountId());
+        verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
+    }
+
+    @Test
+    void shouldFindHistorySuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistory(eq(100L), any())).thenReturn(List.of(entity1, entity2));
+
+        var result = repository.findHistory(100L, 0, 10);
+
+        assertEquals(2, result.size());
+        verify(springDataRepo).findHistory(eq(100L), any());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindHistoryNotFound() {
+        when(springDataRepo.findHistory(eq(999L), any())).thenReturn(List.of());
+
+        var result = repository.findHistory(999L, 0, 10);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findHistory(eq(999L), any());
+    }
+
+    @Test
+    void shouldFilterOutNullMappingsWhenFindHistory() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistory(eq(100L), any())).thenReturn(List.of(entity1, entity2));
+        lenient().when(mapper.toDomain(entity2)).thenReturn(null);
+
+        var result = repository.findHistory(100L, 0, 10);
+
+        assertEquals(1, result.size());
+        assertEquals(200L, result.getFirst().getReceiverAccountId());
+        verify(springDataRepo).findHistory(eq(100L), any());
+    }
+
+    @Test
+    void shouldFindHistoryBetweenSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistoryBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
+
+        var result = repository.findHistoryBetween(100L, start, end);
+
+        assertEquals(2, result.size());
+        verify(springDataRepo).findHistoryBetween(100L, start, end);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindHistoryBetweenNotFound() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+
+        when(springDataRepo.findHistoryBetween(999L, start, end)).thenReturn(List.of());
+
+        var result = repository.findHistoryBetween(999L, start, end);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findHistoryBetween(999L, start, end);
+    }
+
+    @Test
+    void shouldFilterOutNullMappingsWhenFindHistoryBetween() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistoryBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
+        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
+
+        var result = repository.findHistoryBetween(100L, start, end);
+
+        assertEquals(1, result.size());
+        assertEquals(100L, result.getFirst().getReceiverAccountId());
+        verify(springDataRepo).findHistoryBetween(100L, start, end);
+    }
+
+    @Test
+    void shouldFindHistoryBetweenWithPaginationSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistoryBetween(eq(100L), eq(start), eq(end), any())).thenReturn(List.of(entity1));
+
+        var result = repository.findHistoryBetween(100L, start, end, 0, 10);
+
+        assertEquals(1, result.size());
+        assertEquals(100L, result.getFirst().getSenderAccountId());
+        verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), any());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindHistoryBetweenWithPaginationNotFound() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+
+        when(springDataRepo.findHistoryBetween(eq(999L), eq(start), eq(end), any())).thenReturn(List.of());
+
+        var result = repository.findHistoryBetween(999L, start, end, 0, 10);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findHistoryBetween(eq(999L), eq(start), eq(end), any());
+    }
+
+    @Test
+    void shouldFilterOutNullMappingsWhenFindHistoryBetweenWithPagination() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findHistoryBetween(eq(100L), eq(start), eq(end), any())).thenReturn(List.of(entity1, entity2));
+        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
+
+        var result = repository.findHistoryBetween(100L, start, end, 0, 10);
+
+        assertEquals(1, result.size());
+        assertEquals(100L, result.getFirst().getReceiverAccountId());
+        verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), any());
     }
 }

@@ -14,6 +14,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.core.env.Environment;
 import static org.mockito.Mockito.*;
@@ -58,6 +60,13 @@ class JwtServiceTest {
 
     @Test
     void shouldNotThrowExceptionWhenCustomSecret() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
+        assertDoesNotThrow(() -> jwtService.validateSecret());
+    }
+
+    @Test
+    void shouldNotThrowExceptionWhenProdWithNonDefaultSecret() {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
         ReflectionTestUtils.setField(jwtService, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
         assertDoesNotThrow(() -> jwtService.validateSecret());
     }
@@ -113,6 +122,21 @@ class JwtServiceTest {
 
         ExpiredJwtException ex = assertThrows(ExpiredJwtException.class, () -> jwtService.extractUsername(token));
         assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void shouldGenerateTokenWithExtraClaims() {
+        User user = new User(100L, "john_doe", "password", "ROLE_USER");
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", "ADMIN");
+
+        String token = jwtService.generateToken(extraClaims, user);
+        assertNotNull(token);
+
+        String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
+        assertEquals("ADMIN", role);
+        Long userId = jwtService.extractClaim(token, claims -> claims.get("userId", Long.class));
+        assertEquals(100L, userId);
     }
 
     @Test

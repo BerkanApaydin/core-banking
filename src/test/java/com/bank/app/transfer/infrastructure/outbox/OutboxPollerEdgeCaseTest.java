@@ -187,6 +187,33 @@ class OutboxPollerEdgeCaseTest {
     }
 
     @Test
+    void shouldCreateWithCustomMaxRetries() {
+        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 3);
+
+        OutboxEventJpaEntity event = new OutboxEventJpaEntity();
+        event.setId(UUID.randomUUID().toString());
+        event.setEventType("TRANSFER_COMPLETED");
+        event.setProcessed(false);
+        event.setDeadLetter(false);
+        event.setRetryCount(2);
+        event.setCreatedAt(LocalDateTime.now());
+
+        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
+        try {
+            doThrow(new RuntimeException("Handler failed"))
+                    .when(handler).handle(event);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        pollerWithCustomRetries.pollAndProcessEvents();
+
+        assertEquals(3, event.getRetryCount());
+        assertTrue(event.isDeadLetter());
+    }
+
+    @Test
     void shouldHandleNoHandlersList() {
         OutboxPoller emptyPoller = new OutboxPoller(lockRepository, outboxRepo, Collections.emptyList());
 
