@@ -256,13 +256,16 @@ class IdempotencyAspectTest {
                 when(objectMapper.writeValueAsString(body))
                                 .thenReturn("{\"message\":\"success\"}");
 
-                aspect.handleIdempotency(joinPoint, annotation());
+                Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyManager)
                                 .completeRequest(
                                                 eq("user_abc"),
                                                 anyString(),
                                                 eq(200));
+                assertNotNull(result);
+                assertInstanceOf(ResponseEntity.class, result);
+                assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
         }
 
         @Test
@@ -283,10 +286,12 @@ class IdempotencyAspectTest {
                 when(joinPoint.proceed())
                                 .thenReturn(ResponseEntity.ok().build());
 
-                aspect.handleIdempotency(joinPoint, annotation());
+                Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyManager)
                                 .failRequest("user_abc");
+                assertNotNull(result);
+                assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
         }
 
         @Test
@@ -307,10 +312,12 @@ class IdempotencyAspectTest {
                 when(joinPoint.proceed())
                                 .thenReturn(ResponseEntity.badRequest().build());
 
-                aspect.handleIdempotency(joinPoint, annotation());
+                Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyManager)
                                 .failRequest("user_abc");
+                assertNotNull(result);
+                assertEquals(400, ((ResponseEntity<?>) result).getStatusCode().value());
         }
 
         @Test
@@ -331,10 +338,11 @@ class IdempotencyAspectTest {
                 when(joinPoint.proceed())
                                 .thenReturn("OK");
 
-                aspect.handleIdempotency(joinPoint, annotation());
+                Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyManager)
                                 .failRequest("user_abc");
+                assertEquals("OK", result);
         }
 
         @Test

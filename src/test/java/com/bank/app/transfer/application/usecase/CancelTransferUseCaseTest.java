@@ -57,6 +57,7 @@ class CancelTransferUseCaseTest {
 
         verify(accountOperationsPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
         verify(saveTransferPort).save(transfer);
+        verify(auditService).log(any(), anyString());
     }
 
     @Test

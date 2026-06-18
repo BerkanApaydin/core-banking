@@ -68,7 +68,6 @@ public class GenerateTransferReportUseCase {
         // Batch load account IBANs to avoid N+1 query problem
         Set<Long> accountIds = transfers.stream()
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
-                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
         Map<Long, String> ibansMap = accountOperationsPort.getIbansForAccounts(accountIds);

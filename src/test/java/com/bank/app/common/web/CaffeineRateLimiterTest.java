@@ -76,7 +76,7 @@ class CaffeineRateLimiterTest {
         assertTrue(limiter.tryAcquire("client"));
     }
 
-    private static class SettableClock extends Clock {
+    static class SettableClock extends Clock {
         private long millis;
 
         SettableClock(long millis) {

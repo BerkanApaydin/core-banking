@@ -144,4 +144,59 @@ class MoneyEdgeCaseTest {
         Money money = Money.of("100.00", Money.Currency.TRY);
         assertEquals(2, money.amount().scale());
     }
+
+    @Test
+    void shouldThrowSpecificMessageWhenAddWithNull() {
+        Money money = Money.of("100.00", Money.Currency.TRY);
+        NullPointerException ex = assertThrows(NullPointerException.class, () -> money.add(null));
+        assertEquals("Toplanacak para nesnesi null olamaz", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowSpecificMessageWhenSubtractWithNull() {
+        Money money = Money.of("100.00", Money.Currency.TRY);
+        NullPointerException ex = assertThrows(NullPointerException.class, () -> money.subtract(null));
+        assertEquals("Çıkarılacak para nesnesi null olamaz", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowSpecificMessageWhenIsGreaterThanWithNull() {
+        Money money = Money.of("100.00", Money.Currency.TRY);
+        NullPointerException ex = assertThrows(NullPointerException.class, () -> money.isGreaterThan(null));
+        assertEquals("Karşılaştırılacak para nesnesi null olamaz", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowSpecificMessageWhenIsGreaterThanOrEqualWithNull() {
+        Money money = Money.of("100.00", Money.Currency.TRY);
+        NullPointerException ex = assertThrows(NullPointerException.class, () -> money.isGreaterThanOrEqual(null));
+        assertEquals("Karşılaştırılacak para nesnesi null olamaz", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowCurrencyMismatchOnAddWhenDifferentCurrencies() {
+        Money m1 = Money.of("100.00", Money.Currency.TRY);
+        Money m2 = Money.of("50.00", Money.Currency.USD);
+        assertThrows(CurrencyMismatchException.class, () -> m1.add(m2));
+    }
+
+    @Test
+    void shouldCreateMoneyWithZeroBigDecimalDirectly() {
+        Money money = new Money(BigDecimal.ZERO.setScale(2), Money.Currency.TRY);
+        assertEquals(BigDecimal.ZERO.setScale(2), money.amount());
+    }
+
+    @Test
+    void isGreaterThanShouldReturnTrueWhenGreater() {
+        Money larger = Money.of("200.00", Money.Currency.TRY);
+        Money smaller = Money.of("100.00", Money.Currency.TRY);
+        assertTrue(larger.isGreaterThan(smaller));
+    }
+
+    @Test
+    void isGreaterThanOrEqualShouldReturnTrueWhenGreater() {
+        Money larger = Money.of("200.00", Money.Currency.TRY);
+        Money smaller = Money.of("100.00", Money.Currency.TRY);
+        assertTrue(larger.isGreaterThanOrEqual(smaller));
+    }
 }

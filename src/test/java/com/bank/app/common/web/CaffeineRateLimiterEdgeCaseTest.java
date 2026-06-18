@@ -68,4 +68,30 @@ class CaffeineRateLimiterEdgeCaseTest {
             assertTrue(limiter.tryAcquire("client-" + i));
         }
     }
+
+    @Test
+    void shouldExpirePastBoundary() {
+        CaffeineRateLimiterTest.SettableClock clock = new CaffeineRateLimiterTest.SettableClock(0);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 50000, 10000, clock);
+
+        assertTrue(limiter.tryAcquire("client-1"));
+        assertFalse(limiter.tryAcquire("client-1"));
+
+        clock.advance(50001);
+
+        assertTrue(limiter.tryAcquire("client-1"));
+    }
+
+    @Test
+    void shouldNotExpireAtExactBoundary() {
+        CaffeineRateLimiterTest.SettableClock clock = new CaffeineRateLimiterTest.SettableClock(0);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 50000, 10000, clock);
+
+        assertTrue(limiter.tryAcquire("client-1"));
+        assertFalse(limiter.tryAcquire("client-1"));
+
+        clock.advance(50000);
+
+        assertFalse(limiter.tryAcquire("client-1"));
+    }
 }

@@ -143,5 +143,17 @@ class JwtAuthenticationFilterTest {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(auth);
         assertInstanceOf(UsernamePasswordAuthenticationToken.class, auth);
+        assertNotNull(auth.getDetails());
+    }
+
+    @Test
+    void shouldContinueChainOnBearerTokenWithMalformedJwt() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer ");
+        when(jwtService.extractUsername("")).thenThrow(new RuntimeException("JWT string is empty"));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 }

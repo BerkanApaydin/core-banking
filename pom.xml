@@ -25,6 +25,7 @@
         <jacoco.branch.coverage>1.00</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
         <testcontainers.version>1.20.6</testcontainers.version>
+        <pitest.version>1.19.1</pitest.version>
     </properties>
 
     <dependencies>
@@ -266,6 +267,37 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>${pitest.version}</version>
+                <configuration>
+                    <targetClasses>
+                        <param>com.bank.app.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.bank.app.*</param>
+                    </targetTests>
+                    <mutationThreshold>80</mutationThreshold>
+                    <coverageThreshold>90</coverageThreshold>
+                    <timestampedReports>false</timestampedReports>
+                    <mutators>
+                        <mutator>DEFAULTS</mutator>
+                    </mutators>
+
+                    <excludedMethods>
+                        <param>hashCode</param>
+                        <param>equals</param>
+                    </excludedMethods>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.2</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>

@@ -81,4 +81,23 @@ class RedisRateLimitConfigurationTest {
                             .isEqualTo(6380);
                 });
     }
+
+    @Test
+    void shouldCreateStringRedisTemplateWithConnectionFactory() {
+        contextRunner
+                .withBean(RedisProperties.class, () -> {
+                    RedisProperties props = new RedisProperties();
+                    props.setHost("localhost");
+                    props.setPort(6379);
+                    return props;
+                })
+                .withPropertyValues(
+                        "app.security.rate-limit.backend=redis")
+                .run(context -> {
+                    StringRedisTemplate template = context.getBean(StringRedisTemplate.class);
+                    assertThat(template.getConnectionFactory()).isNotNull();
+                    assertThat(template.getConnectionFactory())
+                            .isSameAs(context.getBean(RedisConnectionFactory.class));
+                });
+    }
 }

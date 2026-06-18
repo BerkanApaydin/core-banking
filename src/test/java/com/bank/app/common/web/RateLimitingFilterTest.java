@@ -224,6 +224,26 @@ class RateLimitingFilterTest {
     }
 
     @Test
+    void shouldReturn429WithCorrectContentType() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.99");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.99");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+        assertTrue(resp.getContentType() != null && resp.getContentType().startsWith("application/json"));
+    }
+
+    @Test
     void shouldReturn429WithTurkishErrorMessage() throws Exception {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
