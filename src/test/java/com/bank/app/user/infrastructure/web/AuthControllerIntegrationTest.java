@@ -55,7 +55,7 @@ class AuthControllerIntegrationTest {
 
     @Test
     void shouldRegisterUserSuccessfully() throws Exception {
-        AuthRequest request = new AuthRequest("new_user", "my_password");
+        AuthRequest request = new AuthRequest("new_user", "My_passw0rd");
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -67,7 +67,7 @@ class AuthControllerIntegrationTest {
 
         assertEquals("new_user", savedUser.getUsername());
         assertEquals("ROLE_USER", savedUser.getRole());
-        assertTrue(passwordEncoder.matches("my_password", savedUser.getPassword()));
+        assertTrue(passwordEncoder.matches("My_passw0rd", savedUser.getPassword()));
     }
 
     @Test
