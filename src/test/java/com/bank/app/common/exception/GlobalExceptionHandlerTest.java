@@ -144,7 +144,8 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("İşlem sırasında eşzamanlı bir güncelleme çakışması oluştu. Lütfen tekrar deneyin.", response.getBody().message());
+        assertEquals("İşlem sırasında eşzamanlı bir güncelleme çakışması oluştu. Lütfen tekrar deneyin.",
+                response.getBody().message());
     }
 
     @Test
@@ -259,11 +260,10 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldReturn405WhenHttpRequestMethodNotSupported() {
-        HttpRequestMethodNotSupportedException ex =
-                new HttpRequestMethodNotSupportedException("PATCH", List.of("GET", "POST"));
+        HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("PATCH",
+                List.of("GET", "POST"));
 
-        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response =
-                handler.handleMethodNotSupportedException(ex);
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleMethodNotSupportedException(ex);
 
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -278,7 +278,8 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("Sistemsel bir hata oluştu. Lütfen teknik destek ile iletişime geçin.", response.getBody().message());
+        assertEquals("Sistemsel bir hata oluştu. Lütfen teknik destek ile iletişime geçin.",
+                response.getBody().message());
     }
 
     @Test
@@ -296,11 +297,10 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldHandleHttpRequestMethodNotSupportedWithNullSupportedMethods() {
-        HttpRequestMethodNotSupportedException ex =
-                new HttpRequestMethodNotSupportedException("DELETE", Collections.emptyList());
+        HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("DELETE",
+                Collections.emptyList());
 
-        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response =
-                handler.handleMethodNotSupportedException(ex);
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleMethodNotSupportedException(ex);
 
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
         assertNotNull(response.getBody());

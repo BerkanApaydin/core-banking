@@ -24,16 +24,16 @@ public class CaffeineRateLimiter implements RateLimiter {
     public CaffeineRateLimiter(
             @Value("${app.security.rate-limit.max-requests}") int maxRequests,
             @Value("${app.security.rate-limit.time-window-ms}") long timeWindowMs) {
-        this(maxRequests, timeWindowMs, Clock.systemDefaultZone());
+        this(maxRequests, timeWindowMs, 10000, Clock.systemDefaultZone());
     }
 
-    CaffeineRateLimiter(int maxRequests, long timeWindowMs, Clock clock) {
+    CaffeineRateLimiter(int maxRequests, long timeWindowMs, int maxCacheSize, Clock clock) {
         this.maxRequests = maxRequests;
         this.timeWindowMs = timeWindowMs;
         this.clock = clock;
         this.cache = Caffeine.newBuilder()
                 .expireAfterWrite(timeWindowMs, TimeUnit.MILLISECONDS)
-                .maximumSize(10000)
+                .maximumSize(maxCacheSize)
                 .build();
     }
 

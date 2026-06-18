@@ -115,13 +115,13 @@ public class PlaceTransferUseCase {
                             "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",
                             savedTransfer.getId(), senderIban, receiverIban,
                             savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.warn("Audit log kaydedilemedi: {}", e.getMessage(), e);
         }
 
         try {
             eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("Event publish edilemedi. Transfer ID: {}", savedTransfer.getId(), e);
         }
     }

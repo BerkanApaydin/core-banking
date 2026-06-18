@@ -14,7 +14,7 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldAllowRequestsUntilLimit() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(3, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(3, 10_000, 10000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-1"));
@@ -23,7 +23,7 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldRejectWhenLimitExceeded() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 10_000, 10000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-1"));
@@ -33,7 +33,7 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldUseSeparateCountersForDifferentClients() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000, 10000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-2"));
@@ -45,7 +45,7 @@ class CaffeineRateLimiterTest {
     @Test
     void shouldResetAfterWindowExpiry() {
         SettableClock testClock = new SettableClock(1000);
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 500, testClock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 500, 10000, testClock);
 
         assertTrue(limiter.tryAcquire("client"));
         assertTrue(limiter.tryAcquire("client"));
@@ -60,19 +60,19 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldRejectAllRequestsWhenLimitIsZero() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(0, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(0, 10_000, 10000, clock);
         assertFalse(limiter.tryAcquire("client"));
     }
 
     @Test
     void shouldRejectAllRequestsWhenLimitIsNegative() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(-1, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(-1, 10_000, 10000, clock);
         assertFalse(limiter.tryAcquire("client"));
     }
 
     @Test
     void shouldAllowAllRequestsWhenLimitIsLarge() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(Integer.MAX_VALUE, 10_000, clock);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(Integer.MAX_VALUE, 10_000, 10000, clock);
         assertTrue(limiter.tryAcquire("client"));
     }
 

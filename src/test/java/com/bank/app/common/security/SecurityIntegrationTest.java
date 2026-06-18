@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -75,7 +74,7 @@ class SecurityIntegrationTest {
     @Test
     void shouldRejectSecuredEndpointsWithInvalidToken() throws Exception {
         mockMvc.perform(get("/api/v1/accounts")
-                        .header("Authorization", "Bearer invalid.jwt.token"))
+                .header("Authorization", "Bearer invalid.jwt.token"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -88,8 +87,8 @@ class SecurityIntegrationTest {
         userRepository.save(user);
 
         String loginJson = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"jwt_user\",\"password\":\"password\"}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"jwt_user\",\"password\":\"password\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token", notNullValue()))
                 .andReturn().getResponse().getContentAsString();
@@ -97,14 +96,14 @@ class SecurityIntegrationTest {
         String token = objectMapper.readTree(loginJson).get("token").asText();
 
         mockMvc.perform(get("/api/v1/accounts")
-                        .header("Authorization", "Bearer " + token))
+                .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
     }
 
     @Test
     void shouldRejectAccessWithExpiredOrInvalidJwtToken() throws Exception {
         mockMvc.perform(get("/api/v1/accounts")
-                        .header("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.invalid"))
+                .header("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.invalid"))
                 .andExpect(status().isUnauthorized());
     }
 }

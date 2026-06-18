@@ -6,7 +6,6 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
-import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -17,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -74,14 +72,11 @@ class TransferControllerIntegrationTest {
                 userRepository.deleteAll();
 
                 UserJpaEntity u1 = userRepository.save(
-                    new UserJpaEntity(null, "u1", "pass", "ROLE_USER")
-                );
+                                new UserJpaEntity(null, "u1", "pass", "ROLE_USER"));
                 UserJpaEntity u2 = userRepository.save(
-                    new UserJpaEntity(null, "u2", "pass", "ROLE_USER")
-                );
+                                new UserJpaEntity(null, "u2", "pass", "ROLE_USER"));
                 UserJpaEntity u3 = userRepository.save(
-                    new UserJpaEntity(null, "u3", "pass", "ROLE_USER")
-                );
+                                new UserJpaEntity(null, "u3", "pass", "ROLE_USER"));
 
                 accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
                                 new BigDecimal("1000.00"), "TRY", true));
@@ -334,8 +329,9 @@ class TransferControllerIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest());
-                
-                // If it cleaned up successfully, we should be able to run it again (it won't be pending or completed)
+
+                // If it cleaned up successfully, we should be able to run it again (it won't be
+                // pending or completed)
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Idempotency-Key", "fail-key-123")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -359,7 +355,8 @@ class TransferControllerIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isConflict())
-                                .andExpect(jsonPath("$.message", is("Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.")));
+                                .andExpect(jsonPath("$.message",
+                                                is("Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.")));
         }
 
         @Test

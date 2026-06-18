@@ -19,12 +19,12 @@ public class AccountOperationsAdapter implements AccountOperationsPort {
     }
 
     @Override
-    public AccountInfo getAccountInfo(@NonNull Long accountId) {
+    public @NonNull AccountInfo getAccountInfo(@NonNull Long accountId) {
         return map(accountInternalService.getAccountInfo(accountId));
     }
 
     @Override
-    public AccountInfo getAccountInfoForTransfer(String ibanValue) {
+    public @NonNull AccountInfo getAccountInfoForTransfer(String ibanValue) {
         return map(accountInternalService.getAccountInfoForTransfer(ibanValue));
     }
 
@@ -40,7 +40,7 @@ public class AccountOperationsAdapter implements AccountOperationsPort {
 
     @Override
     public void reverseBalancesForCancellation(@NonNull Long senderId, @NonNull Long receiverId,
-                                                @NonNull Money amount) {
+            @NonNull Money amount) {
         accountInternalService.reverseBalancesForCancellation(senderId, receiverId, amount);
     }
 
