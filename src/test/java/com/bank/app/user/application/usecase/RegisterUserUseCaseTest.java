@@ -32,15 +32,15 @@ class RegisterUserUseCaseTest {
 
     @Test
     void shouldRegisterUserSuccessfully() {
-        AuthRequest request = new AuthRequest("newuser", "rawpassword");
+        AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("rawpassword")).thenReturn("hashedpassword");
+        when(passwordEncoder.encode("Rawpassword1")).thenReturn("hashedpassword");
 
         registerUserUseCase.execute(request);
 
         verify(loadUserPort).findByUsername("newuser");
-        verify(passwordEncoder).encode("rawpassword");
+        verify(passwordEncoder).encode("Rawpassword1");
         verify(saveUserPort).save(argThat(user -> 
                 "newuser".equals(user.getUsername()) &&
                 "hashedpassword".equals(user.getPassword()) &&

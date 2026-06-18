@@ -45,14 +45,14 @@ class RegisterUserUseCaseEdgeCaseTest {
 
     @Test
     void shouldRegisterUserSuccessfullyWhenUsernameDoesNotExist() {
-        AuthRequest request = new AuthRequest("newuser", "mypassword");
+        AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("mypassword")).thenReturn("encodedPassword");
+        when(passwordEncoder.encode("Mypasswor1")).thenReturn("encodedPassword");
 
         registerUserUseCase.execute(request);
 
         verify(loadUserPort).findByUsername("newuser");
-        verify(passwordEncoder).encode("mypassword");
+        verify(passwordEncoder).encode("Mypasswor1");
         verify(saveUserPort).save(argThat(user ->
                 "newuser".equals(user.getUsername()) &&
                 "encodedPassword".equals(user.getPassword()) &&
@@ -62,13 +62,25 @@ class RegisterUserUseCaseEdgeCaseTest {
 
     @Test
     void shouldPropagateSaveException() {
-        AuthRequest request = new AuthRequest("newuser", "mypassword");
+        AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("mypassword")).thenReturn("encodedPassword");
+        when(passwordEncoder.encode("Mypasswor1")).thenReturn("encodedPassword");
         doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
 
         assertThrows(RuntimeException.class,
                 () -> registerUserUseCase.execute(request));
+    }
+
+    @Test
+    void shouldThrowWhenPasswordViolatesPolicy() {
+        AuthRequest request = new AuthRequest("newuser", "weak");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> registerUserUseCase.execute(request));
+        assertTrue(ex.getMessage().contains("en az"));
+        verify(loadUserPort).findByUsername("newuser");
+        verifyNoInteractions(passwordEncoder);
+        verify(saveUserPort, never()).save(any());
     }
 
     @Test
