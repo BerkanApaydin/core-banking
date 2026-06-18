@@ -2,20 +2,19 @@ package com.bank.app.common.web;
 
 import org.junit.jupiter.api.Test;
 
-import com.github.benmanes.caffeine.cache.Cache;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CaffeineRateLimiterTest {
 
+    private final Clock clock = Clock.systemUTC();
+
     @Test
     void shouldAllowRequestsUntilLimit() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(3, 10_000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(3, 10_000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-1"));
@@ -24,7 +23,7 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldRejectWhenLimitExceeded() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 10_000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 10_000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-1"));
@@ -34,7 +33,7 @@ class CaffeineRateLimiterTest {
 
     @Test
     void shouldUseSeparateCountersForDifferentClients() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000, clock);
 
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-2"));
@@ -44,122 +43,68 @@ class CaffeineRateLimiterTest {
     }
 
     @Test
-    void shouldCreateNewCounterWhenEntryExpired() throws Exception {
-        // küçük window veriyoruz ki expire kesin olsun
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 50);
+    void shouldResetAfterWindowExpiry() {
+        SettableClock testClock = new SettableClock(1000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 500, testClock);
 
-        String client = "client";
+        assertTrue(limiter.tryAcquire("client"));
+        assertTrue(limiter.tryAcquire("client"));
+        assertFalse(limiter.tryAcquire("client"));
 
-        // ilk window
-        assertTrue(limiter.tryAcquire(client));
-        assertTrue(limiter.tryAcquire(client));
+        testClock.advance(600);
 
-        // expire olması için bekle
-        Thread.sleep(100);
-
-        // yeni window başlamış olmalı (counter reset)
-        assertTrue(limiter.tryAcquire(client));
-        assertTrue(limiter.tryAcquire(client));
-        assertFalse(limiter.tryAcquire(client));
+        assertTrue(limiter.tryAcquire("client"));
+        assertTrue(limiter.tryAcquire("client"));
+        assertFalse(limiter.tryAcquire("client"));
     }
 
     @Test
-    void rateLimitInfoShouldReportNotExpired() throws Exception {
-        Class<?> clazz = Class.forName(
-                "com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-
-        Constructor<?> constructor = clazz.getDeclaredConstructor(int.class, long.class);
-        constructor.setAccessible(true);
-
-        Object info = constructor.newInstance(1, 10_000);
-
-        Method isExpiredMethod = clazz.getDeclaredMethod("isExpired");
-        isExpiredMethod.setAccessible(true);
-
-        boolean expired = (boolean) isExpiredMethod.invoke(info);
-
-        assertFalse(expired);
+    void shouldRejectAllRequestsWhenLimitIsZero() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(0, 10_000, clock);
+        assertFalse(limiter.tryAcquire("client"));
     }
 
     @Test
-    void rateLimitInfoShouldReportExpired() throws Exception {
-        Class<?> clazz = Class.forName(
-                "com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-
-        Constructor<?> constructor = clazz.getDeclaredConstructor(int.class, long.class);
-        constructor.setAccessible(true);
-
-        Object info = constructor.newInstance(1, 10_000);
-
-        Field resetTimeField = clazz.getDeclaredField("resetTime");
-        resetTimeField.setAccessible(true);
-
-        resetTimeField.setLong(info,
-                System.currentTimeMillis() - 1000);
-
-        Method isExpiredMethod = clazz.getDeclaredMethod("isExpired");
-        isExpiredMethod.setAccessible(true);
-
-        boolean expired = (boolean) isExpiredMethod.invoke(info);
-
-        assertTrue(expired);
+    void shouldRejectAllRequestsWhenLimitIsNegative() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(-1, 10_000, clock);
+        assertFalse(limiter.tryAcquire("client"));
     }
 
     @Test
-    void rateLimitInfoConstructorShouldInitializeFields() throws Exception {
-        Class<?> clazz = Class.forName(
-                "com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-
-        Constructor<?> constructor = clazz.getDeclaredConstructor(int.class, long.class);
-        constructor.setAccessible(true);
-
-        Object info = constructor.newInstance(5, 10_000);
-
-        Field requestCountField = clazz.getDeclaredField("requestCount");
-        requestCountField.setAccessible(true);
-
-        AtomicInteger requestCount = (AtomicInteger) requestCountField.get(info);
-
-        assertEquals(5, requestCount.get());
-
-        Field resetTimeField = clazz.getDeclaredField("resetTime");
-        resetTimeField.setAccessible(true);
-
-        long resetTime = resetTimeField.getLong(info);
-
-        assertTrue(resetTime > System.currentTimeMillis());
+    void shouldAllowAllRequestsWhenLimitIsLarge() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(Integer.MAX_VALUE, 10_000, clock);
+        assertTrue(limiter.tryAcquire("client"));
     }
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void shouldCreateNewEntryWhenExistingEntryIsExpired() throws Exception {
+    private static class SettableClock extends Clock {
+        private long millis;
 
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(10, 60_000);
+        SettableClock(long millis) {
+            this.millis = millis;
+        }
 
-        Field cacheField = CaffeineRateLimiter.class.getDeclaredField("cache");
+        void advance(long millis) {
+            this.millis += millis;
+        }
 
-        cacheField.setAccessible(true);
+        @Override
+        public long millis() {
+            return millis;
+        }
 
-        Cache<String, Object> cache = (Cache<String, Object>) cacheField.get(limiter);
+        @Override
+        public Instant instant() {
+            return Instant.ofEpochMilli(millis);
+        }
 
-        Class<?> rateLimitInfoClass = Class.forName(
-                "com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
 
-        Constructor<?> constructor = rateLimitInfoClass.getDeclaredConstructor(
-                int.class,
-                long.class);
-
-        constructor.setAccessible(true);
-
-        Object expiredInfo = constructor.newInstance(
-                5,
-                -1000L);
-
-        cache.put("client1", expiredInfo);
-
-        boolean result = limiter.tryAcquire("client1");
-
-        assertTrue(result);
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
-
 }

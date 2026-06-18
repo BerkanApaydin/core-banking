@@ -25,21 +25,27 @@ class TransferTest {
     void shouldThrowTransferAlreadyCancelledExceptionWhenAlreadyCancelled() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
         
-        assertThrows(TransferAlreadyCancelledException.class, () -> transfer.cancel(24));
+        TransferAlreadyCancelledException ex = assertThrows(TransferAlreadyCancelledException.class,
+                () -> transfer.cancel(24));
+        assertTrue(ex.getMessage().contains("zaten"));
     }
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenStatusIsNotCompleted() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
-        
-        assertThrows(TransferNotCancellableException.class, () -> transfer.cancel(24));
+
+        TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
+                () -> transfer.cancel(24));
+        assertTrue(ex.getMessage().toLowerCase().contains("iptal"));
     }
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenOlderThan24Hours() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
-        
-        assertThrows(TransferNotCancellableException.class, () -> transfer.cancel(24));
+
+        TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
+                () -> transfer.cancel(24));
+        assertTrue(ex.getMessage().toLowerCase().contains("iptal"));
     }
 
     @Test
@@ -69,6 +75,29 @@ class TransferTest {
     @Test
     void shouldThrowIllegalStateExceptionWhenCompletingNonPendingTransfer() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+
+        assertThrows(IllegalStateException.class, transfer::complete);
+    }
+
+    @Test
+    void shouldCreateTransferWithVersion() {
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.PENDING, LocalDateTime.now(), 3L);
+        assertEquals(3L, transfer.getVersion());
+    }
+
+    @Test
+    void shouldCreateTransferWithNullVersionByDefault() {
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        assertNull(transfer.getVersion());
+    }
+
+    @Test
+    void shouldCompleteAndFailStatusTransitionsCorrectly() {
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        assertEquals(TransferStatus.PENDING, transfer.getStatus());
+
+        transfer.complete();
+        assertEquals(TransferStatus.COMPLETED, transfer.getStatus());
 
         assertThrows(IllegalStateException.class, transfer::complete);
     }

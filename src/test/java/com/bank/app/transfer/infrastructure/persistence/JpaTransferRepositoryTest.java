@@ -5,6 +5,9 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,15 +16,16 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class JpaTransferRepositoryTest {
 
-    private SpringDataTransferRepo springDataRepo;
+    @Mock private SpringDataTransferRepo springDataRepo;
+
     private TransferMapper mapper;
     private JpaTransferRepository repository;
 
     @BeforeEach
     void setUp() {
-        springDataRepo = mock(SpringDataTransferRepo.class);
         mapper = new TransferMapper();
         repository = new JpaTransferRepository(springDataRepo, mapper);
     }

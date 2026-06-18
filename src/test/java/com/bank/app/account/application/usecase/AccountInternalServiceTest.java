@@ -118,8 +118,10 @@ class AccountInternalServiceTest {
         void shouldThrowExceptionWhenSenderNotFoundInDebitAndCredit() {
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.empty());
 
-                assertThrows(AccountNotFoundException.class, () -> accountInternalService.debitAndCredit(1L, 2L,
-                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+                AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
+                                () -> accountInternalService.debitAndCredit(1L, 2L,
+                                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+                assertTrue(ex.getMessage().contains("1"));
 
                 verify(loadAccountPort).findByIdWithLock(1L);
                 verify(saveAccountPort, never()).save(any());
@@ -133,8 +135,10 @@ class AccountInternalServiceTest {
                 when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
                 when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
-                assertThrows(AccountNotFoundException.class, () -> accountInternalService.debitAndCredit(1L, 2L,
-                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+                AccountNotFoundException ex = assertThrows(AccountNotFoundException.class,
+                                () -> accountInternalService.debitAndCredit(1L, 2L,
+                                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+                assertTrue(ex.getMessage().contains("2"));
 
                 verify(loadAccountPort).findByIdWithLock(1L);
                 verify(loadAccountPort).findByIdWithLock(2L);

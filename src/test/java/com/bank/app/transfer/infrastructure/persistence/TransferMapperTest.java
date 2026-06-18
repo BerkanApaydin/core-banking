@@ -15,42 +15,75 @@ class TransferMapperTest {
     private final TransferMapper mapper = new TransferMapper();
 
     @Test
-    void shouldMapJpaEntityToDomain() {
-        LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity entity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("250.00"), "TRY", "COMPLETED", now);
-        
-        Transfer domain = mapper.toDomain(entity);
-        
-        assertNotNull(domain);
-        assertEquals(10L, domain.getId());
-        assertEquals(1L, domain.getSenderAccountId());
-        assertEquals(2L, domain.getReceiverAccountId());
-        assertEquals(new BigDecimal("250.00"), domain.getAmount().amount());
-        assertEquals(Money.Currency.TRY, domain.getAmount().currency());
-        assertEquals(TransferStatus.COMPLETED, domain.getStatus());
-        assertEquals(now, domain.getCreatedAt());
-    }
-
-    @Test
     void shouldMapDomainToJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domain = new Transfer(10L, 1L, 2L, Money.of("250.00", Money.Currency.TRY), TransferStatus.COMPLETED, now);
-        
+        Transfer domain = new Transfer(1L, 10L, 20L,
+                Money.of("200.00", Money.Currency.TRY),
+                TransferStatus.COMPLETED, now, 3L);
+
         TransferJpaEntity entity = mapper.toJpaEntity(domain);
-        
+
         assertNotNull(entity);
-        assertEquals(10L, entity.getId());
-        assertEquals(1L, entity.getSenderAccountId());
-        assertEquals(2L, entity.getReceiverAccountId());
-        assertEquals(new BigDecimal("250.00"), entity.getAmount());
+        assertEquals(1L, entity.getId());
+        assertEquals(10L, entity.getSenderAccountId());
+        assertEquals(20L, entity.getReceiverAccountId());
+        assertEquals(new BigDecimal("200.00"), entity.getAmount());
         assertEquals("TRY", entity.getCurrency());
         assertEquals("COMPLETED", entity.getStatus());
         assertEquals(now, entity.getCreatedAt());
+        assertEquals(3L, entity.getVersion());
     }
 
     @Test
-    void shouldReturnNullWhenMappingNullValues() {
-        assertNull(mapper.toDomain(null));
+    void shouldMapJpaEntityToDomain() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity = new TransferJpaEntity(2L, 30L, 40L,
+                new BigDecimal("150.50"), "USD", "PENDING", now);
+        entity.setVersion(7L);
+
+        Transfer domain = mapper.toDomain(entity);
+
+        assertNotNull(domain);
+        assertEquals(2L, domain.getId());
+        assertEquals(30L, domain.getSenderAccountId());
+        assertEquals(40L, domain.getReceiverAccountId());
+        assertEquals(new BigDecimal("150.50"), domain.getAmount().amount());
+        assertEquals(Money.Currency.USD, domain.getAmount().currency());
+        assertEquals(TransferStatus.PENDING, domain.getStatus());
+        assertEquals(now, domain.getCreatedAt());
+        assertEquals(7L, domain.getVersion());
+    }
+
+    @Test
+    void shouldReturnNullWhenDomainIsNull() {
         assertNull(mapper.toJpaEntity(null));
+    }
+
+    @Test
+    void shouldReturnNullWhenEntityIsNull() {
+        assertNull(mapper.toDomain(null));
+    }
+
+    @Test
+    void shouldMapDomainWithoutVersion() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer domain = new Transfer(3L, 50L, 60L,
+                Money.of("100.00", Money.Currency.TRY),
+                TransferStatus.PENDING, now);
+
+        TransferJpaEntity entity = mapper.toJpaEntity(domain);
+
+        assertNull(entity.getVersion());
+    }
+
+    @Test
+    void shouldMapEntityWithoutVersion() {
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity = new TransferJpaEntity(4L, 70L, 80L,
+                new BigDecimal("99.99"), "EUR", "COMPLETED", now);
+
+        Transfer domain = mapper.toDomain(entity);
+
+        assertNull(domain.getVersion());
     }
 }

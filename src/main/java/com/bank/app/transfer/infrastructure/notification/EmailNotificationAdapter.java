@@ -17,12 +17,20 @@ public class EmailNotificationAdapter implements SendNotificationPort {
     @Override
     @CircuitBreaker(name = "notificationService", fallbackMethod = "fallbackNotify")
     public void notifyTransferCompleted(Transfer transfer) {
+        if (transfer == null) {
+            log.warn("Email bildirimi için null transfer alındı, atlanıyor.");
+            return;
+        }
         log.info("Email Bildirimi: {} ID'li transfer başarıyla tamamlandı. Tutar: {} {}", 
                 transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency());
     }
 
     public void fallbackNotify(Transfer transfer, Throwable throwable) {
+        if (transfer == null) {
+            log.warn("Email fallback için null transfer alındı, atlanıyor.");
+            return;
+        }
         log.error("Email bildirimi gönderimi başarısız oldu. Hata: {}. Bildirim kuyruğa alındı (Fallback). Transfer ID: {}", 
-                throwable.getMessage(), transfer.getId());
+                throwable != null ? throwable.getMessage() : "null", transfer.getId());
     }
 }

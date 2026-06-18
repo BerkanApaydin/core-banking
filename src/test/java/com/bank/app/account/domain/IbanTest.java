@@ -16,8 +16,13 @@ class IbanTest {
 
     @Test
     void shouldThrowInvalidIbanExceptionWhenFormatIsInvalid() {
-        assertThrows(InvalidIbanException.class, () -> new Iban("TR29000"));
-        assertThrows(InvalidIbanException.class, () -> new Iban("US290006200000000000000111"));
-        assertThrows(InvalidIbanException.class, () -> new Iban("TR29000620000000000000011A"));
+        InvalidIbanException ex1 = assertThrows(InvalidIbanException.class, () -> new Iban("TR29000"));
+        assertTrue(ex1.getMessage().toLowerCase().contains("geçersiz"));
+        InvalidIbanException ex2 = assertThrows(InvalidIbanException.class,
+                () -> new Iban("US290006200000000000000111"));
+        assertTrue(ex2.getMessage().toLowerCase().contains("geçersiz"));
+        InvalidIbanException ex3 = assertThrows(InvalidIbanException.class,
+                () -> new Iban("TR29000620000000000000011A"));
+        assertTrue(ex3.getMessage().toLowerCase().contains("geçersiz"));
     }
 }

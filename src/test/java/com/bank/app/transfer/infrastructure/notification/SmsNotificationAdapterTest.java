@@ -1,0 +1,51 @@
+package com.bank.app.transfer.infrastructure.notification;
+
+import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.TransferStatus;
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
+class SmsNotificationAdapterTest {
+
+    private final SmsNotificationAdapter adapter = new SmsNotificationAdapter();
+
+    @Test
+    void shouldLogSuccessfullyOnNotify() {
+        Transfer transfer = new Transfer(1L, 10L, 20L,
+                Money.of("100.00", Money.Currency.TRY),
+                TransferStatus.COMPLETED, LocalDateTime.now());
+
+        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(transfer));
+    }
+
+    @Test
+    void shouldHandleFallbackWithoutError() {
+        Transfer transfer = new Transfer(1L, 10L, 20L,
+                Money.of("100.00", Money.Currency.TRY),
+                TransferStatus.COMPLETED, LocalDateTime.now());
+
+        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, new RuntimeException("SMS gateway down")));
+    }
+
+    @Test
+    void shouldHandleNullTransferGracefully() {
+        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(null));
+    }
+
+    @Test
+    void shouldHandleNullTransferInFallbackGracefully() {
+        assertDoesNotThrow(() -> adapter.fallbackNotify(null, new RuntimeException("error")));
+    }
+
+    @Test
+    void shouldHandleFallbackWithNullThrowable() {
+        Transfer transfer = new Transfer(1L, 10L, 20L,
+                Money.of("100.00", Money.Currency.TRY),
+                TransferStatus.COMPLETED, LocalDateTime.now());
+        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, null));
+    }
+}

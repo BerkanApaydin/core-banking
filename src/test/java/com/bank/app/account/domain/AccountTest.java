@@ -28,17 +28,20 @@ class AccountTest {
     @Test
     void shouldThrowInsufficientBalanceExceptionWhenDebitAmountIsGreaterThanBalance() {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("100.00", Money.Currency.TRY), true);
-        assertThrows(InsufficientBalanceException.class, () ->
+        InsufficientBalanceException ex = assertThrows(InsufficientBalanceException.class, () ->
                 account.debit(Money.of("101.00", Money.Currency.TRY)));
+        assertTrue(ex.getMessage().contains("yetersiz"));
     }
 
     @Test
     void shouldThrowAccountNotActiveExceptionWhenDebitOrCreditOnInactiveAccount() {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), false);
-        assertThrows(AccountNotActiveException.class, () ->
+        AccountNotActiveException ex1 = assertThrows(AccountNotActiveException.class, () ->
                 account.debit(Money.of("100.00", Money.Currency.TRY)));
-        assertThrows(AccountNotActiveException.class, () ->
+        assertTrue(ex1.getMessage().contains("aktif"));
+        AccountNotActiveException ex2 = assertThrows(AccountNotActiveException.class, () ->
                 account.credit(Money.of("100.00", Money.Currency.TRY)));
+        assertTrue(ex2.getMessage().contains("aktif"));
     }
 
     @Test
@@ -64,6 +67,31 @@ class AccountTest {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true);
         assertThrows(NullPointerException.class, () -> account.debit(null));
         assertThrows(NullPointerException.class, () -> account.credit(null));
+    }
+
+    @Test
+    void shouldCreateAccountWithVersion() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true, 5L);
+        assertEquals(5L, account.getVersion());
+    }
+
+    @Test
+    void shouldCreateAccountWithNullVersionByDefault() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true);
+        assertNull(account.getVersion());
+    }
+
+    @Test
+    void shouldThrowWhenUserIdIsNull() {
+        assertThrows(NullPointerException.class, () ->
+                new Account(1L, null, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true));
+    }
+
+    @Test
+    void shouldThrowWhenDebitAmountExceedsBalanceWithExactBoundary() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("100.00", Money.Currency.TRY), true);
+        assertDoesNotThrow(() -> account.debit(Money.of("100.00", Money.Currency.TRY)));
+        assertEquals(new BigDecimal("0.00"), account.getBalance().amount());
     }
 }
 

@@ -3,19 +3,23 @@ package com.bank.app.user.infrastructure.persistence;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class JpaUserAdapterTest {
 
-    private UserRepository userRepository;
+    @Mock private UserRepository userRepository;
+
     private JpaUserAdapter jpaUserAdapter;
 
     @BeforeEach
     void setUp() {
-        userRepository = mock(UserRepository.class);
         jpaUserAdapter = new JpaUserAdapter(userRepository);
     }
 

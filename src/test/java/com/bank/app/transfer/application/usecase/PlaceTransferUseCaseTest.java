@@ -12,9 +12,12 @@ import com.bank.app.common.exception.SameAccountTransferException;
 import com.bank.app.common.exception.AccountNotActiveException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
-import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 
@@ -22,29 +25,41 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
 class PlaceTransferUseCaseTest {
 
-    private AccountOperationsPort accountOperationsPort;
-    private SaveTransferPort saveTransferPort;
-    private ApplicationEventPublisher eventPublisher;
-    private AuditService auditService;
-    private TransferDomainService transferDomainService;
+    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private SaveTransferPort saveTransferPort;
+    @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private AuditService auditService;
+
     private PlaceTransferUseCase placeTransferUseCase;
 
     @BeforeEach
     void setUp() {
-        accountOperationsPort = mock(AccountOperationsPort.class);
-        saveTransferPort = mock(SaveTransferPort.class);
-        eventPublisher = mock(ApplicationEventPublisher.class);
-        auditService = mock(AuditService.class);
-        transferDomainService = new TransferDomainService();
         placeTransferUseCase = new PlaceTransferUseCase(
                 accountOperationsPort,
                 saveTransferPort,
                 auditService,
                 eventPublisher,
-                transferDomainService);
+                new TransferDomainService());
+    }
+
+    private void mockSaveReturnsCopy() {
+        when(saveTransferPort.save(any(Transfer.class))).thenAnswer(invocation -> {
+            Transfer t = invocation.getArgument(0);
+            return new Transfer(10L, t.getSenderAccountId(), t.getReceiverAccountId(), t.getAmount(), t.getStatus(),
+                    t.getCreatedAt());
+        });
+    }
+
+    private void mockAccountInfos(String senderIban, long senderId, long senderUserId, boolean senderActive,
+                                   String receiverIban, long receiverId, long receiverUserId, boolean receiverActive) {
+        when(accountOperationsPort.getAccountInfoForTransfer(senderIban))
+                .thenReturn(new AccountInfo(senderId, senderUserId, "TRY", senderActive));
+        when(accountOperationsPort.getAccountInfoForTransfer(receiverIban))
+                .thenReturn(new AccountInfo(receiverId, receiverUserId, "TRY", receiverActive));
     }
 
     @Test
@@ -55,17 +70,9 @@ class PlaceTransferUseCaseTest {
                 new BigDecimal("200.00"),
                 Money.Currency.TRY);
 
-        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
-        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
-
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
-
-        when(saveTransferPort.save(any(Transfer.class))).thenAnswer(invocation -> {
-            Transfer t = invocation.getArgument(0);
-            return new Transfer(10L, t.getSenderAccountId(), t.getReceiverAccountId(), t.getAmount(), t.getStatus(),
-                    t.getCreatedAt());
-        });
+        mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
+                "TR290006200000000000000222", 2L, 200L, true);
+        mockSaveReturnsCopy();
 
         TransferResponse response = placeTransferUseCase.execute(request);
 
@@ -94,8 +101,8 @@ class PlaceTransferUseCaseTest {
         AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
         AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
 
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
+                "TR290006200000000000000222", 2L, 200L, true);
 
         doThrow(new AccessDeniedException("Bu hesaptan transfer yapmaya yetkiniz yok."))
                 .when(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
@@ -130,11 +137,8 @@ class PlaceTransferUseCaseTest {
                 new BigDecimal("200.00"),
                 Money.Currency.TRY);
 
-        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", false);
-        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
-
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        mockAccountInfos("TR290006200000000000000111", 1L, 100L, false,
+                "TR290006200000000000000222", 2L, 200L, true);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
         verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
@@ -148,13 +152,52 @@ class PlaceTransferUseCaseTest {
                 new BigDecimal("200.00"),
                 Money.Currency.TRY);
 
-        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
-        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", false);
-
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000111")).thenReturn(senderInfo);
-        when(accountOperationsPort.getAccountInfoForTransfer("TR290006200000000000000222")).thenReturn(receiverInfo);
+        mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
+                "TR290006200000000000000222", 2L, 200L, false);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
         verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenSenderIbanIsNull() {
+        TransferRequest request = new TransferRequest(
+                null,
+                "TR290006200000000000000222",
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        assertThrows(NullPointerException.class, () -> placeTransferUseCase.execute(request));
+    }
+
+    @Test
+    void shouldThrowNullPointerExceptionWhenReceiverIbanIsNull() {
+        TransferRequest request = new TransferRequest(
+                "TR290006200000000000000111",
+                null,
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        assertThrows(NullPointerException.class, () -> placeTransferUseCase.execute(request));
+    }
+
+    @Test
+    void shouldTransferResponseContainCorrectFieldTypes() {
+        TransferRequest request = new TransferRequest(
+                "TR290006200000000000000111",
+                "TR290006200000000000000222",
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
+                "TR290006200000000000000222", 2L, 200L, true);
+        mockSaveReturnsCopy();
+
+        TransferResponse response = placeTransferUseCase.execute(request);
+
+        assertNotNull(response.createdAt());
+        assertEquals(1L, response.senderAccountId());
+        assertEquals(2L, response.receiverAccountId());
+        assertEquals("TRY", response.currency());
     }
 }

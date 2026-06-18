@@ -86,7 +86,6 @@ class ConcurrencyTransferIntegrationTest {
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failureCount.incrementAndGet();
-                    System.err.println("Concurrency transfer error: " + e.getMessage());
                 } finally {
                     finishLatch.countDown();
                 }

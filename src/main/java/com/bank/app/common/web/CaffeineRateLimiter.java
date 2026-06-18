@@ -2,10 +2,12 @@ package com.bank.app.common.web;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,12 +18,19 @@ public class CaffeineRateLimiter implements RateLimiter {
     private final int maxRequests;
     private final long timeWindowMs;
     private final Cache<String, RateLimitInfo> cache;
+    private final Clock clock;
 
+    @Autowired
     public CaffeineRateLimiter(
             @Value("${app.security.rate-limit.max-requests}") int maxRequests,
             @Value("${app.security.rate-limit.time-window-ms}") long timeWindowMs) {
+        this(maxRequests, timeWindowMs, Clock.systemDefaultZone());
+    }
+
+    CaffeineRateLimiter(int maxRequests, long timeWindowMs, Clock clock) {
         this.maxRequests = maxRequests;
         this.timeWindowMs = timeWindowMs;
+        this.clock = clock;
         this.cache = Caffeine.newBuilder()
                 .expireAfterWrite(timeWindowMs, TimeUnit.MILLISECONDS)
                 .maximumSize(10000)
@@ -31,8 +40,8 @@ public class CaffeineRateLimiter implements RateLimiter {
     @Override
     public boolean tryAcquire(String clientKey) {
         RateLimitInfo info = cache.asMap().compute(clientKey, (k, v) -> {
-            if (v == null || v.isExpired()) {
-                return new RateLimitInfo(1, timeWindowMs);
+            if (v == null || v.isExpired(clock)) {
+                return new RateLimitInfo(1, timeWindowMs, clock);
             }
             v.requestCount.incrementAndGet();
             return v;
@@ -44,13 +53,13 @@ public class CaffeineRateLimiter implements RateLimiter {
         final long resetTime;
         final AtomicInteger requestCount;
 
-        RateLimitInfo(int count, long durationMs) {
-            this.resetTime = System.currentTimeMillis() + durationMs;
+        RateLimitInfo(int count, long durationMs, Clock clock) {
+            this.resetTime = clock.millis() + durationMs;
             this.requestCount = new AtomicInteger(count);
         }
 
-        boolean isExpired() {
-            return System.currentTimeMillis() > resetTime;
+        boolean isExpired(Clock clock) {
+            return clock.millis() > resetTime;
         }
     }
 }

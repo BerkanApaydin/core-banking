@@ -3,6 +3,8 @@ package com.bank.app.common.security;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -16,6 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class SecurityUtilsTest {
 
     private SecurityUtils securityUtils;
@@ -34,14 +37,14 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUserId_whenAuthIsNull() {
+    void shouldReturnEmptyWhenAuthIsNull() {
         SecurityContextHolder.getContext().setAuthentication(null);
         Optional<Long> userId = securityUtils.getCurrentUserId();
         assertFalse(userId.isPresent());
     }
 
     @Test
-    void testGetCurrentUserId_whenNotAuthenticated() {
+    void shouldReturnEmptyWhenNotAuthenticated() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(false);
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -51,7 +54,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUserId_whenAnonymousToken() {
+    void shouldReturnEmptyWhenAnonymousToken() {
         AnonymousAuthenticationToken auth = new AnonymousAuthenticationToken(
                 "key", "anonymousUser", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -61,7 +64,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUserId_whenAnonymousUserName() {
+    void shouldReturnEmptyWhenAnonymousUserName() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("anonymousUser");
@@ -72,7 +75,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUserId_whenPrincipalNotCustomUserDetails() {
+    void shouldReturnEmptyWhenPrincipalNotCustomUserDetails() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("user");
@@ -84,7 +87,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUserId_whenPrincipalIsCustomUserDetails() {
+    void shouldReturnUserIdWhenPrincipalIsCustomUserDetails() {
         CustomUserDetails principal = mock(CustomUserDetails.class);
         when(principal.getId()).thenReturn(42L);
 
@@ -100,14 +103,14 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUsername_whenAuthIsNull() {
+    void shouldReturnEmptyUsernameWhenAuthIsNull() {
         SecurityContextHolder.getContext().setAuthentication(null);
         Optional<String> username = securityUtils.getCurrentUsername();
         assertFalse(username.isPresent());
     }
 
     @Test
-    void testGetCurrentUsername_whenNotAuthenticated() {
+    void shouldReturnEmptyUsernameWhenNotAuthenticated() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(false);
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -117,7 +120,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUsername_whenAnonymousToken() {
+    void shouldReturnEmptyUsernameWhenAnonymousToken() {
         AnonymousAuthenticationToken auth = new AnonymousAuthenticationToken(
                 "key", "anonymousUser", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -127,7 +130,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUsername_whenAnonymousUserName() {
+    void shouldReturnEmptyUsernameWhenAnonymousUserName() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("anonymousUser");
@@ -138,7 +141,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testGetCurrentUsername_whenValidUser() {
+    void shouldReturnUsernameWhenValidUser() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("john");
@@ -150,7 +153,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testCheckUserAuthorization_whenNotLoggedIn() {
+    void shouldThrowWhenNotLoggedIn() {
         SecurityContextHolder.getContext().setAuthentication(null);
         AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> {
             securityUtils.checkUserAuthorization(42L, "Error message");
@@ -159,7 +162,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testCheckUserAuthorization_whenUserIdMismatch() {
+    void shouldThrowWhenUserIdMismatch() {
         CustomUserDetails principal = mock(CustomUserDetails.class);
         when(principal.getId()).thenReturn(10L);
 
@@ -176,7 +179,7 @@ class SecurityUtilsTest {
     }
 
     @Test
-    void testCheckUserAuthorization_whenAuthorized() {
+    void shouldNotThrowWhenAuthorized() {
         CustomUserDetails principal = mock(CustomUserDetails.class);
         when(principal.getId()).thenReturn(42L);
 

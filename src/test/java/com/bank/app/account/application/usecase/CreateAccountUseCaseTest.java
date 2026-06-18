@@ -15,6 +15,9 @@ import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,21 +30,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class CreateAccountUseCaseTest {
 
-    private LoadAccountPort loadAccountPort;
-    private SaveAccountPort saveAccountPort;
-    private AuditService auditService;
-    private SecurityContextPort securityContextPort;
+    @Mock private LoadAccountPort loadAccountPort;
+    @Mock private SaveAccountPort saveAccountPort;
+    @Mock private AuditService auditService;
+
     private CreateAccountUseCase createAccountUseCase;
 
     @BeforeEach
     void setUp() {
-        loadAccountPort = mock(LoadAccountPort.class);
-        saveAccountPort = mock(SaveAccountPort.class);
-        auditService = mock(AuditService.class);
-        securityContextPort = new SecurityUtils();
-        createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService, securityContextPort);
+        createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService, new SecurityUtils());
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
@@ -103,7 +103,9 @@ class CreateAccountUseCaseTest {
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        assertThrows(AccessDeniedException.class, () -> createAccountUseCase.execute(request));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> createAccountUseCase.execute(request));
+        assertNotNull(ex.getMessage());
         verify(saveAccountPort, never()).save(any(Account.class));
     }
 
@@ -147,16 +149,19 @@ class CreateAccountUseCaseTest {
         Iban iban = new Iban(request.iban());
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
 
-        assertThrows(NullPointerException.class, () -> {
+        NullPointerException ex = assertThrows(NullPointerException.class, () -> {
             createAccountUseCase.execute(request);
         });
+        assertNotNull(ex.getMessage());
 
         verify(saveAccountPort, never()).save(any(Account.class));
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenRequestIsNull() {
-        assertThrows(NullPointerException.class, () -> createAccountUseCase.execute(null));
+        NullPointerException ex = assertThrows(NullPointerException.class,
+                () -> createAccountUseCase.execute(null));
+        assertNotNull(ex.getMessage());
     }
 
     @Test
@@ -171,7 +176,9 @@ class CreateAccountUseCaseTest {
         // Clear security context to simulate no logged in user
         SecurityContextHolder.clearContext();
 
-        assertThrows(AccessDeniedException.class, () -> createAccountUseCase.execute(request));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> createAccountUseCase.execute(request));
+        assertEquals("Oturum bulunamadı.", ex.getMessage());
         verify(saveAccountPort, never()).save(any(Account.class));
     }
 

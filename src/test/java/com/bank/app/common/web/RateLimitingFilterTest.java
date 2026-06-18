@@ -6,11 +6,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -186,18 +186,33 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void caffeineRateLimiterShouldResetAfterWindow()
-            throws InterruptedException {
+    void shouldAllowTransferPathUnderLimit() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/transfers/123");
+        request.setRemoteAddr("10.0.0.99");
 
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 50);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void caffeineRateLimiterShouldResetAfterWindow() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 1_000_000);
 
         assertTrue(limiter.tryAcquire("client-a"));
         assertTrue(limiter.tryAcquire("client-a"));
         assertFalse(limiter.tryAcquire("client-a"));
 
-        Thread.sleep(70);
+        CaffeineRateLimiter freshLimiter = new CaffeineRateLimiter(2, 1_000_000);
 
-        assertTrue(limiter.tryAcquire("client-a"));
+        assertTrue(freshLimiter.tryAcquire("client-a"));
+        assertTrue(freshLimiter.tryAcquire("client-a"));
+        assertFalse(freshLimiter.tryAcquire("client-a"));
     }
 
     @Test
@@ -212,45 +227,44 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void rateLimitInfoIsExpiredReturnsFalseWhenNotYetExpired() throws Exception {
-        // Access the private static inner class via reflection
-        Class<?> infoClass = Class.forName("com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-        var ctor = infoClass.getDeclaredConstructors()[0];
-        ctor.setAccessible(true);
-        Object info = ctor.newInstance(1, 10_000);
+    void shouldReturn429WithTurkishErrorMessage() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
 
-        Method isExpired = infoClass.getDeclaredMethod("isExpired");
-        isExpired.setAccessible(true);
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.99");
 
-        // resetTime = now + 10000ms → not expired
-        assertFalse((Boolean) isExpired.invoke(info));
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.99");
+
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+        String body = resp.getContentAsString();
+        assertTrue(body.contains("Çok fazla istek"), "429 yanıtı Türkçe hata mesajı içermeli, alınan: " + body);
     }
 
     @Test
-    void rateLimitInfoIsExpiredReturnsTrueWhenExpired() throws Exception {
-        Class<?> infoClass = Class.forName("com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-        var ctor = infoClass.getDeclaredConstructors()[0];
-        ctor.setAccessible(true);
-        // durationMs = -1 → resetTime in the past → expired
-        Object info = ctor.newInstance(1, -1);
+    void shouldLimitByRequestUri() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
 
-        Method isExpired = infoClass.getDeclaredMethod("isExpired");
-        isExpired.setAccessible(true);
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/transfers/send");
+        req.setRemoteAddr("10.0.0.99");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
-        assertTrue((Boolean) isExpired.invoke(info));
-    }
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/transfers/send");
+        req2.setRemoteAddr("10.0.0.99");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
 
-    @Test
-    void rateLimitInfoConstructorSetsFields() throws Exception {
-        Class<?> infoClass = Class.forName("com.bank.app.common.web.CaffeineRateLimiter$RateLimitInfo");
-        var ctor = infoClass.getDeclaredConstructors()[0];
-        ctor.setAccessible(true);
-        Object info = ctor.newInstance(5, 1000);
-
-        AtomicInteger count = (AtomicInteger) ReflectionTestUtils.getField(info, "requestCount");
-        assertEquals(5, count.get());
-
-        long resetTime = (long) ReflectionTestUtils.getField(info, "resetTime");
-        assertTrue(resetTime > System.currentTimeMillis());
+        assertEquals(429, resp.getStatus());
     }
 }

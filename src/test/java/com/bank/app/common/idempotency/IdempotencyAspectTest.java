@@ -2,7 +2,6 @@ package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.bank.app.common.security.port.SecurityContextPort;
-import com.bank.app.common.web.CaffeineRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -506,27 +505,6 @@ class IdempotencyAspectTest {
                 .readValue(anyString(), eq(Object.class));
     }
 
-    @Test
-    void shouldAllowRequestWhenKeyDoesNotExist() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 1000);
-        boolean result = limiter.tryAcquire("client1");
-        assertTrue(result);
-    }
 
-    @Test
-    void shouldIncrementRequestCountWhenEntryNotExpired() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 1000);
-        assertTrue(limiter.tryAcquire("client1"));
-        assertTrue(limiter.tryAcquire("client1"));
-        assertFalse(limiter.tryAcquire("client1"));
-    }
-
-    @Test
-    void shouldResetCounterWhenEntryExpired() throws Exception {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10);
-        assertTrue(limiter.tryAcquire("client1"));
-        Thread.sleep(30);
-        assertTrue(limiter.tryAcquire("client1"));
-    }
 
 }

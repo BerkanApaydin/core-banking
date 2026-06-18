@@ -5,6 +5,9 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -12,44 +15,59 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class JpaAccountRepositoryTest {
 
-    private SpringDataAccountRepo springDataRepo;
+    @Mock private SpringDataAccountRepo springDataRepo;
+    @Mock private jakarta.persistence.EntityManager entityManager;
+
     private AccountMapper mapper;
     private JpaAccountRepository repository;
 
     @BeforeEach
     void setUp() {
-        springDataRepo = mock(SpringDataAccountRepo.class);
         mapper = new AccountMapper();
-        repository = new JpaAccountRepository(springDataRepo, mapper, mock(jakarta.persistence.EntityManager.class));
+        repository = new JpaAccountRepository(springDataRepo, mapper, entityManager);
+    }
+
+    private AccountJpaEntity createEntity(Long id, String iban, String ownerName, BigDecimal balance, Long userId) {
+        return new AccountJpaEntity(id, userId, iban, ownerName, balance, "TRY", true);
     }
 
     @Test
     void shouldFindByIbanSuccessfully() {
         Iban iban = new Iban("TR290006200000000000000111");
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", true);
+        AccountJpaEntity jpaEntity = createEntity(1L, iban.value(), "Ahmet", new BigDecimal("1000.00"), 100L);
 
         when(springDataRepo.findByIban(iban.value())).thenReturn(Optional.of(jpaEntity));
 
         Optional<Account> result = repository.findByIban(iban);
 
         assertTrue(result.isPresent());
-        assertEquals("Ahmet", result.get().getOwnerName());
-        assertEquals(new BigDecimal("1000.00"), result.get().getBalance().amount());
+        Account account = result.get();
+        assertEquals("Ahmet", account.getOwnerName());
+        assertEquals(1L, account.getId());
+        assertEquals(100L, account.getUserId());
+        assertEquals("TR290006200000000000000111", account.getIban().value());
+        assertEquals(new BigDecimal("1000.00"), account.getBalance().amount());
+        assertTrue(account.isActive());
         verify(springDataRepo).findByIban(iban.value());
     }
 
     @Test
     void shouldFindByIdSuccessfully() {
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", true);
+        AccountJpaEntity jpaEntity = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), 100L);
 
         when(springDataRepo.findById(1L)).thenReturn(Optional.of(jpaEntity));
 
         Optional<Account> result = repository.findById(1L);
 
         assertTrue(result.isPresent());
-        assertEquals("Ahmet", result.get().getOwnerName());
+        Account account = result.get();
+        assertEquals(1L, account.getId());
+        assertEquals("Ahmet", account.getOwnerName());
+        assertEquals(100L, account.getUserId());
+        assertEquals(new BigDecimal("1000.00"), account.getBalance().amount());
         verify(springDataRepo).findById(1L);
     }
 

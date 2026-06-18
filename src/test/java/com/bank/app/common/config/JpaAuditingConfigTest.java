@@ -3,6 +3,8 @@ package com.bank.app.common.config;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -16,6 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class JpaAuditingConfigTest {
 
     private JpaAuditingConfig config;
@@ -34,7 +37,7 @@ class JpaAuditingConfigTest {
     }
 
     @Test
-    void testAuditorProviderWhenAuthIsNull() {
+    void shouldReturnSystemWhenAuthIsNull() {
         AuditorAware<String> provider = config.auditorProvider();
         Optional<String> auditor = provider.getCurrentAuditor();
         assertTrue(auditor.isPresent());
@@ -42,7 +45,7 @@ class JpaAuditingConfigTest {
     }
 
     @Test
-    void testAuditorProviderWhenAuthIsNotAuthenticated() {
+    void shouldReturnSystemWhenNotAuthenticated() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(false);
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -54,7 +57,7 @@ class JpaAuditingConfigTest {
     }
 
     @Test
-    void testAuditorProviderWhenAuthIsAnonymousToken() {
+    void shouldReturnSystemWhenAnonymousToken() {
         AnonymousAuthenticationToken auth = new AnonymousAuthenticationToken(
                 "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -66,7 +69,7 @@ class JpaAuditingConfigTest {
     }
 
     @Test
-    void testAuditorProviderWhenAuthIsAnonymousName() {
+    void shouldReturnSystemWhenAnonymousName() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("anonymousUser");
@@ -79,7 +82,7 @@ class JpaAuditingConfigTest {
     }
 
     @Test
-    void testAuditorProviderWhenAuthIsValidUser() {
+    void shouldReturnValidUserWhenAuthenticated() {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "john_doe", "password", AuthorityUtils.createAuthorityList("ROLE_USER"));
         SecurityContextHolder.getContext().setAuthentication(auth);

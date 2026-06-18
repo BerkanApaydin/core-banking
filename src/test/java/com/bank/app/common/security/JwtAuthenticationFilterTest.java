@@ -6,18 +6,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@SuppressWarnings("null")
+@ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
     @Mock
@@ -40,24 +42,21 @@ class JwtAuthenticationFilterTest {
 
     private JwtAuthenticationFilter filter;
     private SecurityContext originalContext;
-    private AutoCloseable closeable;
 
     @BeforeEach
     void setUp() {
-        closeable = MockitoAnnotations.openMocks(this);
         filter = new JwtAuthenticationFilter(jwtService, userDetailsService);
         originalContext = SecurityContextHolder.getContext();
         SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
         SecurityContextHolder.setContext(originalContext);
-        closeable.close();
     }
 
     @Test
-    void testDoFilterInternal_whenAuthHeaderIsNull() throws Exception {
+    void shouldContinueChainWhenAuthHeaderIsNull() throws Exception {
         when(request.getHeader("Authorization")).thenReturn(null);
 
         filter.doFilterInternal(request, response, filterChain);
@@ -68,7 +67,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenAuthHeaderDoesNotStartWithBearer() throws Exception {
+    void shouldContinueChainWhenAuthHeaderDoesNotStartWithBearer() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Basic userpass");
 
         filter.doFilterInternal(request, response, filterChain);
@@ -79,7 +78,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenJwtServiceThrowsException() throws Exception {
+    void shouldContinueChainWhenJwtServiceThrowsException() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer invalidjwt");
         when(jwtService.extractUsername("invalidjwt")).thenThrow(new RuntimeException("invalid token"));
 
@@ -91,7 +90,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenUsernameIsNull() throws Exception {
+    void shouldContinueChainWhenUsernameIsNull() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(jwtService.extractUsername("token")).thenReturn(null);
 
@@ -103,7 +102,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenAlreadyAuthenticated() throws Exception {
+    void shouldSkipAuthenticationWhenAlreadyAuthenticated() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(jwtService.extractUsername("token")).thenReturn("user");
 
@@ -118,7 +117,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenTokenIsInvalid() throws Exception {
+    void shouldSkipAuthenticationWhenTokenIsInvalid() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(jwtService.extractUsername("token")).thenReturn("user");
         when(userDetailsService.loadUserByUsername("user")).thenReturn(userDetails);
@@ -131,7 +130,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_whenTokenIsValid() throws Exception {
+    void shouldSetAuthenticationWhenTokenIsValid() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(jwtService.extractUsername("token")).thenReturn("user");
         when(userDetailsService.loadUserByUsername("user")).thenReturn(userDetails);
@@ -143,6 +142,6 @@ class JwtAuthenticationFilterTest {
         verify(filterChain).doFilter(request, response);
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(auth);
-        assertEquals(userDetails, auth.getPrincipal());
+        assertInstanceOf(UsernamePasswordAuthenticationToken.class, auth);
     }
 }

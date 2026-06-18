@@ -10,6 +10,9 @@ import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.audit.application.service.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
@@ -18,20 +21,18 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class CancelTransferUseCaseTest {
 
-    private LoadTransferPort loadTransferPort;
-    private SaveTransferPort saveTransferPort;
-    private AccountOperationsPort accountOperationsPort;
-    private AuditService auditService;
+    @Mock private LoadTransferPort loadTransferPort;
+    @Mock private SaveTransferPort saveTransferPort;
+    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private AuditService auditService;
+
     private CancelTransferUseCase cancelTransferUseCase;
 
     @BeforeEach
     void setUp() {
-        loadTransferPort = mock(LoadTransferPort.class);
-        saveTransferPort = mock(SaveTransferPort.class);
-        accountOperationsPort = mock(AccountOperationsPort.class);
-        auditService = mock(AuditService.class);
         cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationsPort, auditService, 24);
     }
 
@@ -53,7 +54,9 @@ class CancelTransferUseCaseTest {
     void shouldThrowTransferNotFoundExceptionWhenTransferDoesNotExist() {
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.empty());
 
-        assertThrows(TransferNotFoundException.class, () -> cancelTransferUseCase.execute(10L));
+        TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertTrue(ex.getMessage().contains("10"));
 
         verifyNoInteractions(accountOperationsPort);
         verifyNoInteractions(saveTransferPort);
@@ -67,7 +70,9 @@ class CancelTransferUseCaseTest {
         doThrow(new AccessDeniedException("Bu transferi iptal etmeye yetkiniz yok."))
                 .when(accountOperationsPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
 
-        assertThrows(AccessDeniedException.class, () -> cancelTransferUseCase.execute(10L));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertEquals("Bu transferi iptal etmeye yetkiniz yok.", ex.getMessage());
 
         verify(saveTransferPort, never()).save(any());
     }
@@ -78,12 +83,17 @@ class CancelTransferUseCaseTest {
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
 
-        assertThrows(IllegalArgumentException.class, () -> cancelTransferUseCase.execute(10L));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertTrue(ex.getMessage().contains("aynı"));
+
         verifyNoInteractions(accountOperationsPort);
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
-        assertThrows(NullPointerException.class, () -> cancelTransferUseCase.execute(null));
+        NullPointerException ex = assertThrows(NullPointerException.class,
+                () -> cancelTransferUseCase.execute(null));
+        assertNotNull(ex.getMessage());
     }
 }

@@ -12,6 +12,9 @@ import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,17 +26,16 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class GetAccountUseCaseTest {
 
-    private LoadAccountPort loadAccountPort;
-    private SecurityContextPort securityContextPort;
+    @Mock private LoadAccountPort loadAccountPort;
+
     private GetAccountUseCase getAccountUseCase;
 
     @BeforeEach
     void setUp() {
-        loadAccountPort = mock(LoadAccountPort.class);
-        securityContextPort = new SecurityUtils();
-        getAccountUseCase = new GetAccountUseCase(loadAccountPort, securityContextPort);
+        getAccountUseCase = new GetAccountUseCase(loadAccountPort, new SecurityUtils());
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
@@ -113,8 +115,12 @@ class GetAccountUseCaseTest {
 
     @Test
     void shouldThrowNullPointerExceptionWhenArgsAreNull() {
-        assertThrows(NullPointerException.class, () -> getAccountUseCase.getById(null));
-        assertThrows(NullPointerException.class, () -> getAccountUseCase.getByIban(null));
+        NullPointerException ex1 = assertThrows(NullPointerException.class,
+                () -> getAccountUseCase.getById(null));
+        assertNotNull(ex1.getMessage());
+        NullPointerException ex2 = assertThrows(NullPointerException.class,
+                () -> getAccountUseCase.getByIban(null));
+        assertNotNull(ex2.getMessage());
     }
 
     @Test
@@ -134,7 +140,9 @@ class GetAccountUseCaseTest {
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
 
-        assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getById(1L));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> getAccountUseCase.getById(1L));
+        assertTrue(ex.getMessage().contains("yetkiniz"));
     }
 
     @Test
@@ -155,7 +163,9 @@ class GetAccountUseCaseTest {
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
 
-        assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
+        assertTrue(ex.getMessage().contains("yetkiniz"));
     }
 
     @Test

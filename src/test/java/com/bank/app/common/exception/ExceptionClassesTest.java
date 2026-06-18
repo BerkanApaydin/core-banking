@@ -6,34 +6,52 @@ import static org.junit.jupiter.api.Assertions.*;
 class ExceptionClassesTest {
 
     @Test
-    void testExceptions() {
-        TransferNotCancellableException ex1 = new TransferNotCancellableException("message");
-        assertEquals("message", ex1.getMessage());
-        assertNull(ex1.getMessageKey());
-        assertNull(ex1.getArgs());
+    void shouldCreateTransferNotCancellableExceptionWithMessage() {
+        TransferNotCancellableException ex = new TransferNotCancellableException("message");
+        assertEquals("message", ex.getMessage());
+        assertNull(ex.getMessageKey());
+        assertNull(ex.getArgs());
+    }
 
-        TransferNotCancellableException ex1WithArgs = new TransferNotCancellableException("key", new Object[]{"arg"}, "default");
-        assertEquals("default", ex1WithArgs.getMessage());
-        assertEquals("key", ex1WithArgs.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex1WithArgs.getArgs());
+    @Test
+    void shouldCreateTransferNotCancellableExceptionWithKeyAndArgs() {
+        TransferNotCancellableException ex = new TransferNotCancellableException("key", new Object[]{"arg"}, "default");
+        assertEquals("default", ex.getMessage());
+        assertEquals("key", ex.getMessageKey());
+        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
+    }
 
-        InvalidCurrencyException ex2 = new InvalidCurrencyException("XYZ");
-        assertEquals("XYZ", ex2.getMessage());
+    @Test
+    void shouldCreateInvalidCurrencyException() {
+        InvalidCurrencyException ex = new InvalidCurrencyException("XYZ");
+        assertEquals("XYZ", ex.getMessage());
+    }
 
-        InsufficientBalanceException ex3 = new InsufficientBalanceException("insufficient");
-        assertEquals("insufficient", ex3.getMessage());
+    @Test
+    void shouldCreateInsufficientBalanceExceptionWithMessage() {
+        InsufficientBalanceException ex = new InsufficientBalanceException("insufficient");
+        assertEquals("insufficient", ex.getMessage());
+    }
 
-        InsufficientBalanceException ex3WithArgs = new InsufficientBalanceException("key", new Object[]{"arg"}, "default");
-        assertEquals("default", ex3WithArgs.getMessage());
-        assertEquals("key", ex3WithArgs.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex3WithArgs.getArgs());
+    @Test
+    void shouldCreateInsufficientBalanceExceptionWithKeyAndArgs() {
+        InsufficientBalanceException ex = new InsufficientBalanceException("key", new Object[]{"arg"}, "default");
+        assertEquals("default", ex.getMessage());
+        assertEquals("key", ex.getMessageKey());
+        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
+    }
 
-        ConcurrentRequestException ex4 = new ConcurrentRequestException("concurrent");
-        assertEquals("concurrent", ex4.getMessage());
+    @Test
+    void shouldCreateConcurrentRequestExceptionWithMessage() {
+        ConcurrentRequestException ex = new ConcurrentRequestException("concurrent");
+        assertEquals("concurrent", ex.getMessage());
+    }
 
-        ConcurrentRequestException ex4WithArgs = new ConcurrentRequestException("key", new Object[]{"arg"}, "default");
-        assertEquals("default", ex4WithArgs.getMessage());
-        assertEquals("key", ex4WithArgs.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex4WithArgs.getArgs());
+    @Test
+    void shouldCreateConcurrentRequestExceptionWithKeyAndArgs() {
+        ConcurrentRequestException ex = new ConcurrentRequestException("key", new Object[]{"arg"}, "default");
+        assertEquals("default", ex.getMessage());
+        assertEquals("key", ex.getMessageKey());
+        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
     }
 }

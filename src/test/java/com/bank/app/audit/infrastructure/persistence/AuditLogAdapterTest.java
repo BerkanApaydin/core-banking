@@ -4,7 +4,10 @@ import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 
@@ -13,14 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class AuditLogAdapterTest {
 
-    private SpringDataAuditLogRepository springDataRepo;
+    @Mock private SpringDataAuditLogRepository springDataRepo;
+
     private AuditLogAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        springDataRepo = mock(SpringDataAuditLogRepository.class);
         adapter = new AuditLogAdapter(springDataRepo);
     }
 

@@ -17,7 +17,7 @@ class JpaEntitiesTest {
     static class TestAuditable extends AuditableJpaEntity {}
 
     @Test
-    void testAuditableJpaEntity() {
+    void shouldCreateAuditableJpaEntity() {
         TestAuditable entity = new TestAuditable();
         LocalDateTime now = LocalDateTime.now();
 
@@ -33,7 +33,7 @@ class JpaEntitiesTest {
     }
 
     @Test
-    void testAuditLogJpaEntity() {
+    void shouldCreateAuditLogJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
         AuditLogJpaEntity entity = new AuditLogJpaEntity(1L, "user", AuditAction.ACCOUNT_CREATED, "details", now);
 
@@ -58,7 +58,7 @@ class JpaEntitiesTest {
     }
 
     @Test
-    void testIdempotencyKeyJpaEntity() {
+    void shouldCreateIdempotencyKeyJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key", "PENDING", "body", now);
 
@@ -80,7 +80,7 @@ class JpaEntitiesTest {
     }
 
     @Test
-    void testUserJpaEntity() {
+    void shouldCreateUserJpaEntity() {
         UserJpaEntity entity = new UserJpaEntity(1L, "user", "pass", "role");
 
         assertEquals(1L, entity.getId());
@@ -101,7 +101,7 @@ class JpaEntitiesTest {
     }
 
     @Test
-    void testAccountJpaEntity() {
+    void shouldCreateAccountJpaEntity() {
         AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, "TRY", true);
 
         assertEquals(1L, entity.getId());
@@ -133,7 +133,7 @@ class JpaEntitiesTest {
     }
 
     @Test
-    void testTransferJpaEntity() {
+    void shouldCreateTransferJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity = new TransferJpaEntity(1L, 2L, 3L, BigDecimal.TEN, "TRY", "PENDING", now);
 

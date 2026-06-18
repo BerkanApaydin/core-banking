@@ -2,7 +2,11 @@ package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -10,14 +14,24 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
 class IdempotencyTest {
 
-    @Test
-    void testCleanupExpiredKeys() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyCleanupScheduler scheduler = new IdempotencyCleanupScheduler(repo, 24);
+    @Mock
+    private SpringDataIdempotencyKeyRepo repo;
 
+    private IdempotencyCleanupScheduler scheduler;
+    private IdempotencyManager manager;
+
+    @BeforeEach
+    void setUp() {
+        scheduler = new IdempotencyCleanupScheduler(repo, 24);
+        manager = new IdempotencyManager(repo);
+    }
+
+    @Test
+    void shouldDeleteExpiredKeysOnCleanup() {
         when(repo.deleteByCreatedAtBefore(any(LocalDateTime.class))).thenReturn(5);
 
         scheduler.cleanupExpiredKeys();
@@ -26,10 +40,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_NewRequest() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldReturnNewStatusWhenKeyDoesNotExist() {
         when(repo.findById("key-1")).thenReturn(Optional.empty());
 
         IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
@@ -43,10 +54,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_PendingRequest() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldReturnPendingStatusWhenKeyExistsAndPending() {
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
 
@@ -58,10 +66,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_CompletedRequest() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldReturnCompletedStatusWhenKeyExistsAndCompleted() {
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "COMPLETED", "resp-body",
                 LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
@@ -75,10 +80,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_ConflictResolutionPending() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldResolveConflictAsPendingWhenSaveFailsAndKeyIsPending() {
         IdempotencyKeyJpaEntity existing = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
         when(repo.findById("key-1"))
                 .thenReturn(Optional.empty())
@@ -91,10 +93,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_ConflictResolutionCompleted() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldResolveConflictAsCompletedWhenSaveFailsAndKeyIsCompleted() {
         IdempotencyKeyJpaEntity existing = new IdempotencyKeyJpaEntity("key-1", "COMPLETED", "resp",
                 LocalDateTime.now());
         when(repo.findById("key-1"))
@@ -109,10 +108,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_ConflictResolutionFailedToFind() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldThrowIllegalStateWhenConflictResolutionFailsToFindKey() {
         when(repo.findById("key-1"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.empty());
@@ -122,10 +118,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_CompleteRequest() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldCompleteRequestAndUpdateEntity() {
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
 
@@ -138,10 +131,7 @@ class IdempotencyTest {
     }
 
     @Test
-    void testIdempotencyManager_FailRequest() {
-        SpringDataIdempotencyKeyRepo repo = mock(SpringDataIdempotencyKeyRepo.class);
-        IdempotencyManager manager = new IdempotencyManager(repo);
-
+    void shouldDeleteKeyOnFailRequest() {
         manager.failRequest("key-1");
 
         verify(repo).deleteById("key-1");
