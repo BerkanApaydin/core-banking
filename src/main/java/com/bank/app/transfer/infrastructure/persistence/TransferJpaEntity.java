@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.persistence;
 
 import com.bank.app.common.persistence.AuditableJpaEntity;
+import com.bank.app.transfer.domain.TransferStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,8 +26,9 @@ public class TransferJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false)
     private String currency;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private TransferStatus status;
 
     @Version
     private Long version;
@@ -41,7 +43,7 @@ public class TransferJpaEntity extends AuditableJpaEntity {
         this.version = version;
     }
 
-    public TransferJpaEntity(Long id, Long senderAccountId, Long receiverAccountId, BigDecimal amount, String currency, String status, LocalDateTime createdAt) {
+    public TransferJpaEntity(Long id, Long senderAccountId, Long receiverAccountId, BigDecimal amount, String currency, TransferStatus status, LocalDateTime createdAt) {
         this.id = id;
         this.senderAccountId = senderAccountId;
         this.receiverAccountId = receiverAccountId;
@@ -92,11 +94,11 @@ public class TransferJpaEntity extends AuditableJpaEntity {
         this.currency = currency;
     }
 
-    public String getStatus() {
+    public TransferStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(TransferStatus status) {
         this.status = status;
     }
 }

@@ -121,7 +121,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-        when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now)))
+        when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
@@ -151,7 +151,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-        when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
+        when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
         assertDoesNotThrow(() -> generateTransferReportUseCase.execute(criteria));
@@ -166,7 +166,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end)))
+        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
@@ -188,7 +188,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end)))
+        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
@@ -233,7 +233,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-        when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class)))
+        when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);

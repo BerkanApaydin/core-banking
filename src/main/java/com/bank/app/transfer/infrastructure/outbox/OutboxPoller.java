@@ -21,7 +21,7 @@ public class OutboxPoller {
     private final List<OutboxEventHandler> handlers;
 
     @Value("${app.outbox.max-retries:5}")
-    private int maxRetries;
+    private int maxRetries = 5;
 
     @Autowired
     public OutboxPoller(OutboxEventLockRepository lockRepository,
@@ -30,13 +30,12 @@ public class OutboxPoller {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;
-        this.maxRetries = 5;
     }
 
     OutboxPoller(OutboxEventLockRepository lockRepository,
                  SpringDataOutboxEventRepo outboxRepo,
                  List<OutboxEventHandler> handlers,
-                 int maxRetries) {
+                 @Value("${app.outbox.max-retries:5}") int maxRetries) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;

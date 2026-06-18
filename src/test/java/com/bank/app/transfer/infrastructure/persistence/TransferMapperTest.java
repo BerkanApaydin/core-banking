@@ -29,7 +29,7 @@ class TransferMapperTest {
         assertEquals(20L, entity.getReceiverAccountId());
         assertEquals(new BigDecimal("200.00"), entity.getAmount());
         assertEquals("TRY", entity.getCurrency());
-        assertEquals("COMPLETED", entity.getStatus());
+        assertEquals(TransferStatus.COMPLETED, entity.getStatus());
         assertEquals(now, entity.getCreatedAt());
         assertEquals(3L, entity.getVersion());
     }
@@ -38,7 +38,7 @@ class TransferMapperTest {
     void shouldMapJpaEntityToDomain() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity = new TransferJpaEntity(2L, 30L, 40L,
-                new BigDecimal("150.50"), "USD", "PENDING", now);
+                new BigDecimal("150.50"), "USD", TransferStatus.PENDING, now);
         entity.setVersion(7L);
 
         Transfer domain = mapper.toDomain(entity);
@@ -80,7 +80,7 @@ class TransferMapperTest {
     void shouldMapEntityWithoutVersion() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity = new TransferJpaEntity(4L, 70L, 80L,
-                new BigDecimal("99.99"), "EUR", "COMPLETED", now);
+                new BigDecimal("99.99"), "EUR", TransferStatus.COMPLETED, now);
 
         Transfer domain = mapper.toDomain(entity);
 

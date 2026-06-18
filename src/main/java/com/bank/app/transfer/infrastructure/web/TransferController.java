@@ -90,8 +90,10 @@ public class TransferController {
     public ResponseEntity<TransferReportResponse> getReport(
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
-        return ResponseEntity.ok(generateTransferReportUseCase.execute(new ReportCriteria(accountId, startDate, endDate)));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(generateTransferReportUseCase.execute(new ReportCriteria(accountId, startDate, endDate, page, size)));
     }
 }
 

@@ -49,6 +49,9 @@ public class GenerateTransferReportUseCase {
             throw new IllegalArgumentException("Rapor aralığı en fazla 12 ay olabilir.");
         }
 
+        int page = Math.max(criteria.page(), 0);
+        int size = Math.min(criteria.size(), 100);
+
         // Load account metadata through the internal service (decoupled from domain Account entity)
         AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
 
@@ -57,7 +60,9 @@ public class GenerateTransferReportUseCase {
         List<Transfer> transfers = loadTransferPort.findHistoryBetween(
             accountId,
             startDate,
-            endDate
+            endDate,
+            page,
+            size
         );
 
         // Batch load account IBANs to avoid N+1 query problem

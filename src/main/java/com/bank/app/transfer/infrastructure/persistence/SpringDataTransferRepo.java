@@ -28,4 +28,11 @@ public interface SpringDataTransferRepo extends JpaRepository<TransferJpaEntity,
                         @Param("accountId") Long accountId,
                         @Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end);
+
+        @Query("select t from TransferJpaEntity t where (t.senderAccountId = :accountId or t.receiverAccountId = :accountId) and t.createdAt between :start and :end")
+        List<TransferJpaEntity> findHistoryBetween(
+                        @Param("accountId") Long accountId,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end,
+                        Pageable pageable);
 }

@@ -19,7 +19,7 @@ public class TransferMapper {
                 entity.getSenderAccountId(),
                 entity.getReceiverAccountId(),
                 new Money(entity.getAmount(), Money.Currency.valueOf(entity.getCurrency())),
-                TransferStatus.valueOf(entity.getStatus()),
+                entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getVersion()
         );
@@ -36,7 +36,7 @@ public class TransferMapper {
                 domain.getReceiverAccountId(),
                 domain.getAmount().amount(),
                 domain.getAmount().currency().name(),
-                domain.getStatus().name(),
+                domain.getStatus(),
                 domain.getCreatedAt()
         );
         entity.setVersion(domain.getVersion());

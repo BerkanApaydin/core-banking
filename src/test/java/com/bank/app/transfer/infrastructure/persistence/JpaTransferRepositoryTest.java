@@ -34,7 +34,7 @@ class JpaTransferRepositoryTest {
     @Test
     void shouldFindByIdSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity jpaEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity jpaEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findById(10L)).thenReturn(Optional.of(jpaEntity));
 
@@ -56,7 +56,7 @@ class JpaTransferRepositoryTest {
     void shouldSaveSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
         Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, now);
-        TransferJpaEntity savedEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity savedEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
 
@@ -85,8 +85,8 @@ class JpaTransferRepositoryTest {
     @Test
     void shouldFindBySenderAccountIdSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findBySenderAccountId(100L)).thenReturn(List.of(entity1, entity2));
 
@@ -113,8 +113,8 @@ class JpaTransferRepositoryTest {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);
         LocalDateTime end = now.plusDays(1);
-        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
+        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
+        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
 

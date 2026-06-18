@@ -81,4 +81,13 @@ public class JpaTransferRepository implements SaveTransferPort, LoadTransferPort
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return springDataRepo.findHistoryBetween(accountId, start, end, pageable).stream()
+                .map(mapper::toDomain)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
 }

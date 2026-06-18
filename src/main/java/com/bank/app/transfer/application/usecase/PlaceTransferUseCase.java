@@ -23,9 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 @Transactional
 public class PlaceTransferUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(PlaceTransferUseCase.class);
 
     private final AccountOperationsPort accountOperationsPort;
     private final SaveTransferPort saveTransferPort;
@@ -111,13 +116,13 @@ public class PlaceTransferUseCase {
                             savedTransfer.getId(), senderIban, receiverIban,
                             savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
         } catch (Exception e) {
-            System.err.println("Audit log hatası: " + e.getMessage());
+            log.warn("Audit log kaydedilemedi: {}", e.getMessage(), e);
         }
 
         try {
             eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
         } catch (Exception e) {
-            System.err.println("Event publish hatası: " + e.getMessage());
+            log.error("Event publish edilemedi. Transfer ID: {}", savedTransfer.getId(), e);
         }
     }
 }

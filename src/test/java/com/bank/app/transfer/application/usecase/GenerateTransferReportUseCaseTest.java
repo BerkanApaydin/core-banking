@@ -77,7 +77,7 @@ class GenerateTransferReportUseCaseTest {
 
         List<Transfer> transfers = Arrays.asList(t1, t2);
 
-        when(loadTransferPort.findHistoryBetween(1L, start, end)).thenReturn(transfers);
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100)).thenReturn(transfers);
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
 
@@ -101,7 +101,7 @@ class GenerateTransferReportUseCaseTest {
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
 
-        when(loadTransferPort.findHistoryBetween(1L, start, end))
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100))
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);

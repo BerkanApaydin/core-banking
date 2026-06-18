@@ -4,6 +4,7 @@ import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.infrastructure.persistence.AuditLogJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
+import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import org.junit.jupiter.api.Test;
 
@@ -135,14 +136,14 @@ class JpaEntitiesTest {
     @Test
     void shouldCreateTransferJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity entity = new TransferJpaEntity(1L, 2L, 3L, BigDecimal.TEN, "TRY", "PENDING", now);
+        TransferJpaEntity entity = new TransferJpaEntity(1L, 2L, 3L, BigDecimal.TEN, "TRY", TransferStatus.PENDING, now);
 
         assertEquals(1L, entity.getId());
         assertEquals(2L, entity.getSenderAccountId());
         assertEquals(3L, entity.getReceiverAccountId());
         assertEquals(BigDecimal.TEN, entity.getAmount());
         assertEquals("TRY", entity.getCurrency());
-        assertEquals("PENDING", entity.getStatus());
+        assertEquals(TransferStatus.PENDING, entity.getStatus());
         assertEquals(now, entity.getCreatedAt());
 
         TransferJpaEntity empty = new TransferJpaEntity();
@@ -151,7 +152,7 @@ class JpaEntitiesTest {
         empty.setReceiverAccountId(30L);
         empty.setAmount(BigDecimal.ONE);
         empty.setCurrency("USD");
-        empty.setStatus("COMPLETED");
+        empty.setStatus(TransferStatus.COMPLETED);
         empty.setCreatedAt(now);
 
         assertEquals(10L, empty.getId());
@@ -159,7 +160,7 @@ class JpaEntitiesTest {
         assertEquals(30L, empty.getReceiverAccountId());
         assertEquals(BigDecimal.ONE, empty.getAmount());
         assertEquals("USD", empty.getCurrency());
-        assertEquals("COMPLETED", empty.getStatus());
+        assertEquals(TransferStatus.COMPLETED, empty.getStatus());
         assertEquals(now, empty.getCreatedAt());
     }
 }
