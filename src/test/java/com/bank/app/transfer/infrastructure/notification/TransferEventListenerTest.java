@@ -13,14 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class TransferEventListenerTest {
 
+    @Mock
+    private SendNotificationPort notificationPort;
+
     @Test
     void shouldSendNotificationWhenTransferCompletedEventIsTriggered() {
-        SendNotificationPort notificationPort = mock(SendNotificationPort.class);
         TransferEventListener listener = new TransferEventListener(List.of(notificationPort));
 
         Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());

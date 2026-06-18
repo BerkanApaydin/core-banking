@@ -13,7 +13,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import org.springframework.core.env.Environment;
-import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Optional;
 
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,12 +33,9 @@ class LoginUserUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        Environment environment = mock(Environment.class);
-        lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
-        jwtService = new JwtService(environment);
-        ReflectionTestUtils.setField(jwtService, "secretKey", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L);
-        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+        jwtService = new JwtService(mock(Environment.class),
+                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
+                86400000L, true);
         loginUserUseCase = new LoginUserUseCase(authenticationManager, jwtService, loadUserPort);
     }
 

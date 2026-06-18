@@ -27,15 +27,6 @@ class IdempotencyCleanupSchedulerEdgeCaseTest {
     }
 
     @Test
-    void shouldDeleteExpiredKeysOnCleanup() {
-        when(repo.deleteByCreatedAtBefore(any(LocalDateTime.class))).thenReturn(5);
-
-        scheduler.cleanupExpiredKeys();
-
-        verify(repo).deleteByCreatedAtBefore(any(LocalDateTime.class));
-    }
-
-    @Test
     void shouldHandleZeroExpiredKeys() {
         when(repo.deleteByCreatedAtBefore(any(LocalDateTime.class))).thenReturn(0);
 

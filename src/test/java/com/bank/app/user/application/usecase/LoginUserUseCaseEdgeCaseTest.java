@@ -15,8 +15,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,13 +32,9 @@ class LoginUserUseCaseEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
-        Environment environment = mock(Environment.class);
-        lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
-        jwtService = new JwtService(environment);
-        ReflectionTestUtils.setField(jwtService, "secretKey",
-                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L);
-        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+        jwtService = new JwtService(mock(Environment.class),
+                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
+                86400000L, true);
         loginUserUseCase = new LoginUserUseCase(authenticationManager, jwtService, loadUserPort);
     }
 

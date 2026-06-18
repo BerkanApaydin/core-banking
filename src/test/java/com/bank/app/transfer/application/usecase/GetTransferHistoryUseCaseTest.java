@@ -93,6 +93,36 @@ class GetTransferHistoryUseCaseTest {
     }
 
     @Test
+    void shouldCapPageSizeAtMaxLimit() {
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+                1L, "TR290006200000000000000111",
+                2L, "TR290006200000000000000222"));
+        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
+
+        getTransferHistoryUseCase.execute(1L, 0, Integer.MAX_VALUE);
+
+        verify(loadTransferPort).findHistory(1L, 0, 100);
+    }
+
+    @Test
+    void shouldCapNegativePageToZero() {
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+                1L, "TR290006200000000000000111",
+                2L, "TR290006200000000000000222"));
+        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20))).thenReturn(Collections.emptyList());
+
+        getTransferHistoryUseCase.execute(1L, -5, 20);
+
+        verify(loadTransferPort).findHistory(1L, 0, 20);
+    }
+
+    @Test
     void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
         NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
         assertEquals("Account ID null olamaz", exception.getMessage());

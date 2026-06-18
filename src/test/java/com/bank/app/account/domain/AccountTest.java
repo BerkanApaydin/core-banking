@@ -51,13 +51,25 @@ class AccountTest {
     }
 
     @Test
-    void shouldThrowNullPointerExceptionWhenConstructorArgsAreNull() {
+    void shouldThrowWhenIbanIsNull() {
         assertThrows(NullPointerException.class, () ->
                 new Account(1L, 1L, null, "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true));
+    }
+
+    @Test
+    void shouldThrowWhenOwnerNameIsNull() {
         assertThrows(NullPointerException.class, () ->
                 new Account(1L, 1L, new Iban("TR290006200000000000000111"), null, Money.of("1000.00", Money.Currency.TRY), true));
+    }
+
+    @Test
+    void shouldThrowWhenBalanceIsNull() {
         assertThrows(NullPointerException.class, () ->
                 new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", null, true));
+    }
+
+    @Test
+    void shouldThrowWhenUserIdIsNull() {
         assertThrows(NullPointerException.class, () ->
                 new Account(1L, null, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true));
     }
@@ -97,21 +109,17 @@ class AccountTest {
     @Test
     void shouldThrowCurrencyMismatchExceptionWhenDebitCurrencyMismatchesBalance() {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("100.00", Money.Currency.TRY), true);
-        assertThrows(CurrencyMismatchException.class, () ->
+        CurrencyMismatchException ex = assertThrows(CurrencyMismatchException.class, () ->
                 account.debit(Money.of("50.00", Money.Currency.USD)));
+        assertTrue(ex.getMessage().contains("karşılaştırılamaz"));
     }
 
     @Test
     void shouldThrowCurrencyMismatchExceptionWhenCreditCurrencyMismatchesBalance() {
         Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("100.00", Money.Currency.TRY), true);
-        assertThrows(CurrencyMismatchException.class, () ->
+        CurrencyMismatchException ex = assertThrows(CurrencyMismatchException.class, () ->
                 account.credit(Money.of("50.00", Money.Currency.USD)));
-    }
-
-    @Test
-    void shouldThrowNullPointerExceptionWhenUserIdIsNull() {
-        assertThrows(NullPointerException.class, () ->
-                new Account(1L, null, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Money.Currency.TRY), true));
+        assertTrue(ex.getMessage().contains("toplanamaz"));
     }
 }
 

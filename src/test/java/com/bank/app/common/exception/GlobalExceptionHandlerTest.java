@@ -2,7 +2,6 @@ package com.bank.app.common.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.hibernate.exception.ConstraintViolationException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,14 +12,15 @@ import org.springframework.context.NoSuchMessageException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.MapBindingResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
@@ -34,9 +34,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
 class GlobalExceptionHandlerTest {
@@ -46,21 +43,9 @@ class GlobalExceptionHandlerTest {
     @Mock
     private MessageSource messageSource;
 
-    @Mock
-    private Logger log;
-
-    private Logger originalLog;
-
     @BeforeEach
     void setUp() {
         handler = new GlobalExceptionHandler(messageSource);
-        originalLog = (Logger) ReflectionTestUtils.getField(GlobalExceptionHandler.class, "log");
-        ReflectionTestUtils.setField(GlobalExceptionHandler.class, "log", log);
-    }
-
-    @AfterEach
-    void tearDown() {
-        ReflectionTestUtils.setField(GlobalExceptionHandler.class, "log", originalLog);
     }
 
     @Test
@@ -294,6 +279,19 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("Sistemsel bir hata oluştu. Lütfen teknik destek ile iletişime geçin.", response.getBody().message());
+    }
+
+    @Test
+    void shouldHandleHttpMediaTypeNotSupportedException() {
+        HttpMediaTypeNotSupportedException ex = new HttpMediaTypeNotSupportedException(
+                MediaType.APPLICATION_XML, List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
+                .handleMediaTypeNotSupportedException(ex);
+
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().message().contains("Desteklenmeyen medya türü"));
     }
 
     @Test

@@ -21,27 +21,29 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
     private String secretKey;
-
-    @Value("${jwt.expiration:86400000}")
     private long jwtExpiration;
-
-    @Value("${jwt.allow-default-secret:false}")
     private boolean allowDefaultSecret;
-
     private final Environment environment;
 
-    public JwtService(Environment environment) {
+    public JwtService(Environment environment,
+                      @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}") String secretKey,
+                      @Value("${jwt.expiration:86400000}") long jwtExpiration,
+                      @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {
         this.environment = environment;
+        this.secretKey = secretKey;
+        this.jwtExpiration = jwtExpiration;
+        this.allowDefaultSecret = allowDefaultSecret;
     }
 
     @PostConstruct
     public void validateSecret() {
-        String defaultSecret = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
         boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
-        if (defaultSecret.equals(secretKey) && (isProd || !allowDefaultSecret)) {
-            throw new IllegalStateException("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.");
+        if (isProd || !allowDefaultSecret) {
+            String defaultSecret = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+            if (defaultSecret.equals(secretKey)) {
+                throw new IllegalStateException("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.");
+            }
         }
     }
 

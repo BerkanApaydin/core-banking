@@ -30,10 +30,7 @@ class JwtServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
-        jwtService = new JwtService(environment);
-        ReflectionTestUtils.setField(jwtService, "secretKey", defaultSecretKey);
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 86400000L); // 24 hours
-        ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", true);
+        jwtService = new JwtService(environment, defaultSecretKey, 86400000L, true);
     }
 
     @Test

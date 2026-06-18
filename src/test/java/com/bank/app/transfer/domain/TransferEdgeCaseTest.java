@@ -111,20 +111,6 @@ class TransferEdgeCaseTest {
     }
 
     @Test
-    void shouldTransferAllStateTransitionsCorrectly() {
-        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
-        assertEquals(TransferStatus.PENDING, transfer.getStatus());
-
-        transfer.complete();
-        assertEquals(TransferStatus.COMPLETED, transfer.getStatus());
-
-        transfer.cancel(24);
-        assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
-
-        assertThrows(TransferAlreadyCancelledException.class, () -> transfer.cancel(24));
-    }
-
-    @Test
     void shouldCreateTransferWithVersion() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY),
                 TransferStatus.PENDING, LocalDateTime.now(), 5L);

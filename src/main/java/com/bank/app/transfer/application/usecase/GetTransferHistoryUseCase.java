@@ -39,12 +39,15 @@ public class GetTransferHistoryUseCase {
     public List<TransferResponse> execute(Long accountId, int page, int size) {
         Objects.requireNonNull(accountId, "Account ID null olamaz");
 
+        int cappedPage = Math.max(page, 0);
+        int cappedSize = Math.min(size, 100);
+
         // Load account metadata through the internal service (decoupled from domain Account entity)
         AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
 
-        List<Transfer> transfers = loadTransferPort.findHistory(accountId, page, size);
+        List<Transfer> transfers = loadTransferPort.findHistory(accountId, cappedPage, cappedSize);
 
         // Batch load account IBANs to avoid N+1 query problem
         Set<Long> accountIds = transfers.stream()

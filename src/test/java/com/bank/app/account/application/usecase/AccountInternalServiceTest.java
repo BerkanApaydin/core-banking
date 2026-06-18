@@ -7,6 +7,7 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.exception.AccountNotActiveException;
 import com.bank.app.common.exception.AccountNotFoundException;
+import com.bank.app.common.exception.CurrencyMismatchException;
 import com.bank.app.common.exception.InsufficientBalanceException;
 import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
@@ -324,6 +325,23 @@ class AccountInternalServiceTest {
                 () -> accountInternalService.debitAndCredit(1L, 2L,
                         new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
     }
+
+        @Test
+        void shouldThrowCurrencyMismatchWhenSenderAndReceiverCurrenciesDiffer() {
+                Account sender = new Account(1L, 100L, new Iban("TR290006200000000000000111"), "Sender",
+                                new Money(new BigDecimal("500.00"), Money.Currency.TRY), true);
+                Account receiver = new Account(2L, 200L, new Iban("TR290006200000000000000222"), "Receiver",
+                                new Money(new BigDecimal("500.00"), Money.Currency.USD), true);
+
+                when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
+                when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
+
+                CurrencyMismatchException ex = assertThrows(CurrencyMismatchException.class,
+                                () -> accountInternalService.debitAndCredit(1L, 2L,
+                                                new Money(new BigDecimal("100.00"), Money.Currency.TRY)));
+                assertTrue(ex.getMessage().contains("toplanamaz"));
+        }
 
         @Test
         void shouldThrowExceptionWhenSenderNotFoundInReverseBalancesForCancellationWithSenderGreaterThanReceiver() {
