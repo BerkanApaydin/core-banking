@@ -7,7 +7,6 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.SecurityUtils;
-import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,7 +29,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class GetAccountUseCaseTest {
 
-    @Mock private LoadAccountPort loadAccountPort;
+    @Mock
+    private LoadAccountPort loadAccountPort;
 
     private GetAccountUseCase getAccountUseCase;
 
@@ -39,7 +40,8 @@ class GetAccountUseCaseTest {
 
         // Set default authenticated user context using CustomUserDetails
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
+                Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
@@ -135,7 +137,8 @@ class GetAccountUseCaseTest {
 
         // Authenticate with a different user ID (999L)
         CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
+                Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
@@ -158,7 +161,8 @@ class GetAccountUseCaseTest {
 
         // Authenticate with a different user ID (999L)
         CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
+                Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
@@ -180,7 +184,7 @@ class GetAccountUseCaseTest {
 
         when(loadAccountPort.findByUserId(100L)).thenReturn(Collections.singletonList(account));
 
-        java.util.List<AccountResponse> results = getAccountUseCase.getAll();
+        List<AccountResponse> results = getAccountUseCase.getAll();
 
         assertNotNull(results);
         assertEquals(1, results.size());

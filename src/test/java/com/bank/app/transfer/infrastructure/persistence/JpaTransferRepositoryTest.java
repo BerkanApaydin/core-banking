@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,7 +88,7 @@ class JpaTransferRepositoryTest {
         TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
         TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
 
-        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(java.util.List.of(entity1, entity2));
+        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(List.of(entity1, entity2));
 
         var result = repository.findBySenderAccountId(100L);
 
@@ -99,7 +100,7 @@ class JpaTransferRepositoryTest {
 
     @Test
     void shouldReturnEmptyListWhenFindBySenderAccountIdNotFound() {
-        when(springDataRepo.findBySenderAccountId(999L)).thenReturn(java.util.List.of());
+        when(springDataRepo.findBySenderAccountId(999L)).thenReturn(List.of());
 
         var result = repository.findBySenderAccountId(999L);
 
@@ -115,7 +116,7 @@ class JpaTransferRepositoryTest {
         TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", "COMPLETED", now);
         TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", "COMPLETED", now);
 
-        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(java.util.List.of(entity1, entity2));
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
 
         var result = repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
 
@@ -131,7 +132,7 @@ class JpaTransferRepositoryTest {
         LocalDateTime start = now.minusDays(1);
         LocalDateTime end = now.plusDays(1);
 
-        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(999L, start, end)).thenReturn(java.util.List.of());
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(999L, start, end)).thenReturn(List.of());
 
         var result = repository.findBySenderAccountIdAndCreatedAtBetween(999L, start, end);
 

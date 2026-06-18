@@ -1,5 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.account.domain.Iban;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
@@ -52,20 +53,22 @@ public class PlaceTransferUseCase {
     public TransferResponse execute(TransferRequest request) {
         Objects.requireNonNull(request, "Request null olamaz");
 
-        if (request.senderIban().equalsIgnoreCase(request.receiverIban())) {
-            throw new SameAccountTransferException(request.senderIban());
+        String senderIban = new Iban(request.senderIban()).value();
+        String receiverIban = new Iban(request.receiverIban()).value();
+
+        if (senderIban.equalsIgnoreCase(receiverIban)) {
+            throw new SameAccountTransferException(senderIban);
         }
 
-        AccountInfo senderInfo = accountOperationsPort.getAccountInfoForTransfer(request.senderIban());
-        AccountInfo receiverInfo = accountOperationsPort.getAccountInfoForTransfer(request.receiverIban());
+        AccountInfo senderInfo = accountOperationsPort.getAccountInfoForTransfer(senderIban);
+        AccountInfo receiverInfo = accountOperationsPort.getAccountInfoForTransfer(receiverIban);
 
-        validateAccountsActive(senderInfo, receiverInfo, request.senderIban(), request.receiverIban());
+        validateAccountsActive(senderInfo, receiverInfo, senderIban, receiverIban);
 
         Money amount = new Money(request.amount(), request.currency());
 
-        // Domain kuralları bakiye hareketinden önce doğrulanır (fail-fast)
-        Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, request.senderIban(),
-                request.receiverIban(), amount);
+        Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, senderIban,
+                receiverIban, amount);
 
         accountOperationsPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
@@ -73,9 +76,9 @@ public class PlaceTransferUseCase {
 
         Transfer completedTransfer = saveTransferPort.save(transfer);
 
-        logAuditAndPublishEvent(completedTransfer, request.senderIban(), request.receiverIban());
+        logAuditAndPublishEvent(completedTransfer, senderIban, receiverIban);
 
-        return TransferResponse.from(completedTransfer, request.senderIban(), request.receiverIban());
+        return TransferResponse.from(completedTransfer, senderIban, receiverIban);
     }
 
     private void validateAccountsActive(AccountInfo sender, AccountInfo receiver, String senderIban, String receiverIban) {

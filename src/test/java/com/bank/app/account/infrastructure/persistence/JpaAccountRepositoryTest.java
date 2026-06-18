@@ -3,6 +3,7 @@ package com.bank.app.account.infrastructure.persistence;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,7 +21,7 @@ import static org.mockito.Mockito.*;
 class JpaAccountRepositoryTest {
 
     @Mock private SpringDataAccountRepo springDataRepo;
-    @Mock private jakarta.persistence.EntityManager entityManager;
+    @Mock private EntityManager entityManager;
 
     private AccountMapper mapper;
     private JpaAccountRepository repository;
@@ -114,7 +116,7 @@ class JpaAccountRepositoryTest {
         AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", true);
         AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", true);
 
-        when(springDataRepo.findAll()).thenReturn(java.util.List.of(entity1, entity2));
+        when(springDataRepo.findAll()).thenReturn(List.of(entity1, entity2));
 
         var result = repository.findAll();
 
@@ -126,7 +128,7 @@ class JpaAccountRepositoryTest {
 
     @Test
     void shouldReturnEmptyListWhenFindAllReturnsEmpty() {
-        when(springDataRepo.findAll()).thenReturn(java.util.List.of());
+        when(springDataRepo.findAll()).thenReturn(List.of());
 
         var result = repository.findAll();
 
@@ -139,14 +141,14 @@ class JpaAccountRepositoryTest {
         AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", true);
         AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", true);
 
-        when(springDataRepo.findAllById(java.util.List.of(1L, 2L))).thenReturn(java.util.List.of(entity1, entity2));
+        when(springDataRepo.findAllById(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));
 
-        var result = repository.findByIds(java.util.List.of(1L, 2L));
+        var result = repository.findByIds(List.of(1L, 2L));
 
         assertEquals(2, result.size());
         assertEquals("Ahmet", result.get(0).getOwnerName());
         assertEquals("Mehmet", result.get(1).getOwnerName());
-        verify(springDataRepo).findAllById(java.util.List.of(1L, 2L));
+        verify(springDataRepo).findAllById(List.of(1L, 2L));
     }
 
     @Test
@@ -159,7 +161,7 @@ class JpaAccountRepositoryTest {
 
     @Test
     void shouldReturnEmptyListWhenFindByIdsIsEmpty() {
-        var result = repository.findByIds(java.util.List.of());
+        var result = repository.findByIds(List.of());
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(springDataRepo);

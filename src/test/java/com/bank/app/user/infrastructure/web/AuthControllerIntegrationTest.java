@@ -1,5 +1,7 @@
 package com.bank.app.user.infrastructure.web;
 
+import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
+import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -33,10 +35,10 @@ class AuthControllerIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo accountRepo;
+    private SpringDataAccountRepo accountRepo;
 
     @Autowired
-    private com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo transferRepo;
+    private SpringDataTransferRepo transferRepo;
 
     @Autowired
     private PasswordEncoder passwordEncoder;

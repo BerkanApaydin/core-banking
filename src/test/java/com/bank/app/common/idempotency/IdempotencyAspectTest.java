@@ -22,6 +22,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Optional;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -419,12 +420,12 @@ class IdempotencyAspectTest {
                 return false;
             }
 
-            return java.util.Objects.equals(message, other.message);
+            return Objects.equals(message, other.message);
         }
 
         @Override
         public int hashCode() {
-            return java.util.Objects.hash(message);
+            return Objects.hash(message);
         }
     }
 

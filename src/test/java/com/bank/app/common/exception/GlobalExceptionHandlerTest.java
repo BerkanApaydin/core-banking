@@ -24,6 +24,8 @@ import org.springframework.validation.MapBindingResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,8 +53,7 @@ class GlobalExceptionHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new GlobalExceptionHandler();
-        ReflectionTestUtils.setField(handler, "messageSource", messageSource);
+        handler = new GlobalExceptionHandler(messageSource);
         originalLog = (Logger) ReflectionTestUtils.getField(GlobalExceptionHandler.class, "log");
         ReflectionTestUtils.setField(GlobalExceptionHandler.class, "log", log);
     }
@@ -91,7 +92,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void shouldHandleBusinessException() {
         BusinessException ex = new InsufficientBalanceException("error.insufficient_balance",
-                new Object[] { "TR1", java.math.BigDecimal.TEN }, "Insufficient balance");
+                new Object[] { "TR1", BigDecimal.TEN }, "Insufficient balance");
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                 .thenReturn("Insufficient balance");
 
@@ -298,7 +299,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void shouldHandleHttpRequestMethodNotSupportedWithNullSupportedMethods() {
         HttpRequestMethodNotSupportedException ex =
-                new HttpRequestMethodNotSupportedException("DELETE", java.util.Collections.emptyList());
+                new HttpRequestMethodNotSupportedException("DELETE", Collections.emptyList());
 
         ResponseEntity<GlobalExceptionHandler.ErrorResponse> response =
                 handler.handleMethodNotSupportedException(ex);

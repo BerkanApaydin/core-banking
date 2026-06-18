@@ -4,6 +4,7 @@ import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.common.exception.TransferAlreadyCancelledException;
 import com.bank.app.common.exception.TransferNotCancellableException;
 import com.bank.app.common.exception.TransferNotFoundException;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.common.domain.Money;
@@ -30,12 +31,13 @@ class CancelTransferUseCaseTest {
     @Mock private SaveTransferPort saveTransferPort;
     @Mock private AccountOperationsPort accountOperationsPort;
     @Mock private AuditService auditService;
+    @Mock private SecurityContextPort securityContextPort;
 
     private CancelTransferUseCase cancelTransferUseCase;
 
     @BeforeEach
     void setUp() {
-        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationsPort, auditService, 24);
+        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationsPort, auditService, securityContextPort, 24);
     }
 
     @Test
@@ -43,6 +45,8 @@ class CancelTransferUseCaseTest {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
         cancelTransferUseCase.execute(10L);
 
@@ -62,6 +66,24 @@ class CancelTransferUseCaseTest {
 
         verifyNoInteractions(accountOperationsPort);
         verifyNoInteractions(saveTransferPort);
+        verifyNoInteractions(securityContextPort);
+    }
+
+    @Test
+    void shouldThrowAccessDeniedExceptionWhenNotAuthorizedToCancel() {
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
+
+        when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doThrow(new AccessDeniedException("Bu transferi iptal etmeye yetkiniz yok."))
+                .when(securityContextPort).checkUserAuthorization(eq(100L), any());
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertEquals("Bu transferi iptal etmeye yetkiniz yok.", ex.getMessage());
+
+        verify(accountOperationsPort, never()).reverseBalancesForCancellation(any(), any(), any());
+        verify(saveTransferPort, never()).save(any());
     }
 
     @Test
@@ -69,6 +91,8 @@ class CancelTransferUseCaseTest {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
         doThrow(new AccessDeniedException("Bu transferi iptal etmeye yetkiniz yok."))
                 .when(accountOperationsPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
 
@@ -90,6 +114,7 @@ class CancelTransferUseCaseTest {
         assertEquals("Gönderici ve alıcı hesap aynı olamaz.", ex.getMessage());
 
         verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(securityContextPort);
     }
 
     @Test
@@ -97,11 +122,14 @@ class CancelTransferUseCaseTest {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
         TransferAlreadyCancelledException ex = assertThrows(TransferAlreadyCancelledException.class,
                 () -> cancelTransferUseCase.execute(10L));
         assertEquals("Transfer zaten iptal edilmiş. ID: 10", ex.getMessage());
 
+        verify(accountOperationsPort, never()).reverseBalancesForCancellation(any(), any(), any());
         verifyNoInteractions(saveTransferPort);
     }
 
@@ -110,12 +138,14 @@ class CancelTransferUseCaseTest {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.PENDING, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> cancelTransferUseCase.execute(10L));
         assertTrue(ex.getMessage().contains("Sadece tamamlanmış transferler iptal edilebilir"));
 
-        verifyNoInteractions(accountOperationsPort);
+        verify(accountOperationsPort, never()).reverseBalancesForCancellation(any(), any(), any());
         verifyNoInteractions(saveTransferPort);
     }
 
@@ -124,12 +154,14 @@ class CancelTransferUseCaseTest {
         Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(new AccountOperationsPort.AccountInfo(1L, 100L, "TRY", true));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> cancelTransferUseCase.execute(10L));
         assertTrue(ex.getMessage().contains("saat geçtiği için iptal edilemez"));
 
-        verifyNoInteractions(accountOperationsPort);
+        verify(accountOperationsPort, never()).reverseBalancesForCancellation(any(), any(), any());
         verifyNoInteractions(saveTransferPort);
     }
 

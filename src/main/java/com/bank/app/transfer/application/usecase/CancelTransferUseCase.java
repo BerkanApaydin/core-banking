@@ -4,6 +4,7 @@ import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.exception.TransferNotFoundException;
+import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -24,17 +25,20 @@ public class CancelTransferUseCase {
     private final SaveTransferPort saveTransferPort;
     private final AccountOperationsPort accountOperationsPort;
     private final AuditService auditService;
+    private final SecurityContextPort securityContextPort;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCase(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
                                  AccountOperationsPort accountOperationsPort,
                                  AuditService auditService,
+                                 SecurityContextPort securityContextPort,
                                  @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountOperationsPort = accountOperationsPort;
         this.auditService = auditService;
+        this.securityContextPort = securityContextPort;
         this.cancellationWindowHours = cancellationWindowHours;
     }
 
@@ -54,6 +58,10 @@ public class CancelTransferUseCase {
         if (senderAccountId.equals(receiverAccountId)) {
             throw new IllegalArgumentException("Gönderici ve alıcı hesap aynı olamaz.");
         }
+
+        // Auth check before domain mutation (fail-fast)
+        Long senderUserId = accountOperationsPort.getAccountInfo(senderAccountId).userId();
+        securityContextPort.checkUserAuthorization(senderUserId, "Bu transferi iptal etmeye yetkiniz yok.");
 
         transfer.cancel(cancellationWindowHours);
 

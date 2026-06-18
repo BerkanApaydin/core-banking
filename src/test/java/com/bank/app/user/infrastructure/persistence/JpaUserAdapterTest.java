@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -45,9 +47,9 @@ class JpaUserAdapterTest {
     @Test
     void shouldFindUserByUsername() {
         UserJpaEntity jpaEntity = new UserJpaEntity(1L, "testuser", "password", "ROLE_USER");
-        when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(jpaEntity));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(jpaEntity));
 
-        java.util.Optional<User> result = jpaUserAdapter.findByUsername("testuser");
+        Optional<User> result = jpaUserAdapter.findByUsername("testuser");
 
         assertTrue(result.isPresent());
         assertEquals("testuser", result.get().getUsername());
@@ -56,9 +58,9 @@ class JpaUserAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenUserNotFound() {
-        when(userRepository.findByUsername("nonexistent")).thenReturn(java.util.Optional.empty());
+        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
 
-        java.util.Optional<User> result = jpaUserAdapter.findByUsername("nonexistent");
+        Optional<User> result = jpaUserAdapter.findByUsername("nonexistent");
 
         assertFalse(result.isPresent());
         verify(userRepository).findByUsername("nonexistent");

@@ -4,9 +4,9 @@ import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.application.port.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
+import jakarta.persistence.EntityManager;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
-
 
 import java.util.Collection;
 import java.util.List;
@@ -19,9 +19,9 @@ public class JpaAccountRepository implements LoadAccountPort, SaveAccountPort {
 
     private final SpringDataAccountRepo springDataRepo;
     private final AccountMapper mapper;
-    private final jakarta.persistence.EntityManager entityManager;
+    private final EntityManager entityManager;
 
-    public JpaAccountRepository(SpringDataAccountRepo springDataRepo, AccountMapper mapper, jakarta.persistence.EntityManager entityManager) {
+    public JpaAccountRepository(SpringDataAccountRepo springDataRepo, AccountMapper mapper, EntityManager entityManager) {
         this.springDataRepo = springDataRepo;
         this.mapper = mapper;
         this.entityManager = entityManager;
@@ -84,10 +84,11 @@ public class JpaAccountRepository implements LoadAccountPort, SaveAccountPort {
     }
 
     @Override
-    public void save(Account account) {
+    public Account save(Account account) {
         AccountJpaEntity entity = mapper.toJpaEntity(account);
-        if (entity != null) {
-            springDataRepo.save(entity);
+        if (entity == null) {
+            return null;
         }
+        return mapper.toDomain(springDataRepo.save(entity));
     }
 }

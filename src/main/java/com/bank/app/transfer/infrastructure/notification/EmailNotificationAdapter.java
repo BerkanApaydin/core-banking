@@ -15,7 +15,7 @@ public class EmailNotificationAdapter implements SendNotificationPort {
     private static final Logger log = LoggerFactory.getLogger(EmailNotificationAdapter.class);
 
     @Override
-    @CircuitBreaker(name = "notificationService", fallbackMethod = "fallbackNotify")
+    @CircuitBreaker(name = "emailNotification", fallbackMethod = "fallbackNotify")
     public void notifyTransferCompleted(Transfer transfer) {
         if (transfer == null) {
             log.warn("Email bildirimi için null transfer alındı, atlanıyor.");

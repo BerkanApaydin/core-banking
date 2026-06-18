@@ -8,6 +8,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -27,15 +30,18 @@ public class GlobalExceptionHandler {
 
     private static Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.context.MessageSource messageSource;
+    private final MessageSource messageSource;
+
+    public GlobalExceptionHandler(MessageSource messageSource) {
+        this.messageSource = messageSource;
+    }
 
     private String translate(BusinessException ex) {
         String messageKey = ex.getMessageKey();
         if (messageKey != null) {
             try {
-                return messageSource.getMessage(messageKey, ex.getArgs(), org.springframework.context.i18n.LocaleContextHolder.getLocale());
-            } catch (org.springframework.context.NoSuchMessageException e) {
+                return messageSource.getMessage(messageKey, ex.getArgs(), LocaleContextHolder.getLocale());
+            } catch (NoSuchMessageException e) {
                 // fallback
             }
         }

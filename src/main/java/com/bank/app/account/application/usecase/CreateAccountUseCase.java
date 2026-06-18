@@ -9,7 +9,6 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.exception.DuplicateIbanException;
-import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.stereotype.Service;
@@ -48,10 +47,7 @@ public class CreateAccountUseCase {
         Money balance = new Money(request.initialBalance(), currency);
         Account account = new Account(null, request.userId(), iban, request.ownerName(), balance, true);
 
-        saveAccountPort.save(account);
-
-        Account savedAccount = loadAccountPort.findByIban(iban)
-                .orElseThrow(() -> new AccountNotFoundException(iban.value()));
+        Account savedAccount = saveAccountPort.save(account);
 
         auditService.log(
             AuditAction.ACCOUNT_CREATED,

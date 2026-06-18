@@ -13,7 +13,7 @@ public class SmsNotificationAdapter implements SendNotificationPort {
     private static final Logger log = LoggerFactory.getLogger(SmsNotificationAdapter.class);
 
     @Override
-    @CircuitBreaker(name = "notificationService", fallbackMethod = "fallbackNotify")
+    @CircuitBreaker(name = "smsNotification", fallbackMethod = "fallbackNotify")
     public void notifyTransferCompleted(Transfer transfer) {
         if (transfer == null) {
             log.warn("SMS bildirimi için null transfer alındı, atlanıyor.");

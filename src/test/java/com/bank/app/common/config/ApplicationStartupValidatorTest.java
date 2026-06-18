@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,7 +67,7 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        org.assertj.core.api.Assertions.assertThat(exception.getMessage())
+        assertThat(exception.getMessage())
                 .contains("secure database password");
     }
 
@@ -87,7 +88,7 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        org.assertj.core.api.Assertions.assertThat(exception.getMessage())
+        assertThat(exception.getMessage())
                 .contains("secure database password");
     }
 

@@ -10,7 +10,6 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.common.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.SecurityUtils;
-import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,175 +32,163 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CreateAccountUseCaseTest {
 
-    @Mock private LoadAccountPort loadAccountPort;
-    @Mock private SaveAccountPort saveAccountPort;
-    @Mock private AuditService auditService;
+        @Mock
+        private LoadAccountPort loadAccountPort;
+        @Mock
+        private SaveAccountPort saveAccountPort;
+        @Mock
+        private AuditService auditService;
 
-    private CreateAccountUseCase createAccountUseCase;
+        private CreateAccountUseCase createAccountUseCase;
 
-    @BeforeEach
-    void setUp() {
-        createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService, new SecurityUtils());
+        @BeforeEach
+        void setUp() {
+                createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService,
+                                new SecurityUtils());
 
-        // Set default authenticated user context using CustomUserDetails
-        CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
+                // Set default authenticated user context using CustomUserDetails
+                CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password",
+                                Collections.emptyList());
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal,
+                                null, Collections.emptyList());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
+        @AfterEach
+        void tearDown() {
+                SecurityContextHolder.clearContext();
+        }
 
-    @Test
-    void shouldCreateAccountSuccessfully() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                100L,
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldCreateAccountSuccessfully() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                100L,
+                                "TR290006200000000000000123",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                Money.Currency.TRY);
 
-        Iban iban = new Iban(request.iban());
-        Account expectedAccount = new Account(
-                1L,
-                100L,
-                iban,
-                "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                Iban iban = new Iban(request.iban());
+                Account savedAccount = new Account(
+                                1L,
+                                100L,
+                                iban,
+                                "Ali Veli",
+                                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
+                                true);
 
-        when(loadAccountPort.findByIban(iban))
-                .thenReturn(Optional.empty())       // 1. çağrı: mükerrer IBAN kontrolü
-                .thenReturn(Optional.of(expectedAccount)); // 2. çağrı: kayıt sonrası yüklenen hesap
+                when(loadAccountPort.findByIban(iban))
+                                .thenReturn(Optional.empty());
+                when(saveAccountPort.save(any(Account.class)))
+                                .thenReturn(savedAccount);
 
-        AccountResponse response = createAccountUseCase.execute(request);
+                AccountResponse response = createAccountUseCase.execute(request);
 
-        assertNotNull(response);
-        assertEquals(1L, response.id());
-        assertEquals("TR290006200000000000000123", response.iban());
-        assertEquals("Ali Veli", response.ownerName());
-        assertEquals(new BigDecimal("500.00"), response.balance());
-        assertEquals("TRY", response.currency());
-        assertTrue(response.active());
+                assertNotNull(response);
+                assertEquals(1L, response.id());
+                assertEquals("TR290006200000000000000123", response.iban());
+                assertEquals("Ali Veli", response.ownerName());
+                assertEquals(new BigDecimal("500.00"), response.balance());
+                assertEquals("TRY", response.currency());
+                assertTrue(response.active());
 
-        verify(saveAccountPort).save(any(Account.class));
-    }
+                verify(saveAccountPort).save(any(Account.class));
+        }
 
-    @Test
-    void shouldThrowAccessDeniedExceptionWhenCreatingAccountForAnotherUser() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                200L, // ID is 200
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldThrowAccessDeniedExceptionWhenCreatingAccountForAnotherUser() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                200L, // ID is 200
+                                "TR290006200000000000000123",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                Money.Currency.TRY);
 
-        // Authenticated as user ID 100 using CustomUserDetails
-        CustomUserDetails principal = new CustomUserDetails(100L, "ali_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+                // Authenticated as user ID 100 using CustomUserDetails
+                CustomUserDetails principal = new CustomUserDetails(100L, "ali_user", "password",
+                                Collections.emptyList());
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal,
+                                null, Collections.emptyList());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
-                () -> createAccountUseCase.execute(request));
-        assertEquals("Başka bir kullanıcı adına hesap oluşturamazsınız.", ex.getMessage());
-        verify(saveAccountPort, never()).save(any(Account.class));
-    }
+                AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                                () -> createAccountUseCase.execute(request));
+                assertEquals("Başka bir kullanıcı adına hesap oluşturamazsınız.", ex.getMessage());
+                verify(saveAccountPort, never()).save(any(Account.class));
+        }
 
-    @Test
-    void shouldThrowExceptionWhenIbanAlreadyExists() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                100L,
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldThrowExceptionWhenIbanAlreadyExists() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                100L,
+                                "TR290006200000000000000123",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                Money.Currency.TRY);
 
-        Iban iban = new Iban(request.iban());
-        Account existingAccount = new Account(
-                1L,
-                100L,
-                iban,
-                "Eski Sahip",
-                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
-                true);
+                Iban iban = new Iban(request.iban());
+                Account existingAccount = new Account(
+                                1L,
+                                100L,
+                                iban,
+                                "Eski Sahip",
+                                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                                true);
 
-        when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(existingAccount));
+                when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(existingAccount));
 
-        DuplicateIbanException exception = assertThrows(DuplicateIbanException.class, () -> {
-            createAccountUseCase.execute(request);
-        });
+                DuplicateIbanException exception = assertThrows(DuplicateIbanException.class, () -> {
+                        createAccountUseCase.execute(request);
+                });
 
-        assertEquals("Bu IBAN ile kayıtlı bir hesap zaten mevcut: TR290006200000000000000123", exception.getMessage());
-        verify(saveAccountPort, never()).save(any(Account.class));
-    }
+                assertEquals("Bu IBAN ile kayıtlı bir hesap zaten mevcut: TR290006200000000000000123",
+                                exception.getMessage());
+                verify(saveAccountPort, never()).save(any(Account.class));
+        }
 
-    @Test
-    void shouldThrowExceptionWhenCurrencyIsNull() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                100L,
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                null);
+        @Test
+        void shouldThrowNullPointerExceptionWhenCurrencyIsNull() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                100L,
+                                "TR290006200000000000000123",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                null);
 
-        Iban iban = new Iban(request.iban());
-        when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
+                Iban iban = new Iban(request.iban());
+                when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
 
-        NullPointerException ex = assertThrows(NullPointerException.class, () -> {
-            createAccountUseCase.execute(request);
-        });
-        assertEquals("Para birimi boş olamaz", ex.getMessage());
+                NullPointerException ex = assertThrows(NullPointerException.class, () -> {
+                        createAccountUseCase.execute(request);
+                });
+                assertEquals("Para birimi boş olamaz", ex.getMessage());
 
-        verify(saveAccountPort, never()).save(any(Account.class));
-    }
+                verify(saveAccountPort, never()).save(any(Account.class));
+        }
 
-    @Test
-    void shouldThrowNullPointerExceptionWhenRequestIsNull() {
-        NullPointerException ex = assertThrows(NullPointerException.class,
-                () -> createAccountUseCase.execute(null));
-        assertEquals("Request null olamaz", ex.getMessage());
-    }
+        @Test
+        void shouldThrowNullPointerExceptionWhenRequestIsNull() {
+                NullPointerException ex = assertThrows(NullPointerException.class,
+                                () -> createAccountUseCase.execute(null));
+                assertEquals("Request null olamaz", ex.getMessage());
+        }
 
-    @Test
-    void shouldThrowAccessDeniedExceptionWhenUserNotLoggedIn() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                100L,
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldThrowAccessDeniedExceptionWhenUserNotLoggedIn() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                100L,
+                                "TR290006200000000000000123",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                Money.Currency.TRY);
 
-        // Clear security context to simulate no logged in user
-        SecurityContextHolder.clearContext();
+                // Clear security context to simulate no logged in user
+                SecurityContextHolder.clearContext();
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
-                () -> createAccountUseCase.execute(request));
-        assertEquals("Oturum bulunamadı.", ex.getMessage());
-        verify(saveAccountPort, never()).save(any(Account.class));
-    }
+                AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                                () -> createAccountUseCase.execute(request));
+                assertEquals("Oturum bulunamadı.", ex.getMessage());
+                verify(saveAccountPort, never()).save(any(Account.class));
+        }
 
-    @Test
-    void shouldThrowExceptionWhenAccountNotFoundAfterSave() {
-        CreateAccountRequest request = new CreateAccountRequest(
-                100L,
-                "TR290006200000000000000123",
-                "Ali Veli",
-                new BigDecimal("500.00"),
-                Money.Currency.TRY);
-
-        Iban iban = new Iban(request.iban());
-        when(loadAccountPort.findByIban(iban))
-                .thenReturn(Optional.empty())  // 1. çağrı: mükerrer IBAN kontrolü
-                .thenReturn(Optional.empty()); // 2. çağrı: kayıt sonrası bulunamadı
-
-        com.bank.app.common.exception.AccountNotFoundException exception = assertThrows(
-                com.bank.app.common.exception.AccountNotFoundException.class,
-                () -> createAccountUseCase.execute(request)
-        );
-
-        assertEquals("Hesap bulunamadı. IBAN: TR290006200000000000000123", exception.getMessage());
-        verify(saveAccountPort).save(any(Account.class));
-    }
 }

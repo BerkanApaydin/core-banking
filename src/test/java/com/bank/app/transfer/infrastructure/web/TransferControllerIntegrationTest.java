@@ -4,6 +4,12 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
+import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import com.bank.app.transfer.application.dto.TransferRequest;
+import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
+import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
+import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,10 +51,10 @@ class TransferControllerIntegrationTest {
         private SpringDataAccountRepo accountRepo;
 
         @Autowired
-        private com.bank.app.user.infrastructure.persistence.UserRepository userRepository;
+        private UserRepository userRepository;
 
         @Autowired
-        private com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo transferRepo;
+        private SpringDataTransferRepo transferRepo;
 
         @Autowired
         private ObjectMapper objectMapper;
@@ -57,7 +63,7 @@ class TransferControllerIntegrationTest {
         private SecurityUtils securityUtils;
 
         @Autowired
-        private com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo idempotencyKeyRepo;
+        private SpringDataIdempotencyKeyRepo idempotencyKeyRepo;
 
         @BeforeEach
         void setUp() {
@@ -67,14 +73,14 @@ class TransferControllerIntegrationTest {
                 accountRepo.deleteAll();
                 userRepository.deleteAll();
 
-                com.bank.app.user.infrastructure.persistence.UserJpaEntity u1 = userRepository.save(
-                    new com.bank.app.user.infrastructure.persistence.UserJpaEntity(null, "u1", "pass", "ROLE_USER")
+                UserJpaEntity u1 = userRepository.save(
+                    new UserJpaEntity(null, "u1", "pass", "ROLE_USER")
                 );
-                com.bank.app.user.infrastructure.persistence.UserJpaEntity u2 = userRepository.save(
-                    new com.bank.app.user.infrastructure.persistence.UserJpaEntity(null, "u2", "pass", "ROLE_USER")
+                UserJpaEntity u2 = userRepository.save(
+                    new UserJpaEntity(null, "u2", "pass", "ROLE_USER")
                 );
-                com.bank.app.user.infrastructure.persistence.UserJpaEntity u3 = userRepository.save(
-                    new com.bank.app.user.infrastructure.persistence.UserJpaEntity(null, "u3", "pass", "ROLE_USER")
+                UserJpaEntity u3 = userRepository.save(
+                    new UserJpaEntity(null, "u3", "pass", "ROLE_USER")
                 );
 
                 accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
@@ -339,7 +345,7 @@ class TransferControllerIntegrationTest {
 
         @Test
         void shouldReturnConflictWhenIdempotencyKeyIsPending() throws Exception {
-                idempotencyKeyRepo.save(new com.bank.app.common.persistence.IdempotencyKeyJpaEntity(
+                idempotencyKeyRepo.save(new IdempotencyKeyJpaEntity(
                                 "u1_pending-key", "PENDING", null, LocalDateTime.now()));
 
                 TransferRequest request = new TransferRequest(
