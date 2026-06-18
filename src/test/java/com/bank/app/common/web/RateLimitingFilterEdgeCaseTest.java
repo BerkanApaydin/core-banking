@@ -32,7 +32,7 @@ class RateLimitingFilterEdgeCaseTest {
 
     @Test
     void shouldAllowRequestWhenNotRateLimitedPath() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/accounts");
+        when(request.getRequestURI()).thenReturn("/api/v1/health");
 
         filter.doFilter(request, response, chain);
 

@@ -26,7 +26,7 @@ class RateLimitingFilterTest {
     @Test
     void shouldNotLimitNonMonitoredPath() throws IOException, ServletException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRequestURI("/api/v1/accounts");
+        request.setRequestURI("/api/v1/health");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -264,6 +264,27 @@ class RateLimitingFilterTest {
         assertEquals(429, resp.getStatus());
         String body = resp.getContentAsString();
         assertTrue(body.contains("Çok fazla istek"), "429 yanıtı Türkçe hata mesajı içermeli, alınan: " + body);
+    }
+
+    @Test
+    void shouldLimitAccountCreation() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/accounts");
+        req.setMethod("POST");
+        req.setRemoteAddr("10.0.0.99");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/accounts");
+        req2.setMethod("POST");
+        req2.setRemoteAddr("10.0.0.99");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
     }
 
     @Test
