@@ -125,6 +125,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldHandleTooManyFailedLoginAttemptsException() {
+        TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException("Çok fazla başarısız giriş denemesi");
+
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
+                .handleTooManyFailedLoginAttemptsException(ex);
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Çok fazla başarısız giriş denemesi", response.getBody().message());
+    }
+
+    @Test
     void shouldHandleAccessDeniedException() {
         AccessDeniedException ex = new AccessDeniedException("Access denied");
 

@@ -1,6 +1,7 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
+import com.bank.app.common.web.FailedLoginAttemptService;
 import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
@@ -46,11 +47,16 @@ class AuthControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private FailedLoginAttemptService failedLoginAttemptService;
+
     @BeforeEach
     void setUp() {
         transferRepo.deleteAll();
         accountRepo.deleteAll();
         userRepository.deleteAll();
+        failedLoginAttemptService.reset("127.0.0.1");
+        failedLoginAttemptService.reset("10.0.0.99");
     }
 
     @Test
@@ -123,5 +129,37 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status", is(401)))
                 .andExpect(jsonPath("$.message", containsString("Bad credentials")));
+    }
+
+    @Test
+    void shouldBlockLoginAfterTooManyFailedAttempts() throws Exception {
+        UserJpaEntity user = new UserJpaEntity();
+        user.setUsername("blocked_user");
+        user.setPassword(passwordEncoder.encode("Mypassw0rd!"));
+        user.setRole("ROLE_USER");
+        userRepository.save(user);
+
+        AuthRequest request = new AuthRequest("blocked_user", "wrongpass");
+
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request))
+                            .with(req -> {
+                                req.setRemoteAddr("10.0.0.99");
+                                return req;
+                            }))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(req -> {
+                            req.setRemoteAddr("10.0.0.99");
+                            return req;
+                        }))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message", containsString("Çok fazla başarısız giriş")));
     }
 }
