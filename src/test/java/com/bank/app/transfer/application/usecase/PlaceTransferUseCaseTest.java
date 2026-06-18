@@ -10,6 +10,7 @@ import com.bank.app.transfer.domain.*;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.common.exception.SameAccountTransferException;
 import com.bank.app.common.exception.AccountNotActiveException;
+import com.bank.app.common.exception.InvalidIbanException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +18,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,9 +101,6 @@ class PlaceTransferUseCaseTest {
                 "TR290006200000000000000222",
                 new BigDecimal("200.00"),
                 Money.Currency.TRY);
-
-        AccountInfo senderInfo = new AccountInfo(1L, 100L, "TRY", true);
-        AccountInfo receiverInfo = new AccountInfo(2L, 200L, "TRY", true);
 
         mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                 "TR290006200000000000000222", 2L, 200L, true);
@@ -210,6 +207,30 @@ class PlaceTransferUseCaseTest {
         Method method = PlaceTransferUseCase.class.getMethod("execute", TransferRequest.class);
         Retryable retryable = method.getAnnotation(Retryable.class);
         assertNotNull(retryable, "execute method should be annotated with @Retryable");
+    }
+
+    @Test
+    void shouldThrowInvalidIbanExceptionWhenSenderIbanHasInvalidFormat() {
+        TransferRequest request = new TransferRequest(
+                "INVALID_IBAN",
+                "TR290006200000000000000222",
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        assertThrows(InvalidIbanException.class, () -> placeTransferUseCase.execute(request));
+        verifyNoInteractions(accountOperationsPort);
+    }
+
+    @Test
+    void shouldThrowInvalidIbanExceptionWhenReceiverIbanHasInvalidFormat() {
+        TransferRequest request = new TransferRequest(
+                "TR290006200000000000000111",
+                "INVALID_IBAN",
+                new BigDecimal("200.00"),
+                Money.Currency.TRY);
+
+        assertThrows(InvalidIbanException.class, () -> placeTransferUseCase.execute(request));
+        verifyNoInteractions(accountOperationsPort);
     }
 
     @Test

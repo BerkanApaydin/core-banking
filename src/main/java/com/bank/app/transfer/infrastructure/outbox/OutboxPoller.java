@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -22,12 +23,24 @@ public class OutboxPoller {
     @Value("${app.outbox.max-retries:5}")
     private int maxRetries;
 
+    @Autowired
     public OutboxPoller(OutboxEventLockRepository lockRepository,
                         SpringDataOutboxEventRepo outboxRepo,
                         List<OutboxEventHandler> handlers) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;
+        this.maxRetries = 5;
+    }
+
+    OutboxPoller(OutboxEventLockRepository lockRepository,
+                 SpringDataOutboxEventRepo outboxRepo,
+                 List<OutboxEventHandler> handlers,
+                 int maxRetries) {
+        this.lockRepository = lockRepository;
+        this.outboxRepo = outboxRepo;
+        this.handlers = handlers;
+        this.maxRetries = maxRetries;
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:2000}")

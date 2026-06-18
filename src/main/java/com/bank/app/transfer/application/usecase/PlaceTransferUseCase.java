@@ -103,13 +103,21 @@ public class PlaceTransferUseCase {
     }
 
     private void logAuditAndPublishEvent(Transfer savedTransfer, String senderIban, String receiverIban) {
-        auditService.log(
-                AuditAction.TRANSFER_EXECUTED,
-                String.format(
-                        "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",
-                        savedTransfer.getId(), senderIban, receiverIban,
-                        savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
+        try {
+            auditService.log(
+                    AuditAction.TRANSFER_EXECUTED,
+                    String.format(
+                            "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",
+                            savedTransfer.getId(), senderIban, receiverIban,
+                            savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
+        } catch (Exception e) {
+            System.err.println("Audit log hatası: " + e.getMessage());
+        }
 
-        eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
+        try {
+            eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
+        } catch (Exception e) {
+            System.err.println("Event publish hatası: " + e.getMessage());
+        }
     }
 }
