@@ -45,8 +45,8 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        assertTrue(exception.getMessage().contains("non-default JWT secret"),
-                "Prod'da default JWT secret hata fırlatmalı");
+        assertEquals("Production profile requires a non-default JWT secret. Set JWT_SECRET environment variable.",
+                exception.getMessage());
     }
 
     @Test
@@ -87,8 +87,8 @@ class ApplicationStartupValidatorTest {
                 IllegalStateException.class,
                 () -> validator.validateProductionConfig());
 
-        assertTrue(exception.getMessage().contains("secure database password"),
-                "Prod'da boş DB şifresi uyarı vermeli");
+        org.assertj.core.api.Assertions.assertThat(exception.getMessage())
+                .contains("secure database password");
     }
 
     @Test

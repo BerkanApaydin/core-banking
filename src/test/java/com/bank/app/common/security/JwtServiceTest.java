@@ -49,7 +49,7 @@ class JwtServiceTest {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
         ReflectionTestUtils.setField(jwtService, "allowDefaultSecret", false);
         IllegalStateException ex2 = assertThrows(IllegalStateException.class, () -> jwtService.validateSecret());
-        assertTrue(ex2.getMessage().toLowerCase().contains("secret"));
+        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.", ex2.getMessage());
     }
 
     @Test

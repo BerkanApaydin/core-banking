@@ -48,8 +48,8 @@ public class CancelTransferUseCase {
         Transfer transfer = loadTransferPort.findByIdWithLock(transferId)
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
-        Long senderAccountId = Objects.requireNonNull(transfer.getSenderAccountId(), "Sender account ID null olamaz");
-        Long receiverAccountId = Objects.requireNonNull(transfer.getReceiverAccountId(), "Receiver account ID null olamaz");
+        Long senderAccountId = transfer.getSenderAccountId();
+        Long receiverAccountId = transfer.getReceiverAccountId();
 
         if (senderAccountId.equals(receiverAccountId)) {
             throw new IllegalArgumentException("Gönderici ve alıcı hesap aynı olamaz.");

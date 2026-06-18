@@ -77,6 +77,38 @@ class TransferDomainServiceTest {
         }
 
         @Test
+        void shouldThrowNullPointerExceptionWhenSenderIdIsNull() {
+                NullPointerException ex = assertThrows(
+                                NullPointerException.class,
+                                () -> transferDomainService.execute(
+                                                null,
+                                                "TR1",
+                                                Money.Currency.TRY,
+                                                2L,
+                                                "TR2",
+                                                Money.Currency.TRY,
+                                                Money.of("100.00", Money.Currency.TRY)));
+
+                assertEquals("Gönderici ID null olamaz", ex.getMessage());
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionWhenReceiverIdIsNull() {
+                NullPointerException ex = assertThrows(
+                                NullPointerException.class,
+                                () -> transferDomainService.execute(
+                                                1L,
+                                                "TR1",
+                                                Money.Currency.TRY,
+                                                null,
+                                                "TR2",
+                                                Money.Currency.TRY,
+                                                Money.of("100.00", Money.Currency.TRY)));
+
+                assertEquals("Alıcı ID null olamaz", ex.getMessage());
+        }
+
+        @Test
         void shouldThrowNullPointerExceptionWhenSenderIbanIsNull() {
                 NullPointerException ex = assertThrows(
                                 NullPointerException.class,
@@ -153,7 +185,7 @@ class TransferDomainServiceTest {
                                                 Money.Currency.TRY,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("Gönderici hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor"));
+                assertEquals("Gönderici hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor.", ex.getMessage());
         }
 
         @Test
@@ -169,6 +201,6 @@ class TransferDomainServiceTest {
                                                 Money.Currency.USD,
                                                 Money.of("100.00", Money.Currency.TRY)));
 
-                assertTrue(ex.getMessage().contains("Alıcı hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor"));
+                assertEquals("Alıcı hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor.", ex.getMessage());
         }
 }

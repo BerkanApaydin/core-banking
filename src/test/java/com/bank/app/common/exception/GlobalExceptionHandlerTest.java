@@ -188,6 +188,7 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().message().contains("Geçersiz değer: VALUE3"));
+        assertTrue(response.getBody().message().contains("Kabul edilen değerler"));
     }
 
     @Test
@@ -238,7 +239,8 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("Veritabanı bütünlük kısıt ihlali"));
+        assertEquals("Veritabanı bütünlük kısıt ihlali: İşlem yapılmak istenen veri zaten mevcut veya geçersiz.",
+                response.getBody().message());
     }
 
     @Test
@@ -251,7 +253,8 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().message().contains("Bu kayıt zaten mevcut"));
+        assertEquals("Bu kayıt zaten mevcut (benzersizlik kısıt ihlali).",
+                response.getBody().message());
     }
 
     @Test

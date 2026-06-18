@@ -1,6 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.common.exception.TransferAlreadyCancelledException;
+import com.bank.app.common.exception.TransferNotCancellableException;
 import com.bank.app.common.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
@@ -88,6 +90,47 @@ class CancelTransferUseCaseTest {
         assertEquals("Gönderici ve alıcı hesap aynı olamaz.", ex.getMessage());
 
         verifyNoInteractions(accountOperationsPort);
+    }
+
+    @Test
+    void shouldThrowTransferAlreadyCancelledExceptionWhenTransferIsCancelled() {
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now().minusHours(1));
+
+        when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+
+        TransferAlreadyCancelledException ex = assertThrows(TransferAlreadyCancelledException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertEquals("Transfer zaten iptal edilmiş. ID: 10", ex.getMessage());
+
+        verifyNoInteractions(saveTransferPort);
+    }
+
+    @Test
+    void shouldThrowTransferNotCancellableExceptionWhenStatusIsPending() {
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.PENDING, LocalDateTime.now().minusHours(1));
+
+        when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+
+        TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertTrue(ex.getMessage().contains("Sadece tamamlanmış transferler iptal edilebilir"));
+
+        verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(saveTransferPort);
+    }
+
+    @Test
+    void shouldThrowTransferNotCancellableExceptionWhenCancellationWindowExpired() {
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
+
+        when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
+
+        TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
+                () -> cancelTransferUseCase.execute(10L));
+        assertTrue(ex.getMessage().contains("saat geçtiği için iptal edilemez"));
+
+        verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(saveTransferPort);
     }
 
     @Test

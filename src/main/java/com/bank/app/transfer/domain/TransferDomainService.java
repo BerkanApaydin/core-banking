@@ -11,7 +11,9 @@ public class TransferDomainService {
                             Long receiverId, String receiverIban, Money.Currency receiverCurrency,
                             Money amount) {
         Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
+        Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
         Objects.requireNonNull(senderIban, "Gönderici IBAN null olamaz");
+        Objects.requireNonNull(receiverId, "Alıcı ID null olamaz");
         Objects.requireNonNull(receiverIban, "Alıcı IBAN null olamaz");
         Objects.requireNonNull(senderCurrency, "Gönderici para birimi null olamaz");
         Objects.requireNonNull(receiverCurrency, "Alıcı para birimi null olamaz");

@@ -36,7 +36,7 @@ class TransferTest {
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
-        assertTrue(ex.getMessage().contains("Sadece tamamlanmış transferler iptal edilebilir"));
+        assertEquals("Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: FAILED", ex.getMessage());
     }
 
     @Test
