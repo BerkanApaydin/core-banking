@@ -107,8 +107,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status", is(400)))
-                                .andExpect(jsonPath("$.message",
-                                                is("Bu IBAN ile kayıtlı bir hesap zaten mevcut: TR290006200000000000000999")));
+                                .andExpect(jsonPath("$.code", is("DUPLICATE_IBAN")));
         }
 
         @Test
@@ -132,7 +131,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status", is(404)))
-                                .andExpect(jsonPath("$.message", is("Hesap bulunamadı. ID: 9999")));
+                                .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND")));
         }
 
         @Test

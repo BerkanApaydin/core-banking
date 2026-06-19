@@ -86,7 +86,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.message", containsString("Kullanıcı adı zaten kullanımda.")));
+                .andExpect(jsonPath("$.code", is("INVALID_ARGUMENT")));
     }
 
     @Test
@@ -123,7 +123,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status", is(401)))
-                .andExpect(jsonPath("$.message", containsString("Bad credentials")));
+                .andExpect(jsonPath("$.code", is("AUTHENTICATION_FAILED")));
     }
 
     @Test
@@ -211,6 +211,6 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
                             return req;
                         }))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.message", containsString("Çok fazla başarısız giriş")));
+                .andExpect(jsonPath("$.code", is("TOO_MANY_FAILED_LOGIN_ATTEMPTS")));
     }
 }

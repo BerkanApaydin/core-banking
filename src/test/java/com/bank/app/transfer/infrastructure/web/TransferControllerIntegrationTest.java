@@ -152,7 +152,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status", is(400)))
-                                .andExpect(jsonPath("$.message", is("Hesap aktif değil: TR290006200000000000000333")));
+                                .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_ACTIVE")));
         }
 
         @Test
@@ -197,7 +197,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status", is(404)))
-                                .andExpect(jsonPath("$.message", is("Transfer bulunamadı. ID: 99999")));
+                                .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
         }
 
         @Test
@@ -364,8 +364,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isConflict())
-                                .andExpect(jsonPath("$.message",
-                                                is("Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.")));
+                                .andExpect(jsonPath("$.code", is("CONCURRENT_REQUEST")));
         }
 
         @Test

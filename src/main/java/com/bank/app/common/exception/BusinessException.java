@@ -40,4 +40,17 @@ public abstract class BusinessException extends RuntimeException {
     public HttpStatus getHttpStatus() {
         return httpStatus;
     }
+
+    private static final java.util.Locale LOCALE = java.util.Locale.ENGLISH;
+
+    public String getErrorCode() {
+        if (messageKey != null) {
+            return messageKey.replace("error.", "").toUpperCase(LOCALE);
+        }
+        String simpleName = getClass().getSimpleName();
+        return simpleName
+                .replaceAll("Exception$", "")
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .toUpperCase(LOCALE);
+    }
 }

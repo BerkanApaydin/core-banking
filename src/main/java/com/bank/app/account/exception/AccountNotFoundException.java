@@ -11,4 +11,9 @@ public class AccountNotFoundException extends BusinessException {
     public AccountNotFoundException(Long id) {
         super("error.account_not_found_id", new Object[]{id}, "Hesap bulunamadı. ID: " + id, HttpStatus.NOT_FOUND);
     }
+
+    @Override
+    public String getErrorCode() {
+        return "ACCOUNT_NOT_FOUND";
+    }
 }
