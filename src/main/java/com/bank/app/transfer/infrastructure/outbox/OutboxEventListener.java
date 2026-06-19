@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
@@ -13,6 +14,9 @@ public class OutboxEventListener {
 
     private final SpringDataOutboxEventRepo outboxRepo;
     private final ObjectMapper objectMapper;
+
+    @Value("${app.outbox.partition-count:0}")
+    private int partitionCount;
 
     public OutboxEventListener(SpringDataOutboxEventRepo outboxRepo, ObjectMapper objectMapper) {
         this.outboxRepo = outboxRepo;
@@ -40,6 +44,9 @@ public class OutboxEventListener {
             outboxEvent.setPayload(jsonPayload);
             outboxEvent.setCreatedAt(LocalDateTime.now());
             outboxEvent.setProcessed(false);
+            outboxEvent.setPartition(partitionCount > 0
+                    ? Math.floorMod(event.getTransfer().getId(), partitionCount)
+                    : 0);
             
             outboxRepo.save(outboxEvent);
         } catch (Exception e) {

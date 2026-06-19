@@ -31,7 +31,7 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
 
     @Test
     void shouldReturnEmptyListWhenNoUnprocessedEvents() {
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
         assertTrue(result.isEmpty());
     }
 
@@ -41,7 +41,7 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
                 "{}", LocalDateTime.now(), false, null));
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-1", result.get(0).getId());
     }
@@ -55,7 +55,7 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
                 "evt-2", "Transfer", "2", "TransferCompletedEvent",
                 "{}", LocalDateTime.now(), false, null));
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-2", result.get(0).getId());
     }
@@ -70,7 +70,7 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
                 "evt-2", "Transfer", "2", "TransferCompletedEvent",
                 "{}", LocalDateTime.now(), false, null));
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-2", result.get(0).getId());
     }
@@ -84,10 +84,24 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
                 "evt-earlier", "Transfer", "2", "TransferCompletedEvent",
                 "{}", LocalDateTime.now().minusMinutes(5), false, null));
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
         assertEquals(2, result.size());
         assertEquals("evt-earlier", result.get(0).getId());
         assertEquals("evt-later", result.get(1).getId());
+    }
+
+    @Test
+    void shouldFilterByPartitionWithoutSkipLocked() {
+        outboxRepo.save(new OutboxEventJpaEntity(
+                "evt-1", "Transfer", "1", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null, 0, false, null, 0));
+        outboxRepo.save(new OutboxEventJpaEntity(
+                "evt-2", "Transfer", "2", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null, 0, false, null, 1));
+
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, 1);
+        assertEquals(1, result.size());
+        assertEquals("evt-2", result.get(0).getId());
     }
 
     @Test
@@ -98,7 +112,7 @@ class OutboxEventLockRepositoryNonSkipLockedTest {
                     "{}", LocalDateTime.now().plusSeconds(i), false, null));
         }
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(3);
+        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(3, -1);
         assertEquals(3, result.size());
     }
 }

@@ -71,6 +71,7 @@ class OutboxPatternTest {
         assertEquals("TransferCompletedEvent", saved.getEventType());
         assertFalse(saved.isProcessed());
         assertNotNull(saved.getPayload());
+        assertEquals(0, saved.getPartition());
     }
 
     @Test
@@ -83,7 +84,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "TransferCompletedEvent",
                 jsonPayload, LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -107,7 +108,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "TransferCompletedEvent",
                 "invalid json string", LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -125,7 +126,7 @@ class OutboxPatternTest {
                 "invalid json string", LocalDateTime.now(), false, null,
                 4, false, "previous error");
 
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -136,7 +137,7 @@ class OutboxPatternTest {
 
     @Test
     void shouldSkipProcessingWhenNoUnprocessedEvents() {
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of());
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of());
 
         outboxPoller.pollAndProcessEvents();
 
@@ -150,7 +151,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "UnknownEventType",
                 "{}", LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -188,6 +189,29 @@ class OutboxPatternTest {
     }
 
     @Test
+    void shouldAssignPartitionWhenPartitionCountGreaterThanZero() throws Exception {
+        ReflectionTestUtils.setField(eventListener, "partitionCount", 3);
+
+        Transfer transfer = new Transfer(
+                5L, 1L, 2L,
+                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                TransferStatus.COMPLETED,
+                LocalDateTime.now());
+        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+
+        OutboxEventJpaEntity[] savedEventHolder = new OutboxEventJpaEntity[1];
+        when(outboxRepo.save(any(OutboxEventJpaEntity.class))).thenAnswer(invocation -> {
+            savedEventHolder[0] = invocation.getArgument(0);
+            return savedEventHolder[0];
+        });
+
+        eventListener.handleTransferCompleted(event);
+
+        int expectedPartition = Math.floorMod(5L, 3);
+        assertEquals(expectedPartition, savedEventHolder[0].getPartition());
+    }
+
+    @Test
     void shouldWrapListenerExceptionAsRuntimeException() throws Exception {
         Transfer transfer = new Transfer(
                 999L, 1L, 2L,
@@ -213,7 +237,7 @@ class OutboxPatternTest {
                 "{\"transferId\":1,\"senderAccountId\":1,\"receiverAccountId\":2,\"amount\":10,\"currency\":\"TRY\"}",
                 LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(10)).thenReturn(List.of(entity));
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -246,7 +270,7 @@ class OutboxPatternTest {
                 false,
                 "old error");
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
@@ -283,7 +307,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();
@@ -320,7 +344,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();
@@ -363,7 +387,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();
@@ -402,7 +426,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();
@@ -440,7 +464,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();
@@ -477,7 +501,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(10))
+        when(lockRepository.findAndLockUnprocessed(50, -1))
                 .thenReturn(List.of(entity));
 
         poller.pollAndProcessEvents();

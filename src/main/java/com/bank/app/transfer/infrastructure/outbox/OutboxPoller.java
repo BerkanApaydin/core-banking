@@ -23,6 +23,12 @@ public class OutboxPoller {
     @Value("${app.outbox.max-retries:5}")
     private int maxRetries = 5;
 
+    @Value("${app.outbox.batch-size:50}")
+    private int batchSize = 50;
+
+    @Value("${app.outbox.partition-count:0}")
+    private int partitionCount;
+
     @Autowired
     public OutboxPoller(OutboxEventLockRepository lockRepository,
                         SpringDataOutboxEventRepo outboxRepo,
@@ -35,17 +41,31 @@ public class OutboxPoller {
     OutboxPoller(OutboxEventLockRepository lockRepository,
                  SpringDataOutboxEventRepo outboxRepo,
                  List<OutboxEventHandler> handlers,
-                 @Value("${app.outbox.max-retries:5}") int maxRetries) {
+                 @Value("${app.outbox.max-retries:5}") int maxRetries,
+                 @Value("${app.outbox.batch-size:50}") int batchSize,
+                 @Value("${app.outbox.partition-count:0}") int partitionCount) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;
         this.maxRetries = maxRetries;
+        this.batchSize = batchSize;
+        this.partitionCount = partitionCount;
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:2000}")
     @Transactional
     public void pollAndProcessEvents() {
-        List<OutboxEventJpaEntity> unprocessedEvents = lockRepository.findAndLockUnprocessed(10);
+        if (partitionCount <= 0) {
+            processPartition(-1);
+        } else {
+            for (int p = 0; p < partitionCount; p++) {
+                processPartition(p);
+            }
+        }
+    }
+
+    private void processPartition(int partition) {
+        List<OutboxEventJpaEntity> unprocessedEvents = lockRepository.findAndLockUnprocessed(batchSize, partition);
         if (unprocessedEvents.isEmpty()) {
             return;
         }

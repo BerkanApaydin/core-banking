@@ -32,7 +32,7 @@ class OutboxPollerEdgeCaseTest {
 
     @Test
     void shouldDoNothingWhenNoUnprocessedEvents() {
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(Collections.emptyList());
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(Collections.emptyList());
 
         poller.pollAndProcessEvents();
 
@@ -50,7 +50,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(0);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
 
         poller.pollAndProcessEvents();
@@ -71,7 +71,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(0);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
         try {
             doThrow(new RuntimeException("Handler failed"))
@@ -99,7 +99,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(4);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
         try {
             doThrow(new RuntimeException("Handler failed"))
@@ -132,7 +132,7 @@ class OutboxPollerEdgeCaseTest {
         event2.setRetryCount(0);
         event2.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt()))
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt()))
                 .thenReturn(List.of(event1, event2));
         when(handler.supports(anyString())).thenReturn(true);
 
@@ -151,7 +151,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(0);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("UNKNOWN_TYPE")).thenReturn(false);
 
         poller.pollAndProcessEvents();
@@ -170,7 +170,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(0);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
         String longError = "x".repeat(3000);
         try {
@@ -188,7 +188,7 @@ class OutboxPollerEdgeCaseTest {
 
     @Test
     void shouldCreateWithCustomMaxRetries() {
-        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 3);
+        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 3, 50, 0);
 
         OutboxEventJpaEntity event = new OutboxEventJpaEntity();
         event.setId(UUID.randomUUID().toString());
@@ -198,7 +198,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(2);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
         when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
         try {
             doThrow(new RuntimeException("Handler failed"))
@@ -214,6 +214,30 @@ class OutboxPollerEdgeCaseTest {
     }
 
     @Test
+    void shouldPollMultiplePartitionsWhenPartitionCountSet() throws Exception {
+        OutboxPoller partitionedPoller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 5, 10, 3);
+
+        OutboxEventJpaEntity event = new OutboxEventJpaEntity();
+        event.setId(UUID.randomUUID().toString());
+        event.setEventType("TRANSFER_COMPLETED");
+        event.setProcessed(false);
+        event.setDeadLetter(false);
+        event.setRetryCount(0);
+        event.setCreatedAt(LocalDateTime.now());
+
+        when(lockRepository.findAndLockUnprocessed(10, 0)).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(10, 1)).thenReturn(Collections.emptyList());
+        when(lockRepository.findAndLockUnprocessed(10, 2)).thenReturn(Collections.emptyList());
+        when(handler.supports("TRANSFER_COMPLETED")).thenReturn(true);
+
+        partitionedPoller.pollAndProcessEvents();
+
+        assertTrue(event.isProcessed());
+        assertNotNull(event.getProcessedAt());
+        verify(handler).handle(event);
+    }
+
+    @Test
     void shouldHandleNoHandlersList() {
         OutboxPoller emptyPoller = new OutboxPoller(lockRepository, outboxRepo, Collections.emptyList());
 
@@ -225,7 +249,7 @@ class OutboxPollerEdgeCaseTest {
         event.setRetryCount(0);
         event.setCreatedAt(LocalDateTime.now());
 
-        when(lockRepository.findAndLockUnprocessed(anyInt())).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(List.of(event));
 
         emptyPoller.pollAndProcessEvents();
 

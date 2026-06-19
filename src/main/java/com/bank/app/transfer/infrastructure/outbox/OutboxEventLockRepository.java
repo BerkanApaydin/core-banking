@@ -18,25 +18,31 @@ public class OutboxEventLockRepository {
     private boolean useSkipLocked;
 
     @SuppressWarnings("unchecked")
-    public List<OutboxEventJpaEntity> findAndLockUnprocessed(int limit) {
+    public List<OutboxEventJpaEntity> findAndLockUnprocessed(int limit, int partition) {
         if (useSkipLocked) {
-            return entityManager.createNativeQuery("""
+            var query = entityManager.createNativeQuery("""
                     SELECT * FROM outbox_events
                     WHERE processed = false AND dead_letter = false
+                    """ + (partition >= 0 ? " AND partition = :partition " : "") + """
                     ORDER BY created_at ASC
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
                     """, OutboxEventJpaEntity.class)
-                    .setParameter("limit", limit)
-                    .getResultList();
+                    .setParameter("limit", limit);
+            if (partition >= 0) {
+                query.setParameter("partition", partition);
+            }
+            return query.getResultList();
         }
-        return entityManager.createQuery("""
-                SELECT e FROM OutboxEventJpaEntity e
-                WHERE e.processed = false AND e.deadLetter = false
-                ORDER BY e.createdAt ASC
-                """, OutboxEventJpaEntity.class)
+        var jpql = "SELECT e FROM OutboxEventJpaEntity e WHERE e.processed = false AND e.deadLetter = false"
+                + (partition >= 0 ? " AND e.partition = :partition" : "")
+                + " ORDER BY e.createdAt ASC";
+        var query = entityManager.createQuery(jpql, OutboxEventJpaEntity.class)
                 .setMaxResults(limit)
-                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                .getResultList();
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE);
+        if (partition >= 0) {
+            query.setParameter("partition", partition);
+        }
+        return query.getResultList();
     }
 }

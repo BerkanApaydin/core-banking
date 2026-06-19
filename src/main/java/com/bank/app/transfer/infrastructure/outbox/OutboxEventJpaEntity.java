@@ -41,16 +41,25 @@ public class OutboxEventJpaEntity {
     @Column(name = "last_error", length = 2000)
     private String lastError;
 
+    @Column(name = "partition", nullable = false)
+    private int partition;
+
     public OutboxEventJpaEntity() {}
 
     public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
                                 String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt) {
-        this(id, aggregateType, aggregateId, eventType, payload, createdAt, processed, processedAt, 0, false, null);
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, processed, processedAt, 0, false, null, 0);
     }
 
     public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
                                 String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt,
                                 int retryCount, boolean deadLetter, String lastError) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, processed, processedAt, retryCount, deadLetter, lastError, 0);
+    }
+
+    public OutboxEventJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
+                                String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt,
+                                int retryCount, boolean deadLetter, String lastError, int partition) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -62,6 +71,7 @@ public class OutboxEventJpaEntity {
         this.retryCount = retryCount;
         this.deadLetter = deadLetter;
         this.lastError = lastError;
+        this.partition = partition;
     }
 
     public String getId() {
@@ -150,5 +160,13 @@ public class OutboxEventJpaEntity {
 
     public void setLastError(String lastError) {
         this.lastError = lastError;
+    }
+
+    public int getPartition() {
+        return partition;
+    }
+
+    public void setPartition(int partition) {
+        this.partition = partition;
     }
 }
