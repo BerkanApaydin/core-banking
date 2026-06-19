@@ -3,6 +3,7 @@ package com.bank.app.account.infrastructure.web;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
@@ -12,10 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -32,11 +32,10 @@ import java.util.Locale;
 import java.util.Optional;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@Transactional
 @SuppressWarnings("null")
-class AccountControllerIntegrationTest {
+class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         @Autowired
         private MockMvc mockMvc;
@@ -61,9 +60,6 @@ class AccountControllerIntegrationTest {
         @BeforeEach
         void setUp() {
                 Locale.setDefault(Locale.of("tr", "TR"));
-                transferRepo.deleteAll();
-                accountRepo.deleteAll();
-                userRepository.deleteAll();
 
                 UserJpaEntity u = userRepository.save(
                                 new UserJpaEntity(null, "test_user", "pass", "ROLE_USER"));

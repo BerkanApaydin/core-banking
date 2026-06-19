@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.jupiter.api.AfterEach;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @Import(OutboxLockRepository.class)
@@ -32,6 +34,11 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        outboxRepo.deleteAll();
+    }
+
+    @AfterEach
+    void tearDown() {
         outboxRepo.deleteAll();
     }
 

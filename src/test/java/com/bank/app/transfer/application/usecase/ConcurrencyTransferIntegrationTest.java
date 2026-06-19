@@ -2,17 +2,21 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
+import com.bank.app.transfer.infrastructure.outbox.OutboxEventJpaRepository;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 
 import java.math.BigDecimal;
@@ -23,9 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class ConcurrencyTransferIntegrationTest {
+class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private PlaceTransferUseCase placeTransferUseCase;
@@ -39,26 +41,49 @@ class ConcurrencyTransferIntegrationTest {
     @Autowired
     private TransferJpaRepository transferRepo;
 
+    @Autowired
+    private OutboxEventJpaRepository outboxEventRepo;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @MockitoBean
     private SecurityContextAdapter securityUtils;
 
     private UserJpaEntity user;
 
+    void runInNewTx(Runnable action) {
+        var template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.execute(status -> {
+            action.run();
+            return null;
+        });
+    }
+
     @BeforeEach
     void setUp() {
-        transferRepo.deleteAll();
-        accountRepo.deleteAll();
-        userRepository.deleteAll();
+        runInNewTx(() -> {
+            user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 
-        user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
-
-        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
-                new BigDecimal("1000.00"), "TRY", true));
-        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
-                new BigDecimal("1000.00"), "TRY", true));
+            accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
+                    new BigDecimal("1000.00"), "TRY", true));
+            accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
+                    new BigDecimal("1000.00"), "TRY", true));
+        });
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
         when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    }
+
+    @AfterEach
+    void tearDown() {
+        runInNewTx(() -> {
+            outboxEventRepo.deleteAll();
+            transferRepo.deleteAll();
+            accountRepo.deleteAll();
+            userRepository.deleteAll();
+        });
     }
 
     @Test

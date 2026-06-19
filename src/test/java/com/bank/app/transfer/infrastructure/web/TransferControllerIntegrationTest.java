@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.web;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
@@ -14,10 +15,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,11 +39,10 @@ import java.util.Locale;
 import java.util.Optional;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@Transactional
 @SuppressWarnings("null")
-class TransferControllerIntegrationTest {
+class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         @Autowired
         private MockMvc mockMvc;
@@ -63,14 +65,21 @@ class TransferControllerIntegrationTest {
         @Autowired
         private IdempotencyKeyJpaRepository idempotencyKeyRepo;
 
+        @Autowired
+        private PlatformTransactionManager transactionManager;
+
+        void saveIdempotencyKeyInNewTx(IdempotencyKeyJpaEntity entity) {
+                var template = new TransactionTemplate(transactionManager);
+                template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                template.execute(status -> {
+                        idempotencyKeyRepo.save(entity);
+                        return null;
+                });
+        }
+
         @BeforeEach
         void setUp() {
                 Locale.setDefault(Locale.of("tr", "TR"));
-                idempotencyKeyRepo.deleteAll();
-                transferRepo.deleteAll();
-                accountRepo.deleteAll();
-                userRepository.deleteAll();
-
                 UserJpaEntity u1 = userRepository.save(
                                 new UserJpaEntity(null, "u1", "pass", "ROLE_USER"));
                 UserJpaEntity u2 = userRepository.save(
@@ -341,7 +350,7 @@ class TransferControllerIntegrationTest {
 
         @Test
         void shouldReturnConflictWhenIdempotencyKeyIsPending() throws Exception {
-                idempotencyKeyRepo.save(new IdempotencyKeyJpaEntity(
+                saveIdempotencyKeyInNewTx(new IdempotencyKeyJpaEntity(
                                 "u1_pending-key", "PENDING", null, LocalDateTime.now()));
 
                 TransferRequest request = new TransferRequest(

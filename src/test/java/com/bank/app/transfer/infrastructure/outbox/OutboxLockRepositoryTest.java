@@ -1,28 +1,18 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
+import com.bank.app.common.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DataJpaTest
-@AutoConfigureTestDatabase
-@ActiveProfiles("test")
 @Import(OutboxLockRepository.class)
-@TestPropertySource(properties = {
-        "app.outbox.use-skip-locked=true",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
-})
 @SuppressWarnings("null")
-class OutboxLockRepositoryTest {
+class OutboxLockRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
     private OutboxLockRepository repository;

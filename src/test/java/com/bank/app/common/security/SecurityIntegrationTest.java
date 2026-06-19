@@ -1,5 +1,6 @@
 package com.bank.app.common.security;
 
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,12 +8,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,10 +19,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
-class SecurityIntegrationTest {
+@Transactional
+class SecurityIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -37,15 +35,6 @@ class SecurityIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @BeforeEach
-    void setUp() {
-        jdbcTemplate.execute("DELETE FROM transfers");
-        jdbcTemplate.execute("DELETE FROM accounts");
-        jdbcTemplate.execute("DELETE FROM users");
-    }
 
     @Test
     void shouldAllowPublicEndpointsWithoutAuthentication() throws Exception {

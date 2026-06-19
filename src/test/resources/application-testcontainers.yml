@@ -1,4 +1,7 @@
 spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 25
   jpa:
     open-in-view: false
     hibernate:
@@ -11,6 +14,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     out-of-order: false
+
+jwt:
+  allow-default-secret: true
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
 
 app:
   outbox:

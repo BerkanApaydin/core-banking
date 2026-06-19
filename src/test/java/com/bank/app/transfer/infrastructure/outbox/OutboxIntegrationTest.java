@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
@@ -12,10 +13,8 @@ import com.bank.app.user.infrastructure.persistence.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,10 +23,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@ActiveProfiles("test")
+@Transactional
 @SuppressWarnings("null")
-class OutboxIntegrationTest {
+class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private PlaceTransferUseCase placeTransferUseCase;
@@ -54,10 +52,6 @@ class OutboxIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        outboxRepo.deleteAll();
-        transferRepo.deleteAll();
-        accountRepo.deleteAll();
-        userRepository.deleteAll();
 
         user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 

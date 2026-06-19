@@ -1,7 +1,7 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
-import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
+import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
@@ -11,11 +11,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,11 +22,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@Transactional
 @SuppressWarnings("null")
-class AuthControllerIntegrationTest {
+class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -52,9 +50,6 @@ class AuthControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        transferRepo.deleteAll();
-        accountRepo.deleteAll();
-        userRepository.deleteAll();
         failedLoginAttemptService.reset("127.0.0.1");
         failedLoginAttemptService.reset("10.0.0.99");
     }
