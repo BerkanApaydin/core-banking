@@ -1,4 +1,4 @@
-package com.bank.app.account.infrastructure.adapter;
+package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.account.application.usecase.AccountInternalService;
 import com.bank.app.common.domain.Money;
