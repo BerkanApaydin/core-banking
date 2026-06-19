@@ -20,4 +20,6 @@ public interface LoadTransferPort {
     List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end);
 
     List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size);
+
+    long countHistory(Long accountId);
 }

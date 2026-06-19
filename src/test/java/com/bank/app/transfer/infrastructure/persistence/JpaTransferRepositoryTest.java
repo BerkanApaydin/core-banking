@@ -334,6 +334,26 @@ class JpaTransferRepositoryTest {
     }
 
     @Test
+    void shouldCountHistorySuccessfully() {
+        when(springDataRepo.countHistory(100L)).thenReturn(5L);
+
+        long count = repository.countHistory(100L);
+
+        assertEquals(5L, count);
+        verify(springDataRepo).countHistory(100L);
+    }
+
+    @Test
+    void shouldReturnZeroWhenCountHistoryNotFound() {
+        when(springDataRepo.countHistory(999L)).thenReturn(0L);
+
+        long count = repository.countHistory(999L);
+
+        assertEquals(0L, count);
+        verify(springDataRepo).countHistory(999L);
+    }
+
+    @Test
     void shouldFilterOutNullMappingsWhenFindHistoryBetweenWithPagination() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);

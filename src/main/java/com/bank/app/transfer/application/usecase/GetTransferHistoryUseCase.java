@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -32,36 +33,38 @@ public class GetTransferHistoryUseCase {
         this.securityContextPort = securityContextPort;
     }
 
-    public List<TransferResponse> execute(Long accountId) {
+    public PagedResponse<TransferResponse> execute(Long accountId) {
         return execute(accountId, 0, 20);
     }
 
-    public List<TransferResponse> execute(Long accountId, int page, int size) {
+    public PagedResponse<TransferResponse> execute(Long accountId, int page, int size) {
         Objects.requireNonNull(accountId, "Account ID null olamaz");
 
         int cappedPage = Math.max(page, 0);
         int cappedSize = Math.min(size, 100);
 
-        // Load account metadata through the internal service (decoupled from domain Account entity)
         AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
 
         List<Transfer> transfers = loadTransferPort.findHistory(accountId, cappedPage, cappedSize);
 
-        // Batch load account IBANs to avoid N+1 query problem
         Set<Long> accountIds = transfers.stream()
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
                 .collect(Collectors.toSet());
 
         Map<Long, String> ibansMap = accountOperationsPort.getIbansForAccounts(accountIds);
 
-        return transfers.stream()
+        List<TransferResponse> items = transfers.stream()
                 .map(transfer -> TransferResponse.from(
                         transfer,
                         ibansMap.get(transfer.getSenderAccountId()),
                         ibansMap.get(transfer.getReceiverAccountId())
                 ))
                 .collect(Collectors.toList());
+
+        long totalItems = loadTransferPort.countHistory(accountId);
+
+        return new PagedResponse<>(items, cappedPage, cappedSize, totalItems);
     }
 }

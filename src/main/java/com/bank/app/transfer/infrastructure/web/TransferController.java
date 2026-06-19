@@ -1,5 +1,6 @@
 package com.bank.app.transfer.infrastructure.web;
 
+import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
@@ -24,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.bank.app.common.idempotency.Idempotent;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
@@ -76,7 +76,7 @@ public class TransferController {
 
     @GetMapping("/history/{accountId}")
     @Operation(summary = "Hesabın transfer geçmişini listeler")
-    public ResponseEntity<List<TransferResponse>> getHistory(
+    public ResponseEntity<PagedResponse<TransferResponse>> getHistory(
             @PathVariable Long accountId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

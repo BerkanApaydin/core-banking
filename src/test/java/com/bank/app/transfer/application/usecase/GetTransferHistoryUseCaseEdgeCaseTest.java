@@ -4,6 +4,7 @@ import com.bank.app.common.exception.AccountNotFoundException;
 import com.bank.app.common.security.SecurityUtils;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
@@ -19,7 +20,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -60,11 +60,12 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
-        List<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
+        PagedResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
 
         assertNotNull(history);
-        assertTrue(history.isEmpty());
+        assertTrue(history.items().isEmpty());
     }
 
     @Test
@@ -73,11 +74,12 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         when(accountOperationsPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(10)))
                 .thenReturn(Collections.emptyList());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
-        List<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 10);
+        PagedResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 10);
 
         assertNotNull(history);
-        assertTrue(history.isEmpty());
+        assertTrue(history.items().isEmpty());
     }
 
     @Test
@@ -122,6 +124,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                 .thenReturn(Collections.emptyList());
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L, 0, 20);
 
@@ -135,6 +138,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                 .thenReturn(Collections.emptyList());
         when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L);
 

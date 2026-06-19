@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.common.domain.Money;
@@ -23,7 +24,6 @@ import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -66,14 +66,19 @@ class GetTransferHistoryUseCaseTest {
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
+        when(loadTransferPort.countHistory(1L)).thenReturn(1L);
 
-        List<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
+        PagedResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
 
         assertNotNull(history);
-        assertEquals(1, history.size());
-        assertEquals(10L, history.get(0).id());
-        assertEquals("TR290006200000000000000111", history.get(0).senderIban());
-        assertEquals("TR290006200000000000000222", history.get(0).receiverIban());
+        assertEquals(1, history.items().size());
+        assertEquals(10L, history.items().get(0).id());
+        assertEquals("TR290006200000000000000111", history.items().get(0).senderIban());
+        assertEquals("TR290006200000000000000222", history.items().get(0).receiverIban());
+        assertEquals(1, history.totalItems());
+        assertEquals(0, history.page());
+        assertEquals(20, history.size());
+        assertEquals(1, history.totalPages());
     }
 
     @Test
@@ -101,6 +106,7 @@ class GetTransferHistoryUseCaseTest {
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L, 0, Integer.MAX_VALUE);
 
@@ -116,6 +122,7 @@ class GetTransferHistoryUseCaseTest {
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20))).thenReturn(Collections.emptyList());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L, -5, 20);
 

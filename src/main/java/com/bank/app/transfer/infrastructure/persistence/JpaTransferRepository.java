@@ -90,4 +90,9 @@ public class JpaTransferRepository implements SaveTransferPort, LoadTransferPort
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public long countHistory(Long accountId) {
+        return springDataRepo.countHistory(accountId);
+    }
 }

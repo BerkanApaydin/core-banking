@@ -35,4 +35,7 @@ public interface SpringDataTransferRepo extends JpaRepository<TransferJpaEntity,
                         @Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end,
                         Pageable pageable);
+
+        @Query("select count(t) from TransferJpaEntity t where t.senderAccountId = :accountId or t.receiverAccountId = :accountId")
+        long countHistory(@Param("accountId") Long accountId);
 }
