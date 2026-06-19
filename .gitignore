@@ -19,6 +19,7 @@
 .springBeans
 .vscode
 .codegraph
+.idea/
 target/
 /code
 MANIFEST.MF
@@ -35,6 +36,7 @@ interpolated*.xml
 lib/
 manifest.yml
 out
+!**/port/out/
 overridedb.*
 test-results/
 .flattened-pom.xml
