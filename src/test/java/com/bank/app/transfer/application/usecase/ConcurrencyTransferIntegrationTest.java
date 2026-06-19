@@ -130,4 +130,50 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         assertEquals(new BigDecimal("900.00"), balanceSender, "Sender balance should be exactly 900.00");
         assertEquals(new BigDecimal("1100.00"), balanceReceiver, "Receiver balance should be exactly 1100.00");
     }
+
+    @Test
+    void shouldHandleOverdraftProtectionUnderConcurrentLoad() throws InterruptedException {
+        int threadCount = 5;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(1);
+        CountDownLatch finishLatch = new CountDownLatch(threadCount);
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
+
+        TransferRequest request = new TransferRequest(
+                "TR290006200000000000000111",
+                "TR290006200000000000000222",
+                new BigDecimal("250.00"),
+                Money.Currency.TRY
+        );
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    latch.await();
+                    placeTransferUseCase.execute(request);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    failureCount.incrementAndGet();
+                } finally {
+                    finishLatch.countDown();
+                }
+            });
+        }
+
+        latch.countDown();
+        finishLatch.await(30, TimeUnit.SECONDS);
+        executorService.shutdown();
+
+        // 4 should succeed (250 * 4 = 1000), 1 should fail (insufficient balance)
+        assertEquals(4, successCount.get(), "Exactly 4 transfers should succeed");
+        assertEquals(1, failureCount.get(), "Exactly 1 transfer should fail due to insufficient balance");
+
+        BigDecimal balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
+        BigDecimal balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
+
+        assertEquals(new BigDecimal("0.00"), balanceSender, "Sender balance should be 0.00");
+        assertEquals(new BigDecimal("2000.00"), balanceReceiver, "Receiver balance should be 2000.00");
+    }
 }

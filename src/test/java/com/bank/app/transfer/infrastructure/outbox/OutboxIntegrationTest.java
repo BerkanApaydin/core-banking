@@ -16,9 +16,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -44,6 +47,9 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private OutboxPoller outboxPoller;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private SecurityContextAdapter securityUtils;
@@ -92,5 +98,70 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         OutboxEventJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
         assertTrue(processedEvent.isProcessed());
         assertNotNull(processedEvent.getProcessedAt());
+    }
+
+    @Test
+    void shouldIncrementRetryCountOnFailedProcessing() {
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                UUID.randomUUID().toString(),
+                "Transfer", "123", "TransferCompletedEvent",
+                "invalid json", LocalDateTime.now(), false, null,
+                0, false, null);
+        outboxRepo.save(entity);
+
+        outboxPoller.pollAndProcessEvents();
+
+        OutboxEventJpaEntity failedEvent = outboxRepo.findById(entity.getId()).orElseThrow();
+        assertEquals(1, failedEvent.getRetryCount());
+        assertFalse(failedEvent.isProcessed());
+        assertFalse(failedEvent.isDeadLetter());
+        assertNotNull(failedEvent.getLastError());
+    }
+
+    @Test
+    void shouldMoveToDeadLetterAfterMaxRetries() {
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                UUID.randomUUID().toString(),
+                "Transfer", "123", "TransferCompletedEvent",
+                "invalid json", LocalDateTime.now(), false, null,
+                4, false, "previous error");
+        outboxRepo.save(entity);
+
+        outboxPoller.pollAndProcessEvents();
+
+        OutboxEventJpaEntity deadEvent = outboxRepo.findById(entity.getId()).orElseThrow();
+        assertEquals(5, deadEvent.getRetryCount());
+        assertTrue(deadEvent.isDeadLetter());
+        assertFalse(deadEvent.isProcessed());
+        assertNotNull(deadEvent.getLastError());
+    }
+
+    @Test
+    void shouldProcessMultipleEventsInOnePoll() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            OutboxEventListener.TransferEventPayload payload =
+                    new OutboxEventListener.TransferEventPayload(
+                            100L + i, 1L, 2L, new BigDecimal("10.00"), "TRY");
+            OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                    UUID.randomUUID().toString(),
+                    "Transfer", String.valueOf(100L + i), "TransferCompletedEvent",
+                    objectMapper.writeValueAsString(payload),
+                    LocalDateTime.now(), false, null);
+            outboxRepo.save(entity);
+        }
+
+        assertEquals(3, outboxRepo.findAll().stream().filter(e -> !e.isProcessed()).count());
+
+        outboxPoller.pollAndProcessEvents();
+
+        List<OutboxEventJpaEntity> processed = outboxRepo.findAll().stream()
+                .filter(OutboxEventJpaEntity::isProcessed)
+                .toList();
+        assertEquals(3, processed.size());
+        for (OutboxEventJpaEntity event : processed) {
+            assertNull(event.getLastError());
+            assertFalse(event.isDeadLetter());
+            assertNotNull(event.getProcessedAt());
+        }
     }
 }
