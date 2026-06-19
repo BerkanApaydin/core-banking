@@ -1,8 +1,9 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.user.application.dto.AuthRequest;
-import com.bank.app.user.application.port.LoadUserPort;
-import com.bank.app.user.application.port.SaveUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.SaveUserPort;
+import com.bank.app.user.application.port.in.RegisterUserPort;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
-public class RegisterUserUseCase {
+public class RegisterUserUseCase implements RegisterUserPort {
 
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;

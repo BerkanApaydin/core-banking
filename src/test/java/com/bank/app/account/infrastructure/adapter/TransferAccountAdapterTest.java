@@ -21,7 +21,7 @@ class AccountOperationsAdapterTest {
     private AccountInternalService accountInternalService;
 
     @InjectMocks
-    private AccountOperationsAdapter adapter;
+    private TransferAccountAdapter adapter;
 
     @Test
     void shouldMapAccountInfoCorrectly() {

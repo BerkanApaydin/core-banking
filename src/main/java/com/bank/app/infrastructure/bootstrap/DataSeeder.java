@@ -6,7 +6,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
-import com.bank.app.user.application.port.LoadUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.usecase.RegisterUserUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

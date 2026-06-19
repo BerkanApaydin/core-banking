@@ -3,12 +3,12 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.common.security.CustomUserDetails;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
-import com.bank.app.transfer.application.port.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
 class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private AccountOperationPort AccountOperationPort;
 
     private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
@@ -40,7 +40,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
         generateTransferReportUseCase = new GenerateTransferReportUseCase(
-                loadTransferPort, accountOperationsPort, securityContextPort);
+                loadTransferPort, AccountOperationPort, securityContextPort);
 
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user",
                 "password", Collections.emptyList());
@@ -60,7 +60,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(999L, start, end);
 
-        when(accountOperationsPort.getAccountInfo(999L))
+        when(AccountOperationPort.getAccountInfo(999L))
                 .thenThrow(new AccountNotFoundException(999L));
 
         assertThrows(AccountNotFoundException.class,
@@ -119,8 +119,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, now, now);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
@@ -149,8 +149,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
@@ -164,8 +164,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
@@ -186,8 +186,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
 
@@ -202,7 +202,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 200L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -218,7 +218,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -231,8 +231,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
 

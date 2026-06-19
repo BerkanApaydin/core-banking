@@ -1,12 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.transfer.exception.TransferNotFoundException;
-import com.bank.app.common.security.port.SecurityContextPort;
-import com.bank.app.transfer.application.port.LoadTransferPort;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.port.in.CancelTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.ConcurrencyFailureException;
@@ -19,25 +20,25 @@ import java.util.Objects;
 
 @Service
 @Transactional
-public class CancelTransferUseCase {
+public class CancelTransferUseCase implements CancelTransferPort {
 
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
-    private final AccountOperationsPort accountOperationsPort;
-    private final AuditService auditService;
+    private final AccountOperationPort AccountOperationPort;
+    private final AuditLogger auditLogger;
     private final SecurityContextPort securityContextPort;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCase(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
-                                 AccountOperationsPort accountOperationsPort,
-                                 AuditService auditService,
+                                 AccountOperationPort AccountOperationPort,
+                                 AuditLogger auditLogger,
                                  SecurityContextPort securityContextPort,
                                  @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
-        this.accountOperationsPort = accountOperationsPort;
-        this.auditService = auditService;
+        this.AccountOperationPort = AccountOperationPort;
+        this.auditLogger = auditLogger;
         this.securityContextPort = securityContextPort;
         this.cancellationWindowHours = cancellationWindowHours;
     }
@@ -56,16 +57,16 @@ public class CancelTransferUseCase {
         Long receiverAccountId = transfer.getReceiverAccountId();
 
         // Auth check before domain mutation (fail-fast)
-        Long senderUserId = accountOperationsPort.getAccountInfo(senderAccountId).userId();
+        Long senderUserId =         AccountOperationPort.getAccountInfo(senderAccountId).userId();
         securityContextPort.checkUserAuthorization(senderUserId, "Bu transferi iptal etmeye yetkiniz yok.");
 
         transfer.cancel(cancellationWindowHours);
 
-        accountOperationsPort.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
+        AccountOperationPort.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
 
         saveTransferPort.save(transfer);
 
-        auditService.log(
+        auditLogger.log(
             AuditAction.TRANSFER_CANCELLED,
             String.format("Transfer iptal edildi. Transfer ID: %d, Gönderici Hesaba Geri Yüklenen: %s %s, Alıcı Hesaptan Düşülen: %s %s",
                 transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency().name(),

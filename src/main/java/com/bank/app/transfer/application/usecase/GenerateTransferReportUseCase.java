@@ -1,13 +1,14 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
-import com.bank.app.transfer.application.port.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,17 +23,17 @@ import java.util.stream.Stream;
 
 @Service
 @Transactional(readOnly = true)
-public class GenerateTransferReportUseCase {
+public class GenerateTransferReportUseCase implements GenerateTransferReportPort {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountOperationsPort accountOperationsPort;
+    private final AccountOperationPort AccountOperationPort;
     private final SecurityContextPort securityContextPort;
 
     public GenerateTransferReportUseCase(LoadTransferPort loadTransferPort,
-                                         AccountOperationsPort accountOperationsPort,
+                                         AccountOperationPort AccountOperationPort,
                                          SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.accountOperationsPort = accountOperationsPort;
+        this.AccountOperationPort = AccountOperationPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -53,7 +54,7 @@ public class GenerateTransferReportUseCase {
         int size = Math.min(criteria.size(), 100);
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account = accountOperationsPort.getAccountInfo(accountId);
+        AccountInfo account =         AccountOperationPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
 
@@ -70,7 +71,7 @@ public class GenerateTransferReportUseCase {
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap = accountOperationsPort.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap =         AccountOperationPort.getIbansForAccounts(accountIds);
 
         List<TransferResponse> responseList = transfers.stream()
             .map(transfer -> TransferResponse.from(

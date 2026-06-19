@@ -1,8 +1,9 @@
 package com.bank.app.audit.application;
 
-import com.bank.app.audit.application.port.SaveAuditLogPort;
+import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,41 +11,30 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class AuditServiceTest {
+class AuditLoggerTest {
 
     @Mock
     private SaveAuditLogPort saveAuditLogPort;
+    @Mock
+    private SecurityContextPort securityContextPort;
 
-    private AuditService auditService;
-    private SecurityContext originalContext;
+    private AuditLogger auditLogger;
 
     @BeforeEach
     void setUp() {
-        auditService = new AuditService(saveAuditLogPort);
-        originalContext = SecurityContextHolder.getContext();
-        SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.setContext(originalContext);
+        auditLogger = new AuditLogger(saveAuditLogPort, securityContextPort);
     }
 
     @Test
     void shouldLogWithExplicitUsername() {
-        auditService.log("user123", AuditAction.ACCOUNT_CREATED, "Account created details");
+        auditLogger.log("user123", AuditAction.ACCOUNT_CREATED, "Account created details");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());
@@ -57,9 +47,9 @@ class AuditServiceTest {
 
     @Test
     void shouldReturnSystemUserWhenAuthIsNull() {
-        SecurityContextHolder.getContext().setAuthentication(null);
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
-        auditService.log(AuditAction.TRANSFER_EXECUTED, "Transfer executed");
+        auditLogger.log(AuditAction.TRANSFER_EXECUTED, "Transfer executed");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());
@@ -71,11 +61,9 @@ class AuditServiceTest {
 
     @Test
     void shouldReturnSystemUserWhenNotAuthenticated() {
-        Authentication auth = mock(Authentication.class);
-        when(auth.isAuthenticated()).thenReturn(false);
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
-        auditService.log(AuditAction.TRANSFER_CANCELLED, "Transfer cancelled");
+        auditLogger.log(AuditAction.TRANSFER_CANCELLED, "Transfer cancelled");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());
@@ -86,12 +74,9 @@ class AuditServiceTest {
 
     @Test
     void shouldReturnSystemUserWhenAnonymousToken() {
-        AnonymousAuthenticationToken auth = new AnonymousAuthenticationToken(
-                "key", "anonymousUser", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))
-        );
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
-        auditService.log(AuditAction.ACCOUNT_CREATED, "Details");
+        auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());
@@ -102,12 +87,9 @@ class AuditServiceTest {
 
     @Test
     void shouldReturnSystemUserWhenAnonymousUsername() {
-        Authentication auth = mock(Authentication.class);
-        when(auth.isAuthenticated()).thenReturn(true);
-        when(auth.getName()).thenReturn("anonymousUser");
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
-        auditService.log(AuditAction.ACCOUNT_CREATED, "Details");
+        auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());
@@ -118,12 +100,9 @@ class AuditServiceTest {
 
     @Test
     void shouldLogWithCurrentUsernameWhenAuthenticated() {
-        Authentication auth = mock(Authentication.class);
-        when(auth.isAuthenticated()).thenReturn(true);
-        when(auth.getName()).thenReturn("jane.doe");
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("jane.doe"));
 
-        auditService.log(AuditAction.ACCOUNT_CREATED, "Details");
+        auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(saveAuditLogPort).save(captor.capture());

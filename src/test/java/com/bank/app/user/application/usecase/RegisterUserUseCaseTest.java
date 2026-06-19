@@ -1,8 +1,8 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.user.application.dto.AuthRequest;
-import com.bank.app.user.application.port.LoadUserPort;
-import com.bank.app.user.application.port.SaveUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

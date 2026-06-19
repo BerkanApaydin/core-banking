@@ -5,7 +5,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.bank.app.common.security.CustomUserDetails;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;

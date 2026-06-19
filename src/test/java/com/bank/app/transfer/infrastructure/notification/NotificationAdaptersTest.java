@@ -2,7 +2,7 @@ package com.bank.app.transfer.infrastructure.notification;
 
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.application.port.SendNotificationPort;
+import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.common.domain.Money;
 
 import org.junit.jupiter.api.BeforeEach;

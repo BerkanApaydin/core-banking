@@ -1,13 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.*;
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.account.exception.AccountNotActiveException;
 import com.bank.app.account.exception.InvalidIbanException;
@@ -17,7 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,20 +33,18 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("null")
 class PlaceTransferUseCaseTest {
 
-    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private AccountOperationPort AccountOperationPort;
     @Mock private SaveTransferPort saveTransferPort;
-    @Mock private ApplicationEventPublisher eventPublisher;
-    @Mock private AuditService auditService;
+    @Mock private DomainEventPublisherPort eventPublisherPort;
+    @Mock private AuditLogger auditLogger;
 
     private PlaceTransferUseCase placeTransferUseCase;
 
     @BeforeEach
     void setUp() {
-        placeTransferUseCase = new PlaceTransferUseCase(
-                accountOperationsPort,
-                saveTransferPort,
-                auditService,
-                eventPublisher,
+        placeTransferUseCase = new PlaceTransferUseCase(AccountOperationPort,
+                saveTransferPort, auditLogger,
+                eventPublisherPort,
                 new TransferDomainService());
     }
 
@@ -60,9 +58,9 @@ class PlaceTransferUseCaseTest {
 
     private void mockAccountInfos(String senderIban, long senderId, long senderUserId, boolean senderActive,
                                    String receiverIban, long receiverId, long receiverUserId, boolean receiverActive) {
-        when(accountOperationsPort.getAccountInfoForTransfer(senderIban))
+        when(AccountOperationPort.getAccountInfoForTransfer(senderIban))
                 .thenReturn(new AccountInfo(senderId, senderUserId, "TRY", senderActive));
-        when(accountOperationsPort.getAccountInfoForTransfer(receiverIban))
+        when(AccountOperationPort.getAccountInfoForTransfer(receiverIban))
                 .thenReturn(new AccountInfo(receiverId, receiverUserId, "TRY", receiverActive));
     }
 
@@ -85,13 +83,13 @@ class PlaceTransferUseCaseTest {
         assertEquals("COMPLETED", response.status());
         assertEquals(new BigDecimal("200.00"), response.amount());
 
-        verify(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+        verify(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
         verify(saveTransferPort, times(1)).save(transferCaptor.capture());
         assertEquals(TransferStatus.COMPLETED, transferCaptor.getValue().getStatus());
 
-        verify(eventPublisher).publishEvent(any(TransferCompletedEvent.class));
+        verify(eventPublisherPort).publish(any(TransferCompletedEvent.class));
     }
 
     @Test
@@ -106,7 +104,7 @@ class PlaceTransferUseCaseTest {
                 "TR290006200000000000000222", 2L, 200L, true);
 
         doThrow(new AccessDeniedException("Bu hesaptan transfer yapmaya yetkiniz yok."))
-                .when(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                .when(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
         assertThrows(AccessDeniedException.class, () -> placeTransferUseCase.execute(request));
 
@@ -127,7 +125,7 @@ class PlaceTransferUseCaseTest {
                 Money.Currency.TRY);
 
         assertThrows(SameAccountTransferException.class, () -> placeTransferUseCase.execute(request));
-        verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(AccountOperationPort);
     }
 
     @Test
@@ -142,7 +140,7 @@ class PlaceTransferUseCaseTest {
                 "TR290006200000000000000222", 2L, 200L, true);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
-        verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+        verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
 
     @Test
@@ -157,7 +155,7 @@ class PlaceTransferUseCaseTest {
                 "TR290006200000000000000222", 2L, 200L, false);
 
         assertThrows(AccountNotActiveException.class, () -> placeTransferUseCase.execute(request));
-        verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+        verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
 
     @Test
@@ -218,7 +216,7 @@ class PlaceTransferUseCaseTest {
                 Money.Currency.TRY);
 
         assertThrows(InvalidIbanException.class, () -> placeTransferUseCase.execute(request));
-        verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(AccountOperationPort);
     }
 
     @Test
@@ -230,7 +228,7 @@ class PlaceTransferUseCaseTest {
                 Money.Currency.TRY);
 
         assertThrows(InvalidIbanException.class, () -> placeTransferUseCase.execute(request));
-        verifyNoInteractions(accountOperationsPort);
+        verifyNoInteractions(AccountOperationPort);
     }
 
     @Test

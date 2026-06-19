@@ -1,7 +1,7 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -23,14 +23,14 @@ import java.lang.reflect.Type;
 @Component
 public class IdempotencyAspect {
 
-    private final IdempotencyManager idempotencyManager;
+    private final IdempotencyGuard idempotencyGuard;
     private final SecurityContextPort securityContextPort;
     private final ObjectMapper objectMapper;
 
-    public IdempotencyAspect(IdempotencyManager idempotencyManager,
+    public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
             SecurityContextPort securityContextPort,
             ObjectMapper objectMapper) {
-        this.idempotencyManager = idempotencyManager;
+        this.idempotencyGuard = idempotencyGuard;
         this.securityContextPort = securityContextPort;
         this.objectMapper = objectMapper;
     }
@@ -53,7 +53,7 @@ public class IdempotencyAspect {
                 .orElseThrow(() -> new AccessDeniedException("Giriş yapmalısınız."));
         String key = username + "_" + idempotencyKeyHeader;
 
-        IdempotencyManager.IdempotencyResult result = idempotencyManager.startRequest(key);
+        IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
 
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
@@ -83,16 +83,16 @@ public class IdempotencyAspect {
             if (responseObj instanceof ResponseEntity<?> responseEntity) {
                 if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
                     String jsonResponse = objectMapper.writeValueAsString(responseEntity.getBody());
-                    idempotencyManager.completeRequest(key, jsonResponse, responseEntity.getStatusCode().value());
+                    idempotencyGuard.completeRequest(key, jsonResponse, responseEntity.getStatusCode().value());
                 } else {
-                    idempotencyManager.failRequest(key);
+                    idempotencyGuard.failRequest(key);
                 }
             } else {
-                idempotencyManager.failRequest(key);
+                idempotencyGuard.failRequest(key);
             }
             return responseObj;
         } catch (Throwable ex) {
-            idempotencyManager.failRequest(key);
+            idempotencyGuard.failRequest(key);
             throw ex;
         }
     }

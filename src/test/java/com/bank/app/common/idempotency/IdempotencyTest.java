@@ -22,12 +22,12 @@ class IdempotencyTest {
     private IdempotencyKeyJpaRepository repo;
 
     private IdempotencyCleanupScheduler scheduler;
-    private IdempotencyManager manager;
+    private IdempotencyGuard manager;
 
     @BeforeEach
     void setUp() {
         scheduler = new IdempotencyCleanupScheduler(repo, 24);
-        manager = new IdempotencyManager(repo);
+        manager = new IdempotencyGuard(repo);
     }
 
     @Test
@@ -43,9 +43,9 @@ class IdempotencyTest {
     void shouldReturnNewStatusWhenKeyDoesNotExist() {
         when(repo.findById("key-1")).thenReturn(Optional.empty());
 
-        IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
-        assertEquals(IdempotencyManager.IdempotencyResult.Status.NEW, result.status());
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.NEW, result.status());
         assertNull(result.responseBody());
         assertFalse(result.isCompleted());
         assertFalse(result.isPending());
@@ -58,9 +58,9 @@ class IdempotencyTest {
         IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
 
-        IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
-        assertEquals(IdempotencyManager.IdempotencyResult.Status.PENDING, result.status());
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.PENDING, result.status());
         assertTrue(result.isPending());
         assertFalse(result.isCompleted());
     }
@@ -71,9 +71,9 @@ class IdempotencyTest {
                 LocalDateTime.now());
         when(repo.findById("key-1")).thenReturn(Optional.of(entity));
 
-        IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
-        assertEquals(IdempotencyManager.IdempotencyResult.Status.COMPLETED, result.status());
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.COMPLETED, result.status());
         assertEquals("resp-body", result.responseBody());
         assertTrue(result.isCompleted());
         assertFalse(result.isPending());
@@ -87,9 +87,9 @@ class IdempotencyTest {
                 .thenReturn(Optional.of(existing));
         doThrow(new RuntimeException("Lock conflict")).when(repo).saveAndFlush(any());
 
-        IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
-        assertEquals(IdempotencyManager.IdempotencyResult.Status.PENDING, result.status());
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.PENDING, result.status());
     }
 
     @Test
@@ -101,9 +101,9 @@ class IdempotencyTest {
                 .thenReturn(Optional.of(existing));
         doThrow(new RuntimeException("Lock conflict")).when(repo).saveAndFlush(any());
 
-        IdempotencyManager.IdempotencyResult result = manager.startRequest("key-1");
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
-        assertEquals(IdempotencyManager.IdempotencyResult.Status.COMPLETED, result.status());
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.COMPLETED, result.status());
         assertEquals("resp", result.responseBody());
     }
 

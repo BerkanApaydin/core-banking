@@ -1,7 +1,7 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
-import com.bank.app.transfer.application.port.LoadTransferPort;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;

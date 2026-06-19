@@ -6,11 +6,11 @@ import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import com.bank.app.transfer.application.usecase.CancelTransferUseCase;
-import com.bank.app.transfer.application.usecase.PlaceTransferUseCase;
-import com.bank.app.transfer.application.usecase.GetTransferDetailUseCase;
-import com.bank.app.transfer.application.usecase.GetTransferHistoryUseCase;
-import com.bank.app.transfer.application.usecase.GenerateTransferReportUseCase;
+import com.bank.app.transfer.application.port.in.CancelTransferPort;
+import com.bank.app.transfer.application.port.in.PlaceTransferPort;
+import com.bank.app.transfer.application.port.in.GetTransferDetailPort;
+import com.bank.app.transfer.application.port.in.GetTransferHistoryPort;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportPort;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -34,29 +34,29 @@ import io.swagger.v3.oas.annotations.Operation;
 @Tag(name = "Transfer API", description = "Para transfer işlemlerini yöneten API")
 public class TransferController {
 
-    private final PlaceTransferUseCase placeTransferUseCase;
-    private final CancelTransferUseCase cancelTransferUseCase;
-    private final GetTransferDetailUseCase getTransferDetailUseCase;
-    private final GetTransferHistoryUseCase getTransferHistoryUseCase;
-    private final GenerateTransferReportUseCase generateTransferReportUseCase;
+    private final PlaceTransferPort placeTransferPort;
+    private final CancelTransferPort cancelTransferPort;
+    private final GetTransferDetailPort getTransferDetailPort;
+    private final GetTransferHistoryPort getTransferHistoryPort;
+    private final GenerateTransferReportPort generateTransferReportPort;
 
-    public TransferController(PlaceTransferUseCase placeTransferUseCase, 
-                              CancelTransferUseCase cancelTransferUseCase,
-                              GetTransferDetailUseCase getTransferDetailUseCase,
-                              GetTransferHistoryUseCase getTransferHistoryUseCase,
-                              GenerateTransferReportUseCase generateTransferReportUseCase) {
-        this.placeTransferUseCase = placeTransferUseCase;
-        this.cancelTransferUseCase = cancelTransferUseCase;
-        this.getTransferDetailUseCase = getTransferDetailUseCase;
-        this.getTransferHistoryUseCase = getTransferHistoryUseCase;
-        this.generateTransferReportUseCase = generateTransferReportUseCase;
+    public TransferController(PlaceTransferPort placeTransferPort, 
+                              CancelTransferPort cancelTransferPort,
+                              GetTransferDetailPort getTransferDetailPort,
+                              GetTransferHistoryPort getTransferHistoryPort,
+                              GenerateTransferReportPort generateTransferReportPort) {
+        this.placeTransferPort = placeTransferPort;
+        this.cancelTransferPort = cancelTransferPort;
+        this.getTransferDetailPort = getTransferDetailPort;
+        this.getTransferHistoryPort = getTransferHistoryPort;
+        this.generateTransferReportPort = generateTransferReportPort;
     }
 
     @PostMapping
     @Idempotent
     @Operation(summary = "Para transferi gerçekleştirir", description = "Gönderici ve alıcı IBAN bilgileriyle para transfer işlemini başlatır ve kaydeder. Idempotency-Key başlığıyla tekrarlı istekler önlenebilir.")
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
-        TransferResponse response = placeTransferUseCase.execute(request);
+        TransferResponse response = placeTransferPort.execute(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -64,14 +64,14 @@ public class TransferController {
     @Idempotent
     @Operation(summary = "Mevcut bir transferi iptal eder", description = "Gönderilen transfer ID'sine ait tamamlanmış işlemi 24 saat içinde iptal eder ve bakiyeleri iade eder.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
-        cancelTransferUseCase.execute(id);
+        cancelTransferPort.execute(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Transfer detaylarını sorgular")
     public ResponseEntity<TransferDetailResponse> getDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(getTransferDetailUseCase.execute(id));
+        return ResponseEntity.ok(getTransferDetailPort.execute(id));
     }
 
     @GetMapping("/history/{accountId}")
@@ -82,7 +82,7 @@ public class TransferController {
             @RequestParam(defaultValue = "20") int size) {
         int cappedSize = Math.min(size, 100);
         int cappedPage = Math.max(page, 0);
-        return ResponseEntity.ok(getTransferHistoryUseCase.execute(accountId, cappedPage, cappedSize));
+        return ResponseEntity.ok(getTransferHistoryPort.execute(accountId, cappedPage, cappedSize));
     }
 
     @GetMapping("/report")
@@ -93,7 +93,7 @@ public class TransferController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        return ResponseEntity.ok(generateTransferReportUseCase.execute(new ReportCriteria(accountId, startDate, endDate, page, size)));
+        return ResponseEntity.ok(generateTransferReportPort.execute(new ReportCriteria(accountId, startDate, endDate, page, size)));
     }
 }
 

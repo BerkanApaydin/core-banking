@@ -1,17 +1,17 @@
 package com.bank.app.audit.infrastructure.adapter;
 
-import com.bank.app.audit.application.port.SaveAuditLogPort;
+import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditLog;
 import com.bank.app.audit.infrastructure.persistence.AuditLogJpaEntity;
 import com.bank.app.audit.infrastructure.persistence.AuditLogJpaRepository;
 import org.springframework.stereotype.Component;
 
 @Component
-public class AuditLogAdapter implements SaveAuditLogPort {
+public class AuditPersistenceAdapter implements SaveAuditLogPort {
 
     private final AuditLogJpaRepository repository;
 
-    public AuditLogAdapter(AuditLogJpaRepository repository) {
+    public AuditPersistenceAdapter(AuditLogJpaRepository repository) {
         this.repository = repository;
     }
 

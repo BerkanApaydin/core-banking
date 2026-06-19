@@ -1,7 +1,7 @@
 package com.bank.app.user.infrastructure.adapter;
 
-import com.bank.app.user.application.port.LoadUserPort;
-import com.bank.app.user.application.port.SaveUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -11,11 +11,11 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 @Component
-public class UserJpaAdapter implements LoadUserPort, SaveUserPort {
+public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
 
     private final UserRepository userRepository;
 
-    public UserJpaAdapter(UserRepository userRepository) {
+    public UserPersistenceAdapter(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 

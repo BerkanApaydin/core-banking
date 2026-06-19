@@ -1,5 +1,6 @@
 package com.bank.app.common.security;
 
+import com.bank.app.common.security.port.out.JwtPort;
 import com.bank.app.user.domain.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -19,14 +20,14 @@ import java.util.Map;
 import java.util.function.Function;
 
 @Service
-public class JwtService {
+public class JwtTokenProvider implements JwtPort {
 
     private String secretKey;
     private long jwtExpiration;
     private boolean allowDefaultSecret;
     private final Environment environment;
 
-    public JwtService(Environment environment,
+    public JwtTokenProvider(Environment environment,
                       @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}") String secretKey,
                       @Value("${jwt.expiration:86400000}") long jwtExpiration,
                       @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {

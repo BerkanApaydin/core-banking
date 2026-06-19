@@ -1,7 +1,7 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
 class IdempotencyAspectTest {
 
         @Mock
-        private IdempotencyManager idempotencyManager;
+        private IdempotencyGuard idempotencyGuard;
 
         @Mock
         private SecurityContextPort securityContextPort;
@@ -57,7 +57,7 @@ class IdempotencyAspectTest {
         @BeforeEach
         void setUp() {
                 aspect = new IdempotencyAspect(
-                                idempotencyManager,
+                                idempotencyGuard,
                                 securityContextPort,
                                 objectMapper);
         }
@@ -163,9 +163,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.completed(
+                                                IdempotencyGuard.IdempotencyResult.completed(
                                                                 "{\"message\":\"cached\"}",
                                                                 201));
 
@@ -195,9 +195,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.completed(
+                                                IdempotencyGuard.IdempotencyResult.completed(
                                                                 "{}",
                                                                 null));
 
@@ -224,9 +224,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.pending());
+                                                IdempotencyGuard.IdempotencyResult.pending());
 
                 assertThrows(
                                 ConcurrentRequestException.class,
@@ -244,9 +244,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.newRequest());
+                                                IdempotencyGuard.IdempotencyResult.newRequest());
 
                 TestResponse body = new TestResponse("success");
 
@@ -258,7 +258,7 @@ class IdempotencyAspectTest {
 
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                verify(idempotencyManager)
+                verify(idempotencyGuard)
                                 .completeRequest(
                                                 eq("user_abc"),
                                                 anyString(),
@@ -279,16 +279,16 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.newRequest());
+                                                IdempotencyGuard.IdempotencyResult.newRequest());
 
                 when(joinPoint.proceed())
                                 .thenReturn(ResponseEntity.ok().build());
 
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                verify(idempotencyManager)
+                verify(idempotencyGuard)
                                 .failRequest("user_abc");
                 assertNotNull(result);
                 assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
@@ -305,16 +305,16 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.newRequest());
+                                                IdempotencyGuard.IdempotencyResult.newRequest());
 
                 when(joinPoint.proceed())
                                 .thenReturn(ResponseEntity.badRequest().build());
 
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                verify(idempotencyManager)
+                verify(idempotencyGuard)
                                 .failRequest("user_abc");
                 assertNotNull(result);
                 assertEquals(400, ((ResponseEntity<?>) result).getStatusCode().value());
@@ -331,16 +331,16 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.newRequest());
+                                                IdempotencyGuard.IdempotencyResult.newRequest());
 
                 when(joinPoint.proceed())
                                 .thenReturn("OK");
 
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                verify(idempotencyManager)
+                verify(idempotencyGuard)
                                 .failRequest("user_abc");
                 assertEquals("OK", result);
         }
@@ -356,9 +356,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("parameterizedMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.newRequest());
+                                                IdempotencyGuard.IdempotencyResult.newRequest());
 
                 when(joinPoint.proceed())
                                 .thenThrow(new RuntimeException("boom"));
@@ -367,7 +367,7 @@ class IdempotencyAspectTest {
                                 RuntimeException.class,
                                 () -> aspect.handleIdempotency(joinPoint, annotation()));
 
-                verify(idempotencyManager)
+                verify(idempotencyGuard)
                                 .failRequest("user_abc");
         }
 
@@ -382,9 +382,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("rawMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.completed(
+                                                IdempotencyGuard.IdempotencyResult.completed(
                                                                 "{}",
                                                                 200));
 
@@ -448,9 +448,9 @@ class IdempotencyAspectTest {
                 mockMethod(
                                 getClass().getMethod("nestedGenericMethod"));
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.completed(
+                                                IdempotencyGuard.IdempotencyResult.completed(
                                                                 "{}",
                                                                 200));
 
@@ -486,9 +486,9 @@ class IdempotencyAspectTest {
 
                 mockMethod(method);
 
-                when(idempotencyManager.startRequest("user_abc"))
+                when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
-                                                IdempotencyManager.IdempotencyResult.completed(
+                                                IdempotencyGuard.IdempotencyResult.completed(
                                                                 "{}",
                                                                 200));
 

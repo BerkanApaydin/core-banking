@@ -1,11 +1,11 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
-import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.usecase.LoginUserUseCase;
-import com.bank.app.user.application.usecase.RegisterUserUseCase;
+import com.bank.app.user.application.port.in.LoginUserPort;
+import com.bank.app.user.application.port.in.RegisterUserPort;
+import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,21 +23,21 @@ import io.swagger.v3.oas.annotations.Operation;
 @Tag(name = "Auth API", description = "Kullanıcı kayıt ve kimlik doğrulama API'si")
 public class AuthController {
 
-    private final RegisterUserUseCase registerUserUseCase;
-    private final LoginUserUseCase loginUserUseCase;
+    private final RegisterUserPort registerUserPort;
+    private final LoginUserPort loginUserPort;
     private final FailedLoginAttemptService failedLoginAttemptService;
 
-    public AuthController(RegisterUserUseCase registerUserUseCase, LoginUserUseCase loginUserUseCase,
+    public AuthController(RegisterUserPort registerUserPort, LoginUserPort loginUserPort,
                           FailedLoginAttemptService failedLoginAttemptService) {
-        this.registerUserUseCase = registerUserUseCase;
-        this.loginUserUseCase = loginUserUseCase;
+        this.registerUserPort = registerUserPort;
+        this.loginUserPort = loginUserPort;
         this.failedLoginAttemptService = failedLoginAttemptService;
     }
 
     @PostMapping("/register")
     @Operation(summary = "Yeni kullanıcı kaydı oluşturur", description = "Kullanıcı adı ve şifre ile sisteme yeni üye olunmasını sağlar.")
     public ResponseEntity<Void> register(@Valid @RequestBody AuthRequest request) {
-        registerUserUseCase.execute(request);
+        registerUserPort.execute(request);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -53,7 +53,7 @@ public class AuthController {
         }
 
         try {
-            AuthResponse response = loginUserUseCase.execute(request);
+            AuthResponse response = loginUserPort.execute(request);
             failedLoginAttemptService.reset(ip);
             return ResponseEntity.ok(response);
         } catch (AuthenticationException e) {

@@ -1,20 +1,21 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.domain.Iban;
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.AccountNotActiveException;
 import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.bank.app.transfer.application.port.in.PlaceTransferPort;
+import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
 import com.bank.app.transfer.domain.TransferDomainService;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -28,25 +29,25 @@ import org.slf4j.LoggerFactory;
 
 @Service
 @Transactional
-public class PlaceTransferUseCase {
+public class PlaceTransferUseCase implements PlaceTransferPort {
 
     private static final Logger log = LoggerFactory.getLogger(PlaceTransferUseCase.class);
 
-    private final AccountOperationsPort accountOperationsPort;
+    private final AccountOperationPort AccountOperationPort;
     private final SaveTransferPort saveTransferPort;
-    private final AuditService auditService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AuditLogger auditLogger;
+    private final DomainEventPublisherPort eventPublisherPort;
     private final TransferDomainService transferDomainService;
 
-    public PlaceTransferUseCase(AccountOperationsPort accountOperationsPort,
+    public PlaceTransferUseCase(AccountOperationPort AccountOperationPort,
             SaveTransferPort saveTransferPort,
-            AuditService auditService,
-            ApplicationEventPublisher eventPublisher,
+            AuditLogger auditLogger,
+            DomainEventPublisherPort eventPublisherPort,
             TransferDomainService transferDomainService) {
-        this.accountOperationsPort = accountOperationsPort;
+        this.AccountOperationPort = AccountOperationPort;
         this.saveTransferPort = saveTransferPort;
-        this.auditService = auditService;
-        this.eventPublisher = eventPublisher;
+        this.auditLogger = auditLogger;
+        this.eventPublisherPort = eventPublisherPort;
         this.transferDomainService = transferDomainService;
     }
 
@@ -65,8 +66,8 @@ public class PlaceTransferUseCase {
             throw new SameAccountTransferException(senderIban);
         }
 
-        AccountInfo senderInfo = accountOperationsPort.getAccountInfoForTransfer(senderIban);
-        AccountInfo receiverInfo = accountOperationsPort.getAccountInfoForTransfer(receiverIban);
+        AccountInfo senderInfo = AccountOperationPort.getAccountInfoForTransfer(senderIban);
+        AccountInfo receiverInfo = AccountOperationPort.getAccountInfoForTransfer(receiverIban);
 
         validateAccountsActive(senderInfo, receiverInfo, senderIban, receiverIban);
 
@@ -75,7 +76,7 @@ public class PlaceTransferUseCase {
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, senderIban,
                 receiverIban, amount);
 
-        accountOperationsPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        AccountOperationPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
         transfer.complete();
 
@@ -109,7 +110,7 @@ public class PlaceTransferUseCase {
 
     private void logAuditAndPublishEvent(Transfer savedTransfer, String senderIban, String receiverIban) {
         try {
-            auditService.log(
+            auditLogger.log(
                     AuditAction.TRANSFER_EXECUTED,
                     String.format(
                             "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",
@@ -119,6 +120,6 @@ public class PlaceTransferUseCase {
             log.warn("Audit log kaydedilemedi: {}", e.getMessage(), e);
         }
 
-        eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
+        eventPublisherPort.publish(new TransferCompletedEvent(savedTransfer));
     }
 }

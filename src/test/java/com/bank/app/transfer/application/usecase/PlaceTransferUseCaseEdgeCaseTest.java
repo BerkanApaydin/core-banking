@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.AccountNotActiveException;
@@ -8,9 +8,9 @@ import com.bank.app.account.exception.InsufficientBalanceException;
 import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferDomainService;
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
 import org.springframework.dao.ConcurrencyFailureException;
 
 import java.math.BigDecimal;
@@ -35,13 +35,13 @@ import static org.mockito.Mockito.*;
 class PlaceTransferUseCaseEdgeCaseTest {
 
         @Mock
-        private AccountOperationsPort accountOperationsPort;
+        private AccountOperationPort AccountOperationPort;
         @Mock
         private SaveTransferPort saveTransferPort;
         @Mock
-        private ApplicationEventPublisher eventPublisher;
+        private DomainEventPublisherPort eventPublisherPort;
         @Mock
-        private AuditService auditService;
+        private AuditLogger auditLogger;
 
         private PlaceTransferUseCase placeTransferUseCase;
 
@@ -50,9 +50,8 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
         @BeforeEach
         void setUp() {
-                placeTransferUseCase = new PlaceTransferUseCase(
-                                accountOperationsPort, saveTransferPort, auditService,
-                                eventPublisher, new TransferDomainService());
+                placeTransferUseCase = new PlaceTransferUseCase(AccountOperationPort, saveTransferPort, auditLogger,
+                                eventPublisherPort, new TransferDomainService());
         }
 
         private TransferRequest validRequest() {
@@ -61,9 +60,9 @@ class PlaceTransferUseCaseEdgeCaseTest {
         }
 
         private void mockActiveAccounts() {
-                when(accountOperationsPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
-                when(accountOperationsPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
         }
 
@@ -82,7 +81,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
                 assertThrows(SameAccountTransferException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verifyNoInteractions(accountOperationsPort);
+                verifyNoInteractions(AccountOperationPort);
         }
 
         @Test
@@ -94,33 +93,33 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
                 assertThrows(SameAccountTransferException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verifyNoInteractions(accountOperationsPort);
+                verifyNoInteractions(AccountOperationPort);
         }
 
         @Test
         void shouldThrowWhenSenderAccountNotActive() {
                 TransferRequest request = validRequest();
-                when(accountOperationsPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", false));
-                when(accountOperationsPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
 
                 assertThrows(AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+                verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
         }
 
         @Test
         void shouldThrowWhenReceiverAccountNotActive() {
                 TransferRequest request = validRequest();
-                when(accountOperationsPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
-                when(accountOperationsPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", false));
 
                 assertThrows(AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verify(accountOperationsPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+                verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
         }
 
         @Test
@@ -129,7 +128,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockActiveAccounts();
 
                 doThrow(new InsufficientBalanceException("Yetersiz bakiye"))
-                                .when(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                                .when(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(InsufficientBalanceException.class,
                                 () -> placeTransferUseCase.execute(request));
@@ -142,7 +141,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockActiveAccounts();
 
                 doThrow(new ConcurrencyFailureException("Optimistic lock"))
-                                .when(accountOperationsPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                                .when(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(ConcurrencyFailureException.class,
                                 () -> placeTransferUseCase.execute(request));
@@ -156,7 +155,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockSaveReturnsId();
 
                 doThrow(new RuntimeException("Event publish failed"))
-                                .when(eventPublisher).publishEvent(any(TransferCompletedEvent.class));
+                                .when(eventPublisherPort).publish(any(TransferCompletedEvent.class));
 
                 assertThrows(RuntimeException.class, () -> placeTransferUseCase.execute(request));
         }
@@ -168,10 +167,10 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockSaveReturnsId();
 
                 doThrow(new RuntimeException("Audit failed"))
-                                .when(auditService).log(any(AuditAction.class), anyString());
+                                .when(auditLogger).log(any(AuditAction.class), anyString());
 
                 assertDoesNotThrow(() -> placeTransferUseCase.execute(request));
-                verify(eventPublisher, times(1)).publishEvent(any(TransferCompletedEvent.class));
+                verify(eventPublisherPort, times(1)).publish(any(TransferCompletedEvent.class));
         }
 
         @Test
@@ -215,7 +214,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
                 ArgumentCaptor<TransferCompletedEvent> eventCaptor = ArgumentCaptor
                                 .forClass(TransferCompletedEvent.class);
-                verify(eventPublisher).publishEvent(eventCaptor.capture());
+                verify(eventPublisherPort).publish(eventCaptor.capture());
                 assertNotNull(eventCaptor.getValue().getTransfer());
                 assertEquals(10L, eventCaptor.getValue().getTransfer().getId());
         }

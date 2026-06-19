@@ -12,11 +12,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Service
-public class IdempotencyManager {
+public class IdempotencyGuard {
 
     private final IdempotencyKeyJpaRepository repo;
 
-    public IdempotencyManager(IdempotencyKeyJpaRepository repo) {
+    public IdempotencyGuard(IdempotencyKeyJpaRepository repo) {
         this.repo = repo;
     }
 

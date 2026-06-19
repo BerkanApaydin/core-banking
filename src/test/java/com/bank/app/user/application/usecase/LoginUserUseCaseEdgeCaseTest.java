@@ -1,9 +1,9 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.security.JwtService;
+import com.bank.app.common.security.JwtTokenProvider;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.port.LoadUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,9 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
-import org.springframework.security.authentication.AuthenticationManager;
+import com.bank.app.user.application.port.out.AuthenticationPort;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import java.util.Optional;
 
@@ -24,18 +23,18 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LoginUserUseCaseEdgeCaseTest {
 
-    @Mock private AuthenticationManager authenticationManager;
+    @Mock private AuthenticationPort authenticationPort;
     @Mock private LoadUserPort loadUserPort;
 
-    private JwtService jwtService;
+    private JwtTokenProvider jwtTokenProvider;
     private LoginUserUseCase loginUserUseCase;
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(mock(Environment.class),
+        jwtTokenProvider = new JwtTokenProvider(mock(Environment.class),
                 "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
                 86400000L, true);
-        loginUserUseCase = new LoginUserUseCase(authenticationManager, jwtService, loadUserPort);
+        loginUserUseCase = new LoginUserUseCase(authenticationPort, jwtTokenProvider, loadUserPort);
     }
 
     @Test
@@ -43,8 +42,7 @@ class LoginUserUseCaseEdgeCaseTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         User user = new User(100L, "testuser", "hashed", "ROLE_USER");
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(mock(Authentication.class));
+        doNothing().when(authenticationPort).authenticate(anyString(), anyString());
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.of(user));
 
         AuthResponse response = loginUserUseCase.execute(request);
@@ -59,8 +57,7 @@ class LoginUserUseCaseEdgeCaseTest {
     void shouldThrowWhenUserNotFoundAfterAuthentication() {
         AuthRequest request = new AuthRequest("testuser", "password");
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(mock(Authentication.class));
+        doNothing().when(authenticationPort).authenticate(anyString(), anyString());
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -72,8 +69,7 @@ class LoginUserUseCaseEdgeCaseTest {
     void shouldThrowBadCredentialsWhenPasswordWrong() {
         AuthRequest request = new AuthRequest("testuser", "wrongpassword");
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+        doThrow(new BadCredentialsException("Bad credentials")).when(authenticationPort).authenticate(anyString(), anyString());
 
         assertThrows(BadCredentialsException.class,
                 () -> loginUserUseCase.execute(request));
@@ -84,8 +80,7 @@ class LoginUserUseCaseEdgeCaseTest {
     void shouldThrowBadCredentialsWhenUsernameDoesNotExist() {
         AuthRequest request = new AuthRequest("nonexistent", "password");
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+        doThrow(new BadCredentialsException("Bad credentials")).when(authenticationPort).authenticate(anyString(), anyString());
 
         assertThrows(BadCredentialsException.class,
                 () -> loginUserUseCase.execute(request));

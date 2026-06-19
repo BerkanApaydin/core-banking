@@ -1,11 +1,12 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.application.port.LoadAccountPort;
+import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.account.application.port.in.GetAccountPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
-public class GetAccountUseCase {
+public class GetAccountUseCase implements GetAccountPort {
 
     private final LoadAccountPort loadAccountPort;
     private final SecurityContextPort securityContextPort;

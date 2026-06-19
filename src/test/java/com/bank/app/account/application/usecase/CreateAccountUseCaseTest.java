@@ -1,10 +1,10 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.port.LoadAccountPort;
-import com.bank.app.account.application.port.SaveAccountPort;
+import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.DuplicateIbanException;
@@ -37,13 +37,13 @@ class CreateAccountUseCaseTest {
         @Mock
         private SaveAccountPort saveAccountPort;
         @Mock
-        private AuditService auditService;
+        private AuditLogger auditLogger;
 
         private CreateAccountUseCase createAccountUseCase;
 
         @BeforeEach
         void setUp() {
-                createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService,
+                createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditLogger,
                                 new SecurityContextAdapter());
 
                 // Set default authenticated user context using CustomUserDetails

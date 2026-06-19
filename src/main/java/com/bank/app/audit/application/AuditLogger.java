@@ -1,22 +1,22 @@
 package com.bank.app.audit.application;
 
-import com.bank.app.audit.application.port.SaveAuditLogPort;
+import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AuditService {
+public class AuditLogger {
 
     private final SaveAuditLogPort saveAuditLogPort;
+    private final SecurityContextPort securityContextPort;
 
-    public AuditService(SaveAuditLogPort saveAuditLogPort) {
+    public AuditLogger(SaveAuditLogPort saveAuditLogPort, SecurityContextPort securityContextPort) {
         this.saveAuditLogPort = saveAuditLogPort;
+        this.securityContextPort = securityContextPort;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -32,12 +32,6 @@ public class AuditService {
     }
 
     private String getCurrentUsername() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() &&
-                !(auth instanceof AnonymousAuthenticationToken) &&
-                !"anonymousUser".equals(auth.getName())) {
-            return auth.getName();
-        }
-        return "system";
+        return securityContextPort.getCurrentUsername().orElse("system");
     }
 }

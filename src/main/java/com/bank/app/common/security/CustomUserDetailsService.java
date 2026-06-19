@@ -1,6 +1,6 @@
 package com.bank.app.common.security;
 
-import com.bank.app.user.application.port.LoadUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.domain.User;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

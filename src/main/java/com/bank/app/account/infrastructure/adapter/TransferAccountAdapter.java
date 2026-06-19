@@ -2,7 +2,7 @@ package com.bank.app.account.infrastructure.adapter;
 
 import com.bank.app.account.application.usecase.AccountInternalService;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.application.port.AccountOperationsPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -10,11 +10,11 @@ import java.util.Collection;
 import java.util.Map;
 
 @Component
-public class AccountOperationsAdapter implements AccountOperationsPort {
+public class TransferAccountAdapter implements AccountOperationPort {
 
     private final AccountInternalService accountInternalService;
 
-    public AccountOperationsAdapter(AccountInternalService accountInternalService) {
+    public TransferAccountAdapter(AccountInternalService accountInternalService) {
         this.accountInternalService = accountInternalService;
     }
 

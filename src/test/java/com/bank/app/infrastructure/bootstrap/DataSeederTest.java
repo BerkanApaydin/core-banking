@@ -5,7 +5,7 @@ import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.usecase.CreateAccountUseCase;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
-import com.bank.app.user.application.port.LoadUserPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.usecase.RegisterUserUseCase;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;

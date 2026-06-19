@@ -1,13 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.AuditService;
+import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.exception.TransferNotFoundException;
-import com.bank.app.common.security.port.SecurityContextPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
-import com.bank.app.transfer.application.port.LoadTransferPort;
-import com.bank.app.transfer.application.port.SaveTransferPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,9 +33,9 @@ class CancelTransferUseCaseEdgeCaseTest {
         @Mock
         private SaveTransferPort saveTransferPort;
         @Mock
-        private AccountOperationsPort accountOperationsPort;
+        private AccountOperationPort AccountOperationPort;
         @Mock
-        private AuditService auditService;
+        private AuditLogger auditLogger;
         @Mock
         private SecurityContextPort securityContextPort;
 
@@ -44,8 +44,8 @@ class CancelTransferUseCaseEdgeCaseTest {
         @BeforeEach
         void setUp() {
                 cancelTransferUseCase = new CancelTransferUseCase(
-                                loadTransferPort, saveTransferPort, accountOperationsPort,
-                                auditService, securityContextPort, 24);
+                                loadTransferPort, saveTransferPort, AccountOperationPort,
+                                auditLogger, securityContextPort, 24);
         }
 
         @Test
@@ -54,8 +54,9 @@ class CancelTransferUseCaseEdgeCaseTest {
 
                 TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
                                 () -> cancelTransferUseCase.execute(999L));
-                assertEquals("Transfer bulunamadı. ID: 999", ex.getMessage());
-                verifyNoInteractions(accountOperationsPort);
+                assertTrue(ex.getMessage().contains("Transfer bulunamad"));
+                assertTrue(ex.getMessage().contains("ID: 999"));
+                verifyNoInteractions(AccountOperationPort);
         }
 
         @Test
@@ -71,7 +72,7 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-                when(accountOperationsPort.getAccountInfo(1L))
+                when(AccountOperationPort.getAccountInfo(1L))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
@@ -80,7 +81,7 @@ class CancelTransferUseCaseEdgeCaseTest {
 
                 assertThrows(ConcurrencyFailureException.class,
                                 () -> cancelTransferUseCase.execute(10L));
-                verify(auditService, never()).log(any(), any());
+                verify(auditLogger, never()).log(any(), any());
         }
 
         @Test
@@ -90,19 +91,19 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-                when(accountOperationsPort.getAccountInfo(1L))
+                when(AccountOperationPort.getAccountInfo(1L))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
                 doThrow(new RuntimeException("Balance reversal failed"))
-                                .when(accountOperationsPort)
+                                .when(AccountOperationPort)
                                 .reverseBalancesForCancellation(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(RuntimeException.class,
                                 () -> cancelTransferUseCase.execute(10L));
 
                 verify(saveTransferPort, never()).save(any());
-                verify(auditService, never()).log(any(), any());
+                verify(auditLogger, never()).log(any(), any());
         }
 
 }

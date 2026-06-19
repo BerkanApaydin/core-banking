@@ -23,11 +23,11 @@ class AuditLogAdapterTest {
 
     @Mock private AuditLogJpaRepository springDataRepo;
 
-    private AuditLogAdapter adapter;
+    private AuditPersistenceAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AuditLogAdapter(springDataRepo);
+        adapter = new AuditPersistenceAdapter(springDataRepo);
     }
 
     @Test

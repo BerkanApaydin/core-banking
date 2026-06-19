@@ -1,12 +1,12 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.transfer.exception.TransferNotFoundException;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
-import com.bank.app.transfer.application.port.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.domain.Money;
@@ -28,13 +28,13 @@ import static org.mockito.Mockito.*;
 class GetTransferDetailUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private AccountOperationPort AccountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
     private GetTransferDetailUseCase getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
-        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountOperationsPort, securityContextPort);
+        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, AccountOperationPort, securityContextPort);
     }
 
     @Test
@@ -56,8 +56,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
 
@@ -91,8 +91,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(200L));
 
@@ -126,8 +126,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
 
@@ -160,7 +160,7 @@ class GetTransferDetailUseCaseTest {
         );
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + senderAccountId, exception.getMessage());
@@ -184,8 +184,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + receiverAccountId, exception.getMessage());
@@ -210,8 +210,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationsPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationsPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 

@@ -1,6 +1,6 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
-import com.bank.app.transfer.application.port.SendNotificationPort;
+import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

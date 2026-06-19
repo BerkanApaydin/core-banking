@@ -1,7 +1,7 @@
 package com.bank.app.account.infrastructure.adapter;
 
-import com.bank.app.account.application.port.LoadAccountPort;
-import com.bank.app.account.application.port.SaveAccountPort;
+import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;

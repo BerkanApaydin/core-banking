@@ -1,15 +1,15 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountOperationPort;
+import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import com.bank.app.transfer.application.port.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.adapter.SecurityContextAdapter;
-import com.bank.app.common.security.port.SecurityContextPort;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,14 +35,14 @@ import static org.mockito.Mockito.*;
 class GenerateTransferReportUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationsPort accountOperationsPort;
+    @Mock private AccountOperationPort AccountOperationPort;
     private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
-        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountOperationsPort,
+        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, AccountOperationPort,
                 securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
@@ -64,8 +64,8 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222",
                 3L, "TR290006200000000000000333"));
@@ -98,8 +98,8 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
-        when(accountOperationsPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
 
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100))
                 .thenReturn(Collections.emptyList());
@@ -121,7 +121,7 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(accountOperationsPort.getAccountInfo(1L)).thenReturn(info);
+        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         // Set up authentication for user ID 999 (not owner of sender account 100)
         CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
