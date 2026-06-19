@@ -1,4 +1,4 @@
-package com.bank.app.common.exception;
+package com.bank.app.common.handler;
 
 import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.account.exception.InsufficientBalanceException;

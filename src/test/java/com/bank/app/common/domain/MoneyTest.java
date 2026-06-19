@@ -1,4 +1,4 @@
-package com.bank.app.transfer.domain;
+package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.Money;
 
