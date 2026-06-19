@@ -5,7 +5,6 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserPort;
 import com.bank.app.user.application.port.in.RegisterUserPort;
-import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

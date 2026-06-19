@@ -1,7 +1,5 @@
 package com.bank.app.common.domain;
 
-import com.bank.app.common.domain.Money;
-
 import com.bank.app.common.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.Test;
 
@@ -20,8 +18,7 @@ class MoneyTest {
 
     @Test
     void shouldThrowIllegalArgumentExceptionWhenScaleIsTooLarge() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new Money(new BigDecimal("100.555"), Money.Currency.TRY));
+        assertThrows(IllegalArgumentException.class, () -> new Money(new BigDecimal("100.555"), Money.Currency.TRY));
     }
 
     @Test
@@ -100,4 +97,3 @@ class MoneyTest {
         assertThrows(CurrencyMismatchException.class, () -> m1.subtract(m2));
     }
 }
-
