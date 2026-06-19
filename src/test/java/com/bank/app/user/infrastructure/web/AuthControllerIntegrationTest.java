@@ -132,6 +132,62 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldLoginWithXForwardedForSingleIp() throws Exception {
+        createUser("xff_single");
+        AuthRequest request = new AuthRequest("xff_single", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "10.0.0.1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldLoginWithXForwardedForMultipleIps() throws Exception {
+        createUser("xff_multi");
+        AuthRequest request = new AuthRequest("xff_multi", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "10.0.0.1, 10.0.0.2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldResolveIpFromRemoteAddrWhenXForwardedForIsEmpty() throws Exception {
+        createUser("xff_empty");
+        AuthRequest request = new AuthRequest("xff_empty", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldResolveIpFromRemoteAddrWhenXForwardedForIsUnknown() throws Exception {
+        createUser("xff_unknown");
+        AuthRequest request = new AuthRequest("xff_unknown", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "unknown")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    private UserJpaEntity createUser(String username) {
+        UserJpaEntity user = new UserJpaEntity();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setRole("ROLE_USER");
+        return userRepository.save(user);
+    }
+
+    @Test
     void shouldBlockLoginAfterTooManyFailedAttempts() throws Exception {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername("blocked_user");

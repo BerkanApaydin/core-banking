@@ -59,4 +59,18 @@ class PagedResponseTest {
         assertEquals(101, response.totalItems());
         assertEquals(5, response.totalPages());
     }
+
+    @Test
+    void shouldReturnZeroTotalPagesWhenSizeIsZero() {
+        PagedResponse<String> response = new PagedResponse<>(List.of("a"), 0, 0, 10);
+
+        assertEquals(0, response.totalPages());
+    }
+
+    @Test
+    void shouldReturnZeroTotalPagesWhenSizeIsNegative() {
+        PagedResponse<String> response = new PagedResponse<>(List.of("a"), 0, -1, 10);
+
+        assertEquals(0, response.totalPages());
+    }
 }
