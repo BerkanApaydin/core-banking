@@ -17,7 +17,7 @@ public class FailedLoginAttemptService {
 
     public FailedLoginAttemptService(
             @Value("${app.security.failed-login.max-attempts:5}") int maxAttempts,
-            @Value("${app.security.failed-login.window-minutes:1}") long windowMinutes) {
+            @Value("${app.security.failed-login.window-minutes:15}") long windowMinutes) {
         this.maxAttempts = maxAttempts;
         this.windowMinutes = windowMinutes;
         this.cache = Caffeine.newBuilder()

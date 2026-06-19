@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -15,12 +16,15 @@ import static org.mockito.Mockito.*;
 class RateLimitingFilterTest {
 
     private CaffeineRateLimiter rateLimiter;
+    private MessageSource messageSource;
     private RateLimitingFilter filter;
 
     @BeforeEach
     void setUp() {
         rateLimiter = new CaffeineRateLimiter(10, 10_000);
-        filter = new RateLimitingFilter(rateLimiter);
+        messageSource = mock(MessageSource.class);
+        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        filter = new RateLimitingFilter(rateLimiter, messageSource);
     }
 
     @Test
@@ -60,6 +64,7 @@ class RateLimitingFilterTest {
             MockHttpServletRequest request = new MockHttpServletRequest();
             request.setRequestURI("/api/v1/auth/register");
             request.setRemoteAddr("10.0.0.1");
+            request.setMethod("POST");
 
             MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -71,6 +76,7 @@ class RateLimitingFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/auth/register");
         request.setRemoteAddr("10.0.0.1");
+        request.setMethod("POST");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -85,13 +91,14 @@ class RateLimitingFilterTest {
             throws IOException, ServletException {
 
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter filter = new RateLimitingFilter(limiter);
+        RateLimitingFilter filter = new RateLimitingFilter(limiter, messageSource);
 
         FilterChain chain = mock(FilterChain.class);
 
         MockHttpServletRequest firstRequest = new MockHttpServletRequest();
         firstRequest.setRequestURI("/api/v1/auth/login");
         firstRequest.setRemoteAddr("1.1.1.1");
+        firstRequest.setMethod("POST");
 
         filter.doFilter(
                 firstRequest,
@@ -101,6 +108,7 @@ class RateLimitingFilterTest {
         MockHttpServletRequest secondRequest = new MockHttpServletRequest();
         secondRequest.setRequestURI("/api/v1/auth/login");
         secondRequest.setRemoteAddr("1.1.1.1");
+        secondRequest.setMethod("POST");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -226,16 +234,20 @@ class RateLimitingFilterTest {
     @Test
     void shouldReturn429WithCorrectContentType() throws Exception {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
         req.setRemoteAddr("10.0.0.99");
+        req.setMethod("POST");
         strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
         MockHttpServletRequest req2 = new MockHttpServletRequest();
         req2.setRequestURI("/api/v1/auth/login");
         req2.setRemoteAddr("10.0.0.99");
+        req2.setMethod("POST");
         MockHttpServletResponse resp = new MockHttpServletResponse();
         strictFilter.doFilter(req2, resp, mock(FilterChain.class));
 
@@ -246,17 +258,21 @@ class RateLimitingFilterTest {
     @Test
     void shouldReturn429WithTurkishErrorMessage() throws Exception {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
         req.setRemoteAddr("10.0.0.99");
+        req.setMethod("POST");
 
         strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
         MockHttpServletRequest req2 = new MockHttpServletRequest();
         req2.setRequestURI("/api/v1/auth/login");
         req2.setRemoteAddr("10.0.0.99");
+        req2.setMethod("POST");
 
         MockHttpServletResponse resp = new MockHttpServletResponse();
         strictFilter.doFilter(req2, resp, mock(FilterChain.class));
@@ -269,7 +285,9 @@ class RateLimitingFilterTest {
     @Test
     void shouldLimitAccountCreation() throws Exception {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/accounts");
@@ -290,16 +308,89 @@ class RateLimitingFilterTest {
     @Test
     void shouldLimitByRequestUri() throws Exception {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/transfers/send");
         req.setRemoteAddr("10.0.0.99");
+        req.setMethod("POST");
         strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
         MockHttpServletRequest req2 = new MockHttpServletRequest();
         req2.setRequestURI("/api/v1/transfers/send");
         req2.setRemoteAddr("10.0.0.99");
+        req2.setMethod("POST");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldBlockOverLimitWithPutMethod() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.1");
+        req.setMethod("PUT");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.1");
+        req2.setMethod("PUT");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldBlockOverLimitWithDeleteMethod() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.1");
+        req.setMethod("DELETE");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.1");
+        req2.setMethod("DELETE");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldBlockOverLimitWithPatchMethod() throws Exception {
+        CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.1");
+        req.setMethod("PATCH");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.1");
+        req2.setMethod("PATCH");
         MockHttpServletResponse resp = new MockHttpServletResponse();
         strictFilter.doFilter(req2, resp, mock(FilterChain.class));
 

@@ -2,6 +2,12 @@ jwt:
   allow-default-secret: false
   secret: ${JWT_SECRET}
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
   endpoint:
     health:

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -22,12 +23,14 @@ class RateLimitingFilterEdgeCaseTest {
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
     @Mock private FilterChain chain;
+    @Mock private MessageSource messageSource;
 
     private RateLimitingFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new RateLimitingFilter(rateLimiter);
+        when(request.getMethod()).thenReturn("POST");
+        filter = new RateLimitingFilter(rateLimiter, messageSource);
     }
 
     @Test
@@ -58,6 +61,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
         when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(false);
+        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);

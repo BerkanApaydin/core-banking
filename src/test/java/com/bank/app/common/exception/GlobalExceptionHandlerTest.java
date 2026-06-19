@@ -301,6 +301,47 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldHandleConcurrentRequestExceptionWhenMessageIsEmpty() {
+        ConcurrentRequestException ex = new ConcurrentRequestException("just a message");
+
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleConcurrentRequestException(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("CONCURRENT_REQUEST", response.getBody().code());
+        assertEquals("just a message", response.getBody().message());
+    }
+
+    @Test
+    void shouldHandleConcurrentRequestExceptionWhenMessageSourceThrows() {
+        ConcurrentRequestException ex = new ConcurrentRequestException("error.concurrent", new Object[] {},
+                "fallback message");
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
+                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleConcurrentRequestException(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("CONCURRENT", response.getBody().code());
+        assertEquals("fallback message", response.getBody().message());
+    }
+
+    @Test
+    void shouldHandleConcurrentRequestExceptionWithNullDefaultMessage() {
+        ConcurrentRequestException ex = new ConcurrentRequestException("error.concurrent", new Object[] {}, null);
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
+                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleConcurrentRequestException(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("CONCURRENT", response.getBody().code());
+        assertEquals("", response.getBody().message());
+    }
+
+    @Test
     void shouldReturn405WhenHttpRequestMethodNotSupported() {
         HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("PATCH",
                 List.of("GET", "POST"));
