@@ -76,6 +76,53 @@ class CaffeineRateLimiterTest {
         assertTrue(limiter.tryAcquire("client"));
     }
 
+    // --- cache stats ---
+
+    @Test
+    void shouldReturnStatsWithHitAndMissCounts() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60_000, 10000, clock);
+
+        limiter.tryAcquire("new-client");
+        limiter.tryAcquire("new-client");
+        limiter.tryAcquire("another-client");
+
+        assertEquals(2, limiter.getMissCount());
+        assertEquals(1, limiter.getHitCount());
+        assertEquals(3, limiter.getRequestCount());
+    }
+
+    @Test
+    void shouldReturnStatsWithZeroCountsWhenCacheIsFresh() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60_000, 10000, clock);
+
+        assertEquals(0, limiter.getRequestCount());
+        assertEquals(0, limiter.getHitCount());
+        assertEquals(0, limiter.getMissCount());
+    }
+
+    @Test
+    void shouldIncreaseHitCountOnRepeatedAcquire() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(10, 60_000, 10000, clock);
+
+        limiter.tryAcquire("client");
+        limiter.tryAcquire("client");
+        limiter.tryAcquire("client");
+
+        assertEquals(2, limiter.getHitCount());
+        assertEquals(1, limiter.getMissCount());
+    }
+
+    @Test
+    void shouldIncreaseMissCountForDistinctClients() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(10, 60_000, 10000, clock);
+
+        for (int i = 0; i < 10; i++) {
+            limiter.tryAcquire("client-" + i);
+        }
+
+        assertEquals(10, limiter.getMissCount());
+    }
+
     static class SettableClock extends Clock {
         private long millis;
 

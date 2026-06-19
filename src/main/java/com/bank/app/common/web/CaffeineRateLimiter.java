@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(name = "app.security.rate-limit.backend", havingValue = "caffeine", matchIfMissing = true)
@@ -19,6 +20,8 @@ public class CaffeineRateLimiter implements RateLimiter {
     private final long timeWindowMs;
     private final Cache<String, RateLimitInfo> cache;
     private final Clock clock;
+    private final AtomicLong hitCount = new AtomicLong();
+    private final AtomicLong missCount = new AtomicLong();
 
     @Autowired
     public CaffeineRateLimiter(
@@ -41,12 +44,26 @@ public class CaffeineRateLimiter implements RateLimiter {
     public boolean tryAcquire(String clientKey) {
         RateLimitInfo info = cache.asMap().compute(clientKey, (k, v) -> {
             if (v == null || v.isExpired(clock)) {
+                missCount.incrementAndGet();
                 return new RateLimitInfo(1, timeWindowMs, clock);
             }
+            hitCount.incrementAndGet();
             v.requestCount.incrementAndGet();
             return v;
         });
         return info.requestCount.get() <= maxRequests;
+    }
+
+    public long getHitCount() {
+        return hitCount.get();
+    }
+
+    public long getMissCount() {
+        return missCount.get();
+    }
+
+    public long getRequestCount() {
+        return hitCount.get() + missCount.get();
     }
 
     private static class RateLimitInfo {
