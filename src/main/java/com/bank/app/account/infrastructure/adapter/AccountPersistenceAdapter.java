@@ -1,9 +1,12 @@
-package com.bank.app.account.infrastructure.persistence;
+package com.bank.app.account.infrastructure.adapter;
 
 import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.application.port.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
+import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
+import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.account.infrastructure.persistence.AccountMapper;
 import jakarta.persistence.EntityManager;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;

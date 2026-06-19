@@ -1,7 +1,10 @@
-package com.bank.app.transfer.infrastructure.persistence;
+package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
+import com.bank.app.transfer.infrastructure.persistence.TransferMapper;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

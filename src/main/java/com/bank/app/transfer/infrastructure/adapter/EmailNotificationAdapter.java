@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.notification;
+package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.transfer.application.port.SendNotificationPort;
 import com.bank.app.transfer.domain.Transfer;

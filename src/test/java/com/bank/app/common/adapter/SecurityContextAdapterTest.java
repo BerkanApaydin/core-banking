@@ -1,4 +1,4 @@
-package com.bank.app.common.security;
+package com.bank.app.common.adapter;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import com.bank.app.common.security.CustomUserDetails;
 import java.util.Collections;
 import java.util.Optional;
 

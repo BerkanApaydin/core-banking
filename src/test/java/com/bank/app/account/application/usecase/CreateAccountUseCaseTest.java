@@ -9,7 +9,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.SecurityContextAdapter;
+import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.notification;
+package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
@@ -9,9 +9,9 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-class EmailNotificationAdapterTest {
+class SmsNotificationAdapterTest {
 
-    private final EmailNotificationAdapter adapter = new EmailNotificationAdapter();
+    private final SmsNotificationAdapter adapter = new SmsNotificationAdapter();
 
     @Test
     void shouldLogSuccessfullyOnNotify() {
@@ -28,7 +28,7 @@ class EmailNotificationAdapterTest {
                 Money.of("100.00", Money.Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
-        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, new RuntimeException("Service unavailable")));
+        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, new RuntimeException("SMS gateway down")));
     }
 
     @Test

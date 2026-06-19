@@ -1,8 +1,11 @@
-package com.bank.app.transfer.infrastructure.persistence;
+package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
+import com.bank.app.transfer.infrastructure.persistence.TransferMapper;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.lang.NonNull;

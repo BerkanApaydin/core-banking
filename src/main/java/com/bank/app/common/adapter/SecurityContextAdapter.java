@@ -1,9 +1,10 @@
-package com.bank.app.common.security;
+package com.bank.app.common.adapter;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.stereotype.Component;
 

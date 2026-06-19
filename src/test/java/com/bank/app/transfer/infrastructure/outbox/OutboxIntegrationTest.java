@@ -3,7 +3,7 @@ package com.bank.app.transfer.infrastructure.outbox;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.SecurityContextAdapter;
+import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.usecase.PlaceTransferUseCase;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
