@@ -482,9 +482,8 @@ class IdempotencyAspectTest {
                 when(securityContextPort.getCurrentUsername())
                                 .thenReturn(Optional.of("user"));
 
-                Method method = getClass().getMethod("parameterizedMethod");
-
-                mockMethod(method);
+                mockMethod(
+                                getClass().getMethod("parameterizedMethod"));
 
                 when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(

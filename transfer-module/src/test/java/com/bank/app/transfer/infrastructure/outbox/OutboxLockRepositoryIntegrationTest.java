@@ -1,6 +1,6 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
-import com.bank.app.common.AbstractIntegrationTest;
+import com.bank.app.transfer.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
