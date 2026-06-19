@@ -50,16 +50,11 @@ public class GlobalExceptionHandler {
         return message != null ? message : "";
     }
 
-    @ExceptionHandler({AccountNotFoundException.class, TransferNotFoundException.class})
-    public ResponseEntity<ErrorResponse> handleNotFoundExceptions(BusinessException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.NOT_FOUND, translate(ex));
-        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
-    }
-
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.BAD_REQUEST, translate(ex));
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        HttpStatus status = ex.getHttpStatus() != null ? ex.getHttpStatus() : HttpStatus.BAD_REQUEST;
+        ErrorResponse response = ErrorResponse.of(status, translate(ex));
+        return new ResponseEntity<>(response, status);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -80,12 +75,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex) {
         ErrorResponse response = ErrorResponse.of(HttpStatus.UNAUTHORIZED, ex.getMessage());
         return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-    }
-
-    @ExceptionHandler(TooManyFailedLoginAttemptsException.class)
-    public ResponseEntity<ErrorResponse> handleTooManyFailedLoginAttemptsException(TooManyFailedLoginAttemptsException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

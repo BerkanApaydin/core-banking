@@ -1,4 +1,4 @@
-package com.bank.app.common.web;
+package com.bank.app.user.web;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;

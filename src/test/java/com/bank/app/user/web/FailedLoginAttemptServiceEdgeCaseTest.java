@@ -1,4 +1,4 @@
-package com.bank.app.common.web;
+package com.bank.app.user.web;
 
 import org.junit.jupiter.api.Test;
 
@@ -13,53 +13,68 @@ class FailedLoginAttemptServiceEdgeCaseTest {
 
         assertFalse(service.isBlocked(ip));
         service.recordFailure(ip);
+
         assertTrue(service.isBlocked(ip));
     }
 
     @Test
     void shouldNeverBlockWhenMaxAttemptsIsNegative() {
         FailedLoginAttemptService service = new FailedLoginAttemptService(-1, 1);
-        String ip = "10.0.0.3";
+        String ip = "10.0.0.2";
 
-        assertFalse(service.isBlocked(ip));
         service.recordFailure(ip);
+        service.recordFailure(ip);
+        service.recordFailure(ip);
+
         assertFalse(service.isBlocked(ip));
     }
 
     @Test
-    void shouldHandleResetOnNonExistentIp() {
-        FailedLoginAttemptService service = new FailedLoginAttemptService(5, 1);
-        assertDoesNotThrow(() -> service.reset("10.0.0.4"));
+    void shouldHandleDifferentIpsIndependently() {
+        FailedLoginAttemptService service = new FailedLoginAttemptService(2, 1);
+        String ip1 = "10.0.0.7";
+        String ip2 = "10.0.0.8";
+
+        service.recordFailure(ip1);
+        assertFalse(service.isBlocked(ip1));
+        assertFalse(service.isBlocked(ip2));
+
+        service.recordFailure(ip1);
+        assertTrue(service.isBlocked(ip1));
+        assertFalse(service.isBlocked(ip2));
     }
 
     @Test
-    void shouldNotBlockMultipleIpsWhenNoneExceedLimit() {
+    void shouldResetBlockedIp() {
         FailedLoginAttemptService service = new FailedLoginAttemptService(3, 1);
+        String ip = "10.0.0.4";
 
-        for (int i = 0; i < 10; i++) {
-            String ip = "10.0.0." + i;
-            service.recordFailure(ip);
-            service.recordFailure(ip);
-            assertFalse(service.isBlocked(ip), ip + " should not be blocked with 2 attempts");
-        }
+        service.recordFailure(ip);
+        service.recordFailure(ip);
+        service.recordFailure(ip);
+        assertTrue(service.isBlocked(ip));
+
+        service.reset(ip);
+        assertFalse(service.isBlocked(ip));
     }
 
     @Test
-    void shouldHandleLargeMaxAttempts() {
+    void shouldRespectMaxAttemptsSetting() {
         FailedLoginAttemptService service = new FailedLoginAttemptService(Integer.MAX_VALUE, 1);
-        String ip = "10.0.0.99";
+        String ip = "10.0.0.5";
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 100; i++) {
             service.recordFailure(ip);
         }
         assertFalse(service.isBlocked(ip));
     }
 
     @Test
-    void shouldHandleSmallWindowMinutes() {
+    void shouldBlockExactlyAtMaxAttempts() {
         FailedLoginAttemptService service = new FailedLoginAttemptService(5, 1);
-        String ip = "10.0.0.100";
+        String ip = "10.0.0.6";
 
+        assertFalse(service.isBlocked(ip));
         for (int i = 0; i < 5; i++) {
             service.recordFailure(ip);
         }

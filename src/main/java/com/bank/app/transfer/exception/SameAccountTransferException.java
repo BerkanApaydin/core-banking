@@ -1,4 +1,6 @@
-package com.bank.app.common.exception;
+package com.bank.app.transfer.exception;
+
+import com.bank.app.common.exception.BusinessException;
 
 public class SameAccountTransferException extends BusinessException {
     public SameAccountTransferException(String iban) {

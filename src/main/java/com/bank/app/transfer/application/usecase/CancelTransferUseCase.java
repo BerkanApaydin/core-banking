@@ -3,7 +3,7 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.audit.application.service.AuditService;
 import com.bank.app.audit.domain.AuditAction;
-import com.bank.app.common.exception.TransferNotFoundException;
+import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.transfer.application.port.SaveTransferPort;

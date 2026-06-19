@@ -1,7 +1,7 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
-import com.bank.app.common.web.FailedLoginAttemptService;
+import com.bank.app.user.web.FailedLoginAttemptService;
 import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;

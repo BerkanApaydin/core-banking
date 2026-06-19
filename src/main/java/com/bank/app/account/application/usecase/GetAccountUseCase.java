@@ -4,7 +4,7 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.common.exception.AccountNotFoundException;
+import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.common.security.port.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

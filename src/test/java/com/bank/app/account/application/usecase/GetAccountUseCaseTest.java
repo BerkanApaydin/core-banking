@@ -4,7 +4,7 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.common.exception.AccountNotFoundException;
+import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.SecurityUtils;
 import com.bank.app.common.security.CustomUserDetails;

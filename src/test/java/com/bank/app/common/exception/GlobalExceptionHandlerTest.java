@@ -1,5 +1,8 @@
 package com.bank.app.common.exception;
 
+import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.account.exception.InsufficientBalanceException;
+import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +57,7 @@ class GlobalExceptionHandlerTest {
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                 .thenReturn("Account not found TR1");
 
-        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleNotFoundExceptions(ex);
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -67,7 +70,7 @@ class GlobalExceptionHandlerTest {
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                 .thenThrow(new NoSuchMessageException("No key"));
 
-        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleNotFoundExceptions(ex);
+        ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -129,7 +132,7 @@ class GlobalExceptionHandlerTest {
         TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException("Çok fazla başarısız giriş denemesi");
 
         ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                .handleTooManyFailedLoginAttemptsException(ex);
+                .handleBusinessException(ex);
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
         assertNotNull(response.getBody());

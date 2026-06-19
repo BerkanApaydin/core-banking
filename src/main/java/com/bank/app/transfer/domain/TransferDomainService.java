@@ -1,7 +1,7 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.exception.SameAccountTransferException;
+import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.common.exception.CurrencyMismatchException;
 import java.util.Objects;
 

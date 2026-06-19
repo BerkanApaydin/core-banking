@@ -2,8 +2,8 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.AccountOperationsPort;
 import com.bank.app.transfer.application.port.AccountOperationsPort.AccountInfo;
-import com.bank.app.common.exception.AccountNotFoundException;
-import com.bank.app.common.exception.TransferNotFoundException;
+import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.LoadTransferPort;

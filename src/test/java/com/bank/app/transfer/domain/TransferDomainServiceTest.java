@@ -2,7 +2,7 @@ package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.exception.CurrencyMismatchException;
-import com.bank.app.common.exception.SameAccountTransferException;
+import com.bank.app.transfer.exception.SameAccountTransferException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

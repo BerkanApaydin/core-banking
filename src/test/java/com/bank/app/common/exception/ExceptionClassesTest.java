@@ -1,5 +1,8 @@
 package com.bank.app.common.exception;
 
+import com.bank.app.transfer.exception.TransferNotCancellableException;
+import com.bank.app.account.exception.InvalidCurrencyException;
+import com.bank.app.account.exception.InsufficientBalanceException;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

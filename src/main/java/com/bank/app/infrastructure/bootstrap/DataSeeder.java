@@ -3,7 +3,7 @@ package com.bank.app.infrastructure.bootstrap;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.usecase.CreateAccountUseCase;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.exception.DuplicateIbanException;
+import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.LoadUserPort;
