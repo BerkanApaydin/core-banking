@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.audit.application.port.in.AuditLoggerPort;
-import com.bank.app.audit.domain.AuditAction;
+import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -25,20 +25,20 @@ public class CancelTransferUseCase implements CancelTransferPort {
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
     private final AccountOperationPort accountOperationPort;
-    private final AuditLoggerPort auditLoggerPort;
+    private final EventPublisherPort eventPublisherPort;
     private final SecurityContextPort securityContextPort;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCase(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
                                  AccountOperationPort accountOperationPort,
-                                 AuditLoggerPort auditLoggerPort,
+                                 EventPublisherPort eventPublisherPort,
                                  SecurityContextPort securityContextPort,
                                  @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountOperationPort = accountOperationPort;
-        this.auditLoggerPort = auditLoggerPort;
+        this.eventPublisherPort = eventPublisherPort;
         this.securityContextPort = securityContextPort;
         this.cancellationWindowHours = cancellationWindowHours;
     }
@@ -66,11 +66,8 @@ public class CancelTransferUseCase implements CancelTransferPort {
 
         saveTransferPort.save(transfer);
 
-        auditLoggerPort.log(
-            AuditAction.TRANSFER_CANCELLED,
-            String.format("Transfer iptal edildi. Transfer ID: %d, Gönderici Hesaba Geri Yüklenen: %s %s, Alıcı Hesaptan Düşülen: %s %s",
-                transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency().name(),
-                transfer.getAmount().amount(), transfer.getAmount().currency().name())
-        );
+        eventPublisherPort.publish(new TransferCancelledEvent(
+            transfer.getId(), transfer.getSenderAccountId(), transfer.getReceiverAccountId(), transfer.getAmount()
+        ));
     }
 }

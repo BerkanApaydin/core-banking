@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
@@ -35,7 +35,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         @Mock
         private AccountOperationPort accountOperationPort;
         @Mock
-        private AuditLogger auditLogger;
+        private EventPublisherPort eventPublisherPort;
         @Mock
         private SecurityContextPort securityContextPort;
 
@@ -45,7 +45,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         void setUp() {
                 cancelTransferUseCase = new CancelTransferUseCase(
                                 loadTransferPort, saveTransferPort, accountOperationPort,
-                                auditLogger, securityContextPort, 24);
+                                eventPublisherPort, securityContextPort, 24);
         }
 
         @Test
@@ -81,7 +81,7 @@ class CancelTransferUseCaseEdgeCaseTest {
 
                 assertThrows(ConcurrencyFailureException.class,
                                 () -> cancelTransferUseCase.execute(10L));
-                verify(auditLogger, never()).log(any(), any());
+                verify(eventPublisherPort, never()).publish(any());
         }
 
         @Test
@@ -103,7 +103,7 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 () -> cancelTransferUseCase.execute(10L));
 
                 verify(saveTransferPort, never()).save(any());
-                verify(auditLogger, never()).log(any(), any());
+                verify(eventPublisherPort, never()).publish(any());
         }
 
 }

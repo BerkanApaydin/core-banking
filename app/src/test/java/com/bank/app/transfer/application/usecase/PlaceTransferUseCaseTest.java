@@ -7,7 +7,7 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.*;
-import com.bank.app.audit.application.AuditLogger;
+
 import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.account.exception.InvalidIbanException;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,15 +33,14 @@ class PlaceTransferUseCaseTest {
 
     @Mock private AccountOperationPort accountOperationPort;
     @Mock private SaveTransferPort saveTransferPort;
-    @Mock private DomainEventPublisherPort eventPublisherPort;
-    @Mock private AuditLogger auditLogger;
+    @Mock private EventPublisherPort eventPublisherPort;
 
     private PlaceTransferUseCase placeTransferUseCase;
 
     @BeforeEach
     void setUp() {
         placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort,
-                saveTransferPort, auditLogger,
+                saveTransferPort,
                 eventPublisherPort,
                 new TransferDomainService());
     }

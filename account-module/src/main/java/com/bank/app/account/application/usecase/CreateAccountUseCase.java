@@ -6,8 +6,8 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.audit.application.port.in.AuditLoggerPort;
-import com.bank.app.audit.domain.AuditAction;
+import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.application.port.in.CreateAccountPort;
@@ -22,13 +22,13 @@ public class CreateAccountUseCase implements CreateAccountPort {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final AuditLoggerPort auditLoggerPort;
+    private final EventPublisherPort eventPublisherPort;
     private final SecurityContextPort securityContextPort;
 
-    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, AuditLoggerPort auditLoggerPort, SecurityContextPort securityContextPort) {
+    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, EventPublisherPort eventPublisherPort, SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.auditLoggerPort = auditLoggerPort;
+        this.eventPublisherPort = eventPublisherPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -50,12 +50,10 @@ public class CreateAccountUseCase implements CreateAccountPort {
 
         Account savedAccount = saveAccountPort.save(account);
 
-        auditLoggerPort.log(
-            AuditAction.ACCOUNT_CREATED,
-            String.format("Yeni hesap oluşturuldu. ID: %d, IBAN: %s, Kullanıcı ID: %d, Bakiye: %s %s",
-                savedAccount.getId(), savedAccount.getIban().value(), savedAccount.getUserId(),
-                savedAccount.getBalance().amount(), savedAccount.getBalance().currency())
-        );
+        eventPublisherPort.publish(new AccountCreatedEvent(
+            savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban().value(),
+            savedAccount.getOwnerName(), savedAccount.getBalance()
+        ));
 
         return AccountResponse.from(savedAccount);
     }

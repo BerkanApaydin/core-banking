@@ -1,7 +1,5 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.AuditLogger;
-import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.InsufficientBalanceException;
 import com.bank.app.transfer.exception.SameAccountTransferException;
@@ -20,7 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import org.springframework.dao.ConcurrencyFailureException;
 
 import java.math.BigDecimal;
@@ -38,9 +36,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
         @Mock
         private SaveTransferPort saveTransferPort;
         @Mock
-        private DomainEventPublisherPort eventPublisherPort;
-        @Mock
-        private AuditLogger auditLogger;
+        private EventPublisherPort eventPublisherPort;
 
         private PlaceTransferUseCase placeTransferUseCase;
 
@@ -49,7 +45,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
         @BeforeEach
         void setUp() {
-                placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort, saveTransferPort, auditLogger,
+                placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort, saveTransferPort,
                                 eventPublisherPort, new TransferDomainService());
         }
 
@@ -169,19 +165,6 @@ class PlaceTransferUseCaseEdgeCaseTest {
                                 .when(eventPublisherPort).publish(any(TransferCompletedEvent.class));
 
                 assertThrows(RuntimeException.class, () -> placeTransferUseCase.execute(request));
-        }
-
-        @Test
-        void shouldStillPublishEventWhenAuditServiceFails() {
-                TransferRequest request = validRequest();
-                mockActiveAccounts();
-                mockSaveReturnsId();
-
-                doThrow(new RuntimeException("Audit failed"))
-                                .when(auditLogger).log(any(AuditAction.class), anyString());
-
-                assertDoesNotThrow(() -> placeTransferUseCase.execute(request));
-                verify(eventPublisherPort, times(1)).publish(any(TransferCompletedEvent.class));
         }
 
         @Test

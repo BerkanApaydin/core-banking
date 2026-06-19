@@ -1,7 +1,5 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.port.in.AuditLoggerPort;
-import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -11,7 +9,7 @@ import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.application.port.in.PlaceTransferPort;
-import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.transfer.domain.TransferDomainService;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
@@ -21,29 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Service
 @Transactional
 public class PlaceTransferUseCase implements PlaceTransferPort {
 
-    private static final Logger log = LoggerFactory.getLogger(PlaceTransferUseCase.class);
-
     private final AccountOperationPort accountOperationPort;
     private final SaveTransferPort saveTransferPort;
-    private final AuditLoggerPort auditLoggerPort;
-    private final DomainEventPublisherPort eventPublisherPort;
+    private final EventPublisherPort eventPublisherPort;
     private final TransferDomainService transferDomainService;
 
     public PlaceTransferUseCase(AccountOperationPort accountOperationPort,
             SaveTransferPort saveTransferPort,
-            AuditLoggerPort auditLoggerPort,
-            DomainEventPublisherPort eventPublisherPort,
+            EventPublisherPort eventPublisherPort,
             TransferDomainService transferDomainService) {
         this.accountOperationPort = accountOperationPort;
         this.saveTransferPort = saveTransferPort;
-        this.auditLoggerPort = auditLoggerPort;
         this.eventPublisherPort = eventPublisherPort;
         this.transferDomainService = transferDomainService;
     }
@@ -73,7 +63,7 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
 
         Transfer completedTransfer = saveTransferPort.save(transfer);
 
-        logAuditAndPublishEvent(completedTransfer, senderIban, receiverIban);
+        publishEvent(completedTransfer);
 
         return TransferResponse.from(completedTransfer, senderIban, receiverIban);
     }
@@ -94,18 +84,7 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
                 amount);
     }
 
-    private void logAuditAndPublishEvent(Transfer savedTransfer, String senderIban, String receiverIban) {
-        try {
-            auditLoggerPort.log(
-                    AuditAction.TRANSFER_EXECUTED,
-                    String.format(
-                            "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",
-                            savedTransfer.getId(), senderIban, receiverIban,
-                            savedTransfer.getAmount().amount(), savedTransfer.getAmount().currency().name()));
-        } catch (RuntimeException e) {
-            log.warn("Audit log kaydedilemedi: {}", e.getMessage(), e);
-        }
-
+    private void publishEvent(Transfer savedTransfer) {
         eventPublisherPort.publish(new TransferCompletedEvent(savedTransfer));
     }
 }

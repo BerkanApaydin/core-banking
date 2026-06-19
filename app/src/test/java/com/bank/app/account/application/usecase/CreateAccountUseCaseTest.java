@@ -1,6 +1,7 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.out.LoadAccountPort;
@@ -37,13 +38,13 @@ class CreateAccountUseCaseTest {
         @Mock
         private SaveAccountPort saveAccountPort;
         @Mock
-        private AuditLogger auditLogger;
+        private EventPublisherPort eventPublisherPort;
 
         private CreateAccountUseCase createAccountUseCase;
 
         @BeforeEach
         void setUp() {
-                createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditLogger,
+                createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, eventPublisherPort,
                                 new SecurityContextAdapter());
 
                 // Set default authenticated user context using CustomUserDetails
@@ -93,6 +94,7 @@ class CreateAccountUseCaseTest {
                 assertTrue(response.active());
 
                 verify(saveAccountPort).save(any(Account.class));
+                verify(eventPublisherPort).publish(any(AccountCreatedEvent.class));
         }
 
         @Test

@@ -10,7 +10,8 @@ import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.transfer.domain.TransferCancelledEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,14 +34,14 @@ class CancelTransferUseCaseTest {
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private SaveTransferPort saveTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
-    @Mock private AuditLogger auditLogger;
+    @Mock private EventPublisherPort eventPublisherPort;
     @Mock private SecurityContextPort securityContextPort;
 
     private CancelTransferUseCase cancelTransferUseCase;
 
     @BeforeEach
     void setUp() {
-        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationPort, auditLogger, securityContextPort, 24);
+        cancelTransferUseCase = new CancelTransferUseCase(loadTransferPort, saveTransferPort, accountOperationPort, eventPublisherPort, securityContextPort, 24);
     }
 
     @Test
@@ -57,7 +58,7 @@ class CancelTransferUseCaseTest {
 
         verify(accountOperationPort).reverseBalancesForCancellation(1L, 2L, transfer.getAmount());
         verify(saveTransferPort).save(transfer);
-        verify(auditLogger).log(any(), anyString());
+        verify(eventPublisherPort).publish(any(TransferCancelledEvent.class));
     }
 
     @Test

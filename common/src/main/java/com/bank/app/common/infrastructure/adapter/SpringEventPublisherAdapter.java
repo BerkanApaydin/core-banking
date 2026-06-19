@@ -1,11 +1,11 @@
-package com.bank.app.transfer.infrastructure.adapter;
+package com.bank.app.common.infrastructure.adapter;
 
-import com.bank.app.transfer.application.port.out.DomainEventPublisherPort;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 @Component
-public class SpringEventPublisherAdapter implements DomainEventPublisherPort {
+public class SpringEventPublisherAdapter implements EventPublisherPort {
 
     private final ApplicationEventPublisher eventPublisher;
 
