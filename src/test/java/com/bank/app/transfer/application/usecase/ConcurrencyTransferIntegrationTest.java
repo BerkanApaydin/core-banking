@@ -6,9 +6,11 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.infrastructure.outbox.OutboxEventJpaRepository;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,9 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @MockitoBean
     private SecurityContextAdapter securityUtils;
 
@@ -80,9 +85,9 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     void tearDown() {
         runInNewTx(() -> {
             outboxEventRepo.deleteAll();
-            transferRepo.deleteAllWithoutVersionCheck();
-            accountRepo.deleteAllWithoutVersionCheck();
-            userRepository.deleteAll();
+            entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
+            entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
+            entityManager.createQuery("delete from UserJpaEntity").executeUpdate();
         });
     }
 
