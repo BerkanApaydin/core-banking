@@ -24,8 +24,8 @@ app:
       allowed-origins: http://localhost:3000
     rate-limit:
       backend: caffeine
-      max-requests: 10
-      time-window-ms: 10000
+      max-requests: 1000
+      time-window-ms: 1000
   idempotency:
     cleanup-cron: "0 0 * * * *"
     expiration-hours: 24

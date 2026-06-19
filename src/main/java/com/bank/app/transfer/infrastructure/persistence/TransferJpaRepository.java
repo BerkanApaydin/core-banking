@@ -2,12 +2,13 @@ package com.bank.app.transfer.infrastructure.persistence;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.data.jpa.repository.Lock;
-import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, Long> {
@@ -38,4 +39,8 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
 
         @Query("select count(t) from TransferJpaEntity t where t.senderAccountId = :accountId or t.receiverAccountId = :accountId")
         long countHistory(@Param("accountId") Long accountId);
+
+        @Modifying
+        @Query("delete from TransferJpaEntity")
+        void deleteAllWithoutVersionCheck();
 }

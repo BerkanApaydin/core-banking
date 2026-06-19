@@ -5,7 +5,9 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.security.JwtTokenProvider;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
+import com.bank.app.user.domain.User;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -26,13 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import com.bank.app.common.adapter.SecurityContextAdapter;
-import java.util.Locale;
-import java.util.Optional;
-import static org.mockito.Mockito.when;
-
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 @Transactional
 @SuppressWarnings("null")
 class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
@@ -52,19 +49,20 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
         @Autowired
         private ObjectMapper objectMapper;
 
-        @MockitoBean
-        private SecurityContextAdapter securityUtils;
+        @Autowired
+        private JwtTokenProvider jwtTokenProvider;
 
         private Long testUserId;
+
+        private String jwtToken;
 
         @BeforeEach
         void setUp() {
                 Locale.setDefault(Locale.of("tr", "TR"));
-
                 UserJpaEntity u = userRepository.save(
                                 new UserJpaEntity(null, "test_user", "pass", "ROLE_USER"));
                 testUserId = u.getId();
-                when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(testUserId));
+                jwtToken = jwtTokenProvider.generateToken(new User(u.getId(), "test_user", "pass", "ROLE_USER"));
         }
 
         @Test
@@ -77,6 +75,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 Money.Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/accounts")
+                                .header("Authorization", "Bearer " + jwtToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
@@ -101,6 +100,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 Money.Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/accounts")
+                                .header("Authorization", "Bearer " + jwtToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
@@ -115,7 +115,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888",
                                                 "Fatma Demir", new BigDecimal("2000.00"), "TRY", true));
 
-                mockMvc.perform(get("/api/v1/accounts/" + saved.getId()))
+                mockMvc.perform(get("/api/v1/accounts/" + saved.getId())
+                                .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id", is(saved.getId().intValue())))
                                 .andExpect(jsonPath("$.iban", is("TR290006200000000000000888")))
@@ -125,7 +126,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
         @Test
         void shouldReturnNotFoundWhenAccountByIdDoesNotExist() throws Exception {
-                mockMvc.perform(get("/api/v1/accounts/9999"))
+                mockMvc.perform(get("/api/v1/accounts/9999")
+                                .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status", is(404)))
                                 .andExpect(jsonPath("$.message", is("Hesap bulunamadı. ID: 9999")));
@@ -136,7 +138,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
                                 new BigDecimal("2000.00"), "TRY", true));
 
-                mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000888"))
+                mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000888")
+                                .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.iban", is("TR290006200000000000000888")))
                                 .andExpect(jsonPath("$.ownerName", is("Fatma Demir")));
@@ -147,7 +150,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
                                 new BigDecimal("2000.00"), "TRY", true));
 
-                mockMvc.perform(get("/api/v1/accounts"))
+                mockMvc.perform(get("/api/v1/accounts")
+                                .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$[0].iban", is("TR290006200000000000000888")))
                                 .andExpect(jsonPath("$[0].ownerName", is("Fatma Demir")));

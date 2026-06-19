@@ -80,8 +80,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     void tearDown() {
         runInNewTx(() -> {
             outboxEventRepo.deleteAll();
-            transferRepo.deleteAll();
-            accountRepo.deleteAll();
+            transferRepo.deleteAllWithoutVersionCheck();
+            accountRepo.deleteAllWithoutVersionCheck();
             userRepository.deleteAll();
         });
     }
