@@ -17,11 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -209,13 +205,6 @@ class PlaceTransferUseCaseTest {
     }
 
     @Test
-    void shouldHaveRetryableAnnotationOnExecuteMethod() throws Exception {
-        Method method = PlaceTransferUseCase.class.getMethod("execute", TransferRequest.class);
-        Retryable retryable = method.getAnnotation(Retryable.class);
-        assertNotNull(retryable, "execute method should be annotated with @Retryable");
-    }
-
-    @Test
     void shouldThrowInvalidIbanExceptionWhenSenderIbanHasInvalidFormat() {
         TransferRequest request = new TransferRequest(
                 "INVALID_IBAN",
@@ -247,9 +236,4 @@ class PlaceTransferUseCaseTest {
         verify(accountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
     }
 
-    @Test
-    void shouldHaveTransactionalAnnotationOnClass() {
-        Transactional transactional = PlaceTransferUseCase.class.getAnnotation(Transactional.class);
-        assertNotNull(transactional, "PlaceTransferUseCase should be annotated with @Transactional");
-    }
 }

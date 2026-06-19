@@ -17,11 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -163,16 +159,4 @@ class CancelTransferUseCaseTest {
         assertEquals("Transfer ID null olamaz", ex.getMessage());
     }
 
-    @Test
-    void shouldHaveRetryableAnnotationOnExecuteMethod() throws Exception {
-        Method method = CancelTransferUseCase.class.getMethod("execute", Long.class);
-        Retryable retryable = method.getAnnotation(Retryable.class);
-        assertNotNull(retryable, "execute method should be annotated with @Retryable");
-    }
-
-    @Test
-    void shouldHaveTransactionalAnnotationOnClass() {
-        Transactional transactional = CancelTransferUseCase.class.getAnnotation(Transactional.class);
-        assertNotNull(transactional, "CancelTransferUseCase should be annotated with @Transactional");
-    }
 }

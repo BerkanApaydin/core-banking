@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.bootstrap;
 
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.usecase.CreateAccountUseCase;
+import com.bank.app.account.application.port.in.CreateAccountPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.security.CustomUserDetails;
@@ -31,14 +31,14 @@ public class DataSeeder {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final RegisterUserUseCase registerUserUseCase;
-    private final CreateAccountUseCase createAccountUseCase;
+    private final CreateAccountPort createAccountPort;
     private final LoadUserPort loadUserPort;
 
     public DataSeeder(RegisterUserUseCase registerUserUseCase,
-                      CreateAccountUseCase createAccountUseCase,
+                      CreateAccountPort createAccountPort,
                       LoadUserPort loadUserPort) {
         this.registerUserUseCase = registerUserUseCase;
-        this.createAccountUseCase = createAccountUseCase;
+        this.createAccountPort = createAccountPort;
         this.loadUserPort = loadUserPort;
     }
 
@@ -79,7 +79,7 @@ public class DataSeeder {
     private void seedAccountIfAbsent(Long userId, String iban, String ownerName,
                                      BigDecimal balance, Money.Currency currency) {
         try {
-            createAccountUseCase.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
+            createAccountPort.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
             log.info("Hesap oluşturuldu: {}", iban);
         } catch (DuplicateIbanException ex) {
             log.debug("Hesap zaten mevcut, atlanıyor: {}", iban);

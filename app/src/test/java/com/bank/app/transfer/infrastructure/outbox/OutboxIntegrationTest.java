@@ -6,7 +6,7 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.application.usecase.PlaceTransferUseCase;
+import com.bank.app.transfer.application.port.in.PlaceTransferPort;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private PlaceTransferUseCase placeTransferUseCase;
+    private PlaceTransferPort placeTransferPort;
 
     @Autowired
     private OutboxEventJpaRepository outboxRepo;
@@ -80,7 +80,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         );
 
         // 1. Execute transfer
-        placeTransferUseCase.execute(request);
+        placeTransferPort.execute(request);
 
         // 2. Assert outbox event was created in PENDING/unprocessed status
         List<OutboxEventJpaEntity> outboxEvents = outboxRepo.findAll();

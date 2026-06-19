@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.bootstrap;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.usecase.CreateAccountUseCase;
+import com.bank.app.account.application.port.in.CreateAccountPort;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -31,7 +31,7 @@ class DataSeederTest {
     @Mock
     private RegisterUserUseCase registerUserUseCase;
     @Mock
-    private CreateAccountUseCase createAccountUseCase;
+    private CreateAccountPort createAccountPort;
     @Mock
     private LoadUserPort loadUserPort;
 
@@ -39,7 +39,7 @@ class DataSeederTest {
 
     @BeforeEach
     void setUp() {
-        dataSeeder = new DataSeeder(registerUserUseCase, createAccountUseCase, loadUserPort);
+        dataSeeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort);
     }
 
     @Test
@@ -54,7 +54,7 @@ class DataSeederTest {
 
         verify(registerUserUseCase).execute(new AuthRequest("ahmet", "ahmet123"));
         verify(registerUserUseCase).execute(new AuthRequest("ayse", "ayse123"));
-        verify(createAccountUseCase, atLeastOnce()).execute(any(CreateAccountRequest.class));
+        verify(createAccountPort, atLeastOnce()).execute(any(CreateAccountRequest.class));
     }
 
     @Test
@@ -76,7 +76,7 @@ class DataSeederTest {
         User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
-        doThrow(new DuplicateIbanException("exists")).when(createAccountUseCase)
+        doThrow(new DuplicateIbanException("exists")).when(createAccountPort)
                 .execute(any(CreateAccountRequest.class));
 
         CommandLineRunner runner = dataSeeder.seedData();
@@ -152,7 +152,7 @@ class DataSeederTest {
         when(loadUserPort.findByUsername("ayse"))
                 .thenReturn(Optional.of(ayse));
 
-        when(createAccountUseCase.execute(any(CreateAccountRequest.class)))
+        when(createAccountPort.execute(any(CreateAccountRequest.class)))
                 .thenThrow(new DuplicateIbanException("exists"))
                 .thenReturn(response)
                 .thenReturn(response);
@@ -161,7 +161,7 @@ class DataSeederTest {
 
         assertDoesNotThrow(() -> runner.run());
 
-        verify(createAccountUseCase, times(3))
+        verify(createAccountPort, times(3))
                 .execute(any(CreateAccountRequest.class));
 
         verify(loadUserPort, atLeastOnce()).findByUsername("ahmet");

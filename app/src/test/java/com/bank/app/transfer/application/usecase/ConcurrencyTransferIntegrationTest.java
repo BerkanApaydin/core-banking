@@ -5,6 +5,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
+import com.bank.app.transfer.application.port.in.PlaceTransferPort;
 import com.bank.app.transfer.infrastructure.outbox.OutboxEventJpaRepository;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.when;
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private PlaceTransferUseCase placeTransferUseCase;
+    private PlaceTransferPort placeTransferPort;
 
     @Autowired
     private AccountJpaRepository accountRepo;
@@ -112,7 +113,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             executorService.submit(() -> {
                 try {
                     latch.await(); // Wait for all threads to be ready
-                    placeTransferUseCase.execute(request);
+                    placeTransferPort.execute(request);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failureCount.incrementAndGet();
@@ -157,7 +158,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             executorService.submit(() -> {
                 try {
                     latch.await();
-                    placeTransferUseCase.execute(request);
+                    placeTransferPort.execute(request);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failureCount.incrementAndGet();

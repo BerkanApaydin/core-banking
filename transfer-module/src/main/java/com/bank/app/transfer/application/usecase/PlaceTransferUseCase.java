@@ -11,16 +11,8 @@ import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.application.port.in.PlaceTransferPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.transfer.domain.TransferDomainService;
-import org.springframework.dao.ConcurrencyFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Objects;
 
-@Service
-@Transactional
 public class PlaceTransferUseCase implements PlaceTransferPort {
 
     private final AccountOperationPort accountOperationPort;
@@ -38,11 +30,6 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
         this.transferDomainService = transferDomainService;
     }
 
-    @Retryable(
-            retryFor = ConcurrencyFailureException.class,
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 500, multiplier = 2)
-    )
     public TransferResponse execute(TransferRequest request) {
         Objects.requireNonNull(request, "Request null olamaz");
 

@@ -12,12 +12,8 @@ import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.application.port.in.CreateAccountPort;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
-@Service
-@Transactional
 public class CreateAccountUseCase implements CreateAccountPort {
 
     private final LoadAccountPort loadAccountPort;
