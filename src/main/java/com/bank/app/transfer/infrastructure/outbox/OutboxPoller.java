@@ -16,8 +16,8 @@ public class OutboxPoller {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPoller.class);
 
-    private final OutboxEventLockRepository lockRepository;
-    private final SpringDataOutboxEventRepo outboxRepo;
+    private final OutboxLockRepository lockRepository;
+    private final OutboxEventJpaRepository outboxRepo;
     private final List<OutboxEventHandler> handlers;
 
     @Value("${app.outbox.max-retries:5}")
@@ -30,16 +30,16 @@ public class OutboxPoller {
     private int partitionCount;
 
     @Autowired
-    public OutboxPoller(OutboxEventLockRepository lockRepository,
-                        SpringDataOutboxEventRepo outboxRepo,
+    public OutboxPoller(OutboxLockRepository lockRepository,
+                        OutboxEventJpaRepository outboxRepo,
                         List<OutboxEventHandler> handlers) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;
     }
 
-    OutboxPoller(OutboxEventLockRepository lockRepository,
-                 SpringDataOutboxEventRepo outboxRepo,
+    OutboxPoller(OutboxLockRepository lockRepository,
+                 OutboxEventJpaRepository outboxRepo,
                  List<OutboxEventHandler> handlers,
                  @Value("${app.outbox.max-retries:5}") int maxRetries,
                  @Value("${app.outbox.batch-size:50}") int batchSize,

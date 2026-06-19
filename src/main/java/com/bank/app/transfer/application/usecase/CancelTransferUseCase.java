@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.AccountOperationsPort;
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.SecurityContextPort;
@@ -54,10 +54,6 @@ public class CancelTransferUseCase {
 
         Long senderAccountId = transfer.getSenderAccountId();
         Long receiverAccountId = transfer.getReceiverAccountId();
-
-        if (senderAccountId.equals(receiverAccountId)) {
-            throw new IllegalArgumentException("Gönderici ve alıcı hesap aynı olamaz.");
-        }
 
         // Auth check before domain mutation (fail-fast)
         Long senderUserId = accountOperationsPort.getAccountInfo(senderAccountId).userId();

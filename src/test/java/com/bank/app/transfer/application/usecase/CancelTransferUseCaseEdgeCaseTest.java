@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.SecurityContextPort;
@@ -105,17 +105,4 @@ class CancelTransferUseCaseEdgeCaseTest {
                 verify(auditService, never()).log(any(), any());
         }
 
-        @Test
-        void shouldThrowWhenSenderAndReceiverAccountSame() {
-                Transfer transfer = new Transfer(10L, 1L, 1L,
-                                Money.of("200.00", Money.Currency.TRY),
-                                TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
-
-                when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-
-                IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                                () -> cancelTransferUseCase.execute(10L));
-                assertEquals("Gönderici ve alıcı hesap aynı olamaz.", ex.getMessage());
-                verifyNoInteractions(accountOperationsPort);
-        }
 }

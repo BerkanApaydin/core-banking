@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.transfer.application.dto.ReportCriteria;
@@ -38,7 +38,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
-        securityContextPort = new SecurityUtils();
+        securityContextPort = new SecurityContextAdapter();
         generateTransferReportUseCase = new GenerateTransferReportUseCase(
                 loadTransferPort, accountOperationsPort, securityContextPort);
 

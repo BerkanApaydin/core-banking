@@ -6,7 +6,7 @@ import com.bank.app.account.application.port.LoadAccountPort;
 import com.bank.app.account.application.port.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;

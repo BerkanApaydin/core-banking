@@ -1,6 +1,6 @@
 package com.bank.app.common.idempotency;
 
-import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,11 +12,11 @@ import java.time.LocalDateTime;
 @Service
 public class IdempotencyCleanupScheduler {
     private static final Logger log = LoggerFactory.getLogger(IdempotencyCleanupScheduler.class);
-    private final SpringDataIdempotencyKeyRepo repo;
+    private final IdempotencyKeyJpaRepository repo;
     private final int expirationHours;
 
     public IdempotencyCleanupScheduler(
-            SpringDataIdempotencyKeyRepo repo,
+            IdempotencyKeyJpaRepository repo,
             @Value("${app.idempotency.expiration-hours}") int expirationHours) {
         this.repo = repo;
         this.expirationHours = expirationHours;

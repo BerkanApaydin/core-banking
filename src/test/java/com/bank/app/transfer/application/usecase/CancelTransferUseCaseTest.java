@@ -10,7 +10,7 @@ import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,20 +105,6 @@ class CancelTransferUseCaseTest {
         assertEquals("Bu transferi iptal etmeye yetkiniz yok.", ex.getMessage());
 
         verify(saveTransferPort, never()).save(any());
-    }
-
-    @Test
-    void shouldThrowIllegalArgumentExceptionWhenSenderAndReceiverAreSameAccount() {
-        Transfer transfer = new Transfer(10L, 1L, 1L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
-
-        when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> cancelTransferUseCase.execute(10L));
-        assertEquals("Gönderici ve alıcı hesap aynı olamaz.", ex.getMessage());
-
-        verifyNoInteractions(accountOperationsPort);
-        verifyNoInteractions(securityContextPort);
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
-import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,9 +14,9 @@ import java.util.Optional;
 @Service
 public class IdempotencyManager {
 
-    private final SpringDataIdempotencyKeyRepo repo;
+    private final IdempotencyKeyJpaRepository repo;
 
-    public IdempotencyManager(SpringDataIdempotencyKeyRepo repo) {
+    public IdempotencyManager(IdempotencyKeyJpaRepository repo) {
         this.repo = repo;
     }
 

@@ -19,8 +19,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OutboxPollerEdgeCaseTest {
 
-    @Mock private OutboxEventLockRepository lockRepository;
-    @Mock private SpringDataOutboxEventRepo outboxRepo;
+    @Mock private OutboxLockRepository lockRepository;
+    @Mock private OutboxEventJpaRepository outboxRepo;
     @Mock private OutboxEventHandler handler;
 
     private OutboxPoller poller;

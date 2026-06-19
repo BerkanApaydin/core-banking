@@ -1,7 +1,7 @@
 package com.bank.app.common.idempotency;
 
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
-import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class IdempotencyTest {
 
     @Mock
-    private SpringDataIdempotencyKeyRepo repo;
+    private IdempotencyKeyJpaRepository repo;
 
     private IdempotencyCleanupScheduler scheduler;
     private IdempotencyManager manager;

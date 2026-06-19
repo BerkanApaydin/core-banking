@@ -7,7 +7,7 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.SaveTransferPort;
 import com.bank.app.transfer.domain.*;
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.transfer.exception.SameAccountTransferException;
 import com.bank.app.account.exception.AccountNotActiveException;
 import com.bank.app.account.exception.InvalidIbanException;

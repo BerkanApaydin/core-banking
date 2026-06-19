@@ -12,13 +12,13 @@ import java.util.UUID;
 @Component
 public class OutboxEventListener {
 
-    private final SpringDataOutboxEventRepo outboxRepo;
+    private final OutboxEventJpaRepository outboxRepo;
     private final ObjectMapper objectMapper;
 
     @Value("${app.outbox.partition-count:0}")
     private int partitionCount;
 
-    public OutboxEventListener(SpringDataOutboxEventRepo outboxRepo, ObjectMapper objectMapper) {
+    public OutboxEventListener(OutboxEventJpaRepository outboxRepo, ObjectMapper objectMapper) {
         this.outboxRepo = outboxRepo;
         this.objectMapper = objectMapper;
     }

@@ -1,8 +1,8 @@
 package com.bank.app.user.infrastructure.web;
 
-import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
-import com.bank.app.user.web.FailedLoginAttemptService;
-import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
+import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -36,10 +36,10 @@ class AuthControllerIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private SpringDataAccountRepo accountRepo;
+    private AccountJpaRepository accountRepo;
 
     @Autowired
-    private SpringDataTransferRepo transferRepo;
+    private TransferJpaRepository transferRepo;
 
     @Autowired
     private PasswordEncoder passwordEncoder;

@@ -1,12 +1,12 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
-import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
+import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.usecase.PlaceTransferUseCase;
-import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,22 +33,22 @@ class OutboxIntegrationTest {
     private PlaceTransferUseCase placeTransferUseCase;
 
     @Autowired
-    private SpringDataOutboxEventRepo outboxRepo;
+    private OutboxEventJpaRepository outboxRepo;
 
     @Autowired
-    private SpringDataAccountRepo accountRepo;
+    private AccountJpaRepository accountRepo;
 
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
-    private SpringDataTransferRepo transferRepo;
+    private TransferJpaRepository transferRepo;
 
     @Autowired
     private OutboxPoller outboxPoller;
 
     @MockitoBean
-    private SecurityUtils securityUtils;
+    private SecurityContextAdapter securityUtils;
 
     private UserJpaEntity user;
 

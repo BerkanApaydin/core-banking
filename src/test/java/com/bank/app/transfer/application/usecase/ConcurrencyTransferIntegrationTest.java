@@ -1,10 +1,10 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
-import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
+import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -31,16 +31,16 @@ class ConcurrencyTransferIntegrationTest {
     private PlaceTransferUseCase placeTransferUseCase;
 
     @Autowired
-    private SpringDataAccountRepo accountRepo;
+    private AccountJpaRepository accountRepo;
 
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
-    private SpringDataTransferRepo transferRepo;
+    private TransferJpaRepository transferRepo;
 
     @MockitoBean
-    private SecurityUtils securityUtils;
+    private SecurityContextAdapter securityUtils;
 
     private UserJpaEntity user;
 

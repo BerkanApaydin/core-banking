@@ -1,6 +1,6 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.LoadAccountPort;
@@ -9,7 +9,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +44,7 @@ class CreateAccountUseCaseTest {
         @BeforeEach
         void setUp() {
                 createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, auditService,
-                                new SecurityUtils());
+                                new SecurityContextAdapter());
 
                 // Set default authenticated user context using CustomUserDetails
                 CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password",

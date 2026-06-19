@@ -8,7 +8,7 @@ import com.bank.app.transfer.application.port.LoadTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 import com.bank.app.common.security.port.SecurityContextPort;
 import com.bank.app.common.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +39,7 @@ class GetTransferHistoryUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        securityContextPort = new SecurityUtils();
+        securityContextPort = new SecurityContextAdapter();
         getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationsPort,
                 securityContextPort);
 

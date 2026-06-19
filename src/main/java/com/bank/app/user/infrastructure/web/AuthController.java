@@ -1,7 +1,7 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
-import com.bank.app.user.web.FailedLoginAttemptService;
+import com.bank.app.user.infrastructure.web.FailedLoginAttemptService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.usecase.LoginUserUseCase;

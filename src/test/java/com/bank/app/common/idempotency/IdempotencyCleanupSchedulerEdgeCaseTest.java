@@ -1,6 +1,6 @@
 package com.bank.app.common.idempotency;
 
-import com.bank.app.common.persistence.SpringDataIdempotencyKeyRepo;
+import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class IdempotencyCleanupSchedulerEdgeCaseTest {
 
-    @Mock private SpringDataIdempotencyKeyRepo repo;
+    @Mock private IdempotencyKeyJpaRepository repo;
 
     private IdempotencyCleanupScheduler scheduler;
 

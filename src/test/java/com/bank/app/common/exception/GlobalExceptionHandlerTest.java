@@ -2,6 +2,7 @@ package com.bank.app.common.exception;
 
 import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.account.exception.InsufficientBalanceException;
+import com.bank.app.common.handler.GlobalExceptionHandler;
 import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.hibernate.exception.ConstraintViolationException;

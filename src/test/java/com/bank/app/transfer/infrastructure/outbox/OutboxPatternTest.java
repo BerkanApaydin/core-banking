@@ -23,8 +23,8 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("null")
 class OutboxPatternTest {
 
-    private SpringDataOutboxEventRepo outboxRepo;
-    private OutboxEventLockRepository lockRepository;
+    private OutboxEventJpaRepository outboxRepo;
+    private OutboxLockRepository lockRepository;
     private ObjectMapper objectMapper;
     private ApplicationEventPublisher eventPublisher;
 
@@ -34,8 +34,8 @@ class OutboxPatternTest {
 
     @BeforeEach
     void setUp() {
-        outboxRepo = mock(SpringDataOutboxEventRepo.class);
-        lockRepository = mock(OutboxEventLockRepository.class);
+        outboxRepo = mock(OutboxEventJpaRepository.class);
+        lockRepository = mock(OutboxLockRepository.class);
         objectMapper = new ObjectMapper();
         eventPublisher = mock(ApplicationEventPublisher.class);
 

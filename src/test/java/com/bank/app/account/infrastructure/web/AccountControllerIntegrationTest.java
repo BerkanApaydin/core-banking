@@ -2,9 +2,9 @@ package com.bank.app.account.infrastructure.web;
 
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
-import com.bank.app.account.infrastructure.persistence.SpringDataAccountRepo;
+import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.infrastructure.persistence.SpringDataTransferRepo;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import com.bank.app.common.security.SecurityUtils;
+import com.bank.app.common.security.SecurityContextAdapter;
 import java.util.Locale;
 import java.util.Optional;
 import static org.mockito.Mockito.when;
@@ -42,19 +42,19 @@ class AccountControllerIntegrationTest {
         private MockMvc mockMvc;
 
         @Autowired
-        private SpringDataAccountRepo accountRepo;
+        private AccountJpaRepository accountRepo;
 
         @Autowired
         private UserRepository userRepository;
 
         @Autowired
-        private SpringDataTransferRepo transferRepo;
+        private TransferJpaRepository transferRepo;
 
         @Autowired
         private ObjectMapper objectMapper;
 
         @MockitoBean
-        private SecurityUtils securityUtils;
+        private SecurityContextAdapter securityUtils;
 
         private Long testUserId;
 

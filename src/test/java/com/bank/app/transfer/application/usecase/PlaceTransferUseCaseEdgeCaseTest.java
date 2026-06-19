@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.audit.application.service.AuditService;
+import com.bank.app.audit.application.AuditService;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.AccountNotActiveException;
