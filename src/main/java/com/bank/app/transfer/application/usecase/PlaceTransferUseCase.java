@@ -119,10 +119,6 @@ public class PlaceTransferUseCase {
             log.warn("Audit log kaydedilemedi: {}", e.getMessage(), e);
         }
 
-        try {
-            eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
-        } catch (RuntimeException e) {
-            log.error("Event publish edilemedi. Transfer ID: {}", savedTransfer.getId(), e);
-        }
+        eventPublisher.publishEvent(new TransferCompletedEvent(savedTransfer));
     }
 }

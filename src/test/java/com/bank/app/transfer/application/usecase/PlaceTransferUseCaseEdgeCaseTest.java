@@ -150,7 +150,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
         }
 
         @Test
-        void shouldStillSaveTransferWhenEventPublishFails() {
+        void shouldRollbackWhenEventPublishFails() {
                 TransferRequest request = validRequest();
                 mockActiveAccounts();
                 mockSaveReturnsId();
@@ -158,9 +158,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 doThrow(new RuntimeException("Event publish failed"))
                                 .when(eventPublisher).publishEvent(any(TransferCompletedEvent.class));
 
-                assertDoesNotThrow(() -> placeTransferUseCase.execute(request));
-                verify(saveTransferPort, times(1)).save(any());
-                verify(auditService, times(1)).log(any(AuditAction.class), anyString());
+                assertThrows(RuntimeException.class, () -> placeTransferUseCase.execute(request));
         }
 
         @Test
