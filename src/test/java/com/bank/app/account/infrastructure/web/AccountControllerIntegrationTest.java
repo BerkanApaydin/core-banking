@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Locale;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -58,6 +59,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
         @BeforeEach
         void setUp() {
+                LocaleContextHolder.resetLocaleContext();
                 Locale.setDefault(Locale.of("tr", "TR"));
                 UserJpaEntity u = userRepository.save(
                                 new UserJpaEntity(null, "test_user", "pass", "ROLE_USER"));
