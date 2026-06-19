@@ -2,11 +2,11 @@ package com.bank.app.user.application.usecase;
 
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.port.in.RegisterUserPort;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.User;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,12 +17,12 @@ public class RegisterUserUseCase implements RegisterUserPort {
 
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoderPort passwordEncoderPort;
 
-    public RegisterUserUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort, PasswordEncoder passwordEncoder) {
+    public RegisterUserUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort, PasswordEncoderPort passwordEncoderPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordEncoderPort = passwordEncoderPort;
     }
 
     public void execute(AuthRequest request) {
@@ -35,7 +35,7 @@ public class RegisterUserUseCase implements RegisterUserPort {
             throw new IllegalArgumentException(String.join("; ", policyErrors));
         }
 
-        String encodedPassword = passwordEncoder.encode(request.password());
+        String encodedPassword = passwordEncoderPort.encode(request.password());
         User user = User.create(request.username(), encodedPassword);
         saveUserPort.save(user);
     }

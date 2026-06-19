@@ -23,14 +23,14 @@ import java.util.stream.Stream;
 public class GetTransferHistoryUseCase implements GetTransferHistoryPort {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountOperationPort AccountOperationPort;
+    private final AccountOperationPort accountOperationPort;
     private final SecurityContextPort securityContextPort;
 
     public GetTransferHistoryUseCase(LoadTransferPort loadTransferPort,
-                                     AccountOperationPort AccountOperationPort,
+                                     AccountOperationPort accountOperationPort,
                                      SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.AccountOperationPort = AccountOperationPort;
+        this.accountOperationPort = accountOperationPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -44,7 +44,7 @@ public class GetTransferHistoryUseCase implements GetTransferHistoryPort {
         int cappedPage = Math.max(page, 0);
         int cappedSize = Math.min(size, 100);
 
-        AccountInfo account = AccountOperationPort.getAccountInfo(accountId);
+        AccountInfo account = accountOperationPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
 
@@ -54,7 +54,7 @@ public class GetTransferHistoryUseCase implements GetTransferHistoryPort {
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap = AccountOperationPort.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap = accountOperationPort.getIbansForAccounts(accountIds);
 
         List<TransferResponse> items = transfers.stream()
                 .map(transfer -> TransferResponse.from(

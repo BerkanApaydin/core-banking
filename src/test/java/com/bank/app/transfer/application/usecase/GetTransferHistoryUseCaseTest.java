@@ -33,14 +33,14 @@ import static org.mockito.Mockito.*;
 class GetTransferHistoryUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort AccountOperationPort;
+    @Mock private AccountOperationPort accountOperationPort;
     private SecurityContextPort securityContextPort;
     private GetTransferHistoryUseCase getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
-        getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, AccountOperationPort,
+        getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationPort,
                 securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
@@ -61,8 +61,8 @@ class GetTransferHistoryUseCaseTest {
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
@@ -91,7 +91,7 @@ class GetTransferHistoryUseCaseTest {
                 Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
         assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", exception.getMessage());
@@ -101,8 +101,8 @@ class GetTransferHistoryUseCaseTest {
     void shouldCapPageSizeAtMaxLimit() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
 
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
@@ -117,8 +117,8 @@ class GetTransferHistoryUseCaseTest {
     void shouldCapNegativePageToZero() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
 
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20))).thenReturn(Collections.emptyList());

@@ -2,6 +2,7 @@ package com.bank.app.user.application.usecase;
 
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -22,13 +22,13 @@ class RegisterUserUseCaseEdgeCaseTest {
 
     @Mock private LoadUserPort loadUserPort;
     @Mock private SaveUserPort saveUserPort;
-    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private PasswordEncoderPort passwordEncoderPort;
 
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
     void setUp() {
-        registerUserUseCase = new RegisterUserUseCase(loadUserPort, saveUserPort, passwordEncoder);
+        registerUserUseCase = new RegisterUserUseCase(loadUserPort, saveUserPort, passwordEncoderPort);
     }
 
     @Test
@@ -47,12 +47,12 @@ class RegisterUserUseCaseEdgeCaseTest {
     void shouldRegisterUserSuccessfullyWhenUsernameDoesNotExist() {
         AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Mypasswor1")).thenReturn("encodedPassword");
+        when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
 
         registerUserUseCase.execute(request);
 
         verify(loadUserPort).findByUsername("newuser");
-        verify(passwordEncoder).encode("Mypasswor1");
+        verify(passwordEncoderPort).encode("Mypasswor1");
         verify(saveUserPort).save(argThat(user ->
                 "newuser".equals(user.getUsername()) &&
                 "encodedPassword".equals(user.getPassword()) &&
@@ -64,7 +64,7 @@ class RegisterUserUseCaseEdgeCaseTest {
     void shouldPropagateSaveException() {
         AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Mypasswor1")).thenReturn("encodedPassword");
+        when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
         doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
 
         assertThrows(RuntimeException.class,
@@ -79,7 +79,7 @@ class RegisterUserUseCaseEdgeCaseTest {
                 () -> registerUserUseCase.execute(request));
         assertTrue(ex.getMessage().contains("en az"));
         verify(loadUserPort).findByUsername("newuser");
-        verifyNoInteractions(passwordEncoder);
+        verifyNoInteractions(passwordEncoderPort);
         verify(saveUserPort, never()).save(any());
     }
 
@@ -87,11 +87,11 @@ class RegisterUserUseCaseEdgeCaseTest {
     void shouldEncodePasswordWithBCrypt() {
         AuthRequest request = new AuthRequest("newuser", "rawPassword123");
         when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
+        when(passwordEncoderPort.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
 
         registerUserUseCase.execute(request);
 
-        verify(passwordEncoder).encode("rawPassword123");
+        verify(passwordEncoderPort).encode("rawPassword123");
         verify(saveUserPort).save(argThat(user ->
                 "$2a$10$encryptedhash".equals(user.getPassword())
         ));

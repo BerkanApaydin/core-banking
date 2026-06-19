@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.domain.Iban;
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.audit.application.port.in.AuditLoggerPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.exception.AccountNotActiveException;
@@ -33,20 +33,20 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
 
     private static final Logger log = LoggerFactory.getLogger(PlaceTransferUseCase.class);
 
-    private final AccountOperationPort AccountOperationPort;
+    private final AccountOperationPort accountOperationPort;
     private final SaveTransferPort saveTransferPort;
-    private final AuditLogger auditLogger;
+    private final AuditLoggerPort auditLoggerPort;
     private final DomainEventPublisherPort eventPublisherPort;
     private final TransferDomainService transferDomainService;
 
-    public PlaceTransferUseCase(AccountOperationPort AccountOperationPort,
+    public PlaceTransferUseCase(AccountOperationPort accountOperationPort,
             SaveTransferPort saveTransferPort,
-            AuditLogger auditLogger,
+            AuditLoggerPort auditLoggerPort,
             DomainEventPublisherPort eventPublisherPort,
             TransferDomainService transferDomainService) {
-        this.AccountOperationPort = AccountOperationPort;
+        this.accountOperationPort = accountOperationPort;
         this.saveTransferPort = saveTransferPort;
-        this.auditLogger = auditLogger;
+        this.auditLoggerPort = auditLoggerPort;
         this.eventPublisherPort = eventPublisherPort;
         this.transferDomainService = transferDomainService;
     }
@@ -66,8 +66,8 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
             throw new SameAccountTransferException(senderIban);
         }
 
-        AccountInfo senderInfo = AccountOperationPort.getAccountInfoForTransfer(senderIban);
-        AccountInfo receiverInfo = AccountOperationPort.getAccountInfoForTransfer(receiverIban);
+        AccountInfo senderInfo = accountOperationPort.getAccountInfoForTransfer(senderIban);
+        AccountInfo receiverInfo = accountOperationPort.getAccountInfoForTransfer(receiverIban);
 
         validateAccountsActive(senderInfo, receiverInfo, senderIban, receiverIban);
 
@@ -76,7 +76,7 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, senderIban,
                 receiverIban, amount);
 
-        AccountOperationPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        accountOperationPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
         transfer.complete();
 
@@ -110,7 +110,7 @@ public class PlaceTransferUseCase implements PlaceTransferPort {
 
     private void logAuditAndPublishEvent(Transfer savedTransfer, String senderIban, String receiverIban) {
         try {
-            auditLogger.log(
+            auditLoggerPort.log(
                     AuditAction.TRANSFER_EXECUTED,
                     String.format(
                             "Para transferi gerçekleştirildi. Transfer ID: %d, Gönderici IBAN: %s, Alıcı IBAN: %s, Tutar: %s %s",

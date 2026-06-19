@@ -19,14 +19,14 @@ import java.util.Objects;
 public class GetTransferDetailUseCase implements GetTransferDetailPort {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountOperationPort AccountOperationPort;
+    private final AccountOperationPort accountOperationPort;
     private final SecurityContextPort securityContextPort;
 
     public GetTransferDetailUseCase(LoadTransferPort loadTransferPort,
-                                     AccountOperationPort AccountOperationPort,
+                                     AccountOperationPort accountOperationPort,
                                      SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.AccountOperationPort = AccountOperationPort;
+        this.accountOperationPort = accountOperationPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -36,8 +36,8 @@ public class GetTransferDetailUseCase implements GetTransferDetailPort {
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo sender = AccountOperationPort.getAccountInfo(transfer.getSenderAccountId());
-        AccountInfo receiver = AccountOperationPort.getAccountInfo(transfer.getReceiverAccountId());
+        AccountInfo sender = accountOperationPort.getAccountInfo(transfer.getSenderAccountId());
+        AccountInfo receiver = accountOperationPort.getAccountInfo(transfer.getReceiverAccountId());
 
         Long currentUserId = securityContextPort.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("Oturum bulunamadı."));

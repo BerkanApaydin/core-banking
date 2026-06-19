@@ -28,13 +28,13 @@ import static org.mockito.Mockito.*;
 class GetTransferDetailUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort AccountOperationPort;
+    @Mock private AccountOperationPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
     private GetTransferDetailUseCase getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
-        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, AccountOperationPort, securityContextPort);
+        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountOperationPort, securityContextPort);
     }
 
     @Test
@@ -56,8 +56,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
 
@@ -91,8 +91,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(200L));
 
@@ -126,8 +126,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
 
@@ -160,7 +160,7 @@ class GetTransferDetailUseCaseTest {
         );
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + senderAccountId, exception.getMessage());
@@ -184,8 +184,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + receiverAccountId, exception.getMessage());
@@ -210,8 +210,8 @@ class GetTransferDetailUseCaseTest {
         AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(AccountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(AccountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 

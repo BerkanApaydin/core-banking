@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 class PlaceTransferUseCaseEdgeCaseTest {
 
         @Mock
-        private AccountOperationPort AccountOperationPort;
+        private AccountOperationPort accountOperationPort;
         @Mock
         private SaveTransferPort saveTransferPort;
         @Mock
@@ -50,7 +50,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
         @BeforeEach
         void setUp() {
-                placeTransferUseCase = new PlaceTransferUseCase(AccountOperationPort, saveTransferPort, auditLogger,
+                placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort, saveTransferPort, auditLogger,
                                 eventPublisherPort, new TransferDomainService());
         }
 
@@ -60,9 +60,9 @@ class PlaceTransferUseCaseEdgeCaseTest {
         }
 
         private void mockActiveAccounts() {
-                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
-                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
         }
 
@@ -81,7 +81,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
                 assertThrows(SameAccountTransferException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verifyNoInteractions(AccountOperationPort);
+                verifyNoInteractions(accountOperationPort);
         }
 
         @Test
@@ -93,33 +93,33 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
                 assertThrows(SameAccountTransferException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verifyNoInteractions(AccountOperationPort);
+                verifyNoInteractions(accountOperationPort);
         }
 
         @Test
         void shouldThrowWhenSenderAccountNotActive() {
                 TransferRequest request = validRequest();
-                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", false));
-                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
 
                 assertThrows(AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+                verify(accountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
         }
 
         @Test
         void shouldThrowWhenReceiverAccountNotActive() {
                 TransferRequest request = validRequest();
-                when(AccountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
-                when(AccountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                when(accountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", false));
 
                 assertThrows(AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
-                verify(AccountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
+                verify(accountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
         }
 
         @Test
@@ -128,7 +128,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockActiveAccounts();
 
                 doThrow(new InsufficientBalanceException("Yetersiz bakiye"))
-                                .when(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                                .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(InsufficientBalanceException.class,
                                 () -> placeTransferUseCase.execute(request));
@@ -141,7 +141,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 mockActiveAccounts();
 
                 doThrow(new ConcurrencyFailureException("Optimistic lock"))
-                                .when(AccountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
+                                .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(ConcurrencyFailureException.class,
                                 () -> placeTransferUseCase.execute(request));

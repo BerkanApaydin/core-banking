@@ -1,5 +1,6 @@
 jwt:
   allow-default-secret: false
+  secret: ${JWT_SECRET}
 
 management:
   endpoint:

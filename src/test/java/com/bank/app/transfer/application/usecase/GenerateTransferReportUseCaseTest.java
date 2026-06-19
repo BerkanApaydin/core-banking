@@ -35,14 +35,14 @@ import static org.mockito.Mockito.*;
 class GenerateTransferReportUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort AccountOperationPort;
+    @Mock private AccountOperationPort accountOperationPort;
     private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
-        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, AccountOperationPort,
+        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountOperationPort,
                 securityContextPort);
 
         // Set default authenticated user context using CustomUserDetails
@@ -64,8 +64,8 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222",
                 3L, "TR290006200000000000000333"));
@@ -98,8 +98,8 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
 
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100))
                 .thenReturn(Collections.emptyList());
@@ -121,7 +121,7 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         // Set up authentication for user ID 999 (not owner of sender account 100)
         CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());

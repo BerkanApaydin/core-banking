@@ -26,14 +26,14 @@ import java.util.stream.Stream;
 public class GenerateTransferReportUseCase implements GenerateTransferReportPort {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountOperationPort AccountOperationPort;
+    private final AccountOperationPort accountOperationPort;
     private final SecurityContextPort securityContextPort;
 
     public GenerateTransferReportUseCase(LoadTransferPort loadTransferPort,
-                                         AccountOperationPort AccountOperationPort,
+                                         AccountOperationPort accountOperationPort,
                                          SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.AccountOperationPort = AccountOperationPort;
+        this.accountOperationPort = accountOperationPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -54,7 +54,7 @@ public class GenerateTransferReportUseCase implements GenerateTransferReportPort
         int size = Math.min(criteria.size(), 100);
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account =         AccountOperationPort.getAccountInfo(accountId);
+        AccountInfo account =         accountOperationPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
 
@@ -71,7 +71,7 @@ public class GenerateTransferReportUseCase implements GenerateTransferReportPort
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap =         AccountOperationPort.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap =         accountOperationPort.getIbansForAccounts(accountIds);
 
         List<TransferResponse> responseList = transfers.stream()
             .map(transfer -> TransferResponse.from(

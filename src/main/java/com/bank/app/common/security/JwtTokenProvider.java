@@ -28,7 +28,7 @@ public class JwtTokenProvider implements JwtPort {
     private final Environment environment;
 
     public JwtTokenProvider(Environment environment,
-                      @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}") String secretKey,
+                      @Value("${jwt.secret}") String secretKey,
                       @Value("${jwt.expiration:86400000}") long jwtExpiration,
                       @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {
         this.environment = environment;
@@ -41,9 +41,9 @@ public class JwtTokenProvider implements JwtPort {
     public void validateSecret() {
         boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
         if (isProd || !allowDefaultSecret) {
-            String defaultSecret = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
-            if (defaultSecret.equals(secretKey)) {
-                throw new IllegalStateException("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.");
+            String devDefault = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+            if (devDefault.equals(secretKey)) {
+                throw new IllegalStateException("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key via the JWT_SECRET environment variable.");
             }
         }
     }

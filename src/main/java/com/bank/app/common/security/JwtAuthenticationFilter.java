@@ -1,5 +1,6 @@
 package com.bank.app.common.security;
 
+import com.bank.app.common.security.port.out.JwtPort;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,11 +23,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtPort jwtPort;
     private final UserDetailsService userDetailsService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserDetailsService userDetailsService) {
-        this.jwtTokenProvider = jwtTokenProvider;
+    public JwtAuthenticationFilter(JwtPort jwtPort, UserDetailsService userDetailsService) {
+        this.jwtPort = jwtPort;
         this.userDetailsService = userDetailsService;
     }
 
@@ -48,12 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         jwt = authHeader.substring(7);
         try {
-            username = jwtTokenProvider.extractUsername(jwt);
+            username = jwtPort.extractUsername(jwt);
             
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
                 
-                if (jwtTokenProvider.isTokenValid(jwt, userDetails)) {
+                if (jwtPort.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

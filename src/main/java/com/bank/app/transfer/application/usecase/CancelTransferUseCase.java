@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.audit.application.port.in.AuditLoggerPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.transfer.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
@@ -24,21 +24,21 @@ public class CancelTransferUseCase implements CancelTransferPort {
 
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
-    private final AccountOperationPort AccountOperationPort;
-    private final AuditLogger auditLogger;
+    private final AccountOperationPort accountOperationPort;
+    private final AuditLoggerPort auditLoggerPort;
     private final SecurityContextPort securityContextPort;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCase(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
-                                 AccountOperationPort AccountOperationPort,
-                                 AuditLogger auditLogger,
+                                 AccountOperationPort accountOperationPort,
+                                 AuditLoggerPort auditLoggerPort,
                                  SecurityContextPort securityContextPort,
                                  @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
-        this.AccountOperationPort = AccountOperationPort;
-        this.auditLogger = auditLogger;
+        this.accountOperationPort = accountOperationPort;
+        this.auditLoggerPort = auditLoggerPort;
         this.securityContextPort = securityContextPort;
         this.cancellationWindowHours = cancellationWindowHours;
     }
@@ -57,16 +57,16 @@ public class CancelTransferUseCase implements CancelTransferPort {
         Long receiverAccountId = transfer.getReceiverAccountId();
 
         // Auth check before domain mutation (fail-fast)
-        Long senderUserId =         AccountOperationPort.getAccountInfo(senderAccountId).userId();
+        Long senderUserId =         accountOperationPort.getAccountInfo(senderAccountId).userId();
         securityContextPort.checkUserAuthorization(senderUserId, "Bu transferi iptal etmeye yetkiniz yok.");
 
         transfer.cancel(cancellationWindowHours);
 
-        AccountOperationPort.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
+        accountOperationPort.reverseBalancesForCancellation(senderAccountId, receiverAccountId, transfer.getAmount());
 
         saveTransferPort.save(transfer);
 
-        auditLogger.log(
+        auditLoggerPort.log(
             AuditAction.TRANSFER_CANCELLED,
             String.format("Transfer iptal edildi. Transfer ID: %d, Gönderici Hesaba Geri Yüklenen: %s %s, Alıcı Hesaptan Düşülen: %s %s",
                 transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency().name(),

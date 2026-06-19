@@ -33,7 +33,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         @Mock
         private SaveTransferPort saveTransferPort;
         @Mock
-        private AccountOperationPort AccountOperationPort;
+        private AccountOperationPort accountOperationPort;
         @Mock
         private AuditLogger auditLogger;
         @Mock
@@ -44,7 +44,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         @BeforeEach
         void setUp() {
                 cancelTransferUseCase = new CancelTransferUseCase(
-                                loadTransferPort, saveTransferPort, AccountOperationPort,
+                                loadTransferPort, saveTransferPort, accountOperationPort,
                                 auditLogger, securityContextPort, 24);
         }
 
@@ -56,7 +56,7 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 () -> cancelTransferUseCase.execute(999L));
                 assertTrue(ex.getMessage().contains("Transfer bulunamad"));
                 assertTrue(ex.getMessage().contains("ID: 999"));
-                verifyNoInteractions(AccountOperationPort);
+                verifyNoInteractions(accountOperationPort);
         }
 
         @Test
@@ -72,7 +72,7 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-                when(AccountOperationPort.getAccountInfo(1L))
+                when(accountOperationPort.getAccountInfo(1L))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
@@ -91,12 +91,12 @@ class CancelTransferUseCaseEdgeCaseTest {
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
-                when(AccountOperationPort.getAccountInfo(1L))
+                when(accountOperationPort.getAccountInfo(1L))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), any());
 
                 doThrow(new RuntimeException("Balance reversal failed"))
-                                .when(AccountOperationPort)
+                                .when(accountOperationPort)
                                 .reverseBalancesForCancellation(eq(1L), eq(2L), any(Money.class));
 
                 assertThrows(RuntimeException.class,

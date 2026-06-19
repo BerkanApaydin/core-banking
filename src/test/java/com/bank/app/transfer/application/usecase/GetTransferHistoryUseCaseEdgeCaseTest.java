@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
 class GetTransferHistoryUseCaseEdgeCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort AccountOperationPort;
+    @Mock private AccountOperationPort accountOperationPort;
 
     private SecurityContextPort securityContextPort;
     private GetTransferHistoryUseCase getTransferHistoryUseCase;
@@ -40,7 +40,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
         getTransferHistoryUseCase = new GetTransferHistoryUseCase(
-                loadTransferPort, AccountOperationPort, securityContextPort);
+                loadTransferPort, accountOperationPort, securityContextPort);
 
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user",
                 "password", Collections.emptyList());
@@ -57,7 +57,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Test
     void shouldReturnEmptyListWhenNoTransfersFound() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
@@ -71,7 +71,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Test
     void shouldReturnEmptyListWithPaginationWhenNoTransfersFound() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(10)))
                 .thenReturn(Collections.emptyList());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
@@ -84,7 +84,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
 
     @Test
     void shouldThrowAccountNotFoundExceptionWhenAccountDoesNotExist() {
-        when(AccountOperationPort.getAccountInfo(1L))
+        when(accountOperationPort.getAccountInfo(1L))
                 .thenThrow(new AccountNotFoundException(1L));
 
         assertThrows(AccountNotFoundException.class,
@@ -95,7 +95,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Test
     void shouldThrowAccessDeniedExceptionWhenUserIsNotOwner() {
         AccountInfo account = new AccountInfo(1L, 200L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> getTransferHistoryUseCase.execute(1L));
@@ -108,7 +108,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         NullPointerException ex = assertThrows(NullPointerException.class,
                 () -> getTransferHistoryUseCase.execute(null));
         assertEquals("Account ID null olamaz", ex.getMessage());
-        verifyNoInteractions(AccountOperationPort);
+        verifyNoInteractions(accountOperationPort);
     }
 
     @Test
@@ -120,10 +120,10 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Test
     void shouldCallFindHistoryWithCorrectPagination() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                 .thenReturn(Collections.emptyList());
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L, 0, 20);
@@ -134,10 +134,10 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Test
     void shouldDefaultToPage0AndSize20() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                 .thenReturn(Collections.emptyList());
-        when(AccountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
         getTransferHistoryUseCase.execute(1L);
@@ -150,7 +150,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         SecurityContextHolder.clearContext();
 
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        when(AccountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
 
         assertThrows(AccessDeniedException.class,
                 () -> getTransferHistoryUseCase.execute(1L));

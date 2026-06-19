@@ -40,7 +40,7 @@ class JwtServiceTest {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
         ReflectionTestUtils.setField(JwtTokenProvider, "allowDefaultSecret", true);
         IllegalStateException ex1 = assertThrows(IllegalStateException.class, () -> JwtTokenProvider.validateSecret());
-        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.", ex1.getMessage());
+        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key via the JWT_SECRET environment variable.", ex1.getMessage());
     }
 
     @Test
@@ -48,7 +48,7 @@ class JwtServiceTest {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
         ReflectionTestUtils.setField(JwtTokenProvider, "allowDefaultSecret", false);
         IllegalStateException ex2 = assertThrows(IllegalStateException.class, () -> JwtTokenProvider.validateSecret());
-        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key.", ex2.getMessage());
+        assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key via the JWT_SECRET environment variable.", ex2.getMessage());
     }
 
     @Test

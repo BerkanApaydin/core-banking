@@ -6,7 +6,7 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.audit.application.AuditLogger;
+import com.bank.app.audit.application.port.in.AuditLoggerPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
@@ -22,13 +22,13 @@ public class CreateAccountUseCase implements CreateAccountPort {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final AuditLogger auditLogger;
+    private final AuditLoggerPort auditLoggerPort;
     private final SecurityContextPort securityContextPort;
 
-    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, AuditLogger auditLogger, SecurityContextPort securityContextPort) {
+    public CreateAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, AuditLoggerPort auditLoggerPort, SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.auditLogger = auditLogger;
+        this.auditLoggerPort = auditLoggerPort;
         this.securityContextPort = securityContextPort;
     }
 
@@ -50,7 +50,7 @@ public class CreateAccountUseCase implements CreateAccountPort {
 
         Account savedAccount = saveAccountPort.save(account);
 
-        auditLogger.log(
+        auditLoggerPort.log(
             AuditAction.ACCOUNT_CREATED,
             String.format("Yeni hesap oluşturuldu. ID: %d, IBAN: %s, Kullanıcı ID: %d, Bakiye: %s %s",
                 savedAccount.getId(), savedAccount.getIban().value(), savedAccount.getUserId(),
