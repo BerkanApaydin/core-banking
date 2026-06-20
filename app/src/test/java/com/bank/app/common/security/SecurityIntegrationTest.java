@@ -94,4 +94,6 @@ class SecurityIntegrationTest extends AbstractSpringBootIntegrationTest {
                 .header("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.invalid"))
                 .andExpect(status().isUnauthorized());
     }
+
+
 }

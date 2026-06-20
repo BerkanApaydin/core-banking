@@ -184,6 +184,28 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    void shouldFailRegistrationWhenPasswordDoesNotMeetPolicy() throws Exception {
+        AuthRequest request = new AuthRequest("weak_user", "short");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
+    @Test
+    void shouldFailLoginWithNonExistentUser() throws Exception {
+        AuthRequest request = new AuthRequest("nonexistent", "SomePassw0rd!");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("AUTHENTICATION_FAILED")));
+    }
+
+    @Test
     void shouldBlockLoginAfterTooManyFailedAttempts() throws Exception {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername("blocked_user");

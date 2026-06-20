@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "app.outbox.use-skip-locked=false"
 })
 @SuppressWarnings("null")
-class OutboxLockRepositoryNonSkipLockedTest extends AbstractIntegrationTest {
+class OutboxLockRepositoryNonSkipLockedIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private OutboxLockRepository repository;

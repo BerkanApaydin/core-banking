@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Import(OutboxLockRepository.class)
 @SuppressWarnings("null")
-class OutboxLockRepositoryTest extends AbstractIntegrationTest {
+class OutboxLockRepositoryBasicIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private OutboxLockRepository repository;

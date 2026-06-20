@@ -8,17 +8,12 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import com.bank.app.common.security.CustomUserDetails;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
@@ -34,25 +29,13 @@ class GetTransferHistoryUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
-    private SecurityContextPort securityContextPort;
+    @Mock private SecurityContextPort securityContextPort;
     private GetTransferHistoryUseCase getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
-        securityContextPort = new SecurityContextAdapter();
         getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationPort,
                 securityContextPort);
-
-        // Set default authenticated user context using CustomUserDetails
-        CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -62,6 +45,7 @@ class GetTransferHistoryUseCaseTest {
                 LocalDateTime.now());
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
@@ -85,13 +69,9 @@ class GetTransferHistoryUseCaseTest {
     void shouldThrowAccessDeniedExceptionWhenUserIsNotOwnerOfAccount() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
 
-        // Set up authentication for user ID 999 (not owner of account 100)
-        CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        doThrow(new AccessDeniedException("Bu hesabın işlem geçmişini görme yetkiniz yok."))
+                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
         assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", exception.getMessage());
@@ -102,6 +82,7 @@ class GetTransferHistoryUseCaseTest {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
@@ -118,6 +99,7 @@ class GetTransferHistoryUseCaseTest {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));

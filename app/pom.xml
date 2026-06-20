@@ -14,10 +14,6 @@
     <name>app</name>
     <description>Spring Boot application bootstrap and configuration</description>
 
-    <properties>
-        <jacoco.check.skip>false</jacoco.check.skip>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>com.bank</groupId>
@@ -128,6 +124,108 @@
                 </configuration>
             </plugin>
 
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>merge</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.parent.basedir}/common/target</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                                <fileSet>
+                                    <directory>${project.parent.basedir}/account-module/target</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                                <fileSet>
+                                    <directory>${project.parent.basedir}/transfer-module/target</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                                <fileSet>
+                                    <directory>${project.parent.basedir}/user-module/target</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                                <fileSet>
+                                    <directory>${project.parent.basedir}/audit-module/target</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${project.build.directory}/merged.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>aggregate-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/merged.exec</dataFile>
+                            <classDirs>
+                                <dir>${project.parent.basedir}/common/target/classes</dir>
+                                <dir>${project.parent.basedir}/account-module/target/classes</dir>
+                                <dir>${project.parent.basedir}/transfer-module/target/classes</dir>
+                                <dir>${project.parent.basedir}/user-module/target/classes</dir>
+                                <dir>${project.parent.basedir}/audit-module/target/classes</dir>
+                                <dir>${project.build.outputDirectory}</dir>
+                            </classDirs>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.line.coverage}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.branch.coverage}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>aggregate-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                        <configuration>
+                            <formats>
+                                <format>XML</format>
+                                <format>HTML</format>
+                            </formats>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.pitest</groupId>
                 <artifactId>pitest-maven</artifactId>

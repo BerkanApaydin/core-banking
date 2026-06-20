@@ -45,7 +45,7 @@ class AuditLoggerTest {
     }
 
     @Test
-    void shouldReturnSystemUserWhenAuthIsNull() {
+    void shouldUseSystemUserWhenNoAuthentication() {
         when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
 
         auditLogger.log(AuditAction.TRANSFER_EXECUTED, "Transfer executed");
@@ -56,45 +56,9 @@ class AuditLoggerTest {
         AuditLog saved = captor.getValue();
         assertEquals("system", saved.getUsername());
         assertEquals(AuditAction.TRANSFER_EXECUTED, saved.getAction());
-    }
+        assertEquals("Transfer executed", saved.getDetails());
 
-    @Test
-    void shouldReturnSystemUserWhenNotAuthenticated() {
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
-
-        auditLogger.log(AuditAction.TRANSFER_CANCELLED, "Transfer cancelled");
-
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(saveAuditLogPort).save(captor.capture());
-
-        AuditLog saved = captor.getValue();
-        assertEquals("system", saved.getUsername());
-    }
-
-    @Test
-    void shouldReturnSystemUserWhenAnonymousToken() {
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
-
-        auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
-
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(saveAuditLogPort).save(captor.capture());
-
-        AuditLog saved = captor.getValue();
-        assertEquals("system", saved.getUsername());
-    }
-
-    @Test
-    void shouldReturnSystemUserWhenAnonymousUsername() {
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
-
-        auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
-
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(saveAuditLogPort).save(captor.capture());
-
-        AuditLog saved = captor.getValue();
-        assertEquals("system", saved.getUsername());
+        verifyNoMoreInteractions(saveAuditLogPort);
     }
 
     @Test

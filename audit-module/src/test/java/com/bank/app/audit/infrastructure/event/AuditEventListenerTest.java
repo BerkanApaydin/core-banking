@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class AuditEventListenerTest {
@@ -40,7 +44,13 @@ class AuditEventListenerTest {
 
         eventListener.onAccountCreated(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), anyString());
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), captor.capture());
+        String message = captor.getValue();
+        assertTrue(message.contains("Yeni hesap oluşturuldu"));
+        assertTrue(message.contains("ID: 1"));
+        assertTrue(message.contains("IBAN: TR123456"));
+        assertTrue(message.contains("Bakiye: 1000.00 TRY"));
     }
 
     @Test
@@ -51,7 +61,12 @@ class AuditEventListenerTest {
 
         eventListener.onTransferCompleted(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_EXECUTED), anyString());
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(auditLogger).log(eq(AuditAction.TRANSFER_EXECUTED), captor.capture());
+        String message = captor.getValue();
+        assertTrue(message.contains("Para transferi gerçekleştirildi"));
+        assertTrue(message.contains("Transfer ID: 1"));
+        assertTrue(message.contains("Tutar: 500.00 TRY"));
     }
 
     @Test
@@ -61,6 +76,11 @@ class AuditEventListenerTest {
 
         eventListener.onTransferCancelled(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), anyString());
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), captor.capture());
+        String message = captor.getValue();
+        assertTrue(message.contains("Transfer iptal edildi"));
+        assertTrue(message.contains("Transfer ID: 1"));
+        assertTrue(message.contains("Geri Yüklenen: 200.00 TRY"));
     }
 }

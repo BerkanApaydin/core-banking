@@ -22,97 +22,96 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
-class JwtServiceTest {
+class JwtTokenProviderTest {
 
     @Mock private Environment environment;
-    private JwtTokenProvider JwtTokenProvider;
+    private JwtTokenProvider jwtTokenProvider;
     private final String defaultSecretKey = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
     @BeforeEach
     void setUp() {
         lenient().when(environment.getActiveProfiles()).thenReturn(new String[]{});
-        JwtTokenProvider = new JwtTokenProvider(environment, defaultSecretKey, 86400000L, true);
+        jwtTokenProvider = new JwtTokenProvider(environment, defaultSecretKey, 86400000L, true);
     }
 
     @Test
     void shouldThrowExceptionWhenDefaultSecretAndProdProfile() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
-        ReflectionTestUtils.setField(JwtTokenProvider, "allowDefaultSecret", true);
-        IllegalStateException ex1 = assertThrows(IllegalStateException.class, () -> JwtTokenProvider.validateSecret());
+        ReflectionTestUtils.setField(jwtTokenProvider, "allowDefaultSecret", true);
+        IllegalStateException ex1 = assertThrows(IllegalStateException.class, () -> jwtTokenProvider.validateSecret());
         assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key via the JWT_SECRET environment variable.", ex1.getMessage());
     }
 
     @Test
     void shouldThrowExceptionWhenDefaultSecretAndAllowDefaultSecretFalse() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
-        ReflectionTestUtils.setField(JwtTokenProvider, "allowDefaultSecret", false);
-        IllegalStateException ex2 = assertThrows(IllegalStateException.class, () -> JwtTokenProvider.validateSecret());
+        ReflectionTestUtils.setField(jwtTokenProvider, "allowDefaultSecret", false);
+        IllegalStateException ex2 = assertThrows(IllegalStateException.class, () -> jwtTokenProvider.validateSecret());
         assertEquals("Default JWT secret is not allowed in production or when allow-default-secret is disabled. Please configure a secure JWT secret key via the JWT_SECRET environment variable.", ex2.getMessage());
     }
 
     @Test
     void shouldNotThrowExceptionWhenDefaultSecretAndAllowDefaultSecretTrueAndNotProd() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
-        ReflectionTestUtils.setField(JwtTokenProvider, "allowDefaultSecret", true);
-        assertDoesNotThrow(() -> JwtTokenProvider.validateSecret());
+        ReflectionTestUtils.setField(jwtTokenProvider, "allowDefaultSecret", true);
+        assertDoesNotThrow(() -> jwtTokenProvider.validateSecret());
     }
 
     @Test
     void shouldNotThrowExceptionWhenCustomSecret() {
-        ReflectionTestUtils.setField(JwtTokenProvider, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
-        assertDoesNotThrow(() -> JwtTokenProvider.validateSecret());
+        ReflectionTestUtils.setField(jwtTokenProvider, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
+        assertDoesNotThrow(() -> jwtTokenProvider.validateSecret());
     }
 
     @Test
     void shouldNotThrowExceptionWhenProdWithNonDefaultSecret() {
         when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
-        ReflectionTestUtils.setField(JwtTokenProvider, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
-        assertDoesNotThrow(() -> JwtTokenProvider.validateSecret());
+        ReflectionTestUtils.setField(jwtTokenProvider, "secretKey", "customSecretKeyWithLongEnoughBytesCustomSecretKeyWithLongEnoughBytes");
+        assertDoesNotThrow(() -> jwtTokenProvider.validateSecret());
     }
 
     @Test
     void shouldGenerateAndExtractUsernameSuccessfully() {
-        String token = JwtTokenProvider.generateToken(100L, "john_doe");
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
         assertNotNull(token);
 
-        String username = JwtTokenProvider.extractUsername(token);
+        String username = jwtTokenProvider.extractUsername(token);
         assertEquals("john_doe", username);
     }
 
     @Test
     void shouldExtractCustomClaimUserIdSuccessfully() {
-        String token = JwtTokenProvider.generateToken(100L, "john_doe");
-        Long userId = JwtTokenProvider.extractClaim(token, claims -> claims.get("userId", Long.class));
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
+        Long userId = jwtTokenProvider.extractClaim(token, claims -> claims.get("userId", Long.class));
 
         assertEquals(100L, userId);
     }
 
     @Test
     void shouldValidateTokenSuccessfully() {
-        String token = JwtTokenProvider.generateToken(100L, "john_doe");
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
 
         UserDetails userDetails = new DummyUserDetails("john_doe");
 
-        assertTrue(JwtTokenProvider.isTokenValid(token, userDetails));
+        assertTrue(jwtTokenProvider.isTokenValid(token, userDetails));
     }
 
     @Test
     void shouldReturnFalseWhenValidatingTokenWithDifferentUsername() {
-        String token = JwtTokenProvider.generateToken(100L, "john_doe");
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
 
         UserDetails userDetails = new DummyUserDetails("jane_doe");
 
-        assertFalse(JwtTokenProvider.isTokenValid(token, userDetails));
+        assertFalse(jwtTokenProvider.isTokenValid(token, userDetails));
     }
 
     @Test
     void shouldThrowExpiredJwtExceptionWhenTokenIsExpired() {
-        // Configure JwtTokenProvider with negative expiration for test
-        ReflectionTestUtils.setField(JwtTokenProvider, "jwtExpiration", -1000L);
+        ReflectionTestUtils.setField(jwtTokenProvider, "jwtExpiration", -1000L);
 
-        String token = JwtTokenProvider.generateToken(100L, "john_doe");
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
 
-        ExpiredJwtException ex = assertThrows(ExpiredJwtException.class, () -> JwtTokenProvider.extractUsername(token));
+        ExpiredJwtException ex = assertThrows(ExpiredJwtException.class, () -> jwtTokenProvider.extractUsername(token));
         assertNotNull(ex.getMessage());
     }
 
@@ -121,18 +120,18 @@ class JwtServiceTest {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("role", "ADMIN");
 
-        String token = JwtTokenProvider.generateToken(extraClaims, 100L, "john_doe");
+        String token = jwtTokenProvider.generateToken(extraClaims, 100L, "john_doe");
         assertNotNull(token);
 
-        String role = JwtTokenProvider.extractClaim(token, claims -> claims.get("role", String.class));
+        String role = jwtTokenProvider.extractClaim(token, claims -> claims.get("role", String.class));
         assertEquals("ADMIN", role);
-        Long userId = JwtTokenProvider.extractClaim(token, claims -> claims.get("userId", Long.class));
+        Long userId = jwtTokenProvider.extractClaim(token, claims -> claims.get("userId", Long.class));
         assertEquals(100L, userId);
     }
 
     @Test
     void shouldReturnFalseWhenTokenIsExpiredButNoExceptionThrown() {
-        JwtTokenProvider spyService = spy(JwtTokenProvider);
+        JwtTokenProvider spyService = spy(jwtTokenProvider);
         DummyUserDetails userDetails = new DummyUserDetails("john_doe");
 
         doReturn("john_doe")

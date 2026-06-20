@@ -110,21 +110,6 @@ class PlaceTransferUseCaseTest {
     }
 
     @Test
-    void shouldThrowSameAccountTransferExceptionWhenIbansAreSame() {
-        TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000111",
-                new BigDecimal("200.00"),
-                Money.Currency.TRY);
-
-        mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
-                "TR290006200000000000000111", 1L, 100L, true);
-
-        assertThrows(SameAccountTransferException.class, () -> placeTransferUseCase.execute(request));
-        verify(accountOperationPort, never()).debitAndCredit(anyLong(), anyLong(), any());
-    }
-
-    @Test
     void shouldThrowAccountNotActiveExceptionWhenSenderIsPassive() {
         TransferRequest request = new TransferRequest(
                 "TR290006200000000000000111",

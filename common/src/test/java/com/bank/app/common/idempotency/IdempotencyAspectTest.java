@@ -51,9 +51,6 @@ class IdempotencyAspectTest {
 
         private IdempotencyAspect aspect;
 
-        @Mock
-        private ParameterizedType parameterizedType;
-
         @BeforeEach
         void setUp() {
                 aspect = new IdempotencyAspect(

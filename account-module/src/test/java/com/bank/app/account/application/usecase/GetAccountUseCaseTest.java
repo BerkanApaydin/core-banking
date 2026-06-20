@@ -6,16 +6,12 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.adapter.SecurityContextAdapter;
-import com.bank.app.common.security.CustomUserDetails;
-import org.junit.jupiter.api.AfterEach;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -32,22 +28,14 @@ class GetAccountUseCaseTest {
     @Mock
     private LoadAccountPort loadAccountPort;
 
+    @Mock
+    private SecurityContextPort securityContextPort;
+
     private GetAccountUseCase getAccountUseCase;
 
     @BeforeEach
     void setUp() {
-        getAccountUseCase = new GetAccountUseCase(loadAccountPort, new SecurityContextAdapter());
-
-        // Set default authenticated user context using CustomUserDetails
-        CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+        getAccountUseCase = new GetAccountUseCase(loadAccountPort, securityContextPort);
     }
 
     @Test
@@ -61,6 +49,7 @@ class GetAccountUseCaseTest {
                 true);
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         AccountResponse response = getAccountUseCase.getById(1L);
 
@@ -95,6 +84,7 @@ class GetAccountUseCaseTest {
                 true);
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         AccountResponse response = getAccountUseCase.getByIban("TR290006200000000000000123");
 
@@ -135,13 +125,9 @@ class GetAccountUseCaseTest {
                 new Money(new BigDecimal("500.00"), Money.Currency.TRY),
                 true);
 
-        // Authenticate with a different user ID (999L)
-        CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
+        doThrow(new AccessDeniedException("Bu hesaba erişim yetkiniz yok."))
+                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> getAccountUseCase.getById(1L));
@@ -159,13 +145,9 @@ class GetAccountUseCaseTest {
                 new Money(new BigDecimal("500.00"), Money.Currency.TRY),
                 true);
 
-        // Authenticate with a different user ID (999L)
-        CustomUserDetails principal = new CustomUserDetails(999L, "other_user", "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
+        doThrow(new AccessDeniedException("Bu hesaba erişim yetkiniz yok."))
+                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
@@ -182,6 +164,7 @@ class GetAccountUseCaseTest {
                 new Money(new BigDecimal("500.00"), Money.Currency.TRY),
                 true);
 
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
         when(loadAccountPort.findByUserId(100L)).thenReturn(Collections.singletonList(account));
 
         List<AccountResponse> results = getAccountUseCase.getAll();
@@ -193,7 +176,7 @@ class GetAccountUseCaseTest {
 
     @Test
     void shouldThrowAccessDeniedExceptionWhenNotLoggedInOnGetAll() {
-        SecurityContextHolder.clearContext();
+        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getAll());
     }

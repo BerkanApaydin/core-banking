@@ -59,5 +59,7 @@ class SecurityConfigTest {
 
         SecurityFilterChain chain = securityConfig.securityFilterChain(http);
         assertNotNull(chain);
+
+        verify(http).build();
     }
 }

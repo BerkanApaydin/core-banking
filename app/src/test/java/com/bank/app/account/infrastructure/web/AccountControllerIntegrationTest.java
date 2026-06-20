@@ -145,15 +145,88 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .andExpect(jsonPath("$.ownerName", is("Fatma Demir")));
         }
 
-        @Test
-        void shouldListAccountsSuccessfully() throws Exception {
-                accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
-                                new BigDecimal("2000.00"), "TRY", true));
+    @Test
+    void shouldListAccountsSuccessfully() throws Exception {
+        accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
+                new BigDecimal("2000.00"), "TRY", true));
 
-                mockMvc.perform(get("/api/v1/accounts")
-                                .header("Authorization", "Bearer " + jwtToken))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[0].iban", is("TR290006200000000000000888")))
-                                .andExpect(jsonPath("$[0].ownerName", is("Fatma Demir")));
-        }
+        mockMvc.perform(get("/api/v1/accounts")
+                .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].iban", is("TR290006200000000000000888")))
+                .andExpect(jsonPath("$[0].ownerName", is("Fatma Demir")));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenAccountByIbanNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000099999")
+                .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND")));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenCreatingAccountWithNegativeBalance() throws Exception {
+        CreateAccountRequest request = new CreateAccountRequest(
+                testUserId,
+                "TR290006200000000000000777",
+                "Veli",
+                new BigDecimal("-100.00"),
+                Money.Currency.TRY);
+
+        mockMvc.perform(post("/api/v1/accounts")
+                .header("Authorization", "Bearer " + jwtToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.initialBalance").exists());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenAccessingOtherUsersAccount() throws Exception {
+        UserJpaEntity otherUser = userRepository.save(
+                new UserJpaEntity(null, "other_user", "pass", "ROLE_USER"));
+        AccountJpaEntity otherAccount = accountRepo.save(
+                new AccountJpaEntity(null, otherUser.getId(), "TR290006200000000000000555",
+                        "Other Owner", new BigDecimal("500.00"), "TRY", true));
+
+        mockMvc.perform(get("/api/v1/accounts/" + otherAccount.getId())
+                .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")));
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenAccessingOtherUsersAccountByIban() throws Exception {
+        UserJpaEntity otherUser = userRepository.save(
+                new UserJpaEntity(null, "other_user2", "pass", "ROLE_USER"));
+        accountRepo.save(
+                new AccountJpaEntity(null, otherUser.getId(), "TR290006200000000000000666",
+                        "Other Owner", new BigDecimal("500.00"), "TRY", true));
+
+        mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000666")
+                .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")));
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenCreatingAccountForOtherUser() throws Exception {
+        UserJpaEntity otherUser = userRepository.save(
+                new UserJpaEntity(null, "other_user3", "pass", "ROLE_USER"));
+
+        CreateAccountRequest request = new CreateAccountRequest(
+                otherUser.getId(),
+                "TR290006200000000000000444",
+                "Victim",
+                new BigDecimal("100.00"),
+                Money.Currency.TRY);
+
+        mockMvc.perform(post("/api/v1/accounts")
+                .header("Authorization", "Bearer " + jwtToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")));
+    }
 }

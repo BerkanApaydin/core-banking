@@ -1,23 +1,18 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.common.adapter.SecurityContextAdapter;
-import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,26 +27,14 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
+    @Mock private SecurityContextPort securityContextPort;
 
-    private SecurityContextPort securityContextPort;
     private GenerateTransferReportUseCase generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
-        securityContextPort = new SecurityContextAdapter();
         generateTransferReportUseCase = new GenerateTransferReportUseCase(
                 loadTransferPort, accountOperationPort, securityContextPort);
-
-        CustomUserDetails principal = new CustomUserDetails(100L, "test_user",
-                "password", Collections.emptyList());
-        UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -114,12 +97,13 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
     }
 
     @Test
-    void shouldThrowWhenStartDateEqualsEndDate() {
+    void shouldReturnEmptyReportWhenStartDateEqualsEndDate() {
         LocalDateTime now = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, now, now);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -143,13 +127,15 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Test
     void shouldAllowExactly12MonthsRange() {
-        LocalDateTime start = LocalDateTime.now().minusMonths(12);
-        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusMonths(12);
+        LocalDateTime end = now;
 
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -165,6 +151,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -187,6 +174,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -204,6 +192,9 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         AccountInfo info = new AccountInfo(1L, 200L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
+        doThrow(new AccessDeniedException("Bu hesabın raporunu oluşturma yetkiniz yok."))
+                .when(securityContextPort).checkUserAuthorization(eq(200L), anyString());
+
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
         assertEquals("Bu hesabın raporunu oluşturma yetkiniz yok.", ex.getMessage());
@@ -211,14 +202,15 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Test
     void shouldThrowAccessDeniedExceptionWhenNotLoggedIn() {
-        SecurityContextHolder.clearContext();
-
         LocalDateTime start = LocalDateTime.now().minusDays(5);
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+
+        doThrow(new AccessDeniedException("Bu işlem için giriş yapmalısınız."))
+                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
         assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -232,6 +224,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
+        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());

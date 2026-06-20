@@ -10,24 +10,19 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.adapter.SecurityContextAdapter;
-import com.bank.app.common.security.CustomUserDetails;
-import org.junit.jupiter.api.AfterEach;
+import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,25 +34,15 @@ class CreateAccountUseCaseTest {
         private SaveAccountPort saveAccountPort;
         @Mock
         private EventPublisherPort eventPublisherPort;
+        @Mock
+        private SecurityContextPort securityContextPort;
 
         private CreateAccountUseCase createAccountUseCase;
 
         @BeforeEach
         void setUp() {
                 createAccountUseCase = new CreateAccountUseCase(loadAccountPort, saveAccountPort, eventPublisherPort,
-                                new SecurityContextAdapter());
-
-                // Set default authenticated user context using CustomUserDetails
-                CustomUserDetails principal = new CustomUserDetails(100L, "test_user", "password",
-                                Collections.emptyList());
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal,
-                                null, Collections.emptyList());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-        }
-
-        @AfterEach
-        void tearDown() {
-                SecurityContextHolder.clearContext();
+                                securityContextPort);
         }
 
         @Test
@@ -78,6 +63,7 @@ class CreateAccountUseCaseTest {
                                 new Money(new BigDecimal("500.00"), Money.Currency.TRY),
                                 true);
 
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
                 when(loadAccountPort.findByIban(iban))
                                 .thenReturn(Optional.empty());
                 when(saveAccountPort.save(any(Account.class)))
@@ -100,18 +86,14 @@ class CreateAccountUseCaseTest {
         @Test
         void shouldThrowAccessDeniedExceptionWhenCreatingAccountForAnotherUser() {
                 CreateAccountRequest request = new CreateAccountRequest(
-                                200L, // ID is 200
+                                200L,
                                 "TR290006200000000000000123",
                                 "Ali Veli",
                                 new BigDecimal("500.00"),
                                 Money.Currency.TRY);
 
-                // Authenticated as user ID 100 using CustomUserDetails
-                CustomUserDetails principal = new CustomUserDetails(100L, "ali_user", "password",
-                                Collections.emptyList());
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal,
-                                null, Collections.emptyList());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                doThrow(new AccessDeniedException("Başka bir kullanıcı adına hesap oluşturamazsınız."))
+                        .when(securityContextPort).checkUserAuthorization(eq(200L), anyString());
 
                 AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                                 () -> createAccountUseCase.execute(request));
@@ -137,6 +119,7 @@ class CreateAccountUseCaseTest {
                                 new Money(new BigDecimal("100.00"), Money.Currency.TRY),
                                 true);
 
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
                 when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(existingAccount));
 
                 DuplicateIbanException exception = assertThrows(DuplicateIbanException.class, () -> {
@@ -158,6 +141,7 @@ class CreateAccountUseCaseTest {
                                 null);
 
                 Iban iban = new Iban(request.iban());
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
                 when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
 
                 NullPointerException ex = assertThrows(NullPointerException.class, () -> {
@@ -184,8 +168,8 @@ class CreateAccountUseCaseTest {
                                 new BigDecimal("500.00"),
                                 Money.Currency.TRY);
 
-                // Clear security context to simulate no logged in user
-                SecurityContextHolder.clearContext();
+                doThrow(new AccessDeniedException("Oturum bulunamadı."))
+                        .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
                 AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                                 () -> createAccountUseCase.execute(request));
