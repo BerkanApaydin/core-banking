@@ -3,10 +3,10 @@ package com.bank.app.account.infrastructure.web;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.account.ModuleIntegrationTestConfig;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.JwtTokenProvider;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
+@SpringBootTest(classes = {com.bank.app.account.TestApplication.class, ModuleIntegrationTestConfig.class})
 @SuppressWarnings("null")
 class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -42,9 +44,6 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
         @Autowired
         private UserRepository userRepository;
-
-        @Autowired
-        private TransferJpaRepository transferRepo;
 
         @Autowired
         private ObjectMapper objectMapper;

@@ -1,9 +1,8 @@
 package com.bank.app.user.infrastructure.web;
 
-import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
+import com.bank.app.user.ModuleIntegrationTestConfig;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
+@SpringBootTest(classes = {com.bank.app.user.TestApplication.class, ModuleIntegrationTestConfig.class})
 @SuppressWarnings("null")
 class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -33,12 +34,6 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private AccountJpaRepository accountRepo;
-
-    @Autowired
-    private TransferJpaRepository transferRepo;
 
     @Autowired
     private PasswordEncoder passwordEncoder;

@@ -8,8 +8,8 @@ import java.util.Objects;
 public class TransferDomainService {
 
     public Transfer execute(Long senderId, String senderIban, Money.Currency senderCurrency,
-                            Long receiverId, String receiverIban, Money.Currency receiverCurrency,
-                            Money amount) {
+            Long receiverId, String receiverIban, Money.Currency receiverCurrency,
+            Money amount) {
         Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
         Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
         Objects.requireNonNull(senderIban, "Gönderici IBAN null olamaz");
@@ -24,16 +24,14 @@ public class TransferDomainService {
 
         if (senderCurrency != amount.currency()) {
             throw new CurrencyMismatchException(
-                "Gönderici hesap para birimi (" + senderCurrency +
-                ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor."
-            );
+                    "Gönderici hesap para birimi (" + senderCurrency +
+                            ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor.");
         }
 
         if (receiverCurrency != amount.currency()) {
             throw new CurrencyMismatchException(
-                "Alıcı hesap para birimi (" + receiverCurrency +
-                ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor."
-            );
+                    "Alıcı hesap para birimi (" + receiverCurrency +
+                            ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor.");
         }
 
         return Transfer.create(senderId, receiverId, amount);

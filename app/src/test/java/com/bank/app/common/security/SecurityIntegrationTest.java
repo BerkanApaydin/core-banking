@@ -1,5 +1,6 @@
 package com.bank.app.common.security;
 
+import com.bank.app.BankApplication;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -7,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
+@SpringBootTest(classes = BankApplication.class, properties = "spring.main.allow-bean-definition-overriding=true")
 class SecurityIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired

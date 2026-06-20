@@ -1,0 +1,22 @@
+jwt:
+  allow-default-secret: true
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+
+app:
+  security:
+    cors:
+      allowed-origins: http://localhost:3000
+    rate-limit:
+      max-requests: 100
+      time-window-ms: 60000
+  idempotency:
+    expiration-hours: 24
+    cleanup-cron: 0 0 0 * * ?
+  transfer:
+    cancellation-window-hours: 24
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false

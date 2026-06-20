@@ -4,10 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 
 class BankApplicationTest {
+
+    @Test
+    void shouldCreateInstance() {
+        BankApplication app = new BankApplication();
+        assertNotNull(app);
+    }
 
     @Test
     void shouldStartSpringApplication() {

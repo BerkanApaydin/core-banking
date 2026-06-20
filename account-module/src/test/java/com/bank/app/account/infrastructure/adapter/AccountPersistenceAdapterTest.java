@@ -176,4 +176,61 @@ class AccountPersistenceAdapterTest {
         repository.save(null);
         verifyNoInteractions(springDataRepo);
     }
+
+    @Test
+    void shouldReturnEmptyWhenFindByIbanNotFound() {
+        Iban iban = new Iban("TR290006200000000000000999");
+
+        when(springDataRepo.findByIban(iban.value())).thenReturn(Optional.empty());
+
+        Optional<Account> result = repository.findByIban(iban);
+
+        assertFalse(result.isPresent());
+        verify(springDataRepo).findByIban(iban.value());
+    }
+
+    @Test
+    void shouldReturnEmptyWhenFindByIdNotFound() {
+        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+
+        Optional<Account> result = repository.findById(999L);
+
+        assertFalse(result.isPresent());
+        verify(springDataRepo).findById(999L);
+    }
+
+    @Test
+    void shouldReturnEmptyWhenFindByIdWithLockNotFound() {
+        when(springDataRepo.findByIdWithLock(999L)).thenReturn(Optional.empty());
+
+        var result = repository.findByIdWithLock(999L);
+
+        assertFalse(result.isPresent());
+        verify(springDataRepo).findByIdWithLock(999L);
+    }
+
+    @Test
+    void shouldFindByUserIdSuccessfully() {
+        AccountJpaEntity entity1 = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), 100L);
+        AccountJpaEntity entity2 = createEntity(2L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), 100L);
+
+        when(springDataRepo.findByUserId(100L)).thenReturn(List.of(entity1, entity2));
+
+        var result = repository.findByUserId(100L);
+
+        assertEquals(2, result.size());
+        assertEquals("Ahmet", result.get(0).getOwnerName());
+        assertEquals("Mehmet", result.get(1).getOwnerName());
+        verify(springDataRepo).findByUserId(100L);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindByUserIdReturnsEmpty() {
+        when(springDataRepo.findByUserId(999L)).thenReturn(List.of());
+
+        var result = repository.findByUserId(999L);
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findByUserId(999L);
+    }
 }

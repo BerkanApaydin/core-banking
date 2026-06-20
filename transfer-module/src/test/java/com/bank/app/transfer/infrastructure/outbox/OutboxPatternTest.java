@@ -509,4 +509,80 @@ class OutboxPatternTest {
         assertEquals("short message", entity.getLastError());
     }
 
+    @Test
+    void shouldHandleMultipleEvents() {
+        OutboxEventJpaEntity event1 = new OutboxEventJpaEntity(
+                "id-1", "Transfer", "123", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null);
+        OutboxEventJpaEntity event2 = new OutboxEventJpaEntity(
+                "id-2", "Transfer", "456", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null);
+
+        OutboxEventHandler handler1 = mock(OutboxEventHandler.class);
+        when(handler1.supports(anyString())).thenReturn(true);
+
+        OutboxPoller poller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler1));
+        ReflectionTestUtils.setField(poller, "maxRetries", 5);
+
+        when(lockRepository.findAndLockUnprocessed(50, -1))
+                .thenReturn(List.of(event1, event2));
+
+        poller.pollAndProcessEvents();
+
+        verify(outboxRepo, times(2)).save(any(OutboxEventJpaEntity.class));
+    }
+
+    @Test
+    void shouldCreateWithCustomMaxRetries() {
+        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 3, 50, 0);
+
+        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                "id", "Transfer", "123", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null,
+                2, false, null);
+
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+
+        pollerWithCustomRetries.pollAndProcessEvents();
+
+        assertEquals(3, entity.getRetryCount());
+        assertTrue(entity.isDeadLetter());
+    }
+
+    @Test
+    void shouldPollMultiplePartitionsWhenPartitionCountSet() throws Exception {
+        OutboxPoller partitionedPoller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 5, 10, 3);
+
+        String validPayload = "{\"transferId\":123,\"senderAccountId\":1,\"receiverAccountId\":2,\"amount\":100.00,\"currency\":\"TRY\"}";
+        OutboxEventJpaEntity event = new OutboxEventJpaEntity(
+                "id", "Transfer", "123", "TransferCompletedEvent",
+                validPayload, LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(10, 0)).thenReturn(List.of(event));
+        when(lockRepository.findAndLockUnprocessed(10, 1)).thenReturn(List.of());
+        when(lockRepository.findAndLockUnprocessed(10, 2)).thenReturn(List.of());
+
+        partitionedPoller.pollAndProcessEvents();
+
+        assertTrue(event.isProcessed());
+        assertNotNull(event.getProcessedAt());
+        verify(outboxRepo).save(event);
+    }
+
+    @Test
+    void shouldHandleNoHandlersList() {
+        OutboxPoller emptyPoller = new OutboxPoller(lockRepository, outboxRepo, List.of());
+
+        OutboxEventJpaEntity event = new OutboxEventJpaEntity(
+                "id", "Transfer", "123", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, null);
+
+        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(event));
+
+        emptyPoller.pollAndProcessEvents();
+
+        assertNotNull(event.getLastError());
+        assertTrue(event.getLastError().contains("No handler for event type: TransferCompletedEvent"));
+    }
+
 }

@@ -11,6 +11,7 @@ import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
+import com.bank.app.transfer.ModuleIntegrationTestConfig;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.common.security.JwtTokenProvider;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
+@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
 @SuppressWarnings("null")
 class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -131,7 +134,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 TransferRequest request = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
-                                new BigDecimal("2000.00"), // balance is 1000.00
+                                new BigDecimal("2000.00"),
                                 Money.Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
@@ -146,7 +149,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldReturnBadRequestWhenAccountIsPassive() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000333", // passive account
+                                "TR290006200000000000000333",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Money.Currency.TRY);
@@ -162,7 +165,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
         @Test
         void shouldPerformTransferAndCancelSuccessfully() throws Exception {
-                // 1. Perform a successful transfer
                 TransferRequest request = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
@@ -178,18 +180,15 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
 
-                // Check balances in database before cancelling
                 BigDecimal balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
                 BigDecimal balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
                 assertEquals(new BigDecimal("800.00"), balanceSender);
                 assertEquals(new BigDecimal("700.00"), balanceReceiver);
 
-                // 2. Cancel the transfer
                 mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
                                 .header("Authorization", "Bearer " + jwtToken))
                                 .andExpect(status().isNoContent());
 
-                // Check balances in database after cancelling - should be restored
                 balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
                 balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
                 assertEquals(new BigDecimal("1000.00"), balanceSender);
@@ -207,7 +206,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
         @Test
         void shouldReturnBadRequestWhenRequestHasValidationErrors() throws Exception {
-                // Request with empty sender IBAN and negative amount
                 TransferRequest request = new TransferRequest(
                                 "",
                                 "TR290006200000000000000222",
@@ -225,7 +223,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
         @Test
         void shouldGenerateReportSuccessfully() throws Exception {
-                // 1. Perform two transfers
                 TransferRequest req1 = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
@@ -248,13 +245,11 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .content(objectMapper.writeValueAsString(req2)))
                                 .andExpect(status().isCreated());
 
-                // Find the sender account ID
                 Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
 
                 LocalDateTime start = LocalDateTime.now().minusHours(1);
                 LocalDateTime end = LocalDateTime.now().plusHours(1);
 
-                // 2. Query report
                 mockMvc.perform(get("/api/v1/transfers/report")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .param("accountId", accountId.toString())
@@ -280,7 +275,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 new BigDecimal("100.00"),
                                 Money.Currency.TRY);
 
-                // First request with key
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .header("Idempotency-Key", "unique-key-123")
@@ -289,13 +283,12 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.amount", is(100.00)));
 
-                // Second request with same key
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .header("Idempotency-Key", "unique-key-123")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isCreated()) // Cached response preserves original HTTP 201
+                                .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.amount", is(100.00)));
         }
 
@@ -306,7 +299,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 mockMvc.perform(get("/api/v1/transfers/history/" + accountId)
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .param("page", "0")
-                                .param("size", "200")) // size is capped at 100
+                                .param("size", "200"))
                                 .andExpect(status().isOk());
         }
 
@@ -332,7 +325,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 TransferRequest request = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
-                                new BigDecimal("2000.00"), // balance is 1000.00, will fail
+                                new BigDecimal("2000.00"),
                                 Money.Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
@@ -342,8 +335,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest());
 
-                // If it cleaned up successfully, we should be able to run it again (it won't be
-                // pending or completed)
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .header("Idempotency-Key", "fail-key-123")

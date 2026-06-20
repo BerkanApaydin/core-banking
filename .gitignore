@@ -3,6 +3,7 @@
 *.ipr
 *.iws
 *.jar
+!.mvn/wrapper/maven-wrapper.jar
 *.sw?
 *~
 .#*
@@ -20,7 +21,7 @@
 .vscode
 .codegraph
 .idea/
-.mvn/
+
 target/
 /code
 MANIFEST.MF

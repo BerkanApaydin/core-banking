@@ -21,6 +21,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.bank.app.common.adapter.SecurityContextAdapter;
+import com.bank.app.transfer.ModuleIntegrationTestConfig;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -29,7 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
+import org.springframework.boot.test.context.SpringBootTest;
 
+@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
@@ -112,7 +115,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
                 try {
-                    latch.await(); // Wait for all threads to be ready
+                    latch.await();
                     placeTransferPort.execute(request);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
@@ -123,8 +126,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             });
         }
 
-        latch.countDown(); // Trigger all threads
-        finishLatch.await(30, TimeUnit.SECONDS); // Wait for execution
+        latch.countDown();
+        finishLatch.await(30, TimeUnit.SECONDS);
         executorService.shutdown();
 
         assertEquals(threadCount, successCount.get(), "All parallel transfers should complete successfully");
@@ -172,7 +175,6 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         finishLatch.await(30, TimeUnit.SECONDS);
         executorService.shutdown();
 
-        // 4 should succeed (250 * 4 = 1000), 1 should fail (insufficient balance)
         assertEquals(4, successCount.get(), "Exactly 4 transfers should succeed");
         assertEquals(1, failureCount.get(), "Exactly 1 transfer should fail due to insufficient balance");
 

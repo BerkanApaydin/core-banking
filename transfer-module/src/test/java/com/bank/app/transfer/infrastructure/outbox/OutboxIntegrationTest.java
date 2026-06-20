@@ -25,7 +25,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
+import org.springframework.boot.test.context.SpringBootTest;
+import com.bank.app.transfer.ModuleIntegrationTestConfig;
 
+@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
 @Transactional
 @SuppressWarnings("null")
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
@@ -79,10 +82,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                 Money.Currency.TRY
         );
 
-        // 1. Execute transfer
         placeTransferPort.execute(request);
 
-        // 2. Assert outbox event was created in PENDING/unprocessed status
         List<OutboxEventJpaEntity> outboxEvents = outboxRepo.findAll();
         assertEquals(1, outboxEvents.size());
         OutboxEventJpaEntity event = outboxEvents.get(0);
@@ -91,10 +92,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         assertFalse(event.isProcessed());
         assertNull(event.getProcessedAt());
 
-        // 3. Manually run the poller to process the event
         outboxPoller.pollAndProcessEvents();
 
-        // 4. Assert outbox event is now marked as processed
         OutboxEventJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
         assertTrue(processedEvent.isProcessed());
         assertNotNull(processedEvent.getProcessedAt());
