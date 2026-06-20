@@ -552,7 +552,8 @@ async function loadAccountHistory(accountId) {
     if (!selectedAcc) return;
 
     try {
-        const transfers = await fetchApi(`/transfers/history/${accountId}`);
+        const response = await fetchApi(`/transfers/history/${accountId}`);
+        const transfers = response.items || [];
         historyList.innerHTML = '';
 
         if (transfers.length === 0) {

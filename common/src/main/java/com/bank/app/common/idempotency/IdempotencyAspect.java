@@ -8,6 +8,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,6 +22,7 @@ import java.lang.reflect.Type;
 
 @Aspect
 @Component
+@Order(1)  // Transactional proxy'den (Order=Integer.MAX_VALUE) önce çalış
 public class IdempotencyAspect {
 
     private final IdempotencyGuard idempotencyGuard;

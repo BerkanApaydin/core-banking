@@ -37,13 +37,22 @@ public class IdempotencyGuard {
             repo.saveAndFlush(entity);
             return IdempotencyResult.newRequest();
         } catch (Exception ex) {
-            IdempotencyKeyJpaEntity entity = repo.findById(key)
-                    .orElseThrow(() -> new IllegalStateException("Conflict on idempotency key insertion", ex));
-            if ("PENDING".equals(entity.getStatus())) {
-                return IdempotencyResult.pending();
-            } else {
-                return IdempotencyResult.completed(entity.getResponseBody(), entity.getResponseStatus());
+            // Eşzamanlı INSERT → unique constraint ihlali.
+            // ASLA bu bloktan exception fırlatma: @Transactional(REQUIRES_NEW) sınırı içinde
+            // fırlatılan exception, transaction'ı rollback-only yapar ve dışarıda
+            // UnexpectedRollbackException'a dönüşür (→ 500).
+            // Bunun yerine pending() döndür; exception'ı DIŞARDA aspect fırlatsın.
+            Optional<IdempotencyKeyJpaEntity> race = repo.findById(key);
+            if (race.isPresent()) {
+                IdempotencyKeyJpaEntity entity = race.get();
+                if ("PENDING".equals(entity.getStatus())) {
+                    return IdempotencyResult.pending();
+                } else {
+                    return IdempotencyResult.completed(entity.getResponseBody(), entity.getResponseStatus());
+                }
             }
+            // Kayıt bulunamadı (silinmiş olabilir) → yine de pending döndür
+            return IdempotencyResult.pending();
         }
     }
 

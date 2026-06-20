@@ -53,7 +53,11 @@
             <scope>runtime</scope>
         </dependency>
     </dependencies>
-
+ 
+    <properties>
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+ 
     <build>
         <plugins>
             <plugin>
@@ -67,7 +71,7 @@
                             <goal>merge</goal>
                         </goals>
                         <configuration>
-                            <skip>${jacoco.skip}</skip>
+                            <skip>false</skip>
                             <fileSets>
                                 <fileSet>
                                     <directory>${project.basedir}/..</directory>
@@ -86,7 +90,7 @@
                             <goal>report-aggregate</goal>
                         </goals>
                         <configuration>
-                            <skip>${jacoco.skip}</skip>
+                            <skip>false</skip>
                             <dataFile>${project.build.directory}/merged.exec</dataFile>
                             <formats>
                                 <format>XML</format>

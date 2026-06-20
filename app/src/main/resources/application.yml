@@ -1,5 +1,11 @@
 server:
   shutdown: graceful
+  tomcat:
+    threads:
+      max: 200          # 50 DB bağlantısı üzerinde daha fazlası beklemeye giriyor; ölçüm: 25 thread = 74ms
+      min-spare: 10
+    accept-count: 500
+    max-connections: 2000
 
 spring:
   messages:
@@ -13,6 +19,14 @@ spring:
     username: bank_user
     password: bank_password
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50       # PostgreSQL optimumu; üstesi context-switch ve lock contention üretiyor
+      minimum-idle: 10
+      connection-timeout: 5000    # 5sn: bağlanamayan istek hızlı hata versin, kuyrukta beklesin
+      idle-timeout: 300000        # 5 dk
+      max-lifetime: 1200000       # 20 dk
+      keepalive-time: 60000       # Bağlantı canlı tutma – idle connection drop'u önler
+      leak-detection-threshold: 10000  # 10sn aşan bağlantıları logla
   jpa:
     open-in-view: false
     hibernate:

@@ -19,6 +19,9 @@
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
 
+    <!-- Alert Center -->
+    <div id="alert-container" class="alert-container"></div>
+
     <!-- Authentication Container -->
     <div class="auth-container" id="auth-container">
         <div class="auth-card glass-panel">
@@ -74,6 +77,7 @@
                         <label class="form-label">Şifre</label>
                         <input type="password" class="form-control" id="register-password"
                             placeholder="Güçlü bir şifre belirleyin" required>
+                        <small class="form-help">Şifre en az 8 karakter olmalı, en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.</small>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-register-submit">
                         <span>Hesap Oluştur ve Kaydol</span>
@@ -137,9 +141,6 @@
 
         <!-- Dynamic Content Area -->
         <main class="app-main">
-            <!-- Alert Center -->
-            <div id="alert-container" class="alert-container"></div>
-
             <!-- SECTION 1: ACCOUNTS -->
             <section id="accounts-section" class="tab-content active">
                 <div class="section-header">
