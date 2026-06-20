@@ -21,7 +21,7 @@
 .vscode
 .codegraph
 .idea/
-
+.mvn/
 target/
 /code
 MANIFEST.MF

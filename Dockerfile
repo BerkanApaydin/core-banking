@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
-COPY pom.xml mvnw ./
-COPY .mvn .mvn
+COPY pom.xml ./
+
 RUN --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -B
 COPY src src
 RUN --mount=type=cache,target=/root/.m2 ./mvnw package -DskipTests -B
