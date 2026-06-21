@@ -171,9 +171,8 @@ class AccountPersistenceAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("null")
     void shouldNotSaveWhenAccountIsNull() {
-        repository.save(null);
+        assertThrows(IllegalArgumentException.class, () -> repository.save(null));
         verifyNoInteractions(springDataRepo);
     }
 

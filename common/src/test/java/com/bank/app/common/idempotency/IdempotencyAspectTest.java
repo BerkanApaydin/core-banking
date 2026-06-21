@@ -266,7 +266,7 @@ class IdempotencyAspectTest {
         }
 
         @Test
-        void shouldFailWhenBodyNull() throws Throwable {
+        void shouldCompleteWhenBodyNull() throws Throwable {
 
                 mockRequest("abc");
 
@@ -286,7 +286,7 @@ class IdempotencyAspectTest {
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyGuard)
-                                .failRequest("user_abc");
+                                .completeRequest("user_abc", "", 200);
                 assertNotNull(result);
                 assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
         }
@@ -318,7 +318,7 @@ class IdempotencyAspectTest {
         }
 
         @Test
-        void shouldFailWhenReturnTypeNotResponseEntity() throws Throwable {
+        void shouldCompleteWhenReturnTypeNotResponseEntity() throws Throwable {
 
                 mockRequest("abc");
 
@@ -335,10 +335,13 @@ class IdempotencyAspectTest {
                 when(joinPoint.proceed())
                                 .thenReturn("OK");
 
+                when(objectMapper.writeValueAsString("OK"))
+                                .thenReturn("\"OK\"");
+
                 Object result = aspect.handleIdempotency(joinPoint, annotation());
 
                 verify(idempotencyGuard)
-                                .failRequest("user_abc");
+                                .completeRequest("user_abc", "\"OK\"", 200);
                 assertEquals("OK", result);
         }
 
@@ -479,27 +482,26 @@ class IdempotencyAspectTest {
                 when(securityContextPort.getCurrentUsername())
                                 .thenReturn(Optional.of("user"));
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
-
                 when(idempotencyGuard.startRequest("user_abc"))
                                 .thenReturn(
                                                 IdempotencyGuard.IdempotencyResult.completed(
-                                                                "{}",
-                                                                200));
+                                                                 "{}",
+                                                                 200));
 
                 ParameterizedType mockedType = mock(ParameterizedType.class);
 
                 when(mockedType.getActualTypeArguments())
                                 .thenReturn(new Type[0]);
 
-                when(methodSignature.getMethod())
-                                .thenReturn(mock(Method.class));
+                Method mockedMethod = mock(Method.class);
 
-                Method mockedMethod = methodSignature.getMethod();
+                when(mockedMethod.getReturnType()).thenReturn((Class) ResponseEntity.class);
 
                 when(mockedMethod.getGenericReturnType())
                                 .thenReturn(mockedType);
+
+                when(joinPoint.getSignature()).thenReturn(methodSignature);
+                when(methodSignature.getMethod()).thenReturn(mockedMethod);
 
                 when(objectMapper.readValue(anyString(), eq(Object.class)))
                                 .thenReturn(new Object());

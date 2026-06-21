@@ -8,15 +8,11 @@ import com.bank.app.account.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountPort;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Service
-@Transactional(readOnly = true)
 public class GetAccountUseCase implements GetAccountPort {
 
     private final LoadAccountPort loadAccountPort;

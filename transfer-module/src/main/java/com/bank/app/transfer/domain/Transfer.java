@@ -80,7 +80,7 @@ public class Transfer {
                 "Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: " + this.status
             );
         }
-        if (this.createdAt.plusHours(cancellationWindowHours).isBefore(LocalDateTime.now())) {
+        if (this.createdAt.plusHours(cancellationWindowHours).plusSeconds(5).isBefore(LocalDateTime.now())) {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
                 new Object[]{this.createdAt, cancellationWindowHours},

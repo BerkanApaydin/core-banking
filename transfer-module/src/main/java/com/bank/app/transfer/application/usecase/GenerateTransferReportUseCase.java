@@ -9,8 +9,6 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportPort;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,8 +19,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Service
-@Transactional(readOnly = true)
 public class GenerateTransferReportUseCase implements GenerateTransferReportPort {
 
     private final LoadTransferPort loadTransferPort;

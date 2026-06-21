@@ -7,9 +7,8 @@ import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.in.LoginUserPort;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.domain.User;
-import org.springframework.stereotype.Service;
+import com.bank.app.user.exception.UserNotFoundException;
 
-@Service
 public class LoginUserUseCase implements LoginUserPort {
 
     private final AuthenticationPort authenticationPort;
@@ -22,13 +21,14 @@ public class LoginUserUseCase implements LoginUserPort {
         this.loadUserPort = loadUserPort;
     }
 
+    @Override
     public AuthResponse execute(AuthRequest request) {
         authenticationPort.authenticate(request.username(), request.password());
 
         User user = loadUserPort.findByUsername(request.username())
-                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new UserNotFoundException("Kullanıcı bulunamadı"));
 
-        String token = jwtPort.generateToken(user.getId(), user.getUsername());
+        String token = jwtPort.generateToken(user.getId(), user.getUsername(), user.getRole());
         return new AuthResponse(token, user.getId(), user.getUsername());
     }
 }

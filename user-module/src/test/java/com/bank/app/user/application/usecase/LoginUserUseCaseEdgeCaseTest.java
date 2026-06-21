@@ -14,6 +14,7 @@ import org.springframework.core.env.Environment;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import org.springframework.security.authentication.BadCredentialsException;
 import java.util.Optional;
+import com.bank.app.user.exception.UserNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -58,7 +59,7 @@ class LoginUserUseCaseEdgeCaseTest {
         doNothing().when(authenticationPort).authenticate(anyString(), anyString());
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.empty());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
                 () -> loginUserUseCase.execute(request));
         assertEquals("Kullanıcı bulunamadı", ex.getMessage());
     }

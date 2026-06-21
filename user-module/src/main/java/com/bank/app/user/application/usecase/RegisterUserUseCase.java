@@ -8,11 +8,7 @@ import com.bank.app.user.application.port.in.RegisterUserPort;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.User;
 import java.util.List;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-@Service
-@Transactional
 public class RegisterUserUseCase implements RegisterUserPort {
 
     private final LoadUserPort loadUserPort;
@@ -25,6 +21,7 @@ public class RegisterUserUseCase implements RegisterUserPort {
         this.passwordEncoderPort = passwordEncoderPort;
     }
 
+    @Override
     public void execute(AuthRequest request) {
         if (loadUserPort.findByUsername(request.username()).isPresent()) {
             throw new IllegalArgumentException("Kullanıcı adı zaten kullanımda.");

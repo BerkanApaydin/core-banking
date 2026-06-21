@@ -90,7 +90,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     public Account save(Account account) {
         AccountJpaEntity entity = mapper.toJpaEntity(account);
         if (entity == null) {
-            return null;
+            throw new IllegalArgumentException("Account entity dönüşümü başarısız oldu");
         }
         return mapper.toDomain(springDataRepo.save(entity));
     }

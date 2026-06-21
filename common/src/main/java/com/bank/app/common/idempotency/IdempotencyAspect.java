@@ -61,20 +61,38 @@ public class IdempotencyAspect {
         Method method = signature.getMethod();
         Type returnType = method.getGenericReturnType();
 
+        boolean isResponseEntity = method.getReturnType() != null && ResponseEntity.class.isAssignableFrom(method.getReturnType());
         Class<?> responseBodyClass = Object.class;
-        if (returnType instanceof ParameterizedType paramType) {
-            Type[] actualTypeArguments = paramType.getActualTypeArguments();
-            if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class<?> bodyClass) {
-                responseBodyClass = bodyClass;
+        if (isResponseEntity) {
+            if (returnType instanceof ParameterizedType paramType) {
+                Type[] actualTypeArguments = paramType.getActualTypeArguments();
+                if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class<?> bodyClass) {
+                    responseBodyClass = bodyClass;
+                }
             }
+        } else {
+            responseBodyClass = method.getReturnType() != null ? method.getReturnType() : Object.class;
         }
 
         if (result.isCompleted()) {
-            Object cachedResponse = objectMapper.readValue(result.responseBody(), responseBodyClass);
             HttpStatusCode status = result.responseStatus() != null
                     ? HttpStatusCode.valueOf(result.responseStatus())
                     : HttpStatusCode.valueOf(200);
-            return ResponseEntity.status(status).body(cachedResponse);
+            
+            boolean isEmptyBody = result.responseBody() == null || result.responseBody().isBlank() || "null".equals(result.responseBody());
+            
+            if (isResponseEntity) {
+                if (isEmptyBody) {
+                    return ResponseEntity.status(status).build();
+                }
+                Object cachedResponse = objectMapper.readValue(result.responseBody(), responseBodyClass);
+                return ResponseEntity.status(status).body(cachedResponse);
+            } else {
+                if (isEmptyBody) {
+                    return null;
+                }
+                return objectMapper.readValue(result.responseBody(), responseBodyClass);
+            }
         } else if (result.isPending()) {
             throw new ConcurrentRequestException("error.concurrent_request", null,
                     "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
@@ -83,14 +101,19 @@ public class IdempotencyAspect {
         try {
             Object responseObj = joinPoint.proceed();
             if (responseObj instanceof ResponseEntity<?> responseEntity) {
-                if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
-                    String jsonResponse = objectMapper.writeValueAsString(responseEntity.getBody());
+                if (responseEntity.getStatusCode().is2xxSuccessful()) {
+                    String jsonResponse = responseEntity.getBody() != null
+                            ? objectMapper.writeValueAsString(responseEntity.getBody())
+                            : "";
                     idempotencyGuard.completeRequest(key, jsonResponse, responseEntity.getStatusCode().value());
                 } else {
                     idempotencyGuard.failRequest(key);
                 }
             } else {
-                idempotencyGuard.failRequest(key);
+                String jsonResponse = responseObj != null
+                        ? objectMapper.writeValueAsString(responseObj)
+                        : "";
+                idempotencyGuard.completeRequest(key, jsonResponse, 200);
             }
             return responseObj;
         } catch (Throwable ex) {

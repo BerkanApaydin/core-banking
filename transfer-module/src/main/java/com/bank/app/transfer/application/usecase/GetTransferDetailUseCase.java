@@ -9,13 +9,9 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.in.GetTransferDetailPort;
 import com.bank.app.transfer.domain.Transfer;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
-@Service
-@Transactional(readOnly = true)
 public class GetTransferDetailUseCase implements GetTransferDetailPort {
 
     private final LoadTransferPort loadTransferPort;

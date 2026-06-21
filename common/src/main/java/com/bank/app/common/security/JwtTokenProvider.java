@@ -56,8 +56,16 @@ public class JwtTokenProvider implements JwtPort {
         return claimsResolver.apply(claims);
     }
 
+    @Override
     public String generateToken(Long userId, String username) {
-        return generateToken(new HashMap<>(), userId, username);
+        return generateToken(userId, username, "ROLE_USER");
+    }
+
+    @Override
+    public String generateToken(Long userId, String username, String role) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", role);
+        return generateToken(extraClaims, userId, username);
     }
 
     public String generateToken(Map<String, Object> extraClaims, Long userId, String username) {
@@ -71,9 +79,31 @@ public class JwtTokenProvider implements JwtPort {
                 .compact();
     }
 
+    @Override
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
+    }
+
+    @Override
+    public Long extractUserId(String token) {
+        Number userId = extractClaim(token, claims -> claims.get("userId", Number.class));
+        return userId != null ? userId.longValue() : null;
+    }
+
+    @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    @Override
+    public boolean isTokenValid(String token) {
+        try {
+            final String username = extractUsername(token);
+            return username != null && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {
