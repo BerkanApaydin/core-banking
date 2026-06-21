@@ -1,5 +1,6 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
+import com.bank.app.common.outbox.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.Query;

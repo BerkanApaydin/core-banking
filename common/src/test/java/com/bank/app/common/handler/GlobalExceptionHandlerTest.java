@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -37,7 +38,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
+@SuppressWarnings({"null", "unchecked"})
 class GlobalExceptionHandlerTest {
 
         private GlobalExceptionHandler handler;
@@ -60,12 +61,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Account not found TR1");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
                 assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("ACCOUNT_NOT_FOUND", response.getBody().code());
-                assertEquals("Account not found TR1", response.getBody().message());
+                assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
+                assertEquals("Account not found TR1", response.getBody().getProperties().get("message"));
+                assertEquals("Account not found TR1", response.getBody().getDetail());
         }
 
         @Test
@@ -73,18 +75,19 @@ class GlobalExceptionHandlerTest {
                 BusinessException ex = mock(BusinessException.class);
                 when(ex.getMessageKey()).thenReturn("error.account_not_found_iban");
                 when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
-                when(ex.getMessage()).thenReturn("Hesap bulunamad\u0131. IBAN: TR1");
+                when(ex.getMessage()).thenReturn("Hesap bulunamadı. IBAN: TR1");
                 when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
                 when(ex.getHttpStatus()).thenReturn(HttpStatus.NOT_FOUND);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
                 assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("ACCOUNT_NOT_FOUND", response.getBody().code());
-                assertEquals("Hesap bulunamad\u0131. IBAN: TR1", response.getBody().message());
+                assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
+                assertEquals("Hesap bulunamadı. IBAN: TR1", response.getBody().getProperties().get("message"));
+                assertEquals("Hesap bulunamadı. IBAN: TR1", response.getBody().getDetail());
         }
 
         @Test
@@ -97,12 +100,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Insufficient balance");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INSUFFICIENT_BALANCE", response.getBody().code());
-                assertEquals("Insufficient balance", response.getBody().message());
+                assertEquals("INSUFFICIENT_BALANCE", response.getBody().getProperties().get("code"));
+                assertEquals("Insufficient balance", response.getBody().getProperties().get("message"));
+                assertEquals("Insufficient balance", response.getBody().getDetail());
         }
 
         @Test
@@ -111,24 +115,27 @@ class GlobalExceptionHandlerTest {
                 bindingResult.addError(new FieldError("request", "amount", "Amount must be positive"));
                 MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
 
-                ResponseEntity<Map<String, String>> response = handler.handleValidationExceptions(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleValidationExceptions(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("Amount must be positive", response.getBody().get("amount"));
+                assertEquals("VALIDATION_FAILED", response.getBody().getProperties().get("code"));
+                Map<String, String> errors = (Map<String, String>) response.getBody().getProperties().get("errors");
+                assertNotNull(errors);
+                assertEquals("Amount must be positive", errors.get("amount"));
         }
 
         @Test
         void shouldHandleIllegalArgumentException() {
                 IllegalArgumentException ex = new IllegalArgumentException("Invalid argument");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleIllegalArgumentException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleIllegalArgumentException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INVALID_ARGUMENT", response.getBody().code());
-                assertEquals("Invalid argument", response.getBody().message());
+                assertEquals("INVALID_ARGUMENT", response.getBody().getProperties().get("code"));
+                assertEquals("Invalid argument", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -136,13 +143,13 @@ class GlobalExceptionHandlerTest {
                 AuthenticationException ex = new AuthenticationException("Bad credentials") {
                 };
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleAuthenticationException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleAuthenticationException(ex, null);
 
                 assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("AUTHENTICATION_FAILED", response.getBody().code());
-                assertEquals("Bad credentials", response.getBody().message());
+                assertEquals("AUTHENTICATION_FAILED", response.getBody().getProperties().get("code"));
+                assertEquals("Bad credentials", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -153,26 +160,26 @@ class GlobalExceptionHandlerTest {
                 when(ex.getErrorCode()).thenReturn("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
                 when(ex.getHttpStatus()).thenReturn(HttpStatus.TOO_MANY_REQUESTS);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
-                                .thenReturn("\u00c7ok fazla ba\u015far\u0131s\u0131z giri\u015f denemesi");
+                                .thenReturn("Çok fazla başarısız giriş denemesi");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
                 assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().code());
-                assertEquals("\u00c7ok fazla ba\u015far\u0131s\u0131z giri\u015f denemesi", response.getBody().message());
+                assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().getProperties().get("code"));
+                assertEquals("Çok fazla başarısız giriş denemesi", response.getBody().getProperties().get("message"));
         }
 
         @Test
         void shouldHandleAccessDeniedException() {
                 AccessDeniedException ex = new AccessDeniedException("Access denied");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleAccessDeniedException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleAccessDeniedException(ex, null);
 
                 assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("ACCESS_DENIED", response.getBody().code());
-                assertEquals("Access denied", response.getBody().message());
+                assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
+                assertEquals("Access denied", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -181,13 +188,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.optimistic_lock_conflict"), isNull(), any(Locale.class)))
                                 .thenReturn("Optimistic lock conflict");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleOptimisticLockingFailureException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleOptimisticLockingFailureException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("OPTIMISTIC_LOCK_CONFLICT", response.getBody().code());
-                assertEquals("Optimistic lock conflict", response.getBody().message());
+                assertEquals("OPTIMISTIC_LOCK_CONFLICT", response.getBody().getProperties().get("code"));
+                assertEquals("Optimistic lock conflict", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -196,13 +203,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.invalid_format"), isNull(), any(Locale.class)))
                                 .thenReturn("Invalid format");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleHttpMessageNotReadableException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleHttpMessageNotReadableException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INVALID_FORMAT", response.getBody().code());
-                assertEquals("Invalid format", response.getBody().message());
+                assertEquals("INVALID_FORMAT", response.getBody().getProperties().get("code"));
+                assertEquals("Invalid format", response.getBody().getProperties().get("message"));
         }
 
         enum DummyEnum {
@@ -217,29 +224,29 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.invalid_enum_value"), any(), any(Locale.class)))
                                 .thenReturn("Invalid value: VALUE3. Accepted values: [VALUE1, VALUE2]");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleHttpMessageNotReadableException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleHttpMessageNotReadableException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INVALID_ENUM_VALUE", response.getBody().code());
-                assertTrue(response.getBody().message().contains("VALUE3"));
+                assertEquals("INVALID_ENUM_VALUE", response.getBody().getProperties().get("code"));
+                assertTrue(((String) response.getBody().getProperties().get("message")).contains("VALUE3"));
         }
 
         @Test
         void shouldHandleHttpMessageNotReadableExceptionWithNonEnumCause() {
-                InvalidFormatException cause = new InvalidFormatException(null, "Invalid value", "123", Integer.class);
+                InvalidFormatException cause = new InvalidFormatException(null, "Invalid value", "123", java.lang.Integer.class);
                 HttpMessageNotReadableException ex = new HttpMessageNotReadableException("Not readable", cause, null);
                 when(messageSource.getMessage(eq("error.invalid_format"), isNull(), any(Locale.class)))
                                 .thenReturn("Invalid format");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleHttpMessageNotReadableException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleHttpMessageNotReadableException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INVALID_FORMAT", response.getBody().code());
-                assertEquals("Invalid format", response.getBody().message());
+                assertEquals("INVALID_FORMAT", response.getBody().getProperties().get("code"));
+                assertEquals("Invalid format", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -249,13 +256,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.invalid_format"), isNull(), any(Locale.class)))
                                 .thenReturn("Invalid format");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleHttpMessageNotReadableException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleHttpMessageNotReadableException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INVALID_FORMAT", response.getBody().code());
-                assertEquals("Invalid format", response.getBody().message());
+                assertEquals("INVALID_FORMAT", response.getBody().getProperties().get("code"));
+                assertEquals("Invalid format", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -265,12 +272,12 @@ class GlobalExceptionHandlerTest {
                 when(ex.getMessage()).thenReturn(null);
                 when(ex.getErrorCode()).thenReturn("BUSINESS_ERROR");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("BUSINESS_ERROR", response.getBody().code());
-                assertEquals("", response.getBody().message());
+                assertEquals("BUSINESS_ERROR", response.getBody().getProperties().get("code"));
+                assertEquals("", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -279,13 +286,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.db_integrity_violation"), isNull(), any(Locale.class)))
                                 .thenReturn("DB integrity violation");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleDataIntegrityViolationException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleDataIntegrityViolationException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().code());
-                assertEquals("DB integrity violation", response.getBody().message());
+                assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().getProperties().get("code"));
+                assertEquals("DB integrity violation", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -296,13 +303,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.unique_constraint_violation"), isNull(), any(Locale.class)))
                                 .thenReturn("Unique constraint violation");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleDataIntegrityViolationException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleDataIntegrityViolationException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("UNIQUE_CONSTRAINT_VIOLATION", response.getBody().code());
-                assertEquals("Unique constraint violation", response.getBody().message());
+                assertEquals("UNIQUE_CONSTRAINT_VIOLATION", response.getBody().getProperties().get("code"));
+                assertEquals("Unique constraint violation", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -312,26 +319,26 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Concurrent request");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleConcurrentRequestException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleConcurrentRequestException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("CONCURRENT", response.getBody().code());
-                assertEquals("Concurrent request", response.getBody().message());
+                assertEquals("CONCURRENT", response.getBody().getProperties().get("code"));
+                assertEquals("Concurrent request", response.getBody().getProperties().get("message"));
         }
 
         @Test
         void shouldHandleConcurrentRequestExceptionWhenMessageIsEmpty() {
                 ConcurrentRequestException ex = new ConcurrentRequestException("just a message");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleConcurrentRequestException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleConcurrentRequestException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("CONCURRENT_REQUEST", response.getBody().code());
-                assertEquals("just a message", response.getBody().message());
+                assertEquals("CONCURRENT_REQUEST", response.getBody().getProperties().get("code"));
+                assertEquals("just a message", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -341,13 +348,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
                                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleConcurrentRequestException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleConcurrentRequestException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("CONCURRENT", response.getBody().code());
-                assertEquals("fallback message", response.getBody().message());
+                assertEquals("CONCURRENT", response.getBody().getProperties().get("code"));
+                assertEquals("fallback message", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -357,13 +364,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
                                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleConcurrentRequestException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleConcurrentRequestException(ex, null);
 
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("CONCURRENT", response.getBody().code());
-                assertEquals("", response.getBody().message());
+                assertEquals("CONCURRENT", response.getBody().getProperties().get("code"));
+                assertEquals("", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -371,13 +378,13 @@ class GlobalExceptionHandlerTest {
                 HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("PATCH",
                                 List.of("GET", "POST"));
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleMethodNotSupportedException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleMethodNotSupportedException(ex, null);
 
                 assertEquals(HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("METHOD_NOT_ALLOWED", response.getBody().code());
-                assertTrue(response.getBody().message().contains("Request method 'PATCH' is not supported"));
+                assertEquals("METHOD_NOT_ALLOWED", response.getBody().getProperties().get("code"));
+                assertTrue(((String) response.getBody().getProperties().get("message")).contains("Request method 'PATCH' is not supported"));
         }
 
         @Test
@@ -386,12 +393,12 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.general_internal_error"), isNull(), any(Locale.class)))
                                 .thenReturn("Internal error");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleGeneralException(ex);
+                ResponseEntity<ProblemDetail> response = handler.handleGeneralException(ex, null);
 
                 assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("INTERNAL_ERROR", response.getBody().code());
-                assertEquals("Internal error", response.getBody().message());
+                assertEquals("INTERNAL_ERROR", response.getBody().getProperties().get("code"));
+                assertEquals("Internal error", response.getBody().getProperties().get("message"));
         }
 
         @Test
@@ -401,13 +408,13 @@ class GlobalExceptionHandlerTest {
                 when(messageSource.getMessage(eq("error.unsupported_media_type"), any(), any(Locale.class)))
                                 .thenReturn("Unsupported media type: application/xml");
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleMediaTypeNotSupportedException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleMediaTypeNotSupportedException(ex, null);
 
                 assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("UNSUPPORTED_MEDIA_TYPE", response.getBody().code());
-                assertTrue(response.getBody().message().contains("Unsupported media type"));
+                assertEquals("UNSUPPORTED_MEDIA_TYPE", response.getBody().getProperties().get("code"));
+                assertTrue(((String) response.getBody().getProperties().get("message")).contains("Unsupported media type"));
         }
 
         @Test
@@ -415,11 +422,11 @@ class GlobalExceptionHandlerTest {
                 HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("DELETE",
                                 Collections.emptyList());
 
-                ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler
-                                .handleMethodNotSupportedException(ex);
+                ResponseEntity<ProblemDetail> response = handler
+                                .handleMethodNotSupportedException(ex, null);
 
                 assertEquals(HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
                 assertNotNull(response.getBody());
-                assertEquals("METHOD_NOT_ALLOWED", response.getBody().code());
+                assertEquals("METHOD_NOT_ALLOWED", response.getBody().getProperties().get("code"));
         }
 }

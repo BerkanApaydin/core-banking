@@ -5,6 +5,8 @@ import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bank.app.common.outbox.OutboxEventHandler;
+import com.bank.app.common.outbox.OutboxEventJpaEntity;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 

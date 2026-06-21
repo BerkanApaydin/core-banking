@@ -1,8 +1,5 @@
-package com.bank.app.transfer.infrastructure.outbox;
+package com.bank.app.common.outbox;
 
-/**
- * Outbox event tipi işleme stratejisi — yeni event tipleri OCP ile eklenebilir.
- */
 public interface OutboxEventHandler {
 
     boolean supports(String eventType);

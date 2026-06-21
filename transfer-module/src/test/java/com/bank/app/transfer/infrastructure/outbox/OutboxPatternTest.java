@@ -1,5 +1,6 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
+import com.bank.app.common.outbox.*;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;

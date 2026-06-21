@@ -6,7 +6,7 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferPort;
-import com.bank.app.transfer.infrastructure.outbox.OutboxEventJpaRepository;
+import com.bank.app.common.outbox.OutboxEventJpaRepository;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;

@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.outbox;
+package com.bank.app.common.outbox;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;

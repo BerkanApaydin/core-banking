@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.outbox;
+package com.bank.app.common.outbox;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

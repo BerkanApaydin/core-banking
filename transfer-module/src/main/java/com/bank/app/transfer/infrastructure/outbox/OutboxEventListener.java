@@ -1,6 +1,8 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.bank.app.common.outbox.OutboxEventJpaEntity;
+import com.bank.app.common.outbox.OutboxEventJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;

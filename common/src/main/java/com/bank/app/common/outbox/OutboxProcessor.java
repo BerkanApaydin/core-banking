@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.outbox;
+package com.bank.app.common.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

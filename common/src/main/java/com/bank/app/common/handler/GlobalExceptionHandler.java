@@ -1,6 +1,7 @@
 package com.bank.app.common.handler;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -17,6 +18,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.web.context.request.WebRequest;
+
+import java.net.URI;
 import java.util.Arrays;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -54,52 +58,85 @@ public class GlobalExceptionHandler {
         return resolveMessage(messageKey, null);
     }
 
+    private ResponseEntity<ProblemDetail> createProblemResponse(HttpStatus status, String code, String message, WebRequest request) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, message);
+        problemDetail.setTitle(status.getReasonPhrase());
+        if (request != null) {
+            try {
+                String path = request.getDescription(false).replace("uri=", "");
+                problemDetail.setInstance(URI.create(path));
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+        problemDetail.setProperty("code", code);
+        problemDetail.setProperty("message", message);
+        problemDetail.setProperty("timestamp", LocalDateTime.now());
+        return ResponseEntity
+                .status(status)
+                .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problemDetail);
+    }
+
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
+    public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex, WebRequest request) {
         HttpStatus status = ex.getHttpStatus() != null ? ex.getHttpStatus() : HttpStatus.BAD_REQUEST;
         String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
         if (message.isEmpty() || message.equals(ex.getMessageKey())) {
             message = ex.getMessage() != null ? ex.getMessage() : "";
         }
-        ErrorResponse response = ErrorResponse.of(status, ex.getErrorCode(), message);
-        return new ResponseEntity<>(response, status);
+        return createProblemResponse(status, ex.getErrorCode(), message, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ProblemDetail> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-        return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        problemDetail.setTitle("Validation Failed");
+        if (request != null) {
+            try {
+                String path = request.getDescription(false).replace("uri=", "");
+                problemDetail.setInstance(URI.create(path));
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+        problemDetail.setProperty("code", "VALIDATION_FAILED");
+        problemDetail.setProperty("message", "Validation failed");
+        problemDetail.setProperty("timestamp", LocalDateTime.now());
+        problemDetail.setProperty("errors", errors);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problemDetail);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
+        return createProblemResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage(), request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    public ResponseEntity<ProblemDetail> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
+        return createProblemResponse(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.FORBIDDEN, "ACCESS_DENIED", ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+        return createProblemResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<ErrorResponse> handleOptimisticLockingFailureException(OptimisticLockingFailureException ex) {
+    public ResponseEntity<ProblemDetail> handleOptimisticLockingFailureException(OptimisticLockingFailureException ex, WebRequest request) {
         String message = resolveMessage("error.optimistic_lock_conflict");
-        ErrorResponse response = ErrorResponse.of(HttpStatus.CONFLICT, "OPTIMISTIC_LOCK_CONFLICT", message);
-        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+        return createProblemResponse(HttpStatus.CONFLICT, "OPTIMISTIC_LOCK_CONFLICT", message, request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+    public ResponseEntity<ProblemDetail> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex, WebRequest request) {
         String message = resolveMessage("error.invalid_format");
         String code = "INVALID_FORMAT";
         if (ex.getCause() instanceof InvalidFormatException invalidFormatException) {
@@ -110,12 +147,11 @@ public class GlobalExceptionHandler {
                 code = "INVALID_ENUM_VALUE";
             }
         }
-        ErrorResponse response = ErrorResponse.of(HttpStatus.BAD_REQUEST, code, message);
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        return createProblemResponse(HttpStatus.BAD_REQUEST, code, message, request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolationException(DataIntegrityViolationException ex, WebRequest request) {
         String message;
         String code;
         if (ex.getCause() instanceof ConstraintViolationException) {
@@ -125,45 +161,34 @@ public class GlobalExceptionHandler {
             message = resolveMessage("error.db_integrity_violation");
             code = "DB_INTEGRITY_VIOLATION";
         }
-        ErrorResponse response = ErrorResponse.of(HttpStatus.CONFLICT, code, message);
-        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+        return createProblemResponse(HttpStatus.CONFLICT, code, message, request);
     }
 
     @ExceptionHandler(ConcurrentRequestException.class)
-    public ResponseEntity<ErrorResponse> handleConcurrentRequestException(ConcurrentRequestException ex) {
+    public ResponseEntity<ProblemDetail> handleConcurrentRequestException(ConcurrentRequestException ex, WebRequest request) {
         String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
         if (message.isEmpty() || message.equals(ex.getMessageKey())) {
             message = ex.getMessage() != null ? ex.getMessage() : "";
         }
-        ErrorResponse response = ErrorResponse.of(HttpStatus.CONFLICT, ex.getErrorCode(), message);
-        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+        return createProblemResponse(HttpStatus.CONFLICT, ex.getErrorCode(), message, request);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex) {
+    public ResponseEntity<ProblemDetail> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex, WebRequest request) {
         String message = resolveMessage("error.unsupported_media_type",
                 new Object[]{ex.getContentType()});
-        ErrorResponse response = ErrorResponse.of(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", message);
-        return new ResponseEntity<>(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        return createProblemResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", message, request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
-        ErrorResponse response = ErrorResponse.of(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.METHOD_NOT_ALLOWED);
+    public ResponseEntity<ProblemDetail> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex, WebRequest request) {
+        return createProblemResponse(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
+    public ResponseEntity<ProblemDetail> handleGeneralException(Exception ex, WebRequest request) {
         log.error("Beklenmeyen bir hata oluştu: ", ex);
         String message = resolveMessage("error.general_internal_error");
-        ErrorResponse response = ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", message);
-        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    public record ErrorResponse(int status, String code, String message, LocalDateTime timestamp) {
-        public static ErrorResponse of(HttpStatus status, String code, String message) {
-            return new ErrorResponse(status.value(), code, message, LocalDateTime.now());
-        }
+        return createProblemResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", message, request);
     }
 }

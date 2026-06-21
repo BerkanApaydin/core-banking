@@ -1,4 +1,4 @@
-package com.bank.app.transfer.infrastructure.outbox;
+package com.bank.app.common.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +38,12 @@ public class OutboxPoller {
         this.outboxProcessor = new OutboxProcessor(outboxRepo, handlers);
     }
 
-    OutboxPoller(OutboxLockRepository lockRepository,
-                 OutboxEventJpaRepository outboxRepo,
-                 List<OutboxEventHandler> handlers,
-                 @Value("${app.outbox.max-retries:5}") int maxRetries,
-                 @Value("${app.outbox.batch-size:50}") int batchSize,
-                 @Value("${app.outbox.partition-count:0}") int partitionCount) {
+    public OutboxPoller(OutboxLockRepository lockRepository,
+                        OutboxEventJpaRepository outboxRepo,
+                        List<OutboxEventHandler> handlers,
+                        @Value("${app.outbox.max-retries:5}") int maxRetries,
+                        @Value("${app.outbox.batch-size:50}") int batchSize,
+                        @Value("${app.outbox.partition-count:0}") int partitionCount) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
         this.handlers = handlers;
