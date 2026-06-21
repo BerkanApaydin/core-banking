@@ -13,7 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.exception.AuthorizationException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import java.lang.reflect.Type;
@@ -145,7 +145,7 @@ class IdempotencyAspectTest {
                                 .thenReturn(Optional.empty());
 
                 assertThrows(
-                                AccessDeniedException.class,
+                                AuthorizationException.class,
                                 () -> aspect.handleIdempotency(joinPoint, annotation()));
         }
 

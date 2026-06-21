@@ -5,7 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.exception.AuthorizationException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -156,7 +156,7 @@ class SecurityContextAdapterTest {
     @Test
     void shouldThrowWhenNotLoggedIn() {
         SecurityContextHolder.getContext().setAuthentication(null);
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> {
+        AuthorizationException ex = assertThrows(AuthorizationException.class, () -> {
             securityUtils.checkUserAuthorization(42L, "Error message");
         });
         assertEquals("Oturum bulunamadı.", ex.getMessage());
@@ -173,7 +173,7 @@ class SecurityContextAdapterTest {
         when(auth.getPrincipal()).thenReturn(principal);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> {
+        AuthorizationException ex = assertThrows(AuthorizationException.class, () -> {
             securityUtils.checkUserAuthorization(42L, "Forbidden access");
         });
         assertEquals("Forbidden access", ex.getMessage());

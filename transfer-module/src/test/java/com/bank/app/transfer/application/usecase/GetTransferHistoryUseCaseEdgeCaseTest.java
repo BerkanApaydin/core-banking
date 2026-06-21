@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.exception.AuthorizationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -98,7 +98,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         AccountInfo account = new AccountInfo(1L, 200L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+        AuthorizationException ex = assertThrows(AuthorizationException.class,
                 () -> getTransferHistoryUseCase.execute(1L));
         assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", ex.getMessage());
         verifyNoInteractions(loadTransferPort);
@@ -153,7 +153,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
 
-        assertThrows(AccessDeniedException.class,
+        assertThrows(AuthorizationException.class,
                 () -> getTransferHistoryUseCase.execute(1L));
     }
 }

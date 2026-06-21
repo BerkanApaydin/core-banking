@@ -3,7 +3,6 @@
 *.ipr
 *.iws
 *.jar
-!.mvn/wrapper/maven-wrapper.jar
 *.sw?
 *~
 .#*
@@ -21,7 +20,7 @@
 .vscode
 .codegraph
 .idea/
-/.mvn/
+.mvn/
 target/
 /code
 MANIFEST.MF
@@ -61,6 +60,5 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
-# https://maven.apache.org/tools/wrapper/#Usage_with_or_without_Binary_JAR
-.mvn/wrapper/maven-wrapper.jar
 /load_tests/
+run.err

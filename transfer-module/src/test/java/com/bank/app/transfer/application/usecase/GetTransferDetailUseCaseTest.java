@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.exception.AuthorizationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -132,7 +132,7 @@ class GetTransferDetailUseCaseTest {
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
 
-        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Bu transferin detaylarını görme yetkiniz yok.", exception.getMessage());
     }
 
@@ -141,7 +141,7 @@ class GetTransferDetailUseCaseTest {
         Long transferId = 1L;
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.empty());
 
-        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(null == null ? transferId : null));
         assertEquals("Transfer bulunamadı. ID: " + transferId, exception.getMessage());
     }
 
@@ -216,7 +216,7 @@ class GetTransferDetailUseCaseTest {
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
-        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Oturum bulunamadı.", exception.getMessage());
     }
 

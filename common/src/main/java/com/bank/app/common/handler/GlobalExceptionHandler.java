@@ -87,6 +87,9 @@ public class GlobalExceptionHandler {
         if (className.contains("Concurrent") || className.contains("Duplicate")) {
             return HttpStatus.CONFLICT;
         }
+        if (className.contains("TooMany") || className.contains("RateLimit")) {
+            return HttpStatus.TOO_MANY_REQUESTS;
+        }
         return HttpStatus.BAD_REQUEST;
     }
 

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.exception.AuthorizationException;
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -127,10 +127,10 @@ class GetAccountUseCaseTest {
                 true);
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
-        doThrow(new AccessDeniedException("Bu hesaba erişim yetkiniz yok."))
+        doThrow(new AuthorizationException("Bu hesaba erişim yetkiniz yok."))
                 .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+        AuthorizationException ex = assertThrows(AuthorizationException.class,
                 () -> getAccountUseCase.getById(1L));
         assertEquals("Bu hesaba erişim yetkiniz yok.", ex.getMessage());
     }
@@ -147,10 +147,10 @@ class GetAccountUseCaseTest {
                 true);
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
-        doThrow(new AccessDeniedException("Bu hesaba erişim yetkiniz yok."))
+        doThrow(new AuthorizationException("Bu hesaba erişim yetkiniz yok."))
                 .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
 
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+        AuthorizationException ex = assertThrows(AuthorizationException.class,
                 () -> getAccountUseCase.getByIban("TR290006200000000000000123"));
         assertEquals("Bu hesaba erişim yetkiniz yok.", ex.getMessage());
     }
@@ -179,6 +179,6 @@ class GetAccountUseCaseTest {
     void shouldThrowAccessDeniedExceptionWhenNotLoggedInOnGetAll() {
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
-        assertThrows(AccessDeniedException.class, () -> getAccountUseCase.getAll());
+        assertThrows(AuthorizationException.class, () -> getAccountUseCase.getAll());
     }
 }

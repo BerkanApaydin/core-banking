@@ -5,7 +5,6 @@ import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,14 +20,12 @@ public class AuditLogger implements AuditLoggerUseCase {
         this.securityContextPort = securityContextPort;
     }
 
-    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(AuditAction action, String details) {
         String username = getCurrentUsername();
         log(username, action, details);
     }
 
-    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(String username, AuditAction action, String details) {
         AuditLog auditLog = AuditLog.create(username, action, details);
