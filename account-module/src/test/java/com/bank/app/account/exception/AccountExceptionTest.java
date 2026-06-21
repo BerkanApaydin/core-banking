@@ -1,30 +1,11 @@
-package com.bank.app.common.exception;
+package com.bank.app.account.exception;
 
-import com.bank.app.transfer.exception.TransferNotCancellableException;
-import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.account.exception.InvalidCurrencyException;
-import com.bank.app.account.exception.InsufficientBalanceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-class ExceptionClassesTest {
-
-    @Test
-    void shouldCreateTransferNotCancellableExceptionWithMessage() {
-        TransferNotCancellableException ex = new TransferNotCancellableException("message");
-        assertEquals("message", ex.getMessage());
-        assertNull(ex.getMessageKey());
-        assertNull(ex.getArgs());
-    }
-
-    @Test
-    void shouldCreateTransferNotCancellableExceptionWithKeyAndArgs() {
-        TransferNotCancellableException ex = new TransferNotCancellableException("key", new Object[]{"arg"}, "default");
-        assertEquals("default", ex.getMessage());
-        assertEquals("key", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
-    }
+class AccountExceptionTest {
 
     @Test
     void shouldCreateInvalidCurrencyException() {
@@ -41,20 +22,6 @@ class ExceptionClassesTest {
     @Test
     void shouldCreateInsufficientBalanceExceptionWithKeyAndArgs() {
         InsufficientBalanceException ex = new InsufficientBalanceException("key", new Object[]{"arg"}, "default");
-        assertEquals("default", ex.getMessage());
-        assertEquals("key", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
-    }
-
-    @Test
-    void shouldCreateConcurrentRequestExceptionWithMessage() {
-        ConcurrentRequestException ex = new ConcurrentRequestException("concurrent");
-        assertEquals("concurrent", ex.getMessage());
-    }
-
-    @Test
-    void shouldCreateConcurrentRequestExceptionWithKeyAndArgs() {
-        ConcurrentRequestException ex = new ConcurrentRequestException("key", new Object[]{"arg"}, "default");
         assertEquals("default", ex.getMessage());
         assertEquals("key", ex.getMessageKey());
         assertArrayEquals(new Object[]{"arg"}, ex.getArgs());

@@ -43,12 +43,14 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldReturnEmptyListWhenNoUnprocessedEvents() {
         List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertTrue(result.isEmpty());
     }
 
     @Test
+    @Transactional
     void shouldFindAndLockUnprocessedEventsWithSkipLocked() {
         outboxRepo.save(new OutboxEventJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
@@ -60,6 +62,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldExcludeProcessedEvents() {
         outboxRepo.save(new OutboxEventJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
@@ -74,6 +77,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldExcludeDeadLetterEvents() {
         outboxRepo.save(new OutboxEventJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
@@ -89,6 +93,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldOrderByCreatedAtAscending() {
         outboxRepo.save(new OutboxEventJpaEntity(
                 "evt-later", "Transfer", "1", "TransferCompletedEvent",
@@ -104,6 +109,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldRespectLimit() {
         for (int i = 0; i < 5; i++) {
             outboxRepo.save(new OutboxEventJpaEntity(
@@ -177,6 +183,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Transactional
     void shouldReturnRemainingEventsAfterProcessingSome() {
         for (int i = 0; i < 5; i++) {
             outboxRepo.save(new OutboxEventJpaEntity(

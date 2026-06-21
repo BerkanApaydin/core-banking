@@ -1,0 +1,33 @@
+spring:
+  cache:
+    type: none
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+jwt:
+  allow-default-secret: true
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000
+
+app:
+  security:
+    cors:
+      allowed-origins: http://localhost:3000
+    rate-limit:
+      backend: caffeine
+      max-requests: 1000
+      time-window-ms: 1000
+  idempotency:
+    cleanup-cron: "0 0 * * * *"
+    expiration-hours: 24
+  transfer:
+    cancellation-window-hours: 24
+  outbox:
+    use-skip-locked: false
+    max-retries: 5

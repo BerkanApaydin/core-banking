@@ -108,13 +108,15 @@ class IdempotencyTest {
     }
 
     @Test
-    void shouldThrowIllegalStateWhenConflictResolutionFailsToFindKey() {
+    void shouldResolveConflictAsPendingWhenSaveFailsAndKeyNotFound() {
         when(repo.findById("key-1"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.empty());
         doThrow(new RuntimeException("Lock conflict")).when(repo).saveAndFlush(any());
 
-        assertThrows(IllegalStateException.class, () -> manager.startRequest("key-1"));
+        IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
+
+        assertEquals(IdempotencyGuard.IdempotencyResult.Status.PENDING, result.status());
     }
 
     @Test

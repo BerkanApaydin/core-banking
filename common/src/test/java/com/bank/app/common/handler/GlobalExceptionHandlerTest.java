@@ -1,10 +1,7 @@
 package com.bank.app.common.handler;
 
-import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.account.exception.InsufficientBalanceException;
 import com.bank.app.common.exception.BusinessException;
 import com.bank.app.common.exception.ConcurrentRequestException;
-import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +52,11 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void shouldHandleNotFoundExceptions() {
-                BusinessException ex = new AccountNotFoundException("TR1");
+                BusinessException ex = mock(BusinessException.class);
+                when(ex.getMessageKey()).thenReturn("error.account_not_found_iban");
+                when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
+                when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
+                when(ex.getHttpStatus()).thenReturn(HttpStatus.NOT_FOUND);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Account not found TR1");
 
@@ -69,7 +70,12 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void shouldHandleNotFoundExceptionsFallback() {
-                BusinessException ex = new AccountNotFoundException("TR1");
+                BusinessException ex = mock(BusinessException.class);
+                when(ex.getMessageKey()).thenReturn("error.account_not_found_iban");
+                when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
+                when(ex.getMessage()).thenReturn("Hesap bulunamad\u0131. IBAN: TR1");
+                when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
+                when(ex.getHttpStatus()).thenReturn(HttpStatus.NOT_FOUND);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
@@ -78,13 +84,16 @@ class GlobalExceptionHandlerTest {
                 assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
                 assertNotNull(response.getBody());
                 assertEquals("ACCOUNT_NOT_FOUND", response.getBody().code());
-                assertEquals(ex.getMessage(), response.getBody().message());
+                assertEquals("Hesap bulunamad\u0131. IBAN: TR1", response.getBody().message());
         }
 
         @Test
         void shouldHandleBusinessException() {
-                BusinessException ex = new InsufficientBalanceException("error.insufficient_balance",
-                                new Object[] { "TR1", BigDecimal.TEN }, "Insufficient balance");
+                BusinessException ex = mock(BusinessException.class);
+                when(ex.getMessageKey()).thenReturn("error.insufficient_balance");
+                when(ex.getArgs()).thenReturn(new Object[]{"TR1", BigDecimal.TEN});
+                when(ex.getErrorCode()).thenReturn("INSUFFICIENT_BALANCE");
+                when(ex.getHttpStatus()).thenReturn(HttpStatus.BAD_REQUEST);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Insufficient balance");
 
@@ -138,15 +147,20 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void shouldHandleTooManyFailedLoginAttemptsException() {
-                TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException(
-                                "Çok fazla başarısız giriş denemesi");
+                BusinessException ex = mock(BusinessException.class);
+                when(ex.getMessageKey()).thenReturn("error.too_many_failed_login_attempts");
+                when(ex.getArgs()).thenReturn(new Object[]{});
+                when(ex.getErrorCode()).thenReturn("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
+                when(ex.getHttpStatus()).thenReturn(HttpStatus.TOO_MANY_REQUESTS);
+                when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
+                                .thenReturn("\u00c7ok fazla ba\u015far\u0131s\u0131z giri\u015f denemesi");
 
                 ResponseEntity<GlobalExceptionHandler.ErrorResponse> response = handler.handleBusinessException(ex);
 
                 assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
                 assertNotNull(response.getBody());
                 assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().code());
-                assertEquals("Çok fazla başarısız giriş denemesi", response.getBody().message());
+                assertEquals("\u00c7ok fazla ba\u015far\u0131s\u0131z giri\u015f denemesi", response.getBody().message());
         }
 
         @Test

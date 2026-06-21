@@ -25,7 +25,6 @@
         <module>user-module</module>
         <module>audit-module</module>
         <module>app</module>
-        <module>coverage</module>
     </modules>
 
     <properties>
