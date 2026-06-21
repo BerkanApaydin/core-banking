@@ -57,13 +57,12 @@ class GlobalExceptionHandlerTest {
                 when(ex.getMessageKey()).thenReturn("error.account_not_found_iban");
                 when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
                 when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
-                when(ex.getHttpStatus()).thenReturn(HttpStatus.NOT_FOUND);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Account not found TR1");
 
                 ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
-                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
                 assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
                 assertEquals("Account not found TR1", response.getBody().getProperties().get("message"));
@@ -77,13 +76,12 @@ class GlobalExceptionHandlerTest {
                 when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
                 when(ex.getMessage()).thenReturn("Hesap bulunamadı. IBAN: TR1");
                 when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
-                when(ex.getHttpStatus()).thenReturn(HttpStatus.NOT_FOUND);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
                 ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
-                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
                 assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
                 assertEquals("Hesap bulunamadı. IBAN: TR1", response.getBody().getProperties().get("message"));
@@ -96,7 +94,6 @@ class GlobalExceptionHandlerTest {
                 when(ex.getMessageKey()).thenReturn("error.insufficient_balance");
                 when(ex.getArgs()).thenReturn(new Object[]{"TR1", BigDecimal.TEN});
                 when(ex.getErrorCode()).thenReturn("INSUFFICIENT_BALANCE");
-                when(ex.getHttpStatus()).thenReturn(HttpStatus.BAD_REQUEST);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Insufficient balance");
 
@@ -158,13 +155,12 @@ class GlobalExceptionHandlerTest {
                 when(ex.getMessageKey()).thenReturn("error.too_many_failed_login_attempts");
                 when(ex.getArgs()).thenReturn(new Object[]{});
                 when(ex.getErrorCode()).thenReturn("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
-                when(ex.getHttpStatus()).thenReturn(HttpStatus.TOO_MANY_REQUESTS);
                 when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                                 .thenReturn("Çok fazla başarısız giriş denemesi");
 
                 ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
-                assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 assertNotNull(response.getBody());
                 assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().getProperties().get("code"));
                 assertEquals("Çok fazla başarısız giriş denemesi", response.getBody().getProperties().get("message"));

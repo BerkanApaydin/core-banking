@@ -53,7 +53,10 @@ class OutboxPatternTest {
                 new Money(new BigDecimal("100.00"), Money.Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
-        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+        TransferCompletedEvent event = new TransferCompletedEvent(
+                transfer.getId(), transfer.getSenderAccountId(),
+                transfer.getReceiverAccountId(), transfer.getAmount(),
+                transfer.getStatus());
 
         OutboxEventJpaEntity[] savedEventHolder = new OutboxEventJpaEntity[1];
         when(outboxRepo.save(any(OutboxEventJpaEntity.class))).thenAnswer(invocation -> {
@@ -94,9 +97,9 @@ class OutboxPatternTest {
         verify(eventPublisher).publishEvent(eventCaptor.capture());
 
         AsyncTransferCompletedEvent asyncEvent = eventCaptor.getValue();
-        assertEquals(123L, asyncEvent.transfer().getId());
-        assertEquals(1L, asyncEvent.transfer().getSenderAccountId());
-        assertEquals(2L, asyncEvent.transfer().getReceiverAccountId());
+        assertEquals(123L, asyncEvent.transferId());
+        assertEquals(1L, asyncEvent.senderAccountId());
+        assertEquals(2L, asyncEvent.receiverAccountId());
 
         assertTrue(entity.isProcessed());
         assertNotNull(entity.getProcessedAt());
@@ -185,8 +188,8 @@ class OutboxPatternTest {
         verify(eventPublisher).publishEvent(captor.capture());
 
         AsyncTransferCompletedEvent published = captor.getValue();
-        assertEquals(456L, published.transfer().getId());
-        assertEquals(Money.Currency.USD, published.transfer().getAmount().currency());
+        assertEquals(456L, published.transferId());
+        assertEquals(Money.Currency.USD, published.amount().currency());
     }
 
     @Test
@@ -198,7 +201,10 @@ class OutboxPatternTest {
                 new Money(new BigDecimal("100.00"), Money.Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
-        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+        TransferCompletedEvent event = new TransferCompletedEvent(
+                transfer.getId(), transfer.getSenderAccountId(),
+                transfer.getReceiverAccountId(), transfer.getAmount(),
+                transfer.getStatus());
 
         OutboxEventJpaEntity[] savedEventHolder = new OutboxEventJpaEntity[1];
         when(outboxRepo.save(any(OutboxEventJpaEntity.class))).thenAnswer(invocation -> {
@@ -219,7 +225,10 @@ class OutboxPatternTest {
                 new Money(new BigDecimal("100.00"), Money.Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
-        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+        TransferCompletedEvent event = new TransferCompletedEvent(
+                transfer.getId(), transfer.getSenderAccountId(),
+                transfer.getReceiverAccountId(), transfer.getAmount(),
+                transfer.getStatus());
 
         ObjectMapper failingMapper = mock(ObjectMapper.class);
         when(failingMapper.writeValueAsString(any())).thenThrow(new RuntimeException("boom"));

@@ -1,5 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
@@ -32,11 +33,11 @@ class GenerateTransferReportUseCaseTest {
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
-    private GenerateTransferReportUseCase generateTransferReportUseCase;
+    private GenerateTransferReportQuery generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
-        generateTransferReportUseCase = new GenerateTransferReportUseCase(loadTransferPort, accountOperationPort,
+        generateTransferReportUseCase = new GenerateTransferReportUseCaseImpl(loadTransferPort, accountOperationPort,
                 securityContextPort);
     }
 

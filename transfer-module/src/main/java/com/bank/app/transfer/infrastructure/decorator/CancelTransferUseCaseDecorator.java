@@ -2,11 +2,11 @@ package com.bank.app.transfer.infrastructure.decorator;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import com.bank.app.transfer.application.port.in.CancelTransferPort;
+import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
-import com.bank.app.transfer.application.usecase.CancelTransferUseCase;
+import com.bank.app.transfer.application.usecase.CancelTransferUseCaseImpl;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
@@ -16,9 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Transactional
-public class CancelTransferUseCaseDecorator implements CancelTransferPort {
+public class CancelTransferUseCaseDecorator implements CancelTransferUseCase {
 
-    private final CancelTransferUseCase delegate;
+    private final CancelTransferUseCaseImpl delegate;
 
     public CancelTransferUseCaseDecorator(
             LoadTransferPort loadTransferPort,
@@ -27,7 +27,7 @@ public class CancelTransferUseCaseDecorator implements CancelTransferPort {
             EventPublisherPort eventPublisherPort,
             SecurityContextPort securityContextPort,
             @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
-        this.delegate = new CancelTransferUseCase(
+        this.delegate = new CancelTransferUseCaseImpl(
                 loadTransferPort, saveTransferPort, accountOperationPort,
                 eventPublisherPort, securityContextPort, cancellationWindowHours);
     }

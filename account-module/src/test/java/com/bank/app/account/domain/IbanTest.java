@@ -1,6 +1,6 @@
 package com.bank.app.account.domain;
 
-import com.bank.app.account.exception.InvalidIbanException;
+import com.bank.app.account.domain.exception.InvalidIbanException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

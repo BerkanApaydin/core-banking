@@ -1,5 +1,6 @@
 package com.bank.app.common.idempotency;
 
+import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +12,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -52,7 +52,7 @@ public class IdempotencyAspect {
         }
 
         String username = securityContextPort.getCurrentUsername()
-                .orElseThrow(() -> new AccessDeniedException("Giriş yapmalısınız."));
+                .orElseThrow(() -> new AuthorizationException("Giriş yapmalısınız."));
         String key = username + "_" + idempotencyKeyHeader;
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);

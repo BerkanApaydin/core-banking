@@ -1,10 +1,11 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
+import com.bank.app.account.application.port.in.GetAccountQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
-import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,11 +32,11 @@ class GetAccountUseCaseTest {
     @Mock
     private SecurityContextPort securityContextPort;
 
-    private GetAccountUseCase getAccountUseCase;
+    private GetAccountQuery getAccountUseCase;
 
     @BeforeEach
     void setUp() {
-        getAccountUseCase = new GetAccountUseCase(loadAccountPort, securityContextPort);
+        getAccountUseCase = new GetAccountUseCaseImpl(loadAccountPort, securityContextPort);
     }
 
     @Test

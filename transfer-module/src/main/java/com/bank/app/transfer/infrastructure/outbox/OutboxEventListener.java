@@ -29,11 +29,11 @@ public class OutboxEventListener {
     public void handleTransferCompleted(TransferCompletedEvent event) {
         try {
             TransferEventPayload payload = new TransferEventPayload(
-                event.getTransfer().getId(),
-                event.getTransfer().getSenderAccountId(),
-                event.getTransfer().getReceiverAccountId(),
-                event.getTransfer().getAmount().amount(),
-                event.getTransfer().getAmount().currency().name()
+                event.getTransferId(),
+                event.getSenderAccountId(),
+                event.getReceiverAccountId(),
+                event.getAmount().amount(),
+                event.getAmount().currency().name()
             );
             
             String jsonPayload = objectMapper.writeValueAsString(payload);
@@ -41,13 +41,13 @@ public class OutboxEventListener {
             OutboxEventJpaEntity outboxEvent = new OutboxEventJpaEntity();
             outboxEvent.setId(UUID.randomUUID().toString());
             outboxEvent.setAggregateType("Transfer");
-            outboxEvent.setAggregateId(String.valueOf(event.getTransfer().getId()));
+            outboxEvent.setAggregateId(String.valueOf(event.getTransferId()));
             outboxEvent.setEventType("TransferCompletedEvent");
             outboxEvent.setPayload(jsonPayload);
             outboxEvent.setCreatedAt(LocalDateTime.now());
             outboxEvent.setProcessed(false);
             outboxEvent.setPartition(partitionCount > 0
-                    ? Math.floorMod(event.getTransfer().getId(), partitionCount)
+                    ? Math.floorMod(event.getTransferId(), partitionCount)
                     : 0);
             
             outboxRepo.save(outboxEvent);

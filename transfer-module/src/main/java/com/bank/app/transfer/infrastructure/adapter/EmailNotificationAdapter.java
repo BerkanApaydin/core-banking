@@ -1,7 +1,7 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
@@ -16,21 +16,21 @@ public class EmailNotificationAdapter implements SendNotificationPort {
 
     @Override
     @CircuitBreaker(name = "emailNotification", fallbackMethod = "fallbackNotify")
-    public void notifyTransferCompleted(Transfer transfer) {
-        if (transfer == null) {
-            log.warn("Email bildirimi için null transfer alındı, atlanıyor.");
+    public void notifyTransferCompleted(AsyncTransferCompletedEvent event) {
+        if (event == null) {
+            log.warn("Email bildirimi için null event alındı, atlanıyor.");
             return;
         }
         log.info("Email Bildirimi: {} ID'li transfer başarıyla tamamlandı. Tutar: {} {}", 
-                transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency());
+                event.transferId(), event.amount().amount(), event.amount().currency());
     }
 
-    public void fallbackNotify(Transfer transfer, Throwable throwable) {
-        if (transfer == null) {
-            log.warn("Email fallback için null transfer alındı, atlanıyor.");
+    public void fallbackNotify(AsyncTransferCompletedEvent event, Throwable throwable) {
+        if (event == null) {
+            log.warn("Email fallback için null event alındı, atlanıyor.");
             return;
         }
         log.error("Email bildirimi gönderimi başarısız oldu. Hata: {}. Bildirim kuyruğa alındı (Fallback). Transfer ID: {}", 
-                throwable != null ? throwable.getMessage() : "null", transfer.getId());
+                throwable != null ? throwable.getMessage() : "null", event.transferId());
     }
 }

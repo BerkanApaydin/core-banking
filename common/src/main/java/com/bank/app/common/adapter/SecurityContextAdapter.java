@@ -1,9 +1,9 @@
 package com.bank.app.common.adapter;
 
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.stereotype.Component;
@@ -41,9 +41,9 @@ public class SecurityContextAdapter implements SecurityContextPort {
     @Override
     public void checkUserAuthorization(Long resourceUserId, String errorMessage) {
         Long currentUserId = getCurrentUserId()
-                .orElseThrow(() -> new AccessDeniedException("Oturum bulunamadı."));
+                .orElseThrow(() -> new AuthorizationException("Oturum bulunamadı."));
         if (!currentUserId.equals(resourceUserId)) {
-            throw new AccessDeniedException(errorMessage);
+            throw new AuthorizationException(errorMessage);
         }
     }
 }

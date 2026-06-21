@@ -3,8 +3,8 @@ package com.bank.app.user.infrastructure.web;
 import com.bank.app.common.handler.GlobalExceptionHandler;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.port.in.LoginUserPort;
-import com.bank.app.user.application.port.in.RegisterUserPort;
+import com.bank.app.user.application.port.in.LoginUserUseCase;
+import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,10 +33,10 @@ class AuthControllerWebMvcTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private RegisterUserPort registerUserPort;
+    private RegisterUserUseCase registerUserPort;
 
     @MockitoBean
-    private LoginUserPort loginUserPort;
+    private LoginUserUseCase loginUserPort;
 
     @MockitoBean
     private FailedLoginAttemptService failedLoginAttemptService;

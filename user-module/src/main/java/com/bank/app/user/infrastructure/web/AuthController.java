@@ -1,11 +1,11 @@
 package com.bank.app.user.infrastructure.web;
 
-import com.bank.app.user.exception.TooManyFailedLoginAttemptsException;
+import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.port.in.LoginUserPort;
-import com.bank.app.user.application.port.in.RegisterUserPort;
+import com.bank.app.user.application.port.in.LoginUserUseCase;
+import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,11 +23,11 @@ import io.swagger.v3.oas.annotations.Operation;
 @Tag(name = "Auth API", description = "Kullanıcı kayıt ve kimlik doğrulama API'si")
 public class AuthController {
 
-    private final RegisterUserPort registerUserPort;
-    private final LoginUserPort loginUserPort;
+    private final RegisterUserUseCase registerUserPort;
+    private final LoginUserUseCase loginUserPort;
     private final FailedLoginAttemptService failedLoginAttemptService;
 
-    public AuthController(RegisterUserPort registerUserPort, LoginUserPort loginUserPort,
+    public AuthController(RegisterUserUseCase registerUserPort, LoginUserUseCase loginUserPort,
                           FailedLoginAttemptService failedLoginAttemptService) {
         this.registerUserPort = registerUserPort;
         this.loginUserPort = loginUserPort;

@@ -6,11 +6,11 @@ import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import com.bank.app.transfer.application.port.in.CancelTransferPort;
-import com.bank.app.transfer.application.port.in.PlaceTransferPort;
-import com.bank.app.transfer.application.port.in.GetTransferDetailPort;
-import com.bank.app.transfer.application.port.in.GetTransferHistoryPort;
-import com.bank.app.transfer.application.port.in.GenerateTransferReportPort;
+import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
+import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
+import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -34,17 +34,17 @@ import io.swagger.v3.oas.annotations.Operation;
 @Tag(name = "Transfer API", description = "Para transfer işlemlerini yöneten API")
 public class TransferController {
 
-    private final PlaceTransferPort placeTransferPort;
-    private final CancelTransferPort cancelTransferPort;
-    private final GetTransferDetailPort getTransferDetailPort;
-    private final GetTransferHistoryPort getTransferHistoryPort;
-    private final GenerateTransferReportPort generateTransferReportPort;
+    private final PlaceTransferUseCase placeTransferPort;
+    private final CancelTransferUseCase cancelTransferPort;
+    private final GetTransferDetailQuery getTransferDetailPort;
+    private final GetTransferHistoryQuery getTransferHistoryPort;
+    private final GenerateTransferReportQuery generateTransferReportPort;
 
-    public TransferController(PlaceTransferPort placeTransferPort, 
-                              CancelTransferPort cancelTransferPort,
-                              GetTransferDetailPort getTransferDetailPort,
-                              GetTransferHistoryPort getTransferHistoryPort,
-                              GenerateTransferReportPort generateTransferReportPort) {
+    public TransferController(PlaceTransferUseCase placeTransferPort, 
+                              CancelTransferUseCase cancelTransferPort,
+                              GetTransferDetailQuery getTransferDetailPort,
+                              GetTransferHistoryQuery getTransferHistoryPort,
+                              GenerateTransferReportQuery generateTransferReportPort) {
         this.placeTransferPort = placeTransferPort;
         this.cancelTransferPort = cancelTransferPort;
         this.getTransferDetailPort = getTransferDetailPort;
@@ -80,9 +80,7 @@ public class TransferController {
             @PathVariable Long accountId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        int cappedSize = Math.min(size, 100);
-        int cappedPage = Math.max(page, 0);
-        return ResponseEntity.ok(getTransferHistoryPort.execute(accountId, cappedPage, cappedSize));
+        return ResponseEntity.ok(getTransferHistoryPort.execute(accountId, page, size));
     }
 
     @GetMapping("/report")

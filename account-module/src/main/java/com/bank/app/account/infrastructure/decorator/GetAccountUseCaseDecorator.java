@@ -1,9 +1,9 @@
 package com.bank.app.account.infrastructure.decorator;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.application.port.in.GetAccountPort;
+import com.bank.app.account.application.port.in.GetAccountQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
-import com.bank.app.account.application.usecase.GetAccountUseCase;
+import com.bank.app.account.application.usecase.GetAccountUseCaseImpl;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,14 +12,14 @@ import java.util.List;
 
 @Component
 @Transactional(readOnly = true)
-public class GetAccountUseCaseDecorator implements GetAccountPort {
+public class GetAccountUseCaseDecorator implements GetAccountQuery {
 
-    private final GetAccountUseCase delegate;
+    private final GetAccountUseCaseImpl delegate;
 
     public GetAccountUseCaseDecorator(
             LoadAccountPort loadAccountPort,
             SecurityContextPort securityContextPort) {
-        this.delegate = new GetAccountUseCase(loadAccountPort, securityContextPort);
+        this.delegate = new GetAccountUseCaseImpl(loadAccountPort, securityContextPort);
     }
 
     @Override

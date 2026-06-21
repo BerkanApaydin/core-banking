@@ -1,8 +1,8 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.exception.TransferAlreadyCancelledException;
-import com.bank.app.transfer.exception.TransferNotCancellableException;
+import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
+import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;

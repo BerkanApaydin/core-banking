@@ -1,9 +1,10 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
-import com.bank.app.account.exception.AccountNotFoundException;
-import com.bank.app.transfer.exception.TransferNotFoundException;
+import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.transfer.application.exception.TransferNotFoundException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -30,11 +31,11 @@ class GetTransferDetailUseCaseTest {
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
-    private GetTransferDetailUseCase getTransferDetailUseCase;
+    private GetTransferDetailQuery getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
-        getTransferDetailUseCase = new GetTransferDetailUseCase(loadTransferPort, accountOperationPort, securityContextPort);
+        getTransferDetailUseCase = new GetTransferDetailUseCaseImpl(loadTransferPort, accountOperationPort, securityContextPort);
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
-import com.bank.app.account.application.usecase.AccountInternalService;
+import com.bank.app.account.application.port.in.AccountInfo;
+import com.bank.app.account.application.port.in.AccountQueryPort;
+import com.bank.app.account.application.port.in.AccountTransferOperationPort;
 import com.bank.app.common.domain.Money;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,16 +20,18 @@ import static org.mockito.Mockito.*;
 class AccountOperationAdapterTest {
 
     @Mock
-    private AccountInternalService accountInternalService;
+    private AccountQueryPort accountQueryPort;
+
+    @Mock
+    private AccountTransferOperationPort accountTransferOperation;
 
     @InjectMocks
     private AccountOperationAdapter adapter;
 
     @Test
     void shouldMapAccountInfoCorrectly() {
-        AccountInternalService.AccountInfo internalInfo =
-                new AccountInternalService.AccountInfo(1L, 100L, "TRY", true);
-        when(accountInternalService.getAccountInfo(1L)).thenReturn(internalInfo);
+        AccountInfo internalInfo = new AccountInfo(1L, 100L, "TRY", true);
+        when(accountQueryPort.getAccountInfo(1L)).thenReturn(internalInfo);
 
         var result = adapter.getAccountInfo(1L);
 
@@ -35,14 +39,13 @@ class AccountOperationAdapterTest {
         assertEquals(100L, result.userId());
         assertEquals("TRY", result.currency());
         assertTrue(result.active());
-        verify(accountInternalService).getAccountInfo(1L);
+        verify(accountQueryPort).getAccountInfo(1L);
     }
 
     @Test
     void shouldMapAccountInfoForTransferCorrectly() {
-        AccountInternalService.AccountInfo internalInfo =
-                new AccountInternalService.AccountInfo(2L, 200L, "USD", false);
-        when(accountInternalService.getAccountInfoForTransfer("TR123")).thenReturn(internalInfo);
+        AccountInfo internalInfo = new AccountInfo(2L, 200L, "USD", false);
+        when(accountQueryPort.getAccountInfoForTransfer("TR123")).thenReturn(internalInfo);
 
         var result = adapter.getAccountInfoForTransfer("TR123");
 
@@ -50,7 +53,7 @@ class AccountOperationAdapterTest {
         assertEquals(200L, result.userId());
         assertEquals("USD", result.currency());
         assertFalse(result.active());
-        verify(accountInternalService).getAccountInfoForTransfer("TR123");
+        verify(accountQueryPort).getAccountInfoForTransfer("TR123");
     }
 
     @Test
@@ -59,7 +62,7 @@ class AccountOperationAdapterTest {
 
         adapter.debitAndCredit(1L, 2L, amount);
 
-        verify(accountInternalService).debitAndCredit(1L, 2L, amount);
+        verify(accountTransferOperation).executeTransfer(1L, 2L, amount);
     }
 
     @Test
@@ -68,22 +71,22 @@ class AccountOperationAdapterTest {
 
         adapter.reverseBalancesForCancellation(10L, 20L, amount);
 
-        verify(accountInternalService).reverseBalancesForCancellation(10L, 20L, amount);
+        verify(accountTransferOperation).reverseTransfer(10L, 20L, amount);
     }
 
     @Test
     void shouldMapEmptyIbansForAccounts() {
-        when(accountInternalService.getIbansForAccounts(List.of())).thenReturn(Map.of());
+        when(accountQueryPort.getIbansForAccounts(List.of())).thenReturn(Map.of());
 
         var result = adapter.getIbansForAccounts(List.of());
 
         assertTrue(result.isEmpty());
-        verify(accountInternalService).getIbansForAccounts(List.of());
+        verify(accountQueryPort).getIbansForAccounts(List.of());
     }
 
     @Test
     void shouldMapIbansForAccounts() {
-        when(accountInternalService.getIbansForAccounts(List.of(1L, 2L)))
+        when(accountQueryPort.getIbansForAccounts(List.of(1L, 2L)))
                 .thenReturn(Map.of(1L, "TR1", 2L, "TR2"));
 
         var result = adapter.getIbansForAccounts(List.of(1L, 2L));

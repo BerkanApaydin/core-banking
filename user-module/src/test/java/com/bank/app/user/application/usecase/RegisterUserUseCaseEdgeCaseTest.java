@@ -1,6 +1,7 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.user.application.dto.AuthRequest;
+import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
@@ -27,7 +28,7 @@ class RegisterUserUseCaseEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
-        registerUserUseCase = new RegisterUserUseCase(loadUserPort, saveUserPort, passwordEncoderPort);
+        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort);
     }
 
     @Test

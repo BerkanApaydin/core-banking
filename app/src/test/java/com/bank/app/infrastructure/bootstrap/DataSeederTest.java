@@ -2,11 +2,11 @@ package com.bank.app.infrastructure.bootstrap;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.port.in.CreateAccountPort;
-import com.bank.app.account.exception.DuplicateIbanException;
+import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
+import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
-import com.bank.app.user.application.usecase.RegisterUserUseCase;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class DataSeederTest {
     @Mock
     private RegisterUserUseCase registerUserUseCase;
     @Mock
-    private CreateAccountPort createAccountPort;
+    private CreateAccountUseCase createAccountPort;
     @Mock
     private LoadUserPort loadUserPort;
 

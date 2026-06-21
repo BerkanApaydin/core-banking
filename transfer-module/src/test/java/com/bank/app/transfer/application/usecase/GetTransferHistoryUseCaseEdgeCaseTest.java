@@ -1,7 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.adapter.SecurityContextAdapter;
+import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.dto.PagedResponse;
@@ -34,12 +35,12 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
     @Mock private AccountOperationPort accountOperationPort;
 
     private SecurityContextPort securityContextPort;
-    private GetTransferHistoryUseCase getTransferHistoryUseCase;
+    private GetTransferHistoryQuery getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
         securityContextPort = new SecurityContextAdapter();
-        getTransferHistoryUseCase = new GetTransferHistoryUseCase(
+        getTransferHistoryUseCase = new GetTransferHistoryUseCaseImpl(
                 loadTransferPort, accountOperationPort, securityContextPort);
 
         CustomUserDetails principal = new CustomUserDetails(100L, "test_user",

@@ -2,7 +2,8 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.exception.TransferNotFoundException;
+import com.bank.app.transfer.application.exception.TransferNotFoundException;
+import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
@@ -43,7 +44,7 @@ class CancelTransferUseCaseEdgeCaseTest {
 
         @BeforeEach
         void setUp() {
-                cancelTransferUseCase = new CancelTransferUseCase(
+                cancelTransferUseCase = new CancelTransferUseCaseImpl(
                                 loadTransferPort, saveTransferPort, accountOperationPort,
                                 eventPublisherPort, securityContextPort, 24);
         }

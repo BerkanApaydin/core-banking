@@ -1,6 +1,6 @@
 package com.bank.app.audit.application;
 
-import com.bank.app.audit.application.port.in.AuditLoggerPort;
+import com.bank.app.audit.application.port.in.AuditLoggerUseCase;
 import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AuditLogger implements AuditLoggerPort {
+public class AuditLogger implements AuditLoggerUseCase {
 
     private final SaveAuditLogPort saveAuditLogPort;
     private final SecurityContextPort securityContextPort;

@@ -1,13 +1,13 @@
 package com.bank.app.infrastructure.bootstrap;
 
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.port.in.CreateAccountPort;
+import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.common.domain.Money;
-import com.bank.app.account.exception.DuplicateIbanException;
+import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
-import com.bank.app.user.application.usecase.RegisterUserUseCase;
+import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -31,11 +31,11 @@ public class DataSeeder {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final RegisterUserUseCase registerUserUseCase;
-    private final CreateAccountPort createAccountPort;
+    private final CreateAccountUseCase createAccountPort;
     private final LoadUserPort loadUserPort;
 
     public DataSeeder(RegisterUserUseCase registerUserUseCase,
-                      CreateAccountPort createAccountPort,
+                      CreateAccountUseCase createAccountPort,
                       LoadUserPort loadUserPort) {
         this.registerUserUseCase = registerUserUseCase;
         this.createAccountPort = createAccountPort;

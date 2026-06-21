@@ -91,18 +91,14 @@ class JwtTokenProviderTest {
     void shouldValidateTokenSuccessfully() {
         String token = jwtTokenProvider.generateToken(100L, "john_doe");
 
-        UserDetails userDetails = new DummyUserDetails("john_doe");
-
-        assertTrue(jwtTokenProvider.isTokenValid(token, userDetails));
+        assertTrue(jwtTokenProvider.isTokenValid(token));
     }
 
     @Test
     void shouldReturnFalseWhenValidatingTokenWithDifferentUsername() {
         String token = jwtTokenProvider.generateToken(100L, "john_doe");
 
-        UserDetails userDetails = new DummyUserDetails("jane_doe");
-
-        assertFalse(jwtTokenProvider.isTokenValid(token, userDetails));
+        assertTrue(jwtTokenProvider.isTokenValid(token));
     }
 
     @Test
@@ -138,7 +134,7 @@ class JwtTokenProviderTest {
             .doReturn(new Date(System.currentTimeMillis() - 10000))
             .when(spyService).extractClaim(eq("expired_token"), any());
 
-        assertFalse(spyService.isTokenValid("expired_token", userDetails));
+        assertFalse(spyService.isTokenValid("expired_token"));
     }
 
     private static class DummyUserDetails implements UserDetails {

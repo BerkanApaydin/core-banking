@@ -40,6 +40,6 @@ public class TransferCompletedOutboxHandler implements OutboxEventHandler {
                 TransferStatus.COMPLETED,
                 event.getCreatedAt());
 
-        eventPublisher.publishEvent(new AsyncTransferCompletedEvent(transfer));
+        eventPublisher.publishEvent(AsyncTransferCompletedEvent.from(transfer));
     }
 }

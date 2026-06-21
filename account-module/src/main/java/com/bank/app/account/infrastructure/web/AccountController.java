@@ -2,8 +2,8 @@ package com.bank.app.account.infrastructure.web;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.port.in.CreateAccountPort;
-import com.bank.app.account.application.port.in.GetAccountPort;
+import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.application.port.in.GetAccountQuery;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +18,10 @@ import java.util.List;
 @Tag(name = "Account API", description = "Hesap yönetimi işlemlerini yöneten API")
 public class AccountController {
 
-    private final CreateAccountPort createAccountPort;
-    private final GetAccountPort getAccountPort;
+    private final CreateAccountUseCase createAccountPort;
+    private final GetAccountQuery getAccountPort;
 
-    public AccountController(CreateAccountPort createAccountPort, GetAccountPort getAccountPort) {
+    public AccountController(CreateAccountUseCase createAccountPort, GetAccountQuery getAccountPort) {
         this.createAccountPort = createAccountPort;
         this.getAccountPort = getAccountPort;
     }

@@ -8,8 +8,9 @@ import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.*;
 
-import com.bank.app.transfer.exception.SameAccountTransferException;
-import com.bank.app.account.exception.InvalidIbanException;
+import com.bank.app.transfer.domain.exception.SameAccountTransferException;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
+import com.bank.app.account.domain.exception.InvalidIbanException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +36,7 @@ class PlaceTransferUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort,
+        placeTransferUseCase = new PlaceTransferUseCaseImpl(accountOperationPort,
                 saveTransferPort,
                 eventPublisherPort,
                 new TransferDomainService());
@@ -120,10 +121,10 @@ class PlaceTransferUseCaseTest {
         mockAccountInfos("TR290006200000000000000111", 1L, 100L, false,
                 "TR290006200000000000000222", 2L, 200L, true);
 
-        doThrow(new com.bank.app.account.exception.AccountNotActiveException("TR290006200000000000000111"))
+        doThrow(new com.bank.app.account.domain.exception.AccountNotActiveException("TR290006200000000000000111"))
                 .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
-        assertThrows(com.bank.app.account.exception.AccountNotActiveException.class,
+        assertThrows(com.bank.app.account.domain.exception.AccountNotActiveException.class,
                 () -> placeTransferUseCase.execute(request));
         verify(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
     }
@@ -139,10 +140,10 @@ class PlaceTransferUseCaseTest {
         mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                 "TR290006200000000000000222", 2L, 200L, false);
 
-        doThrow(new com.bank.app.account.exception.AccountNotActiveException("TR290006200000000000000222"))
+        doThrow(new com.bank.app.account.domain.exception.AccountNotActiveException("TR290006200000000000000222"))
                 .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
-        assertThrows(com.bank.app.account.exception.AccountNotActiveException.class,
+        assertThrows(com.bank.app.account.domain.exception.AccountNotActiveException.class,
                 () -> placeTransferUseCase.execute(request));
         verify(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
     }

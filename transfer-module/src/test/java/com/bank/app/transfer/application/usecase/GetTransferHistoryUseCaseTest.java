@@ -1,5 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.transfer.application.dto.PagedResponse;
@@ -30,11 +31,11 @@ class GetTransferHistoryUseCaseTest {
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountOperationPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
-    private GetTransferHistoryUseCase getTransferHistoryUseCase;
+    private GetTransferHistoryQuery getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
-        getTransferHistoryUseCase = new GetTransferHistoryUseCase(loadTransferPort, accountOperationPort,
+        getTransferHistoryUseCase = new GetTransferHistoryUseCaseImpl(loadTransferPort, accountOperationPort,
                 securityContextPort);
     }
 

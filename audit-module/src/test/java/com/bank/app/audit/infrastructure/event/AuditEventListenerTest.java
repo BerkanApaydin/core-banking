@@ -4,7 +4,6 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -56,8 +55,7 @@ class AuditEventListenerTest {
     @Test
     void shouldLogWhenTransferCompleted() {
         Money amount = Money.of("500.00", Money.Currency.TRY);
-        Transfer transfer = new Transfer(1L, 10L, 20L, amount, TransferStatus.COMPLETED, LocalDateTime.now());
-        TransferCompletedEvent event = new TransferCompletedEvent(transfer);
+        TransferCompletedEvent event = new TransferCompletedEvent(1L, 10L, 20L, amount, TransferStatus.COMPLETED);
 
         eventListener.onTransferCompleted(event);
 

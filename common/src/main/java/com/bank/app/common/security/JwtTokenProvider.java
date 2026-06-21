@@ -5,7 +5,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -88,12 +87,6 @@ public class JwtTokenProvider implements JwtPort {
     public Long extractUserId(String token) {
         Number userId = extractClaim(token, claims -> claims.get("userId", Number.class));
         return userId != null ? userId.longValue() : null;
-    }
-
-    @Override
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
     @Override

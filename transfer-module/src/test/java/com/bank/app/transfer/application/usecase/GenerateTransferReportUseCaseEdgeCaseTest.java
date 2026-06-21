@@ -1,7 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
@@ -29,11 +30,11 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
     @Mock private AccountOperationPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
 
-    private GenerateTransferReportUseCase generateTransferReportUseCase;
+    private GenerateTransferReportQuery generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
-        generateTransferReportUseCase = new GenerateTransferReportUseCase(
+        generateTransferReportUseCase = new GenerateTransferReportUseCaseImpl(
                 loadTransferPort, accountOperationPort, securityContextPort);
     }
 

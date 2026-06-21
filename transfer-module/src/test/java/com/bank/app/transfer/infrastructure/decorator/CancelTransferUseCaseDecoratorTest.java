@@ -68,7 +68,7 @@ class CancelTransferUseCaseDecoratorTest {
     void shouldPropagateExceptionWhenTransferNotFound() {
         when(loadTransferPort.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
-        assertThrows(com.bank.app.transfer.exception.TransferNotFoundException.class,
+        assertThrows(com.bank.app.transfer.application.exception.TransferNotFoundException.class,
                 () -> decorator.execute(999L));
 
         verifyNoInteractions(saveTransferPort);

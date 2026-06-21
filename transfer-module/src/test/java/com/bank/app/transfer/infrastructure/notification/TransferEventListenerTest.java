@@ -26,10 +26,10 @@ class TransferEventListenerTest {
         TransferEventListener listener = new TransferEventListener(List.of(notificationPort));
 
         Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
+        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         listener.handleTransferCompleted(event);
 
-        verify(notificationPort).notifyTransferCompleted(transfer);
+        verify(notificationPort).notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
     }
 }

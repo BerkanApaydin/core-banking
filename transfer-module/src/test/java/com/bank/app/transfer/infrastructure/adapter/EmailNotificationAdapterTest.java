@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ class EmailNotificationAdapterTest {
                 Money.of("100.00", Money.Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
-        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(transfer));
+        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer)));
     }
 
     @Test
@@ -28,7 +29,7 @@ class EmailNotificationAdapterTest {
                 Money.of("100.00", Money.Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
-        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, new RuntimeException("Service unavailable")));
+        assertDoesNotThrow(() -> adapter.fallbackNotify(AsyncTransferCompletedEvent.from(transfer), new RuntimeException("Service unavailable")));
     }
 
     @Test
@@ -46,6 +47,6 @@ class EmailNotificationAdapterTest {
         Transfer transfer = new Transfer(1L, 10L, 20L,
                 Money.of("100.00", Money.Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
-        assertDoesNotThrow(() -> adapter.fallbackNotify(transfer, null));
+        assertDoesNotThrow(() -> adapter.fallbackNotify(AsyncTransferCompletedEvent.from(transfer), null));
     }
 }

@@ -6,7 +6,7 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.application.port.in.PlaceTransferPort;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -37,7 +37,7 @@ import com.bank.app.transfer.ModuleIntegrationTestConfig;
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private PlaceTransferPort placeTransferPort;
+    private PlaceTransferUseCase placeTransferPort;
 
     @Autowired
     private OutboxEventJpaRepository outboxRepo;

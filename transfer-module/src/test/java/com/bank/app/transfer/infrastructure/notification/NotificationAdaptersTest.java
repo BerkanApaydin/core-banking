@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.notification;
 
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.common.domain.Money;
 
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,7 +27,11 @@ class NotificationAdaptersTest {
     @BeforeEach
     void setUp() {
         lenient().when(transfer.getId()).thenReturn(1L);
+        lenient().when(transfer.getSenderAccountId()).thenReturn(10L);
+        lenient().when(transfer.getReceiverAccountId()).thenReturn(20L);
         lenient().when(transfer.getAmount()).thenReturn(new Money(BigDecimal.TEN, Money.Currency.TRY));
+        lenient().when(transfer.getStatus()).thenReturn(TransferStatus.COMPLETED);
+        lenient().when(transfer.getCreatedAt()).thenReturn(LocalDateTime.now());
     }
 
     @Test
@@ -33,15 +39,15 @@ class NotificationAdaptersTest {
         SendNotificationPort port1 = mock(SendNotificationPort.class);
         SendNotificationPort port2 = mock(SendNotificationPort.class);
 
-        doThrow(new RuntimeException("failed")).when(port1).notifyTransferCompleted(transfer);
+        doThrow(new RuntimeException("failed")).when(port1).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
 
         TransferEventListener listener = new TransferEventListener(List.of(port1, port2));
-        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
+        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         assertDoesNotThrow(() -> listener.handleTransferCompleted(event));
 
-        verify(port1).notifyTransferCompleted(transfer);
-        verify(port2).notifyTransferCompleted(transfer);
+        verify(port1).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
+        verify(port2).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
     }
 
     @Test
@@ -49,22 +55,22 @@ class NotificationAdaptersTest {
         SendNotificationPort port1 = mock(SendNotificationPort.class);
         SendNotificationPort port2 = mock(SendNotificationPort.class);
 
-        doThrow(new RuntimeException("fail1")).when(port1).notifyTransferCompleted(transfer);
-        doThrow(new RuntimeException("fail2")).when(port2).notifyTransferCompleted(transfer);
+        doThrow(new RuntimeException("fail1")).when(port1).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
+        doThrow(new RuntimeException("fail2")).when(port2).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
 
         TransferEventListener listener = new TransferEventListener(List.of(port1, port2));
-        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
+        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         assertDoesNotThrow(() -> listener.handleTransferCompleted(event));
 
-        verify(port1).notifyTransferCompleted(transfer);
-        verify(port2).notifyTransferCompleted(transfer);
+        verify(port1).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
+        verify(port2).notifyTransferCompleted(any(AsyncTransferCompletedEvent.class));
     }
 
     @Test
     void shouldHandleEmptyPortList() {
         TransferEventListener listener = new TransferEventListener(List.of());
-        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(transfer);
+        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         assertDoesNotThrow(() -> listener.handleTransferCompleted(event));
     }

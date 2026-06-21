@@ -5,7 +5,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.application.port.in.PlaceTransferPort;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.outbox.OutboxEventJpaRepository;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
@@ -36,7 +36,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private PlaceTransferPort placeTransferPort;
+    private PlaceTransferUseCase placeTransferPort;
 
     @Autowired
     private AccountJpaRepository accountRepo;

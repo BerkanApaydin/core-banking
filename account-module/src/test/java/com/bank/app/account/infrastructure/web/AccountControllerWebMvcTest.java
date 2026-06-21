@@ -2,8 +2,8 @@ package com.bank.app.account.infrastructure.web;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
-import com.bank.app.account.application.port.in.CreateAccountPort;
-import com.bank.app.account.application.port.in.GetAccountPort;
+import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.application.port.in.GetAccountQuery;
 import com.bank.app.common.domain.Money;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,10 +33,10 @@ class AccountControllerWebMvcTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private CreateAccountPort createAccountPort;
+    private CreateAccountUseCase createAccountPort;
 
     @MockitoBean
-    private GetAccountPort getAccountPort;
+    private GetAccountQuery getAccountPort;
 
     @Test
     void shouldCreateAccountAndReturn201() throws Exception {

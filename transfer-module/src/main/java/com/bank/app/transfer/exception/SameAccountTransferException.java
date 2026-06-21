@@ -1,9 +1,0 @@
-package com.bank.app.transfer.exception;
-
-import com.bank.app.common.exception.BusinessException;
-
-public class SameAccountTransferException extends BusinessException {
-    public SameAccountTransferException(String iban) {
-        super("error.same_account_transfer", new Object[]{iban}, "Aynı hesaba transfer yapılamaz: " + iban);
-    }
-}

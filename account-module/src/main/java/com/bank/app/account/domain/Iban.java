@@ -1,6 +1,6 @@
 package com.bank.app.account.domain;
 
-import com.bank.app.account.exception.InvalidIbanException;
+import com.bank.app.account.domain.exception.InvalidIbanException;
 import java.util.Objects;
 import java.util.regex.Pattern;
 

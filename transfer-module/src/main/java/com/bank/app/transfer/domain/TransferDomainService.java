@@ -1,39 +1,33 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.exception.SameAccountTransferException;
+import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.common.exception.CurrencyMismatchException;
 import java.util.Objects;
 
 public class TransferDomainService {
 
-    public Transfer execute(Long senderId, String senderIban, Money.Currency senderCurrency,
-            Long receiverId, String receiverIban, Money.Currency receiverCurrency,
-            Money amount) {
+    public Transfer validateAndCreateTransfer(TransferParticipants participants, Money amount) {
+        Objects.requireNonNull(participants, "Transfer katılımcıları null olamaz");
         Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
-        Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
-        Objects.requireNonNull(senderIban, "Gönderici IBAN null olamaz");
-        Objects.requireNonNull(receiverId, "Alıcı ID null olamaz");
-        Objects.requireNonNull(receiverIban, "Alıcı IBAN null olamaz");
-        Objects.requireNonNull(senderCurrency, "Gönderici para birimi null olamaz");
-        Objects.requireNonNull(receiverCurrency, "Alıcı para birimi null olamaz");
 
-        if (senderIban.equalsIgnoreCase(receiverIban) || Objects.equals(senderId, receiverId)) {
-            throw new SameAccountTransferException(senderIban);
+        if (participants.senderIban().equalsIgnoreCase(participants.receiverIban())
+                || Objects.equals(participants.senderId(), participants.receiverId())) {
+            throw new SameAccountTransferException(participants.senderIban());
         }
 
-        if (senderCurrency != amount.currency()) {
+        if (participants.senderCurrency() != amount.currency()) {
             throw new CurrencyMismatchException(
-                    "Gönderici hesap para birimi (" + senderCurrency +
+                    "Gönderici hesap para birimi (" + participants.senderCurrency() +
                             ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor.");
         }
 
-        if (receiverCurrency != amount.currency()) {
+        if (participants.receiverCurrency() != amount.currency()) {
             throw new CurrencyMismatchException(
-                    "Alıcı hesap para birimi (" + receiverCurrency +
+                    "Alıcı hesap para birimi (" + participants.receiverCurrency() +
                             ") ile transfer tutarı para birimi (" + amount.currency() + ") eşleşmiyor.");
         }
 
-        return Transfer.create(senderId, receiverId, amount);
+        return Transfer.create(participants.senderId(), participants.receiverId(), amount);
     }
 }

@@ -1,8 +1,8 @@
 package com.bank.app.account.domain;
 
 import com.bank.app.common.domain.Money;
-import com.bank.app.account.exception.AccountNotActiveException;
-import com.bank.app.account.exception.InsufficientBalanceException;
+import com.bank.app.account.domain.exception.AccountNotActiveException;
+import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

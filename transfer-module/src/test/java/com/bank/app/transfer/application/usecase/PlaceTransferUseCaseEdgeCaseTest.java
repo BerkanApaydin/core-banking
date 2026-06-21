@@ -1,8 +1,9 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.domain.Money;
-import com.bank.app.account.exception.InsufficientBalanceException;
-import com.bank.app.transfer.exception.SameAccountTransferException;
+import com.bank.app.account.domain.exception.InsufficientBalanceException;
+import com.bank.app.transfer.domain.exception.SameAccountTransferException;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
@@ -45,7 +46,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
         @BeforeEach
         void setUp() {
-                placeTransferUseCase = new PlaceTransferUseCase(accountOperationPort, saveTransferPort,
+                placeTransferUseCase = new PlaceTransferUseCaseImpl(accountOperationPort, saveTransferPort,
                                 eventPublisherPort, new TransferDomainService());
         }
 
@@ -105,10 +106,10 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 when(accountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
 
-                doThrow(new com.bank.app.account.exception.AccountNotActiveException(SENDER_IBAN))
+                doThrow(new com.bank.app.account.domain.exception.AccountNotActiveException(SENDER_IBAN))
                                 .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
-                assertThrows(com.bank.app.account.exception.AccountNotActiveException.class,
+                assertThrows(com.bank.app.account.domain.exception.AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
                 verify(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
         }
@@ -121,10 +122,10 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 when(accountOperationPort.getAccountInfoForTransfer(RECEIVER_IBAN))
                                 .thenReturn(new AccountInfo(2L, 200L, "TRY", false));
 
-                doThrow(new com.bank.app.account.exception.AccountNotActiveException(RECEIVER_IBAN))
+                doThrow(new com.bank.app.account.domain.exception.AccountNotActiveException(RECEIVER_IBAN))
                                 .when(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
 
-                assertThrows(com.bank.app.account.exception.AccountNotActiveException.class,
+                assertThrows(com.bank.app.account.domain.exception.AccountNotActiveException.class,
                                 () -> placeTransferUseCase.execute(request));
                 verify(accountOperationPort).debitAndCredit(eq(1L), eq(2L), any(Money.class));
         }
@@ -209,7 +210,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 ArgumentCaptor<TransferCompletedEvent> eventCaptor = ArgumentCaptor
                                 .forClass(TransferCompletedEvent.class);
                 verify(eventPublisherPort).publish(eventCaptor.capture());
-                assertNotNull(eventCaptor.getValue().getTransfer());
-                assertEquals(10L, eventCaptor.getValue().getTransfer().getId());
+                assertNotNull(eventCaptor.getValue().getTransferId());
+                assertEquals(10L, eventCaptor.getValue().getTransferId());
         }
 }

@@ -33,11 +33,10 @@ public class AuditEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTransferCompleted(TransferCompletedEvent event) {
-        var t = event.getTransfer();
         auditLogger.log(
             AuditAction.TRANSFER_EXECUTED,
             String.format("Para transferi gerçekleştirildi. Transfer ID: %d, Tutar: %s %s",
-                t.getId(), t.getAmount().amount(), t.getAmount().currency().name())
+                event.getTransferId(), event.getAmount().amount(), event.getAmount().currency().name())
         );
     }
 

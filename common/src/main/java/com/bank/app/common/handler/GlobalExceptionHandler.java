@@ -29,6 +29,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.exception.BusinessException;
 import com.bank.app.common.exception.ConcurrentRequestException;
 
@@ -78,9 +79,20 @@ public class GlobalExceptionHandler {
                 .body(problemDetail);
     }
 
+    private static HttpStatus resolveHttpStatus(BusinessException ex) {
+        String className = ex.getClass().getSimpleName();
+        if (className.contains("NotFound")) {
+            return HttpStatus.NOT_FOUND;
+        }
+        if (className.contains("Concurrent") || className.contains("Duplicate")) {
+            return HttpStatus.CONFLICT;
+        }
+        return HttpStatus.BAD_REQUEST;
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex, WebRequest request) {
-        HttpStatus status = ex.getHttpStatus() != null ? ex.getHttpStatus() : HttpStatus.BAD_REQUEST;
+        HttpStatus status = resolveHttpStatus(ex);
         String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
         if (message.isEmpty() || message.equals(ex.getMessageKey())) {
             message = ex.getMessage() != null ? ex.getMessage() : "";
@@ -127,6 +139,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
         return createProblemResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AuthorizationException.class)
+    public ResponseEntity<ProblemDetail> handleAuthorizationException(AuthorizationException ex, WebRequest request) {
+        String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
+        if (message.isEmpty() || message.equals(ex.getMessageKey())) {
+            message = ex.getMessage() != null ? ex.getMessage() : "";
+        }
+        return createProblemResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", message, request);
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)

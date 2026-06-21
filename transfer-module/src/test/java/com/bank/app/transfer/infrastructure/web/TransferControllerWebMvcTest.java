@@ -33,19 +33,19 @@ class TransferControllerWebMvcTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private PlaceTransferPort placeTransferPort;
+    private PlaceTransferUseCase placeTransferPort;
 
     @MockitoBean
-    private CancelTransferPort cancelTransferPort;
+    private CancelTransferUseCase cancelTransferPort;
 
     @MockitoBean
-    private GetTransferDetailPort getTransferDetailPort;
+    private GetTransferDetailQuery getTransferDetailPort;
 
     @MockitoBean
-    private GetTransferHistoryPort getTransferHistoryPort;
+    private GetTransferHistoryQuery getTransferHistoryPort;
 
     @MockitoBean
-    private GenerateTransferReportPort generateTransferReportPort;
+    private GenerateTransferReportQuery generateTransferReportPort;
 
     @Test
     void shouldPlaceTransferAndReturn201() throws Exception {

@@ -3,6 +3,9 @@ package com.bank.app.user.application.usecase;
 import com.bank.app.common.security.JwtTokenProvider;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
+import com.bank.app.user.application.exception.UserNotFoundException;
+import com.bank.app.user.application.port.in.LoginUserUseCase;
+import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,10 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
-import com.bank.app.user.application.port.out.AuthenticationPort;
 import org.springframework.security.authentication.BadCredentialsException;
+
 import java.util.Optional;
-import com.bank.app.user.exception.UserNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -33,7 +35,7 @@ class LoginUserUseCaseEdgeCaseTest {
         jwtTokenProvider = new JwtTokenProvider(mock(Environment.class),
                 "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
                 86400000L, true);
-        loginUserUseCase = new LoginUserUseCase(authenticationPort, jwtTokenProvider, loadUserPort);
+        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtTokenProvider, loadUserPort);
     }
 
     @Test

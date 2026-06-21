@@ -1,14 +1,15 @@
 package com.bank.app.account.application.usecase;
 
+import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
-import com.bank.app.account.exception.AccountNotActiveException;
-import com.bank.app.account.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.AccountNotActiveException;
+import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.common.exception.CurrencyMismatchException;
-import com.bank.app.account.exception.InsufficientBalanceException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,7 @@ class AccountInternalServiceTest {
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
 
-        AccountInternalService.AccountInfo info = accountInternalService.getAccountInfo(1L);
+        AccountInfo info = accountInternalService.getAccountInfo(1L);
 
         assertEquals(1L, info.id());
         assertEquals(100L, info.userId());
@@ -76,7 +77,7 @@ class AccountInternalServiceTest {
 
         when(loadAccountPort.findByIban(any(Iban.class))).thenReturn(Optional.of(account));
 
-        AccountInternalService.AccountInfo info = accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111");
+        AccountInfo info = accountInternalService.getAccountInfoForTransfer("TR290006200000000000000111");
 
         assertEquals(1L, info.id());
         assertEquals(100L, info.userId());
