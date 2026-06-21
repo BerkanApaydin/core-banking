@@ -11,6 +11,7 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +49,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );
@@ -83,7 +84,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );
@@ -118,7 +119,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );
@@ -155,7 +156,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );
@@ -177,7 +178,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );
@@ -202,7 +203,7 @@ class GetTransferDetailUseCaseTest {
                 transferId,
                 senderAccountId,
                 receiverAccountId,
-                new Money(new BigDecimal("150.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now()
         );

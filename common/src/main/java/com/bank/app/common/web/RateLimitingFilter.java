@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -18,10 +19,14 @@ public class RateLimitingFilter implements Filter {
 
     private final RateLimiter rateLimiter;
     private final MessageSource messageSource;
+    private final List<String> rateLimitedPaths;
 
-    public RateLimitingFilter(RateLimiter rateLimiter, MessageSource messageSource) {
+    public RateLimitingFilter(RateLimiter rateLimiter,
+                              MessageSource messageSource,
+                              RateLimitProperties rateLimitProperties) {
         this.rateLimiter = rateLimiter;
         this.messageSource = messageSource;
+        this.rateLimitedPaths = rateLimitProperties.getPaths();
     }
 
     @Override
@@ -40,10 +45,8 @@ public class RateLimitingFilter implements Filter {
             return;
         }
 
-        if (path.startsWith("/api/v1/auth/login")
-                || path.startsWith("/api/v1/auth/register")
-                || path.startsWith("/api/v1/accounts")
-                || path.startsWith("/api/v1/transfers")) {
+        boolean matchesRateLimitedPath = rateLimitedPaths.stream().anyMatch(path::startsWith);
+        if (matchesRateLimitedPath) {
             String ip = resolveClientIp(httpRequest);
 
             if (!rateLimiter.tryAcquire(ip)) {

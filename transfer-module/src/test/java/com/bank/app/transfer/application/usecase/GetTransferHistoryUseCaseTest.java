@@ -7,6 +7,7 @@ import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.security.port.out.SecurityContextPort;
@@ -42,7 +43,7 @@ class GetTransferHistoryUseCaseTest {
     @Test
     void shouldReturnTransferHistorySuccessfully() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);

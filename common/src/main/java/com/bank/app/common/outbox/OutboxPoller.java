@@ -2,7 +2,6 @@ package com.bank.app.common.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -16,7 +15,6 @@ public class OutboxPoller {
 
     private final OutboxLockRepository lockRepository;
     private final OutboxEventJpaRepository outboxRepo;
-    private final List<OutboxEventHandler> handlers;
     private final OutboxProcessor outboxProcessor;
 
     @Value("${app.outbox.max-retries:5}")
@@ -28,29 +26,12 @@ public class OutboxPoller {
     @Value("${app.outbox.partition-count:0}")
     private int partitionCount;
 
-    @Autowired
     public OutboxPoller(OutboxLockRepository lockRepository,
                         OutboxEventJpaRepository outboxRepo,
-                        List<OutboxEventHandler> handlers) {
+                        OutboxProcessor outboxProcessor) {
         this.lockRepository = lockRepository;
         this.outboxRepo = outboxRepo;
-        this.handlers = handlers;
-        this.outboxProcessor = new OutboxProcessor(outboxRepo, handlers);
-    }
-
-    public OutboxPoller(OutboxLockRepository lockRepository,
-                        OutboxEventJpaRepository outboxRepo,
-                        List<OutboxEventHandler> handlers,
-                        @Value("${app.outbox.max-retries:5}") int maxRetries,
-                        @Value("${app.outbox.batch-size:50}") int batchSize,
-                        @Value("${app.outbox.partition-count:0}") int partitionCount) {
-        this.lockRepository = lockRepository;
-        this.outboxRepo = outboxRepo;
-        this.handlers = handlers;
-        this.maxRetries = maxRetries;
-        this.batchSize = batchSize;
-        this.partitionCount = partitionCount;
-        this.outboxProcessor = new OutboxProcessor(outboxRepo, handlers);
+        this.outboxProcessor = outboxProcessor;
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:2000}")

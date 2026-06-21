@@ -1,6 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
@@ -12,8 +14,15 @@ import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferParticipants;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
+@Component
+@Transactional
 public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
     private final AccountOperationPort accountOperationPort;
@@ -31,11 +40,17 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         this.transferDomainService = transferDomainService;
     }
 
+    @Override
+    @Retryable(
+            retryFor = ConcurrencyFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 500, multiplier = 2)
+    )
     public TransferResponse execute(TransferRequest request) {
         Objects.requireNonNull(request, "Request null olamaz");
 
-        String senderIban = normalizeIban(request.senderIban());
-        String receiverIban = normalizeIban(request.receiverIban());
+        String senderIban = Iban.normalize(request.senderIban());
+        String receiverIban = Iban.normalize(request.receiverIban());
 
         AccountInfo senderInfo = accountOperationPort.getAccountInfoForTransfer(senderIban);
         AccountInfo receiverInfo = accountOperationPort.getAccountInfoForTransfer(receiverIban);
@@ -56,15 +71,11 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         return TransferResponse.from(completedTransfer, senderIban, receiverIban);
     }
 
-    private static String normalizeIban(String iban) {
-        return iban.replaceAll("\\s", "").toUpperCase();
-    }
-
     private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,
             String receiverIban, Money amount) {
         TransferParticipants participants = new TransferParticipants(
-                sender.id(), senderIban, Money.Currency.valueOf(sender.currency()),
-                receiver.id(), receiverIban, Money.Currency.valueOf(receiver.currency()));
+                sender.id(), senderIban, Currency.valueOf(sender.currency()),
+                receiver.id(), receiverIban, Currency.valueOf(receiver.currency()));
         return transferDomainService.validateAndCreateTransfer(participants, amount);
     }
 

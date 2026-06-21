@@ -5,6 +5,7 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,8 @@ class OutboxPatternTest {
 
         eventListener = new OutboxEventListener(outboxRepo, objectMapper);
         handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher);
-        outboxPoller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler));
+        OutboxProcessor processor = new OutboxProcessor(outboxRepo, List.of(handler));
+        outboxPoller = new OutboxPoller(lockRepository, outboxRepo, processor);
         ReflectionTestUtils.setField(outboxPoller, "maxRetries", 5);
     }
 
@@ -91,7 +93,7 @@ class OutboxPatternTest {
     void shouldSaveOutboxEventWhenTransferCompletedEventFired() throws Exception {
         Transfer transfer = new Transfer(
                 123L, 1L, 2L,
-                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("100.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
         TransferCompletedEvent event = new TransferCompletedEvent(
@@ -230,7 +232,7 @@ class OutboxPatternTest {
 
         AsyncTransferCompletedEvent published = captor.getValue();
         assertEquals(456L, published.transferId());
-        assertEquals(Money.Currency.USD, published.amount().currency());
+        assertEquals(Currency.USD, published.amount().currency());
     }
 
     @Test
@@ -239,7 +241,7 @@ class OutboxPatternTest {
 
         Transfer transfer = new Transfer(
                 5L, 1L, 2L,
-                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("100.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
         TransferCompletedEvent event = new TransferCompletedEvent(
@@ -263,7 +265,7 @@ class OutboxPatternTest {
     void shouldWrapListenerExceptionAsRuntimeException() throws Exception {
         Transfer transfer = new Transfer(
                 999L, 1L, 2L,
-                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
+                new Money(new BigDecimal("100.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
                 LocalDateTime.now());
         TransferCompletedEvent event = new TransferCompletedEvent(
@@ -343,7 +345,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(otherHandler, matchingHandler));
+                new OutboxProcessor(outboxRepo, List.of(otherHandler, matchingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -379,7 +381,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(failingHandler));
+                new OutboxProcessor(outboxRepo, List.of(failingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -418,7 +420,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(failingHandler));
+                new OutboxProcessor(outboxRepo, List.of(failingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -459,7 +461,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(failingHandler));
+                new OutboxProcessor(outboxRepo, List.of(failingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -496,7 +498,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(failingHandler));
+                new OutboxProcessor(outboxRepo, List.of(failingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -514,7 +516,7 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        assertNull(entity.getLastError()); // truncate(null)
+        assertNull(entity.getLastError());
     }
 
     @Test
@@ -532,7 +534,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(
                 lockRepository,
                 outboxRepo,
-                List.of(failingHandler));
+                new OutboxProcessor(outboxRepo, List.of(failingHandler)));
 
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
@@ -565,7 +567,7 @@ class OutboxPatternTest {
         OutboxEventHandler handler1 = mock(OutboxEventHandler.class);
         when(handler1.supports(anyString())).thenReturn(true);
 
-        OutboxPoller poller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler1));
+        OutboxPoller poller = new OutboxPoller(lockRepository, outboxRepo, new OutboxProcessor(outboxRepo, List.of(handler1)));
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
         stubUnprocessed(List.of(event1, event2));
@@ -577,7 +579,11 @@ class OutboxPatternTest {
 
     @Test
     void shouldCreateWithCustomMaxRetries() {
-        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 3, 50, 0);
+        OutboxProcessor customProcessor = new OutboxProcessor(outboxRepo, List.of(handler));
+        OutboxPoller pollerWithCustomRetries = new OutboxPoller(lockRepository, outboxRepo, customProcessor);
+        ReflectionTestUtils.setField(pollerWithCustomRetries, "maxRetries", 3);
+        ReflectionTestUtils.setField(pollerWithCustomRetries, "batchSize", 50);
+        ReflectionTestUtils.setField(pollerWithCustomRetries, "partitionCount", 0);
 
         OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
                 "id", "Transfer", "123", "TransferCompletedEvent",
@@ -594,7 +600,11 @@ class OutboxPatternTest {
 
     @Test
     void shouldPollMultiplePartitionsWhenPartitionCountSet() throws Exception {
-        OutboxPoller partitionedPoller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler), 5, 10, 3);
+        OutboxProcessor partitionedProcessor = new OutboxProcessor(outboxRepo, List.of(handler));
+        OutboxPoller partitionedPoller = new OutboxPoller(lockRepository, outboxRepo, partitionedProcessor);
+        ReflectionTestUtils.setField(partitionedPoller, "maxRetries", 5);
+        ReflectionTestUtils.setField(partitionedPoller, "batchSize", 10);
+        ReflectionTestUtils.setField(partitionedPoller, "partitionCount", 3);
 
         String validPayload = "{\"transferId\":123,\"senderAccountId\":1,\"receiverAccountId\":2,\"amount\":100.00,\"currency\":\"TRY\"}";
         OutboxEventJpaEntity event = new OutboxEventJpaEntity(
@@ -614,7 +624,8 @@ class OutboxPatternTest {
 
     @Test
     void shouldHandleNoHandlersList() {
-        OutboxPoller emptyPoller = new OutboxPoller(lockRepository, outboxRepo, List.of());
+        OutboxProcessor emptyProcessor = new OutboxProcessor(outboxRepo, List.of());
+        OutboxPoller emptyPoller = new OutboxPoller(lockRepository, outboxRepo, emptyProcessor);
 
         OutboxEventJpaEntity event = new OutboxEventJpaEntity(
                 "id", "Transfer", "123", "TransferCompletedEvent",

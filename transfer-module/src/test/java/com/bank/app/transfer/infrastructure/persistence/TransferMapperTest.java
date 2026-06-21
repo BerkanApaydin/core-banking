@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.persistence;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class TransferMapperTest {
     void shouldMapDomainToJpaEntity() {
         LocalDateTime now = LocalDateTime.now();
         Transfer domain = new Transfer(1L, 10L, 20L,
-                Money.of("200.00", Money.Currency.TRY),
+                Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 3L);
 
         TransferJpaEntity entity = mapper.toJpaEntity(domain);
@@ -48,7 +49,7 @@ class TransferMapperTest {
         assertEquals(30L, domain.getSenderAccountId());
         assertEquals(40L, domain.getReceiverAccountId());
         assertEquals(new BigDecimal("150.50"), domain.getAmount().amount());
-        assertEquals(Money.Currency.USD, domain.getAmount().currency());
+        assertEquals(Currency.USD, domain.getAmount().currency());
         assertEquals(TransferStatus.PENDING, domain.getStatus());
         assertEquals(now, domain.getCreatedAt());
         assertEquals(7L, domain.getVersion());
@@ -68,7 +69,7 @@ class TransferMapperTest {
     void shouldMapDomainWithoutVersion() {
         LocalDateTime now = LocalDateTime.now();
         Transfer domain = new Transfer(3L, 50L, 60L,
-                Money.of("100.00", Money.Currency.TRY),
+                Money.of("100.00", Currency.TRY),
                 TransferStatus.PENDING, now);
 
         TransferJpaEntity entity = mapper.toJpaEntity(domain);

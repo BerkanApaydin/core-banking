@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.notification;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
@@ -25,7 +26,7 @@ class TransferEventListenerTest {
     void shouldSendNotificationWhenTransferCompletedEventIsTriggered() {
         TransferEventListener listener = new TransferEventListener(List.of(notificationPort));
 
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         listener.handleTransferCompleted(event);

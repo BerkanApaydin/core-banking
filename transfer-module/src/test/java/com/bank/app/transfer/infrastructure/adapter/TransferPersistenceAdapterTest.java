@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
@@ -49,7 +50,7 @@ class TransferPersistenceAdapterTest {
         assertEquals(1L, result.get().getSenderAccountId());
         assertEquals(2L, result.get().getReceiverAccountId());
         assertEquals(new BigDecimal("200.00"), result.get().getAmount().amount());
-        assertEquals(Money.Currency.TRY, result.get().getAmount().currency());
+        assertEquals(Currency.TRY, result.get().getAmount().currency());
         assertEquals(TransferStatus.COMPLETED, result.get().getStatus());
         assertEquals(now, result.get().getCreatedAt());
         verify(springDataRepo).findById(10L);
@@ -59,7 +60,7 @@ class TransferPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, now);
+        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
         TransferJpaEntity savedEntity = new TransferJpaEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
@@ -71,7 +72,7 @@ class TransferPersistenceAdapterTest {
         assertEquals(1L, result.getSenderAccountId());
         assertEquals(2L, result.getReceiverAccountId());
         assertEquals(new BigDecimal("200.00"), result.getAmount().amount());
-        assertEquals(Money.Currency.TRY, result.getAmount().currency());
+        assertEquals(Currency.TRY, result.getAmount().currency());
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
         verify(springDataRepo).save(any(TransferJpaEntity.class));
     }
@@ -79,7 +80,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowExceptionWhenSaveReturnsNull() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, now);
+        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(null);
 

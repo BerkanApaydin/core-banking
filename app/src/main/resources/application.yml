@@ -57,6 +57,11 @@ app:
       backend: ${RATE_LIMIT_BACKEND:caffeine}
       max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
       time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
+      paths:
+        - /api/v1/auth/login
+        - /api/v1/auth/register
+        - /api/v1/accounts
+        - /api/v1/transfers
   idempotency:
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}

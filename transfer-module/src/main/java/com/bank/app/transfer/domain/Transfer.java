@@ -69,6 +69,18 @@ public class Transfer {
         return version;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Transfer other)) return false;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : System.identityHashCode(this);
+    }
+
     public void cancel(int cancellationWindowHours) {
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);

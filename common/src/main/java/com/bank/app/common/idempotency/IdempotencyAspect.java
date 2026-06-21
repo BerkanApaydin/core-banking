@@ -3,12 +3,12 @@ package com.bank.app.common.idempotency;
 import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -16,13 +16,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-
 @Aspect
 @Component
-@Order(1)  // Transactional proxy'den (Order=Integer.MAX_VALUE) önce çalış
+@Order(1)
 public class IdempotencyAspect {
 
     private final IdempotencyGuard idempotencyGuard;
@@ -57,42 +53,8 @@ public class IdempotencyAspect {
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
 
-        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
-        Type returnType = method.getGenericReturnType();
-
-        boolean isResponseEntity = method.getReturnType() != null && ResponseEntity.class.isAssignableFrom(method.getReturnType());
-        Class<?> responseBodyClass = Object.class;
-        if (isResponseEntity) {
-            if (returnType instanceof ParameterizedType paramType) {
-                Type[] actualTypeArguments = paramType.getActualTypeArguments();
-                if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class<?> bodyClass) {
-                    responseBodyClass = bodyClass;
-                }
-            }
-        } else {
-            responseBodyClass = method.getReturnType() != null ? method.getReturnType() : Object.class;
-        }
-
         if (result.isCompleted()) {
-            HttpStatusCode status = result.responseStatus() != null
-                    ? HttpStatusCode.valueOf(result.responseStatus())
-                    : HttpStatusCode.valueOf(200);
-            
-            boolean isEmptyBody = result.responseBody() == null || result.responseBody().isBlank() || "null".equals(result.responseBody());
-            
-            if (isResponseEntity) {
-                if (isEmptyBody) {
-                    return ResponseEntity.status(status).build();
-                }
-                Object cachedResponse = objectMapper.readValue(result.responseBody(), responseBodyClass);
-                return ResponseEntity.status(status).body(cachedResponse);
-            } else {
-                if (isEmptyBody) {
-                    return null;
-                }
-                return objectMapper.readValue(result.responseBody(), responseBodyClass);
-            }
+            return buildCachedResponse(result);
         } else if (result.isPending()) {
             throw new ConcurrentRequestException("error.concurrent_request", null,
                     "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
@@ -119,6 +81,24 @@ public class IdempotencyAspect {
         } catch (Throwable ex) {
             idempotencyGuard.failRequest(key);
             throw ex;
+        }
+    }
+
+    private Object buildCachedResponse(IdempotencyGuard.IdempotencyResult result) {
+        try {
+            HttpStatusCode status = result.responseStatus() != null
+                    ? HttpStatusCode.valueOf(result.responseStatus())
+                    : HttpStatusCode.valueOf(200);
+
+            String body = result.responseBody();
+            if (body == null || body.isBlank() || "null".equals(body)) {
+                return ResponseEntity.status(status).build();
+            }
+
+            JsonNode cachedBody = objectMapper.readValue(body, JsonNode.class);
+            return ResponseEntity.status(status).body(cachedBody);
+        } catch (Exception e) {
+            throw new RuntimeException("Idempotent cache yanıtı çözümlenemedi", e);
         }
     }
 }

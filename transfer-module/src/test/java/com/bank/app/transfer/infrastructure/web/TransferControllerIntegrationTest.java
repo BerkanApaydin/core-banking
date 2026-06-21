@@ -5,6 +5,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
@@ -87,11 +88,11 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 new UserJpaEntity(null, "u3", "pass", "ROLE_USER"));
 
                 accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
-                                new BigDecimal("1000.00"), "TRY", true));
+                                new BigDecimal("1000.00"), "TRY", "ACTIVE"));
                 accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
-                                new BigDecimal("500.00"), "TRY", true));
+                                new BigDecimal("500.00"), "TRY", "ACTIVE"));
                 accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
-                                new BigDecimal("500.00"), "TRY", false));
+                                new BigDecimal("500.00"), "TRY", "SUSPENDED"));
 
                 jwtToken = jwtTokenProvider.generateToken(u1.getId(), "u1");
         }
@@ -102,7 +103,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -125,7 +126,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("2000.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -142,7 +143,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000333",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -159,7 +160,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -200,7 +201,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "",
                                 "TR290006200000000000000222",
                                 new BigDecimal("-50.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -217,7 +218,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -228,7 +229,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("150.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -263,7 +264,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -299,7 +300,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -316,7 +317,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("2000.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -342,7 +343,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -359,7 +360,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -396,7 +397,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("100.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)

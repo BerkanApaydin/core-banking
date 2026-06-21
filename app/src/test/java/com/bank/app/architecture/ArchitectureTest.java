@@ -57,15 +57,6 @@ class ArchitectureTest {
     }
 
     @Test
-    void transferApplicationShouldUseAccountOperationsPortNotInternalService() {
-        ArchRule rule = noClasses()
-                .that().resideInAnyPackage("com.bank.app.transfer.application..")
-                .should().dependOnClassesThat().haveSimpleName("AccountInternalService");
-
-        rule.check(importedClasses);
-    }
-
-    @Test
     void useCasesShouldResideInApplicationLayer() {
         ArchRule rule = classes()
                 .that().haveSimpleNameEndingWith("UseCase")

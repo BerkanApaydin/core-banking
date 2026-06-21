@@ -7,7 +7,6 @@ import com.bank.app.account.domain.Iban;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.account.infrastructure.persistence.AccountMapper;
-import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -21,21 +20,16 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
 
     private final AccountJpaRepository springDataRepo;
     private final AccountMapper mapper;
-    private final EntityManager entityManager;
 
-    public AccountPersistenceAdapter(AccountJpaRepository springDataRepo, AccountMapper mapper,
-            EntityManager entityManager) {
+    public AccountPersistenceAdapter(AccountJpaRepository springDataRepo, AccountMapper mapper) {
         this.springDataRepo = springDataRepo;
         this.mapper = mapper;
-        this.entityManager = entityManager;
     }
 
     @Override
     public Optional<Account> findByIban(Iban iban) {
-        return springDataRepo.findByIban(iban.value()).map(entity -> {
-            entityManager.detach(entity);
-            return mapper.toDomain(entity);
-        });
+        return springDataRepo.findByIban(iban.value())
+                .map(mapper::toDomain);
     }
 
     @Override
@@ -45,10 +39,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
 
     @Override
     public Optional<Account> findById(Long id) {
-        return springDataRepo.findById(id).map(entity -> {
-            entityManager.detach(entity);
-            return mapper.toDomain(entity);
-        });
+        return springDataRepo.findById(id)
+                .map(mapper::toDomain);
     }
 
     @Override
@@ -59,7 +51,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     @Override
     public List<Account> findAll() {
         return springDataRepo.findAll().stream()
-                .peek(entityManager::detach)
                 .map(mapper::toDomain)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -68,7 +59,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     @Override
     public List<Account> findByUserId(Long userId) {
         return springDataRepo.findByUserId(userId).stream()
-                .peek(entityManager::detach)
                 .map(mapper::toDomain)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -80,7 +70,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
             return List.of();
         }
         return springDataRepo.findAllById(ids).stream()
-                .peek(entityManager::detach)
                 .map(mapper::toDomain)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());

@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.outbox;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -36,7 +37,7 @@ public class TransferCompletedOutboxHandler implements OutboxEventHandler {
                 payload.transferId(),
                 payload.senderAccountId(),
                 payload.receiverAccountId(),
-                new Money(payload.amount(), Money.Currency.valueOf(payload.currency())),
+                new Money(payload.amount(), Currency.valueOf(payload.currency())),
                 TransferStatus.COMPLETED,
                 event.getCreatedAt());
 

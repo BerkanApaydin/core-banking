@@ -1,6 +1,7 @@
 package com.bank.app.transfer.infrastructure.persistence;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ public class TransferMapper {
                 entity.getId(),
                 entity.getSenderAccountId(),
                 entity.getReceiverAccountId(),
-                new Money(entity.getAmount(), Money.Currency.valueOf(entity.getCurrency())),
+                new Money(entity.getAmount(), Currency.valueOf(entity.getCurrency())),
                 entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getVersion());

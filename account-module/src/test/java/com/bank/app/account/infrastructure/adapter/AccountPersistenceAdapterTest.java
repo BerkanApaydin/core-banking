@@ -1,12 +1,13 @@
 package com.bank.app.account.infrastructure.adapter;
 
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.account.infrastructure.persistence.AccountMapper;
 import com.bank.app.common.domain.Money;
-import jakarta.persistence.EntityManager;
+import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +25,6 @@ import static org.mockito.Mockito.*;
 class AccountPersistenceAdapterTest {
 
     @Mock private AccountJpaRepository springDataRepo;
-    @Mock private EntityManager entityManager;
 
     private AccountMapper mapper;
     private AccountPersistenceAdapter repository;
@@ -32,11 +32,11 @@ class AccountPersistenceAdapterTest {
     @BeforeEach
     void setUp() {
         mapper = new AccountMapper();
-        repository = new AccountPersistenceAdapter(springDataRepo, mapper, entityManager);
+        repository = new AccountPersistenceAdapter(springDataRepo, mapper);
     }
 
     private AccountJpaEntity createEntity(Long id, String iban, String ownerName, BigDecimal balance, Long userId) {
-        return new AccountJpaEntity(id, userId, iban, ownerName, balance, "TRY", true);
+        return new AccountJpaEntity(id, userId, iban, ownerName, balance, "TRY", "ACTIVE");
     }
 
     @Test
@@ -80,7 +80,7 @@ class AccountPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveSuccessfully() {
         Iban iban = new Iban("TR290006200000000000000111");
-        Account domainAccount = new Account(1L, 100L, iban, "Ahmet", Money.of("1000.00", Money.Currency.TRY), true);
+        Account domainAccount = new Account(1L, 100L, iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
 
         repository.save(domainAccount);
 
@@ -90,7 +90,7 @@ class AccountPersistenceAdapterTest {
     @Test
     void shouldFindByIbanWithLockSuccessfully() {
         Iban iban = new Iban("TR290006200000000000000111");
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", true);
+        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE");
 
         when(springDataRepo.findByIbanWithLock(iban.value())).thenReturn(Optional.of(jpaEntity));
 
@@ -116,8 +116,8 @@ class AccountPersistenceAdapterTest {
 
     @Test
     void shouldFindAllSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", true);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", true);
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE");
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", "ACTIVE");
 
         when(springDataRepo.findAll()).thenReturn(List.of(entity1, entity2));
 
@@ -141,8 +141,8 @@ class AccountPersistenceAdapterTest {
 
     @Test
     void shouldFindByIdsSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", true);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", true);
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE");
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", "ACTIVE");
 
         when(springDataRepo.findAllById(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));
 

@@ -6,12 +6,16 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.application.exception.AccountNotFoundException;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Component
+@Transactional(readOnly = true)
 public class AccountQueryService implements AccountQueryPort {
 
     private final LoadAccountPort loadAccountPort;
@@ -49,6 +53,6 @@ public class AccountQueryService implements AccountQueryPort {
                 Objects.requireNonNull(account.getId()),
                 Objects.requireNonNull(account.getUserId()),
                 Objects.requireNonNull(account.getBalance().currency().name()),
-                account.isActive());
+                account.getStatus());
     }
 }

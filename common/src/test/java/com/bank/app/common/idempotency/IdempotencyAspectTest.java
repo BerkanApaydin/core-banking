@@ -2,10 +2,10 @@ package com.bank.app.common.idempotency;
 
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,13 +16,9 @@ import org.springframework.http.ResponseEntity;
 import com.bank.app.common.exception.AuthorizationException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import java.lang.reflect.Type;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
 import java.util.Optional;
-import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -31,485 +27,369 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class IdempotencyAspectTest {
 
-        @Mock
-        private IdempotencyGuard idempotencyGuard;
+    @Mock
+    private IdempotencyGuard idempotencyGuard;
 
-        @Mock
-        private SecurityContextPort securityContextPort;
+    @Mock
+    private SecurityContextPort securityContextPort;
 
-        @Mock
-        private ObjectMapper objectMapper;
+    @Mock
+    private ObjectMapper objectMapper;
 
-        @Mock
-        private ProceedingJoinPoint joinPoint;
+    @Mock
+    private ProceedingJoinPoint joinPoint;
 
-        @Mock
-        private MethodSignature methodSignature;
+    @Mock
+    private HttpServletRequest request;
 
-        @Mock
-        private HttpServletRequest request;
+    @Mock
+    private JsonNode jsonNode;
 
-        private IdempotencyAspect aspect;
+    private IdempotencyAspect aspect;
 
-        @BeforeEach
-        void setUp() {
-                aspect = new IdempotencyAspect(
-                                idempotencyGuard,
-                                securityContextPort,
-                                objectMapper);
-        }
+    @BeforeEach
+    void setUp() {
+        aspect = new IdempotencyAspect(
+                idempotencyGuard,
+                securityContextPort,
+                objectMapper);
+    }
 
-        @AfterEach
-        void tearDown() {
-                RequestContextHolder.resetRequestAttributes();
-        }
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
+    }
 
-        @Idempotent
-        public ResponseEntity<TestResponse> parameterizedMethod() {
-                return ResponseEntity.ok(new TestResponse("ok"));
-        }
+    private void mockRequest(String header) {
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request));
 
-        @SuppressWarnings("rawtypes")
-        public ResponseEntity rawMethod() {
-                return ResponseEntity.ok().build();
-        }
+        when(request.getHeader("Idempotency-Key"))
+                .thenReturn(header);
+    }
 
-        private void mockRequest(String header) {
-                RequestContextHolder.setRequestAttributes(
-                                new ServletRequestAttributes(request));
+    private Idempotent annotation() {
+        return new Idempotent() {
+            @Override
+            public String headerName() {
+                return "Idempotency-Key";
+            }
 
-                when(request.getHeader("Idempotency-Key"))
-                                .thenReturn(header);
-        }
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return Idempotent.class;
+            }
+        };
+    }
 
-        private void mockMethod(Method method) {
-                when(joinPoint.getSignature()).thenReturn(methodSignature);
-                when(methodSignature.getMethod()).thenReturn(method);
-        }
+    @Test
+    void shouldProceedWhenRequestContextMissing() throws Throwable {
 
-        private Idempotent annotation() {
-                return new Idempotent() {
-                        @Override
-                        public String headerName() {
-                                return "Idempotency-Key";
-                        }
+        when(joinPoint.proceed()).thenReturn("OK");
 
-                        @Override
-                        public Class<? extends Annotation> annotationType() {
-                                return Idempotent.class;
-                        }
-                };
-        }
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-        @Test
-        void shouldProceedWhenRequestContextMissing() throws Throwable {
+        assertEquals("OK", result);
+        verify(joinPoint).proceed();
+    }
 
-                when(joinPoint.proceed()).thenReturn("OK");
+    @Test
+    void shouldProceedWhenHeaderNull() throws Throwable {
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+        mockRequest(null);
 
-                assertEquals("OK", result);
-                verify(joinPoint).proceed();
-        }
+        when(joinPoint.proceed()).thenReturn("OK");
 
-        @Test
-        void shouldProceedWhenHeaderNull() throws Throwable {
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                mockRequest(null);
+        assertEquals("OK", result);
+    }
 
-                when(joinPoint.proceed()).thenReturn("OK");
+    @Test
+    void shouldProceedWhenHeaderBlank() throws Throwable {
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+        mockRequest(" ");
 
-                assertEquals("OK", result);
-        }
+        when(joinPoint.proceed()).thenReturn("OK");
 
-        @Test
-        void shouldProceedWhenHeaderBlank() throws Throwable {
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                mockRequest(" ");
+        assertEquals("OK", result);
+    }
 
-                when(joinPoint.proceed()).thenReturn("OK");
+    @Test
+    void shouldThrowAccessDeniedException() {
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+        mockRequest("abc");
 
-                assertEquals("OK", result);
-        }
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.empty());
 
-        @Test
-        void shouldThrowAccessDeniedException() {
+        assertThrows(
+                AuthorizationException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+    }
 
-                mockRequest("abc");
+    @Test
+    void shouldReturnCompletedResponseWithCustomStatus() throws Throwable {
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.empty());
+        mockRequest("abc");
 
-                assertThrows(
-                                AuthorizationException.class,
-                                () -> aspect.handleIdempotency(joinPoint, annotation()));
-        }
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-        @Test
-        void shouldReturnCompletedResponseWithCustomStatus() throws Throwable {
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                "{\"message\":\"cached\"}",
+                                201));
 
-                mockRequest("abc");
+        when(objectMapper.readValue(
+                anyString(),
+                eq(JsonNode.class)))
+                .thenReturn(jsonNode);
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        assertEquals(201, result.getStatusCode().value());
+        assertSame(jsonNode, result.getBody());
+    }
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.completed(
-                                                                "{\"message\":\"cached\"}",
-                                                                201));
+    @Test
+    void shouldReturnCompletedResponseWithDefaultStatus() throws Throwable {
 
-                TestResponse body = new TestResponse("cached");
+        mockRequest("abc");
 
-                when(objectMapper.readValue(
-                                anyString(),
-                                eq(TestResponse.class)))
-                                .thenReturn(body);
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
-                                joinPoint,
-                                annotation());
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                "{}",
+                                null));
 
-                assertEquals(201, result.getStatusCode().value());
-                assertEquals(body, result.getBody());
-        }
+        when(objectMapper.readValue(
+                anyString(),
+                eq(JsonNode.class)))
+                .thenReturn(jsonNode);
 
-        @Test
-        void shouldReturnCompletedResponseWithDefaultStatus() throws Throwable {
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
 
-                mockRequest("abc");
+        assertEquals(200, result.getStatusCode().value());
+        assertSame(jsonNode, result.getBody());
+    }
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+    @Test
+    void shouldThrowConcurrentRequestException() throws Exception {
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        mockRequest("abc");
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.completed(
-                                                                "{}",
-                                                                null));
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                when(objectMapper.readValue(
-                                anyString(),
-                                eq(TestResponse.class)))
-                                .thenReturn(new TestResponse("cached"));
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.pending());
 
-                ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
-                                joinPoint,
-                                annotation());
+        assertThrows(
+                ConcurrentRequestException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+    }
 
-                assertEquals(200, result.getStatusCode().value());
-        }
+    @Test
+    void shouldCompleteRequestWhenResponseSuccessful() throws Throwable {
 
-        @Test
-        void shouldThrowConcurrentRequestException() throws Exception {
+        mockRequest("abc");
 
-                mockRequest("abc");
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        String body = "success";
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.pending());
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.ok(body));
 
-                assertThrows(
-                                ConcurrentRequestException.class,
-                                () -> aspect.handleIdempotency(joinPoint, annotation()));
-        }
+        when(objectMapper.writeValueAsString(body))
+                .thenReturn("\"success\"");
 
-        @Test
-        void shouldCompleteRequestWhenResponseSuccessful() throws Throwable {
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                mockRequest("abc");
+        verify(idempotencyGuard)
+                .completeRequest(
+                        eq("user_abc"),
+                        anyString(),
+                        eq(200));
+        assertNotNull(result);
+        assertInstanceOf(ResponseEntity.class, result);
+        assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
+    }
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+    @Test
+    void shouldCompleteWhenBodyNull() throws Throwable {
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        mockRequest("abc");
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.newRequest());
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                TestResponse body = new TestResponse("success");
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
 
-                when(joinPoint.proceed())
-                                .thenReturn(ResponseEntity.ok(body));
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.ok().build());
 
-                when(objectMapper.writeValueAsString(body))
-                                .thenReturn("{\"message\":\"success\"}");
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+        verify(idempotencyGuard)
+                .completeRequest("user_abc", "", 200);
+        assertNotNull(result);
+        assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
+    }
 
-                verify(idempotencyGuard)
-                                .completeRequest(
-                                                eq("user_abc"),
-                                                anyString(),
-                                                eq(200));
-                assertNotNull(result);
-                assertInstanceOf(ResponseEntity.class, result);
-                assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
-        }
+    @Test
+    void shouldFailWhenStatusNotSuccessful() throws Throwable {
 
-        @Test
-        void shouldCompleteWhenBodyNull() throws Throwable {
+        mockRequest("abc");
 
-                mockRequest("abc");
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.badRequest().build());
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.newRequest());
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                when(joinPoint.proceed())
-                                .thenReturn(ResponseEntity.ok().build());
+        verify(idempotencyGuard)
+                .failRequest("user_abc");
+        assertNotNull(result);
+        assertEquals(400, ((ResponseEntity<?>) result).getStatusCode().value());
+    }
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+    @Test
+    void shouldCompleteWhenReturnTypeNotResponseEntity() throws Throwable {
 
-                verify(idempotencyGuard)
-                                .completeRequest("user_abc", "", 200);
-                assertNotNull(result);
-                assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
-        }
+        mockRequest("abc");
 
-        @Test
-        void shouldFailWhenStatusNotSuccessful() throws Throwable {
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                mockRequest("abc");
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        when(joinPoint.proceed())
+                .thenReturn("OK");
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        when(objectMapper.writeValueAsString("OK"))
+                .thenReturn("\"OK\"");
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.newRequest());
+        Object result = aspect.handleIdempotency(joinPoint, annotation());
 
-                when(joinPoint.proceed())
-                                .thenReturn(ResponseEntity.badRequest().build());
+        verify(idempotencyGuard)
+                .completeRequest("user_abc", "\"OK\"", 200);
+        assertEquals("OK", result);
+    }
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+    @Test
+    void shouldFailAndRethrowException() throws Throwable {
 
-                verify(idempotencyGuard)
-                                .failRequest("user_abc");
-                assertNotNull(result);
-                assertEquals(400, ((ResponseEntity<?>) result).getStatusCode().value());
-        }
+        mockRequest("abc");
 
-        @Test
-        void shouldCompleteWhenReturnTypeNotResponseEntity() throws Throwable {
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                mockRequest("abc");
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        when(joinPoint.proceed())
+                .thenThrow(new RuntimeException("boom"));
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        assertThrows(
+                RuntimeException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.newRequest());
+        verify(idempotencyGuard)
+                .failRequest("user_abc");
+    }
 
-                when(joinPoint.proceed())
-                                .thenReturn("OK");
+    @Test
+    void shouldReturnEmptyBodyWhenCachedResponseIsNull() throws Throwable {
 
-                when(objectMapper.writeValueAsString("OK"))
-                                .thenReturn("\"OK\"");
+        mockRequest("abc");
 
-                Object result = aspect.handleIdempotency(joinPoint, annotation());
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                verify(idempotencyGuard)
-                                .completeRequest("user_abc", "\"OK\"", 200);
-                assertEquals("OK", result);
-        }
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                null,
+                                200));
 
-        @Test
-        void shouldFailAndRethrowException() throws Throwable {
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
 
-                mockRequest("abc");
+        assertEquals(200, result.getStatusCode().value());
+        assertNull(result.getBody());
+    }
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+    @Test
+    void shouldReturnEmptyBodyWhenCachedResponseIsBlank() throws Throwable {
 
-                mockMethod(
-                                getClass().getMethod("parameterizedMethod"));
+        mockRequest("abc");
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.newRequest());
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                when(joinPoint.proceed())
-                                .thenThrow(new RuntimeException("boom"));
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                "",
+                                200));
 
-                assertThrows(
-                                RuntimeException.class,
-                                () -> aspect.handleIdempotency(joinPoint, annotation()));
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
 
-                verify(idempotencyGuard)
-                                .failRequest("user_abc");
-        }
+        assertEquals(200, result.getStatusCode().value());
+        assertNull(result.getBody());
+    }
 
-        @Test
-        void shouldUseObjectClassForRawResponseEntity() throws Throwable {
+    @Test
+    void shouldReturnEmptyBodyWhenCachedResponseIsNullLiteral() throws Throwable {
 
-                mockRequest("abc");
+        mockRequest("abc");
 
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
+        when(securityContextPort.getCurrentUsername())
+                .thenReturn(Optional.of("user"));
 
-                mockMethod(
-                                getClass().getMethod("rawMethod"));
+        when(idempotencyGuard.startRequest("user_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                "null",
+                                200));
 
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.completed(
-                                                                "{}",
-                                                                200));
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                annotation());
 
-                when(objectMapper.readValue(
-                                anyString(),
-                                eq(Object.class)))
-                                .thenReturn(new Object());
-
-                aspect.handleIdempotency(joinPoint, annotation());
-
-                verify(objectMapper)
-                                .readValue(anyString(), eq(Object.class));
-        }
-
-        static class TestResponse {
-
-                private String message;
-
-                public TestResponse() {
-                }
-
-                public TestResponse(String message) {
-                        this.message = message;
-                }
-
-                public String getMessage() {
-                        return message;
-                }
-
-                public void setMessage(String message) {
-                        this.message = message;
-                }
-
-                @Override
-                public boolean equals(Object obj) {
-                        if (this == obj) {
-                                return true;
-                        }
-
-                        if (!(obj instanceof TestResponse other)) {
-                                return false;
-                        }
-
-                        return Objects.equals(message, other.message);
-                }
-
-                @Override
-                public int hashCode() {
-                        return Objects.hash(message);
-                }
-        }
-
-        @Test
-        void shouldHandleParameterizedTypeThatIsNotClass() throws Throwable {
-
-                mockRequest("abc");
-
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
-
-                mockMethod(
-                                getClass().getMethod("nestedGenericMethod"));
-
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.completed(
-                                                                "{}",
-                                                                200));
-
-                Object body = new Object();
-
-                when(objectMapper.readValue(
-                                anyString(),
-                                eq(Object.class)))
-                                .thenReturn(body);
-
-                aspect.handleIdempotency(joinPoint, annotation());
-
-                verify(objectMapper)
-                                .readValue(anyString(), eq(Object.class));
-        }
-
-        private static class Wrapper<T> {
-        }
-
-        public ResponseEntity<Wrapper<String>> nestedGenericMethod() {
-                return ResponseEntity.ok(new Wrapper<>());
-        }
-
-        @Test
-        void shouldHandleEmptyTypeArguments() throws Throwable {
-
-                mockRequest("abc");
-
-                when(securityContextPort.getCurrentUsername())
-                                .thenReturn(Optional.of("user"));
-
-                when(idempotencyGuard.startRequest("user_abc"))
-                                .thenReturn(
-                                                IdempotencyGuard.IdempotencyResult.completed(
-                                                                 "{}",
-                                                                 200));
-
-                ParameterizedType mockedType = mock(ParameterizedType.class);
-
-                when(mockedType.getActualTypeArguments())
-                                .thenReturn(new Type[0]);
-
-                Method mockedMethod = mock(Method.class);
-
-                when(mockedMethod.getReturnType()).thenReturn((Class) ResponseEntity.class);
-
-                when(mockedMethod.getGenericReturnType())
-                                .thenReturn(mockedType);
-
-                when(joinPoint.getSignature()).thenReturn(methodSignature);
-                when(methodSignature.getMethod()).thenReturn(mockedMethod);
-
-                when(objectMapper.readValue(anyString(), eq(Object.class)))
-                                .thenReturn(new Object());
-
-                aspect.handleIdempotency(joinPoint, annotation());
-
-                verify(objectMapper)
-                                .readValue(anyString(), eq(Object.class));
-        }
-
+        assertEquals(200, result.getStatusCode().value());
+        assertNull(result.getBody());
+    }
 }

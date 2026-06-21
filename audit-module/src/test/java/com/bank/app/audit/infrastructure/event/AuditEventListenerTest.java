@@ -4,6 +4,7 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.audit.application.AuditLogger;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -34,7 +35,7 @@ class AuditEventListenerTest {
 
     @Test
     void shouldLogWhenAccountCreated() {
-        Money balance = Money.of("1000.00", Money.Currency.TRY);
+        Money balance = Money.of("1000.00", Currency.TRY);
         AccountCreatedEvent event = new AccountCreatedEvent(1L, 10L, "TR123456", "Test User", balance);
 
         eventListener.onAccountCreated(event);
@@ -50,7 +51,7 @@ class AuditEventListenerTest {
 
     @Test
     void shouldLogWhenTransferCompleted() {
-        Money amount = Money.of("500.00", Money.Currency.TRY);
+        Money amount = Money.of("500.00", Currency.TRY);
         TransferCompletedEvent event = new TransferCompletedEvent(1L, 10L, 20L, amount, TransferStatus.COMPLETED);
 
         eventListener.onTransferCompleted(event);
@@ -65,7 +66,7 @@ class AuditEventListenerTest {
 
     @Test
     void shouldLogWhenTransferCancelled() {
-        Money amount = Money.of("200.00", Money.Currency.TRY);
+        Money amount = Money.of("200.00", Currency.TRY);
         TransferCancelledEvent event = new TransferCancelledEvent(1L, 10L, 20L, amount);
 
         eventListener.onTransferCancelled(event);

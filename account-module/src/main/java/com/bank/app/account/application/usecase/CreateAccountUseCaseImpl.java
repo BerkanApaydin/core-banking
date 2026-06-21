@@ -5,15 +5,21 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import java.util.Objects;
 
+@Component
+@Transactional
 public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
     private final LoadAccountPort loadAccountPort;
@@ -39,10 +45,10 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
             throw new DuplicateIbanException("Bu IBAN ile kayıtlı bir hesap zaten mevcut: " + iban.value());
         }
 
-        Money.Currency currency = request.currency();
+        Currency currency = request.currency();
 
         Money balance = new Money(request.initialBalance(), currency);
-        Account account = new Account(null, request.userId(), iban, request.ownerName(), balance, true);
+        Account account = new Account(null, request.userId(), iban, request.ownerName(), balance, AccountStatus.ACTIVE);
 
         Account savedAccount = saveAccountPort.save(account);
 

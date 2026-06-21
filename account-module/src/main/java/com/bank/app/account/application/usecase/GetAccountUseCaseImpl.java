@@ -8,11 +8,15 @@ import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountQuery;
 import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Component
+@Transactional(readOnly = true)
 public class GetAccountUseCaseImpl implements GetAccountQuery {
 
     private final LoadAccountPort loadAccountPort;

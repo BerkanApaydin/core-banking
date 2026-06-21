@@ -5,6 +5,7 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class NotificationAdaptersTest {
         lenient().when(transfer.getId()).thenReturn(1L);
         lenient().when(transfer.getSenderAccountId()).thenReturn(10L);
         lenient().when(transfer.getReceiverAccountId()).thenReturn(20L);
-        lenient().when(transfer.getAmount()).thenReturn(new Money(BigDecimal.TEN, Money.Currency.TRY));
+        lenient().when(transfer.getAmount()).thenReturn(new Money(BigDecimal.TEN, Currency.TRY));
         lenient().when(transfer.getStatus()).thenReturn(TransferStatus.COMPLETED);
         lenient().when(transfer.getCreatedAt()).thenReturn(LocalDateTime.now());
     }

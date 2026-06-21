@@ -4,6 +4,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.outbox.OutboxEventJpaRepository;
@@ -72,9 +73,9 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 
             accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
-                    new BigDecimal("1000.00"), "TRY", true));
+                    new BigDecimal("1000.00"), "TRY", "ACTIVE"));
             accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
-                    new BigDecimal("1000.00"), "TRY", true));
+                    new BigDecimal("1000.00"), "TRY", "ACTIVE"));
         });
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
@@ -105,7 +106,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("10.00"),
-                Money.Currency.TRY);
+                Currency.TRY);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
@@ -149,7 +150,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("250.00"),
-                Money.Currency.TRY);
+                Currency.TRY);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {

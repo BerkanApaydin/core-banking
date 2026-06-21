@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
@@ -52,7 +53,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
 
         private TransferRequest validRequest() {
                 return new TransferRequest(SENDER_IBAN, RECEIVER_IBAN,
-                                new BigDecimal("200.00"), Money.Currency.TRY);
+                                new BigDecimal("200.00"), Currency.TRY);
         }
 
         private void mockActiveAccounts() {
@@ -73,7 +74,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
         @Test
         void shouldThrowWhenSenderIbanAndReceiverIbanAreSame() {
                 TransferRequest request = new TransferRequest(SENDER_IBAN, SENDER_IBAN,
-                                new BigDecimal("200.00"), Money.Currency.TRY);
+                                new BigDecimal("200.00"), Currency.TRY);
 
                 when(accountOperationPort.getAccountInfoForTransfer(SENDER_IBAN))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
@@ -88,7 +89,7 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 TransferRequest request = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "tr290006200000000000000111",
-                                new BigDecimal("200.00"), Money.Currency.TRY);
+                                new BigDecimal("200.00"), Currency.TRY);
 
                 when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000111"))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));

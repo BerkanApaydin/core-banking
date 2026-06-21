@@ -1,15 +1,16 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import java.util.Objects;
 
 public record TransferParticipants(
         Long senderId,
         String senderIban,
-        Money.Currency senderCurrency,
+        Currency senderCurrency,
         Long receiverId,
         String receiverIban,
-        Money.Currency receiverCurrency) {
+        Currency receiverCurrency) {
     public TransferParticipants {
         Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
         Objects.requireNonNull(senderIban, "Gönderici IBAN null olamaz");

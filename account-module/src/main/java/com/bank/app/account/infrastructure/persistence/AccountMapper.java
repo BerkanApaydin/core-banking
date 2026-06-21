@@ -1,8 +1,10 @@
 package com.bank.app.account.infrastructure.persistence;
 
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +21,8 @@ public class AccountMapper {
                 entity.getUserId(),
                 new Iban(entity.getIban()),
                 entity.getOwnerName(),
-                new Money(entity.getBalance(), Money.Currency.valueOf(entity.getCurrency())),
-                entity.isActive(),
+                new Money(entity.getBalance(), Currency.valueOf(entity.getCurrency())),
+                AccountStatus.valueOf(entity.getStatus()),
                 entity.getVersion()
         );
     }
@@ -37,7 +39,7 @@ public class AccountMapper {
                 domain.getOwnerName(),
                 domain.getBalance().amount(),
                 domain.getBalance().currency().name(),
-                domain.isActive(),
+                domain.getStatus().name(),
                 domain.getVersion()
         );
     }

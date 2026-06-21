@@ -9,8 +9,16 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.domain.Transfer;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
+@Component
+@Transactional
 public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
     private final LoadTransferPort loadTransferPort;
@@ -25,7 +33,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
                                  AccountOperationPort accountOperationPort,
                                  EventPublisherPort eventPublisherPort,
                                  SecurityContextPort securityContextPort,
-                                 int cancellationWindowHours) {
+                                 @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountOperationPort = accountOperationPort;
@@ -34,6 +42,12 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         this.cancellationWindowHours = cancellationWindowHours;
     }
 
+    @Override
+    @Retryable(
+            retryFor = ConcurrencyFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 500, multiplier = 2)
+    )
     public void execute(Long transferId) {
         Objects.requireNonNull(transferId, "Transfer ID null olamaz");
         Transfer transfer = loadTransferPort.findByIdWithLock(transferId)

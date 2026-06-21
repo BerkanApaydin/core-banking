@@ -3,7 +3,9 @@ package com.bank.app.transfer.infrastructure.adapter;
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryPort;
 import com.bank.app.account.application.port.in.AccountTransferOperationPort;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,7 +32,7 @@ class AccountOperationAdapterTest {
 
     @Test
     void shouldMapAccountInfoCorrectly() {
-        AccountInfo internalInfo = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo internalInfo = new AccountInfo(1L, 100L, "TRY", AccountStatus.ACTIVE);
         when(accountQueryPort.getAccountInfo(1L)).thenReturn(internalInfo);
 
         var result = adapter.getAccountInfo(1L);
@@ -44,7 +46,7 @@ class AccountOperationAdapterTest {
 
     @Test
     void shouldMapAccountInfoForTransferCorrectly() {
-        AccountInfo internalInfo = new AccountInfo(2L, 200L, "USD", false);
+        AccountInfo internalInfo = new AccountInfo(2L, 200L, "USD", AccountStatus.SUSPENDED);
         when(accountQueryPort.getAccountInfoForTransfer("TR123")).thenReturn(internalInfo);
 
         var result = adapter.getAccountInfoForTransfer("TR123");
@@ -58,7 +60,7 @@ class AccountOperationAdapterTest {
 
     @Test
     void shouldDelegateDebitAndCredit() {
-        Money amount = Money.of("100.00", Money.Currency.TRY);
+        Money amount = Money.of("100.00", Currency.TRY);
 
         adapter.debitAndCredit(1L, 2L, amount);
 
@@ -67,7 +69,7 @@ class AccountOperationAdapterTest {
 
     @Test
     void shouldDelegateReverseBalancesForCancellation() {
-        Money amount = Money.of("50.00", Money.Currency.TRY);
+        Money amount = Money.of("50.00", Currency.TRY);
 
         adapter.reverseBalancesForCancellation(10L, 20L, amount);
 

@@ -2,6 +2,7 @@ package com.bank.app.transfer.infrastructure.adapter;
 
 import com.bank.app.account.application.port.in.AccountQueryPort;
 import com.bank.app.account.application.port.in.AccountTransferOperationPort;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import org.springframework.lang.NonNull;
@@ -25,14 +26,14 @@ public class AccountOperationAdapter implements AccountOperationPort {
     @Override
     public @NonNull AccountInfo getAccountInfo(Long accountId) {
         com.bank.app.account.application.port.in.AccountInfo info = accountQueryPort.getAccountInfo(accountId);
-        return new AccountInfo(info.id(), info.userId(), info.currency(), info.active());
+        return new AccountInfo(info.id(), info.userId(), info.currency(), info.status() == AccountStatus.ACTIVE);
     }
 
     @Override
     public @NonNull AccountInfo getAccountInfoForTransfer(String ibanValue) {
         com.bank.app.account.application.port.in.AccountInfo info = accountQueryPort
                 .getAccountInfoForTransfer(ibanValue);
-        return new AccountInfo(info.id(), info.userId(), info.currency(), info.active());
+        return new AccountInfo(info.id(), info.userId(), info.currency(), info.status() == AccountStatus.ACTIVE);
     }
 
     @Override

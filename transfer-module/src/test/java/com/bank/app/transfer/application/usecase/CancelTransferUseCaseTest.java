@@ -9,6 +9,7 @@ import com.bank.app.common.security.port.out.SecurityContextPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.application.port.out.EventPublisherPort;
@@ -43,7 +44,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldCancelTransferSuccessfully() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));
@@ -73,7 +74,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowAccessDeniedExceptionWhenNotAuthorizedToCancel() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));
@@ -90,7 +91,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldPropagateAccessDeniedExceptionFromAccountOperationsPort() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));
@@ -107,7 +108,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowTransferAlreadyCancelledExceptionWhenTransferIsCancelled() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now().minusHours(1));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));
@@ -123,7 +124,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenStatusIsPending() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.PENDING, LocalDateTime.now().minusHours(1));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.PENDING, LocalDateTime.now().minusHours(1));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));
@@ -139,7 +140,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenCancellationWindowExpired() {
-        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
+        Transfer transfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
 
         when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(new AccountOperationPort.AccountInfo(1L, 100L, "TRY", true));

@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.bootstrap;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
@@ -45,8 +46,8 @@ public class DataSeeder {
     @Bean
     CommandLineRunner seedData() {
         return args -> {
-            seedUser("ahmet", "ahmet123");
-            seedUser("ayse", "ayse123");
+            seedUser("ahmet", "Ahmet123");
+            seedUser("ayse", "Ayse1234");
 
             var ahmet = loadUserPort.findByUsername("ahmet")
                     .orElseThrow(() -> new IllegalStateException("Ahmet kullanıcısı bulunamadı."));
@@ -55,14 +56,14 @@ public class DataSeeder {
 
             runAsUser(ahmet.getId(), ahmet.getUsername(), () -> {
                 seedAccountIfAbsent(ahmet.getId(), "TR123456789012345678901234", "Ahmet Yılmaz",
-                        new BigDecimal("1000.00"), Money.Currency.TRY);
+                        new BigDecimal("1000.00"), Currency.TRY);
                 seedAccountIfAbsent(ahmet.getId(), "TR111111111111111111111111", "Ahmet Yılmaz (Dolar Hesabı)",
-                        new BigDecimal("2000.00"), Money.Currency.USD);
+                        new BigDecimal("2000.00"), Currency.USD);
             });
 
             runAsUser(ayse.getId(), ayse.getUsername(), () ->
                     seedAccountIfAbsent(ayse.getId(), "TR987654321098765432109876", "Ayşe Demir",
-                            new BigDecimal("500.00"), Money.Currency.TRY));
+                            new BigDecimal("500.00"), Currency.TRY));
 
             log.info("Veritabanı tohumlama tamamlandı (use case tabanlı).");
         };
@@ -77,7 +78,7 @@ public class DataSeeder {
     }
 
     private void seedAccountIfAbsent(Long userId, String iban, String ownerName,
-                                     BigDecimal balance, Money.Currency currency) {
+                                     BigDecimal balance, Currency currency) {
         try {
             createAccountPort.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
             log.info("Hesap oluşturuldu: {}", iban);

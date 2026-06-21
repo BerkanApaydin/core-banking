@@ -4,6 +4,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
@@ -68,9 +69,9 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 
         accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
-                new BigDecimal("1000.00"), "TRY", true));
+                new BigDecimal("1000.00"), "TRY", "ACTIVE"));
         accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
-                new BigDecimal("1000.00"), "TRY", true));
+                new BigDecimal("1000.00"), "TRY", "ACTIVE"));
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
         when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
@@ -82,7 +83,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("50.00"),
-                Money.Currency.TRY
+                Currency.TRY
         );
 
         placeTransferPort.execute(request);

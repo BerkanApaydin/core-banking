@@ -1,5 +1,6 @@
 package com.bank.app.user.infrastructure.web;
 
+import com.bank.app.common.api.ApiVersionConfig;
 import com.bank.app.common.handler.GlobalExceptionHandler;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -22,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, ApiVersionConfig.class})
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerWebMvcTest {
 

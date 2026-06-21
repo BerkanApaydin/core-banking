@@ -8,7 +8,9 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.application.exception.UserNotFoundException;
+import org.springframework.stereotype.Component;
 
+@Component
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private final AuthenticationPort authenticationPort;

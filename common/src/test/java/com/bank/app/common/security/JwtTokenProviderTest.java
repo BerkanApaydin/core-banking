@@ -133,6 +133,27 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void shouldThrowExceptionWhenTokenHasInvalidSignature() {
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
+
+        JwtTokenProvider differentKeyProvider = new JwtTokenProvider(environment,
+                "DifferentSecretKeyForTestingPurposesOnlyDifferentSecretKeyForTestingPurposesOnly!",
+                86400000L, true);
+
+        assertThrows(io.jsonwebtoken.security.SecurityException.class,
+                () -> differentKeyProvider.extractUsername(token));
+    }
+
+    @Test
+    void shouldReturnFalseWhenValidatingTamperedToken() {
+        String token = jwtTokenProvider.generateToken(100L, "john_doe");
+        String tamperedToken = token.substring(0, token.length() - 5) + "TAMPER";
+
+        assertThrows(Exception.class,
+                () -> jwtTokenProvider.extractUsername(tamperedToken));
+    }
+
+    @Test
     void shouldReturnFalseWhenTokenIsExpiredButNoExceptionThrown() {
         JwtTokenProvider spyService = spy(jwtTokenProvider);
         DummyUserDetails userDetails = new DummyUserDetails("john_doe");

@@ -35,8 +35,8 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .executeUpdate();
 
         entityManager.createNativeQuery(
-                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
-                "VALUES (2, 100, 'TR290006200000000000000111', 'Test User', 1000.00, 'TRY', true, 0, NOW())")
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at) " +
+                "VALUES (2, 100, 'TR290006200000000000000111', 'Test User', 1000.00, 'TRY', 'ACTIVE', 0, NOW())")
                 .executeUpdate();
 
         savedEntityId = 2L;
@@ -104,8 +104,8 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldPersistAllAccountFieldsCorrectly() {
         entityManager.createNativeQuery(
-                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
-                "VALUES (3, 100, 'TR290006200000000000000222', 'Another User', 500.50, 'EUR', false, 0, NOW())")
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at) " +
+                "VALUES (3, 100, 'TR290006200000000000000222', 'Another User', 500.50, 'EUR', 'SUSPENDED', 0, NOW())")
                 .executeUpdate();
 
         Optional<AccountJpaEntity> found = repo.findByIban("TR290006200000000000000222");
@@ -115,7 +115,7 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
         assertEquals("Another User", found.get().getOwnerName());
         assertEquals(0, new BigDecimal("500.50").compareTo(found.get().getBalance()));
         assertEquals("EUR", found.get().getCurrency());
-        assertFalse(found.get().isActive());
+        assertEquals("SUSPENDED", found.get().getStatus());
     }
 
     @Test

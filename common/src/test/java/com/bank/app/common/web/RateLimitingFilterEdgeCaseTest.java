@@ -30,7 +30,7 @@ class RateLimitingFilterEdgeCaseTest {
     @BeforeEach
     void setUp() {
         when(request.getMethod()).thenReturn("POST");
-        filter = new RateLimitingFilter(rateLimiter, messageSource);
+        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties());
     }
 
     @Test

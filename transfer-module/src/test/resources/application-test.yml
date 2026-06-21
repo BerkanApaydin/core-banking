@@ -2,6 +2,26 @@ jwt:
   allow-default-secret: true
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      emailNotification:
+        registerHealthIndicator: true
+        slidingWindowSize: 3
+        permittedNumberOfCallsInHalfOpenState: 1
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 2
+        waitDurationInOpenState: 60000
+        failureRateThreshold: 50
+      smsNotification:
+        registerHealthIndicator: true
+        slidingWindowSize: 3
+        permittedNumberOfCallsInHalfOpenState: 1
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 2
+        waitDurationInOpenState: 60000
+        failureRateThreshold: 50
+
 app:
   security:
     cors:

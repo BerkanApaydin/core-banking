@@ -6,6 +6,7 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.account.ModuleIntegrationTestConfig;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.security.JwtTokenProvider;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -72,7 +73,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 "TR290006200000000000000999",
                                 "Fatma Demir",
                                 new BigDecimal("1500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/accounts")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -84,20 +85,20 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .andExpect(jsonPath("$.ownerName", is("Fatma Demir")))
                                 .andExpect(jsonPath("$.balance", is(1500.00)))
                                 .andExpect(jsonPath("$.currency", is("TRY")))
-                                .andExpect(jsonPath("$.active", is(true)));
+                                .andExpect(jsonPath("$.status", is("ACTIVE")));
         }
 
         @Test
         void shouldReturnBadRequestWhenCreatingAccountWithDuplicateIban() throws Exception {
                 accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000999", "Eski Sahip",
-                                new BigDecimal("100.00"), "TRY", true));
+                                new BigDecimal("100.00"), "TRY", "ACTIVE"));
 
                 CreateAccountRequest request = new CreateAccountRequest(
                                 testUserId,
                                 "TR290006200000000000000999",
                                 "Fatma Demir",
                                 new BigDecimal("1500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockMvc.perform(post("/api/v1/accounts")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -112,7 +113,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
         void shouldGetAccountByIdSuccessfully() throws Exception {
                 AccountJpaEntity saved = accountRepo
                                 .save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888",
-                                                "Fatma Demir", new BigDecimal("2000.00"), "TRY", true));
+                                                "Fatma Demir", new BigDecimal("2000.00"), "TRY", "ACTIVE"));
 
                 mockMvc.perform(get("/api/v1/accounts/" + saved.getId())
                                 .header("Authorization", "Bearer " + jwtToken))
@@ -135,7 +136,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
         @Test
         void shouldGetAccountByIbanSuccessfully() throws Exception {
                 accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
-                                new BigDecimal("2000.00"), "TRY", true));
+                                new BigDecimal("2000.00"), "TRY", "ACTIVE"));
 
                 mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000888")
                                 .header("Authorization", "Bearer " + jwtToken))
@@ -147,7 +148,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
     @Test
     void shouldListAccountsSuccessfully() throws Exception {
         accountRepo.save(new AccountJpaEntity(null, testUserId, "TR290006200000000000000888", "Fatma Demir",
-                new BigDecimal("2000.00"), "TRY", true));
+                new BigDecimal("2000.00"), "TRY", "ACTIVE"));
 
         mockMvc.perform(get("/api/v1/accounts")
                 .header("Authorization", "Bearer " + jwtToken))
@@ -171,7 +172,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 "TR290006200000000000000777",
                 "Veli",
                 new BigDecimal("-100.00"),
-                Money.Currency.TRY);
+                Currency.TRY);
 
         mockMvc.perform(post("/api/v1/accounts")
                 .header("Authorization", "Bearer " + jwtToken)
@@ -187,7 +188,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 new UserJpaEntity(null, "other_user", "pass", "ROLE_USER"));
         AccountJpaEntity otherAccount = accountRepo.save(
                 new AccountJpaEntity(null, otherUser.getId(), "TR290006200000000000000555",
-                        "Other Owner", new BigDecimal("500.00"), "TRY", true));
+                        "Other Owner", new BigDecimal("500.00"), "TRY", "ACTIVE"));
 
         mockMvc.perform(get("/api/v1/accounts/" + otherAccount.getId())
                 .header("Authorization", "Bearer " + jwtToken))
@@ -201,7 +202,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 new UserJpaEntity(null, "other_user2", "pass", "ROLE_USER"));
         accountRepo.save(
                 new AccountJpaEntity(null, otherUser.getId(), "TR290006200000000000000666",
-                        "Other Owner", new BigDecimal("500.00"), "TRY", true));
+                        "Other Owner", new BigDecimal("500.00"), "TRY", "ACTIVE"));
 
         mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000666")
                 .header("Authorization", "Bearer " + jwtToken))
@@ -219,7 +220,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 "TR290006200000000000000444",
                 "Victim",
                 new BigDecimal("100.00"),
-                Money.Currency.TRY);
+                Currency.TRY);
 
         mockMvc.perform(post("/api/v1/accounts")
                 .header("Authorization", "Bearer " + jwtToken)

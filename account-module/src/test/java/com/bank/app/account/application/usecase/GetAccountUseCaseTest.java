@@ -4,9 +4,11 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.in.GetAccountQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,8 +48,8 @@ class GetAccountUseCaseTest {
                 100L,
                 new Iban("TR290006200000000000000123"),
                 "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                new Money(new BigDecimal("500.00"), Currency.TRY),
+                AccountStatus.ACTIVE);
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
@@ -59,7 +61,7 @@ class GetAccountUseCaseTest {
         assertEquals("TR290006200000000000000123", response.iban());
         assertEquals("Ali Veli", response.ownerName());
         assertEquals(new BigDecimal("500.00"), response.balance());
-        assertTrue(response.active());
+        assertEquals(AccountStatus.ACTIVE, response.status());
     }
 
     @Test
@@ -81,8 +83,8 @@ class GetAccountUseCaseTest {
                 100L,
                 iban,
                 "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                new Money(new BigDecimal("500.00"), Currency.TRY),
+                AccountStatus.ACTIVE);
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
@@ -123,8 +125,8 @@ class GetAccountUseCaseTest {
                 100L,
                 new Iban("TR290006200000000000000123"),
                 "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                new Money(new BigDecimal("500.00"), Currency.TRY),
+                AccountStatus.ACTIVE);
 
         when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
         doThrow(new AuthorizationException("Bu hesaba erişim yetkiniz yok."))
@@ -143,8 +145,8 @@ class GetAccountUseCaseTest {
                 100L,
                 iban,
                 "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                new Money(new BigDecimal("500.00"), Currency.TRY),
+                AccountStatus.ACTIVE);
 
         when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
         doThrow(new AuthorizationException("Bu hesaba erişim yetkiniz yok."))
@@ -162,8 +164,8 @@ class GetAccountUseCaseTest {
                 100L,
                 new Iban("TR290006200000000000000123"),
                 "Ali Veli",
-                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                true);
+                new Money(new BigDecimal("500.00"), Currency.TRY),
+                AccountStatus.ACTIVE);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
         when(loadAccountPort.findByUserId(100L)).thenReturn(Collections.singletonList(account));

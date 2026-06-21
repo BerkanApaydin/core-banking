@@ -20,13 +20,25 @@ public class UserJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false)
     private String role;
 
+    @Column
+    private String email;
+
+    @Column
+    private String phone;
+
     public UserJpaEntity() {}
 
     public UserJpaEntity(Long id, String username, String password, String role) {
+        this(id, username, password, role, null, null);
+    }
+
+    public UserJpaEntity(Long id, String username, String password, String role, String email, String phone) {
         this.id = id;
         this.username = username;
         this.password = password;
         this.role = role;
+        this.email = email;
+        this.phone = phone;
     }
 
     public Long getId() {
@@ -59,5 +71,21 @@ public class UserJpaEntity extends AuditableJpaEntity {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 }

@@ -10,9 +10,13 @@ public record Iban(String value) {
 
     public Iban {
         Objects.requireNonNull(value, "IBAN boş olamaz");
-        value = value.replaceAll("\\s", "").toUpperCase();
+        value = normalize(value);
         if (!IBAN_PATTERN.matcher(value).matches()) {
             throw new InvalidIbanException("Geçersiz IBAN formatı: " + value);
         }
+    }
+
+    public static String normalize(String iban) {
+        return iban.replaceAll("\\s", "").toUpperCase();
     }
 }

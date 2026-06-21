@@ -1,6 +1,7 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
@@ -14,7 +15,7 @@ class TransferTest {
 
     @Test
     void shouldCancelTransferSuccessfullyWhenWithin24HoursAndCompleted() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(2));
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(2));
         
         transfer.cancel(24);
         
@@ -23,7 +24,7 @@ class TransferTest {
 
     @Test
     void shouldThrowTransferAlreadyCancelledExceptionWhenAlreadyCancelled() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
         
         TransferAlreadyCancelledException ex = assertThrows(TransferAlreadyCancelledException.class,
                 () -> transfer.cancel(24));
@@ -32,7 +33,7 @@ class TransferTest {
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenStatusIsFailed() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
@@ -41,7 +42,7 @@ class TransferTest {
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenStatusIsPending() {
-        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Currency.TRY));
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
@@ -50,7 +51,7 @@ class TransferTest {
 
     @Test
     void shouldThrowTransferNotCancellableExceptionWhenOlderThan24Hours() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now().minusHours(25));
 
         TransferNotCancellableException ex = assertThrows(TransferNotCancellableException.class,
                 () -> transfer.cancel(24));
@@ -60,20 +61,20 @@ class TransferTest {
     @Test
     void shouldThrowNullPointerExceptionWhenConstructorArgsAreNull() {
         assertThrows(NullPointerException.class, () ->
-                new Transfer(1L, null, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now()));
+                new Transfer(1L, null, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now()));
         assertThrows(NullPointerException.class, () ->
-                new Transfer(1L, 1L, null, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now()));
+                new Transfer(1L, 1L, null, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now()));
         assertThrows(NullPointerException.class, () ->
                 new Transfer(1L, 1L, 2L, null, TransferStatus.COMPLETED, LocalDateTime.now()));
         assertThrows(NullPointerException.class, () ->
-                new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), null, LocalDateTime.now()));
+                new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), null, LocalDateTime.now()));
         assertThrows(NullPointerException.class, () ->
-                new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, null));
+                new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, null));
     }
 
     @Test
     void shouldCompletePendingTransferSuccessfully() {
-        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Currency.TRY));
         assertEquals(TransferStatus.PENDING, transfer.getStatus());
 
         transfer.complete();
@@ -83,26 +84,26 @@ class TransferTest {
 
     @Test
     void shouldThrowIllegalStateExceptionWhenCompletingNonPendingTransfer() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
 
         assertThrows(IllegalStateException.class, transfer::complete);
     }
 
     @Test
     void shouldCreateTransferWithVersion() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.PENDING, LocalDateTime.now(), 3L);
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.PENDING, LocalDateTime.now(), 3L);
         assertEquals(3L, transfer.getVersion());
     }
 
     @Test
     void shouldCreateTransferWithNullVersionByDefault() {
-        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Currency.TRY));
         assertNull(transfer.getVersion());
     }
 
     @Test
     void shouldCompleteAndFailStatusTransitionsCorrectly() {
-        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Money.Currency.TRY));
+        Transfer transfer = Transfer.create(1L, 2L, Money.of("100.00", Currency.TRY));
         assertEquals(TransferStatus.PENDING, transfer.getStatus());
 
         transfer.complete();

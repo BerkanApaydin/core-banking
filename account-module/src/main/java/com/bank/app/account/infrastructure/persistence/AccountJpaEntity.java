@@ -27,25 +27,25 @@ public class AccountJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false)
     private String currency;
 
-    private boolean active;
+    private String status;
 
     @Version
     private Long version;
 
     public AccountJpaEntity() {}
 
-    public AccountJpaEntity(Long id, Long userId, String iban, String ownerName, BigDecimal balance, String currency, boolean active) {
+    public AccountJpaEntity(Long id, Long userId, String iban, String ownerName, BigDecimal balance, String currency, String status) {
         this.id = id;
         this.userId = userId;
         this.iban = iban;
         this.ownerName = ownerName;
         this.balance = balance;
         this.currency = currency;
-        this.active = active;
+        this.status = status;
     }
 
-    public AccountJpaEntity(Long id, Long userId, String iban, String ownerName, BigDecimal balance, String currency, boolean active, Long version) {
-        this(id, userId, iban, ownerName, balance, currency, active);
+    public AccountJpaEntity(Long id, Long userId, String iban, String ownerName, BigDecimal balance, String currency, String status, Long version) {
+        this(id, userId, iban, ownerName, balance, currency, status);
         this.version = version;
     }
 
@@ -98,12 +98,12 @@ public class AccountJpaEntity extends AuditableJpaEntity {
         this.currency = currency;
     }
 
-    public boolean isActive() {
-        return active;
+    public String getStatus() {
+        return status;
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public Long getVersion() {

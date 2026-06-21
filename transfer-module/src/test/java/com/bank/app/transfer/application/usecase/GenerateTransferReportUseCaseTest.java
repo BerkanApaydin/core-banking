@@ -7,6 +7,7 @@ import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.common.security.port.out.SecurityContextPort;
@@ -55,9 +56,9 @@ class GenerateTransferReportUseCaseTest {
                 2L, "TR290006200000000000000222",
                 3L, "TR290006200000000000000333"));
 
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Money.Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED,
                 start.plusDays(1));
-        Transfer t2 = new Transfer(11L, 1L, 3L, Money.of("250.00", Money.Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t2 = new Transfer(11L, 1L, 3L, Money.of("250.00", Currency.TRY), TransferStatus.COMPLETED,
                 start.plusDays(2));
 
         List<Transfer> transfers = Arrays.asList(t1, t2);

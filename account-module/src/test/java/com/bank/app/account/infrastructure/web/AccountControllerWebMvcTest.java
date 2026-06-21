@@ -4,12 +4,16 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountQuery;
+import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.api.ApiVersionConfig;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AccountController.class)
+@Import(ApiVersionConfig.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AccountControllerWebMvcTest {
 
@@ -42,9 +47,9 @@ class AccountControllerWebMvcTest {
     void shouldCreateAccountAndReturn201() throws Exception {
         CreateAccountRequest request = new CreateAccountRequest(
                 100L, "TR290006200000000000000123", "Ali Veli",
-                new BigDecimal("500.00"), Money.Currency.TRY);
-        AccountResponse response = new AccountResponse(1L, "TR290006200000000000000123",
-                "Ali Veli", new BigDecimal("500.00"), "TRY", true);
+                new BigDecimal("500.00"), Currency.TRY);
+        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000123",
+                "Ali Veli", new BigDecimal("500.00"), "TRY", AccountStatus.ACTIVE, true);
 
         when(createAccountPort.execute(any(CreateAccountRequest.class))).thenReturn(response);
 
@@ -57,7 +62,7 @@ class AccountControllerWebMvcTest {
                 .andExpect(jsonPath("$.ownerName").value("Ali Veli"))
                 .andExpect(jsonPath("$.balance").value(500.00))
                 .andExpect(jsonPath("$.currency").value("TRY"))
-                .andExpect(jsonPath("$.active").value(true));
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test
@@ -73,8 +78,8 @@ class AccountControllerWebMvcTest {
 
     @Test
     void shouldListAllAccounts() throws Exception {
-        AccountResponse a1 = new AccountResponse(1L, "TR290006200000000000000111",
-                "Ali", new BigDecimal("1000.00"), "TRY", true);
+        AccountResponse a1 = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
         when(getAccountPort.getAll()).thenReturn(List.of(a1));
 
         mockMvc.perform(get("/api/v1/accounts"))
@@ -86,8 +91,8 @@ class AccountControllerWebMvcTest {
 
     @Test
     void shouldGetAccountById() throws Exception {
-        AccountResponse response = new AccountResponse(1L, "TR290006200000000000000111",
-                "Ali", new BigDecimal("1000.00"), "TRY", true);
+        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
         when(getAccountPort.getById(1L)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/accounts/1"))
@@ -98,8 +103,8 @@ class AccountControllerWebMvcTest {
 
     @Test
     void shouldGetAccountByIban() throws Exception {
-        AccountResponse response = new AccountResponse(1L, "TR290006200000000000000111",
-                "Ali", new BigDecimal("1000.00"), "TRY", true);
+        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
         when(getAccountPort.getByIban("TR290006200000000000000111")).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000111"))

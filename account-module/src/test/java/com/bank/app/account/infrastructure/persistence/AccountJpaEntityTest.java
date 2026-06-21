@@ -10,7 +10,7 @@ class AccountJpaEntityTest {
 
     @Test
     void shouldCreateAccountJpaEntity() {
-        AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, "TRY", true);
+        AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, "TRY", "ACTIVE");
 
         assertEquals(1L, entity.getId());
         assertEquals(2L, entity.getUserId());
@@ -18,7 +18,7 @@ class AccountJpaEntityTest {
         assertEquals("name", entity.getOwnerName());
         assertEquals(BigDecimal.TEN, entity.getBalance());
         assertEquals("TRY", entity.getCurrency());
-        assertTrue(entity.isActive());
+        assertEquals("ACTIVE", entity.getStatus());
 
         AccountJpaEntity empty = new AccountJpaEntity();
         empty.setId(10L);
@@ -27,7 +27,7 @@ class AccountJpaEntityTest {
         empty.setOwnerName("name2");
         empty.setBalance(BigDecimal.ONE);
         empty.setCurrency("USD");
-        empty.setActive(false);
+        empty.setStatus("SUSPENDED");
         empty.setVersion(5L);
 
         assertEquals(10L, empty.getId());
@@ -36,7 +36,7 @@ class AccountJpaEntityTest {
         assertEquals("name2", empty.getOwnerName());
         assertEquals(BigDecimal.ONE, empty.getBalance());
         assertEquals("USD", empty.getCurrency());
-        assertFalse(empty.isActive());
+        assertEquals("SUSPENDED", empty.getStatus());
         assertEquals(5L, empty.getVersion());
     }
 }

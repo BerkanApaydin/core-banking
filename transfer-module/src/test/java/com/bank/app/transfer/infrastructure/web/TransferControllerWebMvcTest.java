@@ -1,6 +1,8 @@
 package com.bank.app.transfer.infrastructure.web;
 
+import com.bank.app.common.api.ApiVersionConfig;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.dto.*;
 import com.bank.app.transfer.application.port.in.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransferController.class)
+@Import(ApiVersionConfig.class)
 @AutoConfigureMockMvc(addFilters = false)
 class TransferControllerWebMvcTest {
 
@@ -51,7 +55,7 @@ class TransferControllerWebMvcTest {
     void shouldPlaceTransferAndReturn201() throws Exception {
         TransferRequest request = new TransferRequest(
                 "TR290006200000000000000111", "TR290006200000000000000222",
-                new BigDecimal("200.00"), Money.Currency.TRY);
+                new BigDecimal("200.00"), Currency.TRY);
         TransferResponse response = new TransferResponse(10L, "COMPLETED", new BigDecimal("200.00"),
                 "TRY", LocalDateTime.now(), "TR290006200000000000000111",
                 "TR290006200000000000000222", 1L, 2L);

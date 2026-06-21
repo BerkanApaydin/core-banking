@@ -8,9 +8,11 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +55,7 @@ class CreateAccountUseCaseTest {
                                 "TR290006200000000000000123",
                                 "Ali Veli",
                                 new BigDecimal("500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 Iban iban = new Iban(request.iban());
                 Account savedAccount = new Account(
@@ -61,8 +63,8 @@ class CreateAccountUseCaseTest {
                                 100L,
                                 iban,
                                 "Ali Veli",
-                                new Money(new BigDecimal("500.00"), Money.Currency.TRY),
-                                true);
+                                new Money(new BigDecimal("500.00"), Currency.TRY),
+                                AccountStatus.ACTIVE);
 
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
                 when(loadAccountPort.findByIban(iban))
@@ -78,7 +80,7 @@ class CreateAccountUseCaseTest {
                 assertEquals("Ali Veli", response.ownerName());
                 assertEquals(new BigDecimal("500.00"), response.balance());
                 assertEquals("TRY", response.currency());
-                assertTrue(response.active());
+                assertEquals(AccountStatus.ACTIVE, response.status());
 
                 verify(saveAccountPort).save(any(Account.class));
                 verify(eventPublisherPort).publish(any(AccountCreatedEvent.class));
@@ -91,7 +93,7 @@ class CreateAccountUseCaseTest {
                                 "TR290006200000000000000123",
                                 "Ali Veli",
                                 new BigDecimal("500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 doThrow(new AccessDeniedException("Başka bir kullanıcı adına hesap oluşturamazsınız."))
                         .when(securityContextPort).checkUserAuthorization(eq(200L), anyString());
@@ -109,7 +111,7 @@ class CreateAccountUseCaseTest {
                                 "TR290006200000000000000123",
                                 "Ali Veli",
                                 new BigDecimal("500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 Iban iban = new Iban(request.iban());
                 Account existingAccount = new Account(
@@ -117,8 +119,8 @@ class CreateAccountUseCaseTest {
                                 100L,
                                 iban,
                                 "Eski Sahip",
-                                new Money(new BigDecimal("100.00"), Money.Currency.TRY),
-                                true);
+                                new Money(new BigDecimal("100.00"), Currency.TRY),
+                                AccountStatus.ACTIVE);
 
                 doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
                 when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(existingAccount));
@@ -167,7 +169,7 @@ class CreateAccountUseCaseTest {
                                 "TR290006200000000000000123",
                                 "Ali Veli",
                                 new BigDecimal("500.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 doThrow(new AccessDeniedException("Oturum bulunamadı."))
                         .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());

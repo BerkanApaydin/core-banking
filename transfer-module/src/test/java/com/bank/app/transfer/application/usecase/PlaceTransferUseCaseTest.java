@@ -3,6 +3,7 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.transfer.application.port.out.AccountOperationPort;
 import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
@@ -67,7 +68,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                                 "TR290006200000000000000222", 2L, 200L, true);
@@ -95,7 +96,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                                 "TR290006200000000000000222", 2L, 200L, true);
@@ -119,7 +120,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockAccountInfos("TR290006200000000000000111", 1L, 100L, false,
                                 "TR290006200000000000000222", 2L, 200L, true);
@@ -139,7 +140,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                                 "TR290006200000000000000222", 2L, 200L, false);
@@ -159,7 +160,7 @@ class PlaceTransferUseCaseTest {
                                 null,
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 assertThrows(NullPointerException.class, () -> placeTransferUseCase.execute(request));
         }
@@ -170,7 +171,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 null,
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 assertThrows(NullPointerException.class, () -> placeTransferUseCase.execute(request));
         }
@@ -181,7 +182,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 mockAccountInfos("TR290006200000000000000111", 1L, 100L, true,
                                 "TR290006200000000000000222", 2L, 200L, true);
@@ -201,7 +202,7 @@ class PlaceTransferUseCaseTest {
                                 "INVALID_IBAN",
                                 "TR290006200000000000000222",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 when(accountOperationPort.getAccountInfoForTransfer("INVALID_IBAN"))
                                 .thenThrow(new InvalidIbanException("Geçersiz IBAN"));
@@ -216,7 +217,7 @@ class PlaceTransferUseCaseTest {
                                 "TR290006200000000000000111",
                                 "INVALID_IBAN",
                                 new BigDecimal("200.00"),
-                                Money.Currency.TRY);
+                                Currency.TRY);
 
                 when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000111"))
                                 .thenReturn(new AccountInfo(1L, 100L, "TRY", true));

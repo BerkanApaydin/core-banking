@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.common.security.port.out.SecurityContextPort;
@@ -69,7 +70,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         @Test
         void shouldPropagateConcurrencyFailureFromSave() {
                 Transfer transfer = new Transfer(10L, 1L, 2L,
-                                Money.of("200.00", Money.Currency.TRY),
+                                Money.of("200.00", Currency.TRY),
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));
@@ -88,7 +89,7 @@ class CancelTransferUseCaseEdgeCaseTest {
         @Test
         void shouldRollbackWhenBalanceReversalFails() {
                 Transfer transfer = new Transfer(10L, 1L, 2L,
-                                Money.of("200.00", Money.Currency.TRY),
+                                Money.of("200.00", Currency.TRY),
                                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
 
                 when(loadTransferPort.findByIdWithLock(10L)).thenReturn(Optional.of(transfer));

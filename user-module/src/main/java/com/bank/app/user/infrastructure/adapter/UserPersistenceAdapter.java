@@ -35,11 +35,13 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
 
     @NonNull
     private User toDomain(@NonNull UserJpaEntity entity) {
-        return new User(entity.getId(), entity.getUsername(), entity.getPassword(), entity.getRole());
+        return new User(entity.getId(), entity.getUsername(), entity.getPassword(), entity.getRole(),
+                entity.getEmail(), entity.getPhone());
     }
 
     @NonNull
     private UserJpaEntity toJpaEntity(@NonNull User domain) {
-        return new UserJpaEntity(domain.getId(), domain.getUsername(), domain.getPassword(), domain.getRole());
+        return new UserJpaEntity(domain.getId(), domain.getUsername(), domain.getPassword(), domain.getRole(),
+                domain.getEmail(), domain.getPhone());
     }
 }

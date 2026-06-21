@@ -64,8 +64,4 @@ public record Money(
         }
         return this.amount.compareTo(other.amount) >= 0;
     }
-
-    public enum Currency {
-        TRY, USD, EUR
-    }
 }
