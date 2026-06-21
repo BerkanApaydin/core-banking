@@ -6,7 +6,6 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.lang.NonNull;
 
@@ -17,15 +16,15 @@ public class AccountTransferOperationUseCase implements AccountTransferOperation
     private final SecurityContextPort securityContextPort;
 
     public AccountTransferOperationUseCase(LoadAccountPort loadAccountPort,
-                                            SaveAccountPort saveAccountPort,
-                                            SecurityContextPort securityContextPort) {
+            SaveAccountPort saveAccountPort,
+            SecurityContextPort securityContextPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.securityContextPort = securityContextPort;
     }
 
     @Override
-    public void executeTransfer(@NonNull Long senderId, @NonNull Long receiverId, @NonNull Money amount) {
+    public void executeTransfer(Long senderId, Long receiverId, Money amount) {
         LockedAccounts locked = loadAccountsWithLockOrdered(senderId, receiverId);
         Account sender = locked.sender();
         Account receiver = locked.receiver();
@@ -40,7 +39,7 @@ public class AccountTransferOperationUseCase implements AccountTransferOperation
     }
 
     @Override
-    public void reverseTransfer(@NonNull Long senderId, @NonNull Long receiverId, @NonNull Money amount) {
+    public void reverseTransfer(Long senderId, Long receiverId, Money amount) {
         LockedAccounts locked = loadAccountsWithLockOrdered(senderId, receiverId);
         Account sender = locked.sender();
         Account receiver = locked.receiver();
@@ -71,5 +70,6 @@ public class AccountTransferOperationUseCase implements AccountTransferOperation
         return new LockedAccounts(sender, receiver);
     }
 
-    private record LockedAccounts(Account sender, Account receiver) {}
+    private record LockedAccounts(Account sender, Account receiver) {
+    }
 }

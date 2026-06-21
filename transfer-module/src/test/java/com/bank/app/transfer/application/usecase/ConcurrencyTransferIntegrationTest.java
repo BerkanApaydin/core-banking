@@ -7,7 +7,6 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.outbox.OutboxEventJpaRepository;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
@@ -32,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
+@SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class })
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
@@ -43,9 +42,6 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private TransferJpaRepository transferRepo;
 
     @Autowired
     private OutboxEventJpaRepository outboxEventRepo;
@@ -109,8 +105,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("10.00"),
-                Money.Currency.TRY
-        );
+                Money.Currency.TRY);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
@@ -154,8 +149,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("250.00"),
-                Money.Currency.TRY
-        );
+                Money.Currency.TRY);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {

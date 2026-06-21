@@ -103,8 +103,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.status", is(400)))
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.status", is(409)))
                                 .andExpect(jsonPath("$.code", is("DUPLICATE_IBAN")));
         }
 
@@ -178,7 +178,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.initialBalance").exists());
+                .andExpect(jsonPath("$.errors.initialBalance").exists());
     }
 
     @Test

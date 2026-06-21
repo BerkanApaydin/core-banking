@@ -79,7 +79,15 @@ management:
 resilience4j:
   circuitbreaker:
     instances:
-      notificationService:
+      emailNotification:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5000
+        failureRateThreshold: 50
+      smsNotification:
         registerHealthIndicator: true
         slidingWindowSize: 10
         permittedNumberOfCallsInHalfOpenState: 3

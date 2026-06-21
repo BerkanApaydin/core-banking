@@ -31,8 +31,24 @@ class TransferJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        repo.deleteAll();
         entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
+
+        entityManager.createNativeQuery(
+                "INSERT INTO users (id, username, password, role, created_at) " +
+                "VALUES (100, 'transfer_user', 'pass', 'ROLE_USER', NOW())")
+                .executeUpdate();
+
+        entityManager.createNativeQuery(
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
+                "VALUES (1, 100, 'TR290006200000000000000111', 'Sender', 1000.00, 'TRY', true, 0, NOW())")
+                .executeUpdate();
+
+        entityManager.createNativeQuery(
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
+                "VALUES (2, 100, 'TR290006200000000000000222', 'Receiver', 1000.00, 'TRY', true, 0, NOW())")
+                .executeUpdate();
 
         accountId1 = 1L;
         accountId2 = 2L;

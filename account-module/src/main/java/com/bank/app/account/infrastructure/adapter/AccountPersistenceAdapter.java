@@ -8,7 +8,6 @@ import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.account.infrastructure.persistence.AccountMapper;
 import jakarta.persistence.EntityManager;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -24,7 +23,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     private final AccountMapper mapper;
     private final EntityManager entityManager;
 
-    public AccountPersistenceAdapter(AccountJpaRepository springDataRepo, AccountMapper mapper, EntityManager entityManager) {
+    public AccountPersistenceAdapter(AccountJpaRepository springDataRepo, AccountMapper mapper,
+            EntityManager entityManager) {
         this.springDataRepo = springDataRepo;
         this.mapper = mapper;
         this.entityManager = entityManager;
@@ -44,7 +44,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<Account> findById(@NonNull Long id) {
+    public Optional<Account> findById(Long id) {
         return springDataRepo.findById(id).map(entity -> {
             entityManager.detach(entity);
             return mapper.toDomain(entity);
@@ -52,7 +52,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<Account> findByIdWithLock(@NonNull Long id) {
+    public Optional<Account> findByIdWithLock(Long id) {
         return springDataRepo.findByIdWithLock(id).map(mapper::toDomain);
     }
 

@@ -4,7 +4,6 @@ import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryPort;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.usecase.AccountQueryService;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +21,7 @@ public class AccountQueryServiceDecorator implements AccountQueryPort {
     }
 
     @Override
-    public AccountInfo getAccountInfo(@NonNull Long accountId) {
+    public AccountInfo getAccountInfo(Long accountId) {
         return delegate.getAccountInfo(accountId);
     }
 

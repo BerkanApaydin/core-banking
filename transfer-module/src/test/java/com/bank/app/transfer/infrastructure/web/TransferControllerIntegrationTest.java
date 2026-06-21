@@ -7,15 +7,11 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.common.persistence.IdempotencyKeyJpaRepository;
-import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.common.security.JwtTokenProvider;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
+@SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class })
 @SuppressWarnings("null")
 class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -57,9 +53,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         private UserRepository userRepository;
 
         @Autowired
-        private TransferJpaRepository transferRepo;
-
-        @Autowired
         private ObjectMapper objectMapper;
 
         @Autowired
@@ -68,13 +61,10 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Autowired
         private PlatformTransactionManager transactionManager;
 
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+        @Autowired
+        private JwtTokenProvider jwtTokenProvider;
 
-    @Autowired
-    private EntityManager entityManager;
-
-    private String jwtToken;
+        private String jwtToken;
 
         void saveIdempotencyKeyInNewTransaction(IdempotencyKeyJpaEntity entity) {
                 var template = new TransactionTemplate(transactionManager);
@@ -100,7 +90,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 new BigDecimal("1000.00"), "TRY", true));
                 accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
                                 new BigDecimal("500.00"), "TRY", true));
-                accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000333", "Pasif",
+                accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
                                 new BigDecimal("500.00"), "TRY", false));
 
                 jwtToken = jwtTokenProvider.generateToken(u1.getId(), "u1");
@@ -217,8 +207,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.senderIban", notNullValue()))
-                                .andExpect(jsonPath("$.amount", notNullValue()));
+                                .andExpect(jsonPath("$.errors.senderIban", notNullValue()))
+                                .andExpect(jsonPath("$.errors.amount", notNullValue()));
         }
 
         @Test
@@ -363,83 +353,83 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .andExpect(jsonPath("$.code", is("CONCURRENT_REQUEST")));
         }
 
-    @Test
-    void shouldGetTransferDetailSuccessfully() throws Exception {
-        TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000222",
-                new BigDecimal("200.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldGetTransferDetailSuccessfully() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("200.00"),
+                                Money.Currency.TRY);
 
-        String responseJson = mockMvc.perform(post("/api/v1/transfers")
-                .header("Authorization", "Bearer " + jwtToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
+                String responseJson = mockMvc.perform(post("/api/v1/transfers")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andReturn().getResponse().getContentAsString();
 
-        Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
+                Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
 
-        mockMvc.perform(get("/api/v1/transfers/" + transferId)
-                .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(transferId)))
-                .andExpect(jsonPath("$.amount", is(200.00)))
-                .andExpect(jsonPath("$.currency", is("TRY")))
-                .andExpect(jsonPath("$.senderAccountId", notNullValue()))
-                .andExpect(jsonPath("$.receiverAccountId", notNullValue()))
-                .andExpect(jsonPath("$.status", notNullValue()))
-                .andExpect(jsonPath("$.createdAt", notNullValue()));
-    }
+                mockMvc.perform(get("/api/v1/transfers/" + transferId)
+                                .header("Authorization", "Bearer " + jwtToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.id", is(transferId)))
+                                .andExpect(jsonPath("$.amount", is(200.00)))
+                                .andExpect(jsonPath("$.currency", is("TRY")))
+                                .andExpect(jsonPath("$.senderAccountId", notNullValue()))
+                                .andExpect(jsonPath("$.receiverAccountId", notNullValue()))
+                                .andExpect(jsonPath("$.status", notNullValue()))
+                                .andExpect(jsonPath("$.createdAt", notNullValue()));
+        }
 
-    @Test
-    void shouldReturnNotFoundWhenTransferDetailNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/transfers/99999")
-                .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
-    }
+        @Test
+        void shouldReturnNotFoundWhenTransferDetailNotFound() throws Exception {
+                mockMvc.perform(get("/api/v1/transfers/99999")
+                                .header("Authorization", "Bearer " + jwtToken))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
+        }
 
-    @Test
-    void shouldReturnConflictWhenCancellingAlreadyCancelledTransfer() throws Exception {
-        TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000222",
-                new BigDecimal("100.00"),
-                Money.Currency.TRY);
+        @Test
+        void shouldReturnConflictWhenCancellingAlreadyCancelledTransfer() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR290006200000000000000111",
+                                "TR290006200000000000000222",
+                                new BigDecimal("100.00"),
+                                Money.Currency.TRY);
 
-        String responseJson = mockMvc.perform(post("/api/v1/transfers")
-                .header("Authorization", "Bearer " + jwtToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
+                String responseJson = mockMvc.perform(post("/api/v1/transfers")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andReturn().getResponse().getContentAsString();
 
-        Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
+                Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
 
-        mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
-                .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isNoContent());
+                mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
+                                .header("Authorization", "Bearer " + jwtToken))
+                                .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
-                .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code", is("TRANSFER_ALREADY_CANCELLED")));
-    }
+                mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
+                                .header("Authorization", "Bearer " + jwtToken))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code", is("TRANSFER_ALREADY_CANCELLED")));
+        }
 
-    @Test
-    void shouldReturnEmptyReportWhenNoTransfersInDateRange() throws Exception {
-        Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
-        LocalDateTime start = LocalDateTime.now().minusDays(30);
-        LocalDateTime end = LocalDateTime.now().minusDays(29);
+        @Test
+        void shouldReturnEmptyReportWhenNoTransfersInDateRange() throws Exception {
+                Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
+                LocalDateTime start = LocalDateTime.now().minusDays(30);
+                LocalDateTime end = LocalDateTime.now().minusDays(29);
 
-        mockMvc.perform(get("/api/v1/transfers/report")
-                .header("Authorization", "Bearer " + jwtToken)
-                .param("accountId", accountId.toString())
-                .param("startDate", start.toString())
-                .param("endDate", end.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalTransfersCount", is(0)))
-                .andExpect(jsonPath("$.totalVolume", is(0)));
-    }
+                mockMvc.perform(get("/api/v1/transfers/report")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .param("accountId", accountId.toString())
+                                .param("startDate", start.toString())
+                                .param("endDate", end.toString()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.totalTransfersCount", is(0)))
+                                .andExpect(jsonPath("$.totalVolume", is(0)));
+        }
 }

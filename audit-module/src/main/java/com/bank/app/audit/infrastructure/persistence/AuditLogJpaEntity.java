@@ -19,7 +19,7 @@ public class AuditLogJpaEntity {
     @Enumerated(EnumType.STRING)
     private AuditAction action;
 
-    @Column(nullable = false, length = 1000)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String details;
 
     @Column(nullable = false)

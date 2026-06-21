@@ -9,7 +9,6 @@ import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountIn
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
-import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,9 +29,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PlaceTransferUseCaseDecoratorTest {
 
-    @Mock private AccountOperationPort accountOperationPort;
-    @Mock private SaveTransferPort saveTransferPort;
-    @Mock private EventPublisherPort eventPublisherPort;
+    @Mock
+    private AccountOperationPort accountOperationPort;
+    @Mock
+    private SaveTransferPort saveTransferPort;
+    @Mock
+    private EventPublisherPort eventPublisherPort;
 
     private PlaceTransferUseCaseDecorator decorator;
 

@@ -6,7 +6,6 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.application.exception.AccountNotFoundException;
-import org.springframework.lang.NonNull;
 
 import java.util.Collection;
 import java.util.Map;
@@ -22,7 +21,7 @@ public class AccountQueryService implements AccountQueryPort {
     }
 
     @Override
-    public AccountInfo getAccountInfo(@NonNull Long accountId) {
+    public AccountInfo getAccountInfo(Long accountId) {
         Account account = loadAccountPort.findById(accountId)
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
         return toAccountInfo(account);

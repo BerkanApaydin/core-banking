@@ -1,6 +1,5 @@
 package com.bank.app.user.security;
 
-import com.bank.app.common.security.CustomUserDetails;
 import com.bank.app.user.infrastructure.security.CustomUserDetailsService;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.domain.User;
@@ -19,7 +18,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
 
-    @Mock private LoadUserPort loadUserPort;
+    @Mock
+    private LoadUserPort loadUserPort;
 
     private CustomUserDetailsService service;
 
@@ -45,7 +45,8 @@ class CustomUserDetailsServiceTest {
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.empty());
 
-        UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class, () -> service.loadUserByUsername("john"));
+        UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class,
+                () -> service.loadUserByUsername("john"));
         assertEquals("User not found: john", exception.getMessage());
     }
 }

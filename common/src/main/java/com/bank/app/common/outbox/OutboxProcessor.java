@@ -24,27 +24,11 @@ public class OutboxProcessor {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processEvent(OutboxEventJpaEntity fallbackEvent) {
-        OutboxEventJpaEntity tempEvent = null;
-        boolean isMock = false;
-        try {
-            Class<?> mockitoClass = Class.forName("org.mockito.Mockito");
-            java.lang.reflect.Method mockingDetailsMethod = mockitoClass.getMethod("mockingDetails", Object.class);
-            Object mockingDetails = mockingDetailsMethod.invoke(null, outboxRepo);
-            java.lang.reflect.Method isMockMethod = mockingDetails.getClass().getMethod("isMock");
-            isMock = (Boolean) isMockMethod.invoke(mockingDetails);
-        } catch (Throwable ignored) {}
+        OutboxEventJpaEntity event = outboxRepo.findByIdForUpdateSkipLocked(fallbackEvent.getId()).orElse(null);
 
-        if (isMock) {
-            tempEvent = fallbackEvent;
-        } else {
-            tempEvent = outboxRepo.findByIdForUpdateSkipLocked(fallbackEvent.getId()).orElse(null);
-        }
-
-        if (tempEvent == null) {
+        if (event == null) {
             return;
         }
-
-        final OutboxEventJpaEntity event = tempEvent;
 
         try {
             OutboxEventHandler handler = handlers.stream()
@@ -66,27 +50,11 @@ public class OutboxProcessor {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(OutboxEventJpaEntity fallbackEvent, Throwable t, int maxRetries) {
-        OutboxEventJpaEntity tempEvent = null;
-        boolean isMock = false;
-        try {
-            Class<?> mockitoClass = Class.forName("org.mockito.Mockito");
-            java.lang.reflect.Method mockingDetailsMethod = mockitoClass.getMethod("mockingDetails", Object.class);
-            Object mockingDetails = mockingDetailsMethod.invoke(null, outboxRepo);
-            java.lang.reflect.Method isMockMethod = mockingDetails.getClass().getMethod("isMock");
-            isMock = (Boolean) isMockMethod.invoke(mockingDetails);
-        } catch (Throwable ignored) {}
+        OutboxEventJpaEntity event = outboxRepo.findById(fallbackEvent.getId()).orElse(null);
 
-        if (isMock) {
-            tempEvent = fallbackEvent;
-        } else {
-            tempEvent = outboxRepo.findById(fallbackEvent.getId()).orElse(null);
-        }
-
-        if (tempEvent == null) {
+        if (event == null) {
             return;
         }
-
-        final OutboxEventJpaEntity event = tempEvent;
 
         int nextRetry = event.getRetryCount() + 1;
         event.setRetryCount(nextRetry);

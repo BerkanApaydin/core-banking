@@ -33,12 +33,53 @@ class OutboxPatternTest {
     private OutboxPoller outboxPoller;
     private TransferCompletedOutboxHandler handler;
 
+    private final java.util.Map<String, OutboxEventJpaEntity> entityMap = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private OutboxEventJpaEntity register(OutboxEventJpaEntity entity) {
+        entityMap.put(entity.getId(), entity);
+        return entity;
+    }
+
+    private List<OutboxEventJpaEntity> register(List<OutboxEventJpaEntity> entities) {
+        entities.forEach(this::register);
+        return entities;
+    }
+
+    private void stubUnprocessed(List<OutboxEventJpaEntity> entities) {
+        register(entities);
+        when(lockRepository.findAndLockUnprocessed(anyInt(), anyInt())).thenReturn(entities);
+    }
+
+    private void stubUnprocessed(int limit, int partition, List<OutboxEventJpaEntity> entities) {
+        register(entities);
+        when(lockRepository.findAndLockUnprocessed(limit, partition)).thenReturn(entities);
+    }
+
     @BeforeEach
     void setUp() {
+        entityMap.clear();
         outboxRepo = mock(OutboxEventJpaRepository.class);
         lockRepository = mock(OutboxLockRepository.class);
         objectMapper = new ObjectMapper();
         eventPublisher = mock(ApplicationEventPublisher.class);
+
+        when(outboxRepo.findByIdForUpdateSkipLocked(anyString())).thenAnswer(invocation -> {
+            String id = invocation.getArgument(0);
+            return java.util.Optional.ofNullable(entityMap.get(id));
+        });
+        when(outboxRepo.findById(anyString())).thenAnswer(invocation -> {
+            String id = invocation.getArgument(0);
+            return java.util.Optional.ofNullable(entityMap.get(id));
+        });
+
+        // Also stub save to return the argument by default and update the map
+        when(outboxRepo.save(any(OutboxEventJpaEntity.class))).thenAnswer(invocation -> {
+            OutboxEventJpaEntity entity = invocation.getArgument(0);
+            if (entity.getId() != null) {
+                entityMap.put(entity.getId(), entity);
+            }
+            return entity;
+        });
 
         eventListener = new OutboxEventListener(outboxRepo, objectMapper);
         handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher);
@@ -88,7 +129,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "TransferCompletedEvent",
                 jsonPayload, LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -112,7 +153,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "TransferCompletedEvent",
                 "invalid json string", LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -130,7 +171,7 @@ class OutboxPatternTest {
                 "invalid json string", LocalDateTime.now(), false, null,
                 4, false, "previous error");
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -141,7 +182,7 @@ class OutboxPatternTest {
 
     @Test
     void shouldSkipProcessingWhenNoUnprocessedEvents() {
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of());
+        stubUnprocessed(List.of());
 
         outboxPoller.pollAndProcessEvents();
 
@@ -155,7 +196,7 @@ class OutboxPatternTest {
                 "event-uuid", "Transfer", "123", "UnknownEventType",
                 "{}", LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -247,7 +288,7 @@ class OutboxPatternTest {
                 "{\"transferId\":1,\"senderAccountId\":1,\"receiverAccountId\":2,\"amount\":10,\"currency\":\"TRY\"}",
                 LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -280,8 +321,7 @@ class OutboxPatternTest {
                 false,
                 "old error");
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         outboxPoller.pollAndProcessEvents();
 
@@ -317,8 +357,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -354,8 +393,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -397,8 +435,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -436,8 +473,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -474,8 +510,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -511,8 +546,7 @@ class OutboxPatternTest {
                 false,
                 null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         poller.pollAndProcessEvents();
 
@@ -534,8 +568,7 @@ class OutboxPatternTest {
         OutboxPoller poller = new OutboxPoller(lockRepository, outboxRepo, List.of(handler1));
         ReflectionTestUtils.setField(poller, "maxRetries", 5);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1))
-                .thenReturn(List.of(event1, event2));
+        stubUnprocessed(List.of(event1, event2));
 
         poller.pollAndProcessEvents();
 
@@ -551,7 +584,7 @@ class OutboxPatternTest {
                 "{}", LocalDateTime.now(), false, null,
                 2, false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(entity));
+        stubUnprocessed(List.of(entity));
 
         pollerWithCustomRetries.pollAndProcessEvents();
 
@@ -568,9 +601,9 @@ class OutboxPatternTest {
                 "id", "Transfer", "123", "TransferCompletedEvent",
                 validPayload, LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(10, 0)).thenReturn(List.of(event));
-        when(lockRepository.findAndLockUnprocessed(10, 1)).thenReturn(List.of());
-        when(lockRepository.findAndLockUnprocessed(10, 2)).thenReturn(List.of());
+        stubUnprocessed(10, 0, List.of(event));
+        stubUnprocessed(10, 1, List.of());
+        stubUnprocessed(10, 2, List.of());
 
         partitionedPoller.pollAndProcessEvents();
 
@@ -587,7 +620,7 @@ class OutboxPatternTest {
                 "id", "Transfer", "123", "TransferCompletedEvent",
                 "{}", LocalDateTime.now(), false, null);
 
-        when(lockRepository.findAndLockUnprocessed(50, -1)).thenReturn(List.of(event));
+        stubUnprocessed(List.of(event));
 
         emptyPoller.pollAndProcessEvents();
 

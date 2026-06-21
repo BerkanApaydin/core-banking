@@ -27,6 +27,12 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
+
+        entityManager.createNativeQuery(
+                "INSERT INTO users (id, username, password, role, created_at) " +
+                "VALUES (100, 'test_user_db', 'pass', 'ROLE_USER', NOW())")
+                .executeUpdate();
 
         entityManager.createNativeQuery(
                 "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +

@@ -8,7 +8,6 @@ import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
 import com.bank.app.transfer.infrastructure.persistence.TransferMapper;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -42,12 +41,12 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     }
 
     @Override
-    public Optional<Transfer> findById(@NonNull Long id) {
+    public Optional<Transfer> findById(Long id) {
         return springDataRepo.findById(id).map(mapper::toDomain);
     }
 
     @Override
-    public Optional<Transfer> findByIdWithLock(@NonNull Long id) {
+    public Optional<Transfer> findByIdWithLock(Long id) {
         return springDataRepo.findByIdWithLock(id).map(mapper::toDomain);
     }
 
@@ -86,7 +85,8 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     }
 
     @Override
-    public List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size) {
+    public List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page,
+            int size) {
         Pageable pageable = PageRequest.of(page, size);
         return springDataRepo.findHistoryBetween(accountId, start, end, pageable).stream()
                 .map(mapper::toDomain)

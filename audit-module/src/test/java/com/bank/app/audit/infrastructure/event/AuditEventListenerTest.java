@@ -13,15 +13,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
-
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class AuditEventListenerTest {
