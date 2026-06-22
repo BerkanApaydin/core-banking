@@ -14,6 +14,7 @@ import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.common.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,10 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Locale;
 import org.springframework.context.i18n.LocaleContextHolder;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class })
-@SuppressWarnings("null")
+@DisplayName("TransferController Integration")
 class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         @Autowired
@@ -78,8 +79,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
         @BeforeEach
         void setUp() {
-                LocaleContextHolder.resetLocaleContext();
-                Locale.setDefault(Locale.of("tr", "TR"));
+                LocaleContextHolder.setLocale(java.util.Locale.of("tr", "TR"), true);
                 UserJpaEntity u1 = userRepository.save(
                                 new UserJpaEntity(null, "u1", "pass", "ROLE_USER"));
                 UserJpaEntity u2 = userRepository.save(

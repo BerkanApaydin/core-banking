@@ -49,4 +49,21 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <configuration>
+                    <targetClasses>
+                        <param>com.bank.app.transfer.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.bank.app.transfer.*</param>
+                    </targetTests>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -112,6 +112,18 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <configuration>
+                    <targetClasses>
+                        <param>com.bank.app.common.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.bank.app.common.*</param>
+                    </targetTests>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

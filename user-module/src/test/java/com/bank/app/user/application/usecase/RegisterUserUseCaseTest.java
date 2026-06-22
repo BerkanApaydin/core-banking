@@ -7,6 +7,8 @@ import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,10 +16,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("RegisterUserUseCase")
 class RegisterUserUseCaseTest {
 
     @Mock
@@ -26,6 +30,7 @@ class RegisterUserUseCaseTest {
     private SaveUserPort saveUserPort;
     @Mock
     private PasswordEncoderPort passwordEncoderPort;
+
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
@@ -33,104 +38,127 @@ class RegisterUserUseCaseTest {
         registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort);
     }
 
-    @Test
-    void shouldRegisterUserSuccessfully() {
-        AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
+    @Nested
+    @DisplayName("happy path")
+    class HappyPath {
 
-        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+        @Test
+        @DisplayName("should register user successfully")
+        void shouldRegisterSuccessfully() {
+            AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
-        registerUserUseCase.execute(request);
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
 
-        verify(loadUserPort).findByUsername("newuser");
-        verify(passwordEncoderPort).encode("Rawpassword1");
-        verify(saveUserPort).save(argThat(user -> "newuser".equals(user.getUsername()) &&
-                "hashedpassword".equals(user.getPassword()) &&
-                "ROLE_USER".equals(user.getRole())));
+            registerUserUseCase.execute(request);
+
+            verify(loadUserPort).findByUsername("newuser");
+            verify(passwordEncoderPort).encode("Rawpassword1");
+            verify(saveUserPort).save(argThat(user ->
+                    "newuser".equals(user.getUsername()) &&
+                    "hashedpassword".equals(user.getPassword()) &&
+                    "ROLE_USER".equals(user.getRole())));
+        }
+
+        @Test
+        @DisplayName("should register user with email and phone")
+        void shouldRegisterWithEmailAndPhone() {
+            AuthRequest request = new AuthRequest("newuser", "Rawpassword1", "test@example.com", "5551234567");
+
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+
+            registerUserUseCase.execute(request);
+
+            verify(saveUserPort).save(argThat(user ->
+                    "newuser".equals(user.getUsername()) &&
+                    "hashedpassword".equals(user.getPassword()) &&
+                    "test@example.com".equals(user.getEmail()) &&
+                    "5551234567".equals(user.getPhone())
+            ));
+        }
+
+        @Test
+        @DisplayName("should register user with null email and phone")
+        void shouldRegisterWithNullEmailAndPhone() {
+            AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
+
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+
+            registerUserUseCase.execute(request);
+
+            verify(saveUserPort).save(argThat(user ->
+                    user.getEmail() == null && user.getPhone() == null
+            ));
+        }
+
+        @Test
+        @DisplayName("should encode password")
+        void shouldEncodePassword() {
+            AuthRequest request = new AuthRequest("newuser", "rawPassword123");
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
+
+            registerUserUseCase.execute(request);
+
+            verify(passwordEncoderPort).encode("rawPassword123");
+            verify(saveUserPort).save(argThat(user ->
+                    "$2a$10$encryptedhash".equals(user.getPassword())
+            ));
+        }
     }
 
-    @Test
-    void shouldThrowExceptionWhenUsernameAlreadyExists() {
-        AuthRequest request = new AuthRequest("existinguser", "password");
-        User existingUser = new User(1L, "existinguser", "hashed", "ROLE_USER");
+    @Nested
+    @DisplayName("validation")
+    class Validation {
 
-        when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
+        @Test
+        @DisplayName("should throw when username already exists")
+        void shouldThrowOnDuplicateUsername() {
+            AuthRequest request = new AuthRequest("existinguser", "password");
+            User existingUser = new User(1L, "existinguser", "hashed", "ROLE_USER");
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> registerUserUseCase.execute(request));
+            when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
 
-        assertEquals("Kullanıcı adı zaten kullanımda.", exception.getMessage());
-        verify(loadUserPort).findByUsername("existinguser");
-        verifyNoInteractions(passwordEncoderPort);
-        verify(saveUserPort, never()).save(any());
+            assertThatThrownBy(() -> registerUserUseCase.execute(request))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Kullanıcı adı zaten kullanımda.");
+
+            verify(loadUserPort).findByUsername("existinguser");
+            verifyNoInteractions(passwordEncoderPort);
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should throw when password violates policy")
+        void shouldThrowOnWeakPassword() {
+            AuthRequest request = new AuthRequest("newuser", "weak");
+
+            assertThatThrownBy(() -> registerUserUseCase.execute(request))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("en az");
+
+            verify(loadUserPort).findByUsername("newuser");
+            verifyNoInteractions(passwordEncoderPort);
+            verify(saveUserPort, never()).save(any());
+        }
     }
 
-    @Test
-    void shouldPropagateSaveException() {
-        AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
-        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
-        doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
+    @Nested
+    @DisplayName("error propagation")
+    class ErrorPropagation {
 
-        assertThrows(RuntimeException.class,
-                () -> registerUserUseCase.execute(request));
-    }
+        @Test
+        @DisplayName("should propagate save exception")
+        void shouldPropagateSaveException() {
+            AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
+            doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
 
-    @Test
-    void shouldRegisterUserWithEmailAndPhone() {
-        AuthRequest request = new AuthRequest("newuser", "Rawpassword1", "test@example.com", "5551234567");
-
-        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
-
-        registerUserUseCase.execute(request);
-
-        verify(saveUserPort).save(argThat(user ->
-                "newuser".equals(user.getUsername()) &&
-                "hashedpassword".equals(user.getPassword()) &&
-                "test@example.com".equals(user.getEmail()) &&
-                "5551234567".equals(user.getPhone())
-        ));
-    }
-
-    @Test
-    void shouldRegisterUserWithNullEmailAndPhone() {
-        AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
-
-        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
-
-        registerUserUseCase.execute(request);
-
-        verify(saveUserPort).save(argThat(user ->
-                user.getEmail() == null &&
-                user.getPhone() == null
-        ));
-    }
-
-    @Test
-    void shouldThrowWhenPasswordViolatesPolicy() {
-        AuthRequest request = new AuthRequest("newuser", "weak");
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> registerUserUseCase.execute(request));
-        assertTrue(ex.getMessage().contains("en az"));
-        verify(loadUserPort).findByUsername("newuser");
-        verifyNoInteractions(passwordEncoderPort);
-        verify(saveUserPort, never()).save(any());
-    }
-
-    @Test
-    void shouldEncodePasswordWithBCrypt() {
-        AuthRequest request = new AuthRequest("newuser", "rawPassword123");
-        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(passwordEncoderPort.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
-
-        registerUserUseCase.execute(request);
-
-        verify(passwordEncoderPort).encode("rawPassword123");
-        verify(saveUserPort).save(argThat(user ->
-                "$2a$10$encryptedhash".equals(user.getPassword())
-        ));
+            assertThatThrownBy(() -> registerUserUseCase.execute(request))
+                    .isExactlyInstanceOf(RuntimeException.class);
+        }
     }
 }
