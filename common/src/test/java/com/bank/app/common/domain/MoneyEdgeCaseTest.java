@@ -103,6 +103,18 @@ class MoneyEdgeCaseTest {
     }
 
     @Test
+    void shouldThrowNumberFormatExceptionWhenInvalidString() {
+        assertThrows(NumberFormatException.class,
+                () -> Money.of("abc", Currency.TRY));
+    }
+
+    @Test
+    void shouldThrowNumberFormatExceptionWhenStringHasLetters() {
+        assertThrows(NumberFormatException.class,
+                () -> Money.of("100.00XYZ", Currency.TRY));
+    }
+
+    @Test
     void shouldThrowNullPointerOnNullFactoryString() {
         assertThrows(NullPointerException.class,
                 () -> Money.of((String) null, Currency.TRY));

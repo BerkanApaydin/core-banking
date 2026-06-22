@@ -190,6 +190,54 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    void shouldReturn400WhenUsernameIsBlank() throws Exception {
+        AuthRequest request = new AuthRequest("", "ValidPass1");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenPasswordIsBlank() throws Exception {
+        AuthRequest request = new AuthRequest("validuser", "");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenEmailIsInvalid() throws Exception {
+        AuthRequest request = new AuthRequest("validuser", "ValidPass1", "not-an-email", "5551234567");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenRequestBodyIsMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{invalid json}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenLoginWithBlankUsername() throws Exception {
+        AuthRequest request = new AuthRequest("", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldFailLoginWithNonExistentUser() throws Exception {
         AuthRequest request = new AuthRequest("nonexistent", "SomePassw0rd!");
 

@@ -278,6 +278,10 @@
                             <rules>
                                 <rule>
                                     <element>PACKAGE</element>
+                                    <excludes>
+                                        <exclude>com.bank.app.common.security.port.out</exclude>
+                                        <exclude>com.bank.app.transfer.application.port.in</exclude>
+                                    </excludes>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>

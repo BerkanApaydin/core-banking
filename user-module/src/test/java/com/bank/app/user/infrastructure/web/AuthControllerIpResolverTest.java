@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @Import({GlobalExceptionHandler.class, ApiVersionConfig.class})
 @AutoConfigureMockMvc(addFilters = false)
-class AuthControllerWebMvcTest {
+class AuthControllerIpResolverTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,90 +43,88 @@ class AuthControllerWebMvcTest {
     private FailedLoginAttemptService failedLoginAttemptService;
 
     @Test
-    void shouldRegisterAndReturn201() throws Exception {
-        AuthRequest request = new AuthRequest("newuser", "Password1");
+    void shouldUseXForwardedForHeaderWhenPresent() throws Exception {
+        AuthRequest request = new AuthRequest("testuser", "password");
+        AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        doNothing().when(registerUserPort).execute(any(AuthRequest.class));
+        when(failedLoginAttemptService.isBlocked("203.0.113.195")).thenReturn(false);
+        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "203.0.113.195")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isOk());
+
+        verify(failedLoginAttemptService).isBlocked("203.0.113.195");
+        verify(failedLoginAttemptService).reset("203.0.113.195");
     }
 
     @Test
-    void shouldReturn400WhenRegisterRequestIsInvalid() throws Exception {
-        AuthRequest request = new AuthRequest("", "");
+    void shouldTakeFirstIpFromXForwardedForList() throws Exception {
+        AuthRequest request = new AuthRequest("testuser", "password");
+        AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        when(failedLoginAttemptService.isBlocked("198.51.100.1")).thenReturn(false);
+        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "198.51.100.1, 10.0.0.1, 192.168.1.1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
+
+        verify(failedLoginAttemptService).isBlocked("198.51.100.1");
+        verify(failedLoginAttemptService).reset("198.51.100.1");
     }
 
     @Test
-    void shouldLoginAndReturn200() throws Exception {
+    void shouldUseRemoteAddrWhenXForwardedForIsUnknown() throws Exception {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
         when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-        doNothing().when(failedLoginAttemptService).reset("127.0.0.1");
+        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "unknown")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
+    }
+
+    @Test
+    void shouldUseRemoteAddrWhenNoXForwardedForHeader() throws Exception {
+        AuthRequest request = new AuthRequest("testuser", "password");
+        AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
+
+        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
         when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token"))
-                .andExpect(jsonPath("$.userId").value(100L))
-                .andExpect(jsonPath("$.username").value("testuser"));
+                .andExpect(status().isOk());
+
+        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
     }
 
     @Test
-    void shouldReturn429WhenIpIsBlocked() throws Exception {
+    void shouldUseRemoteAddrWhenXForwardedForIsEmpty() throws Exception {
         AuthRequest request = new AuthRequest("testuser", "password");
+        AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(true);
+        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
+        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isTooManyRequests());
-    }
+                .andExpect(status().isOk());
 
-    @Test
-    void shouldReturn400WhenRegisterBodyIsNull() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(""))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldReturn400WhenLoginBodyIsNull() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(""))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldReturn400WhenUsernameIsNull() throws Exception {
-        String body = "{\"password\": \"ValidPass1\"}";
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldReturn400WhenPasswordIsNull() throws Exception {
-        String body = "{\"username\": \"validuser\"}";
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
+        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
     }
 }

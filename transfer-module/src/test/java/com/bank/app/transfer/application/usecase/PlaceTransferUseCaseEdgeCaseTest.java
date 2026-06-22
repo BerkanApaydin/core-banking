@@ -214,4 +214,45 @@ class PlaceTransferUseCaseEdgeCaseTest {
                 assertNotNull(eventCaptor.getValue().getTransferId());
                 assertEquals(10L, eventCaptor.getValue().getTransferId());
         }
+
+        @Test
+        void shouldHandleIbanWithSpacesByNormalizing() {
+                TransferRequest request = new TransferRequest(
+                                "TR29 0006 2000 0000 0000 0001 11",
+                                "TR29 0006 2000 0000 0000 0002 22",
+                                new BigDecimal("200.00"), Currency.TRY);
+
+                when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000111"))
+                                .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
+                when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000222"))
+                                .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
+                mockSaveReturnsId();
+
+                TransferResponse response = placeTransferUseCase.execute(request);
+
+                assertNotNull(response);
+                assertEquals(10L, response.id());
+                assertEquals("COMPLETED", response.status());
+                verify(accountOperationPort).getAccountInfoForTransfer("TR290006200000000000000111");
+                verify(accountOperationPort).getAccountInfoForTransfer("TR290006200000000000000222");
+        }
+
+        @Test
+        void shouldHandleIbanWithMixedCaseAndSpacesByNormalizing() {
+                TransferRequest request = new TransferRequest(
+                                "tr29 0006 2000 0000 0000 0001 11",
+                                "TR29 0006 2000 0000 0000 0002 22",
+                                new BigDecimal("200.00"), Currency.TRY);
+
+                when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000111"))
+                                .thenReturn(new AccountInfo(1L, 100L, "TRY", true));
+                when(accountOperationPort.getAccountInfoForTransfer("TR290006200000000000000222"))
+                                .thenReturn(new AccountInfo(2L, 200L, "TRY", true));
+                mockSaveReturnsId();
+
+                TransferResponse response = placeTransferUseCase.execute(request);
+
+                assertNotNull(response);
+                assertEquals(10L, response.id());
+        }
 }

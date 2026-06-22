@@ -78,9 +78,30 @@ class AccountPersistenceAdapterTest {
 
     @Test
     @SuppressWarnings("null")
-    void shouldSaveSuccessfully() {
+    void shouldSaveExistingAccountWithLock() {
         Iban iban = new Iban("TR290006200000000000000111");
         Account domainAccount = new Account(1L, 100L, iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        AccountJpaEntity existingEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", 0L);
+
+        when(springDataRepo.findByIdWithLock(1L)).thenReturn(Optional.of(existingEntity));
+
+        Account result = repository.save(domainAccount);
+
+        assertNotNull(result);
+        assertEquals("Ahmet", result.getOwnerName());
+        assertEquals(new BigDecimal("1000.00"), result.getBalance().amount());
+        verify(springDataRepo).findByIdWithLock(1L);
+        verify(springDataRepo, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void shouldSaveNewAccount() {
+        Iban iban = new Iban("TR290006200000000000000111");
+        Account domainAccount = new Account(null, 100L, iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        AccountJpaEntity savedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE");
+
+        when(springDataRepo.save(any(AccountJpaEntity.class))).thenReturn(savedEntity);
 
         repository.save(domainAccount);
 
@@ -174,6 +195,18 @@ class AccountPersistenceAdapterTest {
     void shouldNotSaveWhenAccountIsNull() {
         assertThrows(IllegalArgumentException.class, () -> repository.save(null));
         verifyNoInteractions(springDataRepo);
+    }
+
+    @Test
+    void shouldFilterNullEntitiesFromFindAll() {
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "INVALID", "ACTIVE");
+
+        when(springDataRepo.findAll()).thenReturn(List.of(entity1));
+
+        var result = repository.findAll();
+
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findAll();
     }
 
     @Test

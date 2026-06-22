@@ -142,7 +142,7 @@ class GetTransferDetailUseCaseTest {
         Long transferId = 1L;
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.empty());
 
-        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(null == null ? transferId : null));
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Transfer bulunamadı. ID: " + transferId, exception.getMessage());
     }
 

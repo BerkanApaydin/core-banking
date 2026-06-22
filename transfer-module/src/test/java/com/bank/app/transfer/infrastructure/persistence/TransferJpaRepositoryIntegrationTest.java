@@ -41,13 +41,13 @@ class TransferJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .executeUpdate();
 
         entityManager.createNativeQuery(
-                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
-                "VALUES (1, 100, 'TR290006200000000000000111', 'Sender', 1000.00, 'TRY', true, 0, NOW())")
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at) " +
+                "VALUES (1, 100, 'TR290006200000000000000111', 'Sender', 1000.00, 'TRY', 'ACTIVE', 0, NOW())")
                 .executeUpdate();
 
         entityManager.createNativeQuery(
-                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, active, version, created_at) " +
-                "VALUES (2, 100, 'TR290006200000000000000222', 'Receiver', 1000.00, 'TRY', true, 0, NOW())")
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at) " +
+                "VALUES (2, 100, 'TR290006200000000000000222', 'Receiver', 1000.00, 'TRY', 'ACTIVE', 0, NOW())")
                 .executeUpdate();
 
         accountId1 = 1L;
@@ -95,7 +95,7 @@ class TransferJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     void shouldFindHistoryBetweenDates() {
         LocalDateTime start = LocalDateTime.now().minusDays(1);
         LocalDateTime end = LocalDateTime.now().plusDays(1);
-        List<TransferJpaEntity> results = repo.findHistoryBetween(accountId1, start, end);
+        List<TransferJpaEntity> results = repo.findHistoryBetween(accountId1, start, end, PageRequest.of(0, 10));
         assertEquals(1, results.size());
     }
 
@@ -116,7 +116,7 @@ class TransferJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     void shouldReturnEmptyHistoryWhenNoMatches() {
         LocalDateTime start = LocalDateTime.now().minusDays(10);
         LocalDateTime end = LocalDateTime.now().minusDays(9);
-        List<TransferJpaEntity> results = repo.findHistoryBetween(accountId1, start, end);
+        List<TransferJpaEntity> results = repo.findHistoryBetween(accountId1, start, end, PageRequest.of(0, 10));
         assertTrue(results.isEmpty());
     }
 

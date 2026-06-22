@@ -27,22 +27,6 @@ class TransferEdgeCaseTest {
     }
 
     @Test
-    void shouldThrowWhenCompleteOnFailedStatus() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY),
-                TransferStatus.FAILED, LocalDateTime.now());
-        IllegalStateException ex = assertThrows(IllegalStateException.class, transfer::complete);
-        assertTrue(ex.getMessage().contains("Sadece PENDING durumundaki transferler tamamlanabilir"));
-    }
-
-    @Test
-    void shouldThrowWhenCompleteOnCancelledStatus() {
-        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY),
-                TransferStatus.CANCELLED, LocalDateTime.now());
-        IllegalStateException ex = assertThrows(IllegalStateException.class, transfer::complete);
-        assertTrue(ex.getMessage().contains("Sadece PENDING durumundaki transferler tamamlanabilir"));
-    }
-
-    @Test
     void shouldAllowCancellationWithinWindow() {
         Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(23));
@@ -109,6 +93,26 @@ class TransferEdgeCaseTest {
         assertNotNull(transfer.getCreatedAt());
         assertEquals(TransferStatus.PENDING, transfer.getStatus());
         assertNull(transfer.getId());
+    }
+
+    @Test
+    void shouldThrowWhenCompleteOnFailedStatusWithExactMessage() {
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY),
+                TransferStatus.FAILED, LocalDateTime.now());
+        IllegalStateException ex = assertThrows(IllegalStateException.class, transfer::complete);
+        assertTrue(ex.getMessage().contains("Sadece PENDING durumundaki transferler tamamlanabilir"));
+        assertEquals("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: FAILED",
+                ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowWhenCompleteOnCancelledStatusWithExactMessage() {
+        Transfer transfer = new Transfer(1L, 1L, 2L, Money.of("100.00", Currency.TRY),
+                TransferStatus.CANCELLED, LocalDateTime.now());
+        IllegalStateException ex = assertThrows(IllegalStateException.class, transfer::complete);
+        assertTrue(ex.getMessage().contains("Sadece PENDING durumundaki transferler tamamlanabilir"));
+        assertEquals("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: CANCELLED",
+                ex.getMessage());
     }
 
     @Test

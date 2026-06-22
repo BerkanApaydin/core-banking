@@ -16,12 +16,10 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
     List<AccountJpaEntity> findByUserId(Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "10000")})
     @Query("select a from AccountJpaEntity a where a.iban = :iban")
     Optional<AccountJpaEntity> findByIbanWithLock(@Param("iban") String iban);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "10000")})
     @Query("select a from AccountJpaEntity a where a.id = :id")
     Optional<AccountJpaEntity> findByIdWithLock(@Param("id") Long id);
 }

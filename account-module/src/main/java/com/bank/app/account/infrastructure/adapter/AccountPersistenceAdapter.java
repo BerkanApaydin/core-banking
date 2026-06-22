@@ -77,10 +77,36 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
 
     @Override
     public Account save(Account account) {
-        AccountJpaEntity entity = mapper.toJpaEntity(account);
-        if (entity == null) {
-            throw new IllegalArgumentException("Account entity dönüşümü başarısız oldu");
+        if (account == null) {
+            throw new IllegalArgumentException("Account must not be null");
         }
-        return mapper.toDomain(springDataRepo.save(entity));
+        if (account.getId() == null) {
+            AccountJpaEntity entity = mapper.toJpaEntity(account);
+            if (entity == null) {
+                throw new IllegalArgumentException("Account entity dönüşümü başarısız oldu");
+            }
+            AccountJpaEntity savedEntity = springDataRepo.save(entity);
+            if (savedEntity == null) {
+                throw new IllegalStateException("Account entity kaydedilemedi");
+            }
+            Account domain = mapper.toDomain(savedEntity);
+            if (domain == null) {
+                throw new IllegalStateException("Account domain dönüşümü başarısız oldu: " + savedEntity.getId());
+            }
+            return domain;
+        }
+
+        AccountJpaEntity entity = springDataRepo.findByIdWithLock(account.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Account bulunamadı: " + account.getId()));
+
+        entity.setBalance(account.getBalance().amount());
+        entity.setCurrency(account.getBalance().currency().name());
+        entity.setStatus(account.getStatus().name());
+
+        Account domain = mapper.toDomain(entity);
+        if (domain == null) {
+            throw new IllegalStateException("Account domain dönüşümü başarısız oldu: " + entity.getId());
+        }
+        return domain;
     }
 }

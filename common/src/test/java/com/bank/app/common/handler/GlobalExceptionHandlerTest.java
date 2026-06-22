@@ -1,5 +1,6 @@
 package com.bank.app.common.handler;
 
+import com.bank.app.common.exception.AuthorizationException;
 import com.bank.app.common.exception.BusinessException;
 import com.bank.app.common.exception.ConcurrentRequestException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
@@ -176,6 +177,59 @@ class GlobalExceptionHandlerTest {
                 assertNotNull(response.getBody());
                 assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
                 assertEquals("Access denied", response.getBody().getProperties().get("message"));
+        }
+
+        @Test
+        void shouldHandleAuthorizationException() {
+                AuthorizationException ex = new AuthorizationException("Yetki hatası");
+
+                ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                assertNotNull(response.getBody());
+                assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
+                assertEquals("Yetki hatası", response.getBody().getProperties().get("message"));
+        }
+
+        @Test
+        void shouldHandleAuthorizationExceptionWithResolvedMessage() {
+                AuthorizationException ex = mock(AuthorizationException.class);
+                when(ex.getMessageKey()).thenReturn("error.authorization");
+                when(ex.getArgs()).thenReturn(new Object[]{});
+                when(messageSource.getMessage(eq("error.authorization"), any(), any(Locale.class)))
+                                .thenReturn("Yetkilendirme başarısız");
+
+                ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                assertEquals("Yetkilendirme başarısız", response.getBody().getProperties().get("message"));
+        }
+
+        @Test
+        void shouldHandleAuthorizationExceptionWithFallbackToDefaultMessage() {
+                AuthorizationException ex = mock(AuthorizationException.class);
+                when(ex.getMessageKey()).thenReturn("error.authorization");
+                when(ex.getArgs()).thenReturn(new Object[]{});
+                when(ex.getMessage()).thenReturn("İşlem reddedildi");
+                when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
+                                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+
+                ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                assertEquals("İşlem reddedildi", response.getBody().getProperties().get("message"));
+        }
+
+        @Test
+        void shouldHandleAuthorizationExceptionWithNullMessage() {
+                AuthorizationException ex = mock(AuthorizationException.class);
+                when(ex.getMessageKey()).thenReturn(null);
+                when(ex.getMessage()).thenReturn(null);
+
+                ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                assertEquals("", response.getBody().getProperties().get("message"));
         }
 
         @Test

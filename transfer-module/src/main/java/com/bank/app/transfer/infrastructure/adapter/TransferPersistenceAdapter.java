@@ -77,14 +77,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     }
 
     @Override
-    public List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end) {
-        return springDataRepo.findHistoryBetween(accountId, start, end).stream()
-                .map(mapper::toDomain)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page,
             int size) {
         Pageable pageable = PageRequest.of(page, size);

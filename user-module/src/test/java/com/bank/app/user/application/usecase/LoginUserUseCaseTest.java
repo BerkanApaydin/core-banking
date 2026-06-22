@@ -1,6 +1,6 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.security.JwtTokenProvider;
+import com.bank.app.common.security.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.exception.UserNotFoundException;
@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.BadCredentialsException;
 
 import java.util.Optional;
@@ -25,16 +24,13 @@ import static org.mockito.Mockito.*;
 class LoginUserUseCaseTest {
 
     @Mock private AuthenticationPort authenticationPort;
+    @Mock private JwtPort jwtPort;
     @Mock private LoadUserPort loadUserPort;
-    private JwtTokenProvider jwtTokenProvider;
     private LoginUserUseCase loginUserUseCase;
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider(mock(Environment.class),
-                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
-                86400000L, true);
-        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtTokenProvider, loadUserPort);
+        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort);
     }
 
     @Test
@@ -44,16 +40,18 @@ class LoginUserUseCaseTest {
 
         doNothing().when(authenticationPort).authenticate(anyString(), anyString());
         when(loadUserPort.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(jwtPort.generateToken(100L, "testuser", "ROLE_USER")).thenReturn("mock-jwt-token");
 
         AuthResponse response = loginUserUseCase.execute(request);
 
         assertNotNull(response);
-        assertNotNull(response.token());
+        assertEquals("mock-jwt-token", response.token());
         assertEquals(100L, response.userId());
         assertEquals("testuser", response.username());
 
         verify(authenticationPort).authenticate(anyString(), anyString());
         verify(loadUserPort).findByUsername("testuser");
+        verify(jwtPort).generateToken(100L, "testuser", "ROLE_USER");
     }
 
     @Test
@@ -84,6 +82,17 @@ class LoginUserUseCaseTest {
         assertEquals("Bad credentials", exception.getMessage());
 
         verify(authenticationPort).authenticate(anyString(), anyString());
+        verifyNoInteractions(loadUserPort);
+    }
+
+    @Test
+    void shouldThrowBadCredentialsWhenUsernameDoesNotExist() {
+        AuthRequest request = new AuthRequest("nonexistent", "password");
+
+        doThrow(new BadCredentialsException("Bad credentials")).when(authenticationPort).authenticate(anyString(), anyString());
+
+        assertThrows(BadCredentialsException.class,
+                () -> loginUserUseCase.execute(request));
         verifyNoInteractions(loadUserPort);
     }
 }

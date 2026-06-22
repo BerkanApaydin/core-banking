@@ -64,4 +64,73 @@ class RegisterUserUseCaseTest {
         verifyNoInteractions(passwordEncoderPort);
         verify(saveUserPort, never()).save(any());
     }
+
+    @Test
+    void shouldPropagateSaveException() {
+        AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
+        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
+        doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
+
+        assertThrows(RuntimeException.class,
+                () -> registerUserUseCase.execute(request));
+    }
+
+    @Test
+    void shouldRegisterUserWithEmailAndPhone() {
+        AuthRequest request = new AuthRequest("newuser", "Rawpassword1", "test@example.com", "5551234567");
+
+        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+
+        registerUserUseCase.execute(request);
+
+        verify(saveUserPort).save(argThat(user ->
+                "newuser".equals(user.getUsername()) &&
+                "hashedpassword".equals(user.getPassword()) &&
+                "test@example.com".equals(user.getEmail()) &&
+                "5551234567".equals(user.getPhone())
+        ));
+    }
+
+    @Test
+    void shouldRegisterUserWithNullEmailAndPhone() {
+        AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
+
+        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+
+        registerUserUseCase.execute(request);
+
+        verify(saveUserPort).save(argThat(user ->
+                user.getEmail() == null &&
+                user.getPhone() == null
+        ));
+    }
+
+    @Test
+    void shouldThrowWhenPasswordViolatesPolicy() {
+        AuthRequest request = new AuthRequest("newuser", "weak");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> registerUserUseCase.execute(request));
+        assertTrue(ex.getMessage().contains("en az"));
+        verify(loadUserPort).findByUsername("newuser");
+        verifyNoInteractions(passwordEncoderPort);
+        verify(saveUserPort, never()).save(any());
+    }
+
+    @Test
+    void shouldEncodePasswordWithBCrypt() {
+        AuthRequest request = new AuthRequest("newuser", "rawPassword123");
+        when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(passwordEncoderPort.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
+
+        registerUserUseCase.execute(request);
+
+        verify(passwordEncoderPort).encode("rawPassword123");
+        verify(saveUserPort).save(argThat(user ->
+                "$2a$10$encryptedhash".equals(user.getPassword())
+        ));
+    }
 }

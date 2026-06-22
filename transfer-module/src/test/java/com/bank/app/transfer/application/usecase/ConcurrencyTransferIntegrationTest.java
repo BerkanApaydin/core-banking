@@ -1,14 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.account.application.port.in.AccountTransferOperationPort;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.outbox.OutboxEventJpaRepository;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -36,7 +35,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private PlaceTransferUseCase placeTransferPort;
+    private AccountTransferOperationPort accountTransferOperation;
 
     @Autowired
     private AccountJpaRepository accountRepo;
@@ -57,6 +56,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     private SecurityContextAdapter securityUtils;
 
     private UserJpaEntity user;
+    private Long senderAccountId;
+    private Long receiverAccountId;
 
     void runInNewTx(Runnable action) {
         var template = new TransactionTemplate(transactionManager);
@@ -72,10 +73,12 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         runInNewTx(() -> {
             user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 
-            accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
-                    new BigDecimal("1000.00"), "TRY", "ACTIVE"));
-            accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
-                    new BigDecimal("1000.00"), "TRY", "ACTIVE"));
+            AccountJpaEntity sender = accountRepo.save(new AccountJpaEntity(null, user.getId(),
+                    "TR290006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE"));
+            AccountJpaEntity receiver = accountRepo.save(new AccountJpaEntity(null, user.getId(),
+                    "TR290006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE"));
+            senderAccountId = sender.getId();
+            receiverAccountId = receiver.getId();
         });
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
@@ -86,9 +89,9 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     void tearDown() {
         runInNewTx(() -> {
             outboxEventRepo.deleteAll();
-            entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
-            entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
-            entityManager.createQuery("delete from UserJpaEntity").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
         });
     }
 
@@ -102,17 +105,19 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000222",
-                new BigDecimal("10.00"),
-                Currency.TRY);
+        Long senderId = senderAccountId;
+        Long receiverId = receiverAccountId;
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
                 try {
                     latch.await();
-                    placeTransferPort.execute(request);
+                    var tt = new TransactionTemplate(transactionManager);
+                    tt.execute(status -> {
+                        accountTransferOperation.executeTransfer(
+                                senderId, receiverId, new Money(new BigDecimal("10.00"), Currency.TRY));
+                        return null;
+                    });
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failureCount.incrementAndGet();
@@ -146,17 +151,19 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000222",
-                new BigDecimal("250.00"),
-                Currency.TRY);
+        Long senderId = senderAccountId;
+        Long receiverId = receiverAccountId;
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
                 try {
                     latch.await();
-                    placeTransferPort.execute(request);
+                    var tt = new TransactionTemplate(transactionManager);
+                    tt.execute(status -> {
+                        accountTransferOperation.executeTransfer(
+                                senderId, receiverId, new Money(new BigDecimal("250.00"), Currency.TRY));
+                        return null;
+                    });
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failureCount.incrementAndGet();

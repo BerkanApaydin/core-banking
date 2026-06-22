@@ -6,19 +6,22 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.adapter.SecurityContextAdapter;
-import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaRepository;
-import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
-import com.bank.app.user.infrastructure.persistence.UserRepository;
 import com.bank.app.common.outbox.OutboxEventJpaEntity;
 import com.bank.app.common.outbox.OutboxEventJpaRepository;
-import com.bank.app.common.outbox.OutboxPoller;
+import com.bank.app.common.outbox.OutboxProcessor;
+import com.bank.app.transfer.application.dto.TransferRequest;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
+import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
+import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
+import com.bank.app.user.infrastructure.persistence.UserRepository;
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -33,7 +36,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
 
 @SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
-@Transactional
 @SuppressWarnings("null")
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -50,13 +52,16 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private TransferJpaRepository transferRepo;
-
-    @Autowired
-    private OutboxPoller outboxPoller;
-
-    @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private OutboxProcessor outboxProcessor;
+
+    @Autowired
+    private PlatformTransactionManager txManager;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @MockitoBean
     private SecurityContextAdapter securityUtils;
@@ -65,7 +70,6 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @BeforeEach
     void setUp() {
-
         user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
 
         accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
@@ -75,6 +79,17 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
         when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
+    }
+
+    @AfterEach
+    void cleanUp() {
+        new TransactionTemplate(txManager).execute(status -> {
+            entityManager.createQuery("delete from OutboxEventJpaEntity").executeUpdate();
+            entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
+            entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
+            entityManager.createQuery("delete from UserJpaEntity").executeUpdate();
+            return null;
+        });
     }
 
     @Test
@@ -96,7 +111,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         assertFalse(event.isProcessed());
         assertNull(event.getProcessedAt());
 
-        outboxPoller.pollAndProcessEvents();
+        outboxProcessor.processEvent(event);
 
         OutboxEventJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
         assertTrue(processedEvent.isProcessed());
@@ -112,7 +127,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                 0, false, null);
         outboxRepo.save(entity);
 
-        outboxPoller.pollAndProcessEvents();
+        assertThrows(RuntimeException.class, () -> outboxProcessor.processEvent(entity));
+        outboxProcessor.recordFailure(entity, new RuntimeException("processing failed"), 5);
 
         OutboxEventJpaEntity failedEvent = outboxRepo.findById(entity.getId()).orElseThrow();
         assertEquals(1, failedEvent.getRetryCount());
@@ -130,7 +146,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                 4, false, "previous error");
         outboxRepo.save(entity);
 
-        outboxPoller.pollAndProcessEvents();
+        assertThrows(RuntimeException.class, () -> outboxProcessor.processEvent(entity));
+        outboxProcessor.recordFailure(entity, new RuntimeException("processing failed"), 5);
 
         OutboxEventJpaEntity deadEvent = outboxRepo.findById(entity.getId()).orElseThrow();
         assertEquals(5, deadEvent.getRetryCount());
@@ -155,7 +172,10 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         assertEquals(3, outboxRepo.findAll().stream().filter(e -> !e.isProcessed()).count());
 
-        outboxPoller.pollAndProcessEvents();
+        List<OutboxEventJpaEntity> events = outboxRepo.findAll();
+        for (OutboxEventJpaEntity event : events) {
+            outboxProcessor.processEvent(event);
+        }
 
         List<OutboxEventJpaEntity> processed = outboxRepo.findAll().stream()
                 .filter(OutboxEventJpaEntity::isProcessed)

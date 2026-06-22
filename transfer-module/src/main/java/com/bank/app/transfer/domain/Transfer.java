@@ -3,6 +3,7 @@ package com.bank.app.transfer.domain;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -31,7 +32,11 @@ public class Transfer {
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount) {
-        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now());
+        return create(senderAccountId, receiverAccountId, amount, Clock.systemDefaultZone());
+    }
+
+    public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
+        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
     }
 
     public void complete() {
@@ -82,6 +87,10 @@ public class Transfer {
     }
 
     public void cancel(int cancellationWindowHours) {
+        cancel(cancellationWindowHours, Clock.systemDefaultZone());
+    }
+
+    public void cancel(int cancellationWindowHours, Clock clock) {
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);
         }
@@ -92,7 +101,8 @@ public class Transfer {
                 "Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: " + this.status
             );
         }
-        if (this.createdAt.plusHours(cancellationWindowHours).plusSeconds(5).isBefore(LocalDateTime.now())) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (this.createdAt.plusHours(cancellationWindowHours).plusSeconds(5).isBefore(now)) {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
                 new Object[]{this.createdAt, cancellationWindowHours},

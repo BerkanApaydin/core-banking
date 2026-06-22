@@ -113,7 +113,7 @@ class PasswordPolicyTest {
     @Test
     void shouldFailWhenMissingUppercaseAndDigit() {
         List<String> errors = defaultPolicy.validate("password!");
-        assertTrue(errors.size() >= 2);
+        assertEquals(2, errors.size());
         assertTrue(errors.stream().anyMatch(e -> e.contains("büyük harf")));
         assertTrue(errors.stream().anyMatch(e -> e.contains("rakam")));
     }
@@ -121,7 +121,7 @@ class PasswordPolicyTest {
     @Test
     void shouldFailWhenMissingLowercaseAndDigit() {
         List<String> errors = defaultPolicy.validate("PASSWORD!");
-        assertTrue(errors.size() >= 2);
+        assertEquals(2, errors.size());
         assertTrue(errors.stream().anyMatch(e -> e.contains("küçük harf")));
         assertTrue(errors.stream().anyMatch(e -> e.contains("rakam")));
     }

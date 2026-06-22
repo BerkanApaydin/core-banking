@@ -91,7 +91,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 new BigDecimal("1000.00"), "TRY", "ACTIVE"));
                 accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
                                 new BigDecimal("500.00"), "TRY", "ACTIVE"));
-                accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
+                accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000333", "Pasif",
                                 new BigDecimal("500.00"), "TRY", "SUSPENDED"));
 
                 jwtToken = jwtTokenProvider.generateToken(u1.getId(), "u1");

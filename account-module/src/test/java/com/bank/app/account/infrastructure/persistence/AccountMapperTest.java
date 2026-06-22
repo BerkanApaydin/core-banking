@@ -83,4 +83,55 @@ class AccountMapperTest {
 
         assertNull(domain.getVersion());
     }
+
+    @Test
+    void shouldMapDomainToJpaEntityWithEurCurrency() {
+        Iban iban = new Iban("TR290006200000000000000555");
+        Account domain = new Account(5L, 500L, iban, "Ayse",
+                Money.of("2000.00", Currency.EUR), AccountStatus.ACTIVE);
+
+        AccountJpaEntity entity = mapper.toJpaEntity(domain);
+
+        assertEquals("EUR", entity.getCurrency());
+    }
+
+    @Test
+    void shouldMapJpaEntityWithEurToDomain() {
+        AccountJpaEntity entity = new AccountJpaEntity(6L, 600L, "TR290006200000000000000666",
+                "Fatma", new BigDecimal("1500.00"), "EUR", "ACTIVE");
+
+        Account domain = mapper.toDomain(entity);
+
+        assertEquals(Currency.EUR, domain.getBalance().currency());
+    }
+
+    @Test
+    void shouldMapJpaEntityWithClosedStatusToDomain() {
+        AccountJpaEntity entity = new AccountJpaEntity(7L, 700L, "TR290006200000000000000777",
+                "Zeynep", new BigDecimal("0.00"), "TRY", "CLOSED");
+
+        Account domain = mapper.toDomain(entity);
+
+        assertEquals(AccountStatus.CLOSED, domain.getStatus());
+        assertFalse(domain.isActive());
+    }
+
+    @Test
+    void shouldMapDomainWithClosedStatusToJpaEntity() {
+        Iban iban = new Iban("TR290006200000000000000888");
+        Account domain = new Account(8L, 800L, iban, "Bora",
+                Money.of("0.00", Currency.TRY), AccountStatus.CLOSED);
+
+        AccountJpaEntity entity = mapper.toJpaEntity(domain);
+
+        assertEquals("CLOSED", entity.getStatus());
+    }
+
+    @Test
+    void shouldReturnNullWhenEntityHasInvalidEnumValue() {
+        AccountJpaEntity entity = new AccountJpaEntity(9L, 900L, "TR290006200000000000000999",
+                "Invalid", new BigDecimal("100.00"), "INVALID", "ACTIVE");
+
+        assertNull(mapper.toDomain(entity));
+    }
 }

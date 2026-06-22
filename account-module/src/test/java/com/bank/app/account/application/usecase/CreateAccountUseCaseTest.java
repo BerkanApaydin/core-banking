@@ -11,12 +11,15 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
+import com.bank.app.account.domain.exception.InvalidIbanException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -39,6 +42,9 @@ class CreateAccountUseCaseTest {
         private EventPublisherPort eventPublisherPort;
         @Mock
         private SecurityContextPort securityContextPort;
+
+        @Captor
+        private ArgumentCaptor<AccountCreatedEvent> eventCaptor;
 
         private CreateAccountUseCase createAccountUseCase;
 
@@ -82,8 +88,14 @@ class CreateAccountUseCaseTest {
                 assertEquals("TRY", response.currency());
                 assertEquals(AccountStatus.ACTIVE, response.status());
 
-                verify(saveAccountPort).save(any(Account.class));
-                verify(eventPublisherPort).publish(any(AccountCreatedEvent.class));
+                ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+                verify(saveAccountPort).save(accountCaptor.capture());
+                assertEquals("TR290006200000000000000123", accountCaptor.getValue().getIban().value());
+
+                verify(eventPublisherPort).publish(eventCaptor.capture());
+                AccountCreatedEvent publishedEvent = eventCaptor.getValue();
+                assertEquals(1L, publishedEvent.getAccountId());
+                assertEquals(100L, publishedEvent.getUserId());
         }
 
         @Test
@@ -152,6 +164,22 @@ class CreateAccountUseCaseTest {
                 });
                 assertEquals("Para birimi boş olamaz", ex.getMessage());
 
+                verify(saveAccountPort, never()).save(any(Account.class));
+        }
+
+        @Test
+        void shouldThrowInvalidIbanExceptionWhenIbanFormatIsInvalid() {
+                CreateAccountRequest request = new CreateAccountRequest(
+                                100L,
+                                "INVALID_IBAN",
+                                "Ali Veli",
+                                new BigDecimal("500.00"),
+                                Currency.TRY);
+
+                doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+
+                assertThrows(InvalidIbanException.class,
+                                () -> createAccountUseCase.execute(request));
                 verify(saveAccountPort, never()).save(any(Account.class));
         }
 

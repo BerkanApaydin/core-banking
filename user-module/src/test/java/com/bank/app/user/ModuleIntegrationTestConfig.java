@@ -1,5 +1,6 @@
 package com.bank.app.user;
 
+import com.bank.app.common.api.ApiVersionConfig;
 import com.bank.app.common.config.JpaAuditingConfig;
 import com.bank.app.common.handler.GlobalExceptionHandler;
 import com.bank.app.common.security.JwtAuthenticationFilter;
@@ -14,7 +15,8 @@ import org.springframework.context.annotation.Import;
     JwtTokenProvider.class,
     JwtAuthenticationFilter.class,
     JpaAuditingConfig.class,
-    GlobalExceptionHandler.class
+    GlobalExceptionHandler.class,
+    ApiVersionConfig.class
 })
 public class ModuleIntegrationTestConfig {
 }

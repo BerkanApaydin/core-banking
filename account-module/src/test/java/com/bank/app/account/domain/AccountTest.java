@@ -122,5 +122,103 @@ class AccountTest {
                 account.credit(Money.of("50.00", Currency.USD)));
         assertTrue(ex.getMessage().contains("toplanamaz"));
     }
+
+    @Test
+    void shouldThrowWhenStatusIsNull() {
+        assertThrows(NullPointerException.class, () ->
+                new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), null));
+    }
+
+    @Test
+    void shouldCheckIsActiveReturnsTrueForActive() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        assertTrue(account.isActive());
+    }
+
+    @Test
+    void shouldCheckIsActiveReturnsFalseForSuspended() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.SUSPENDED);
+        assertFalse(account.isActive());
+    }
+
+    @Test
+    void shouldCheckIsActiveReturnsFalseForClosed() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.CLOSED);
+        assertFalse(account.isActive());
+    }
+
+    @Test
+    void equalsShouldReturnTrueWhenSameId() {
+        Account a1 = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account a2 = new Account(1L, 2L, new Iban("TR290006200000000000000222"), "Mehmet", Money.of("500.00", Currency.TRY), AccountStatus.SUSPENDED);
+        assertEquals(a1, a2);
+    }
+
+    @Test
+    void equalsShouldReturnFalseWhenDifferentId() {
+        Account a1 = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account a2 = new Account(2L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        assertNotEquals(a1, a2);
+    }
+
+    @Test
+    void equalsShouldReturnFalseWhenBothNullIds() {
+        Account a1 = new Account(null, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account a2 = new Account(null, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        assertNotEquals(a1, a2);
+    }
+
+    @Test
+    void equalsShouldReturnFalseWhenOtherObject() {
+        Account a1 = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        assertNotEquals("some-string", a1);
+    }
+
+    @Test
+    void hashCodeShouldBeConsistentWithEquals() {
+        Account a1 = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account a2 = new Account(1L, 2L, new Iban("TR290006200000000000000222"), "Mehmet", Money.of("500.00", Currency.TRY), AccountStatus.SUSPENDED);
+        assertEquals(a1.hashCode(), a2.hashCode());
+    }
+
+    @Test
+    void hashCodeShouldBeDifferentForDifferentIds() {
+        Account a1 = new Account(1L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account a2 = new Account(2L, 1L, new Iban("TR290006200000000000000111"), "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        assertNotEquals(a1.hashCode(), a2.hashCode());
+    }
+
+    @Test
+    void builderShouldBuildAccountWithAllFields() {
+        Account account = Account.builder()
+                .id(1L)
+                .userId(100L)
+                .iban(new Iban("TR290006200000000000000111"))
+                .ownerName("Ahmet")
+                .balance(Money.of("1000.00", Currency.TRY))
+                .status(AccountStatus.ACTIVE)
+                .version(3L)
+                .build();
+
+        assertEquals(1L, account.getId());
+        assertEquals(100L, account.getUserId());
+        assertEquals("Ahmet", account.getOwnerName());
+        assertEquals(AccountStatus.ACTIVE, account.getStatus());
+        assertEquals(3L, account.getVersion());
+    }
+
+    @Test
+    void builderShouldBuildAccountWithNullVersion() {
+        Account account = Account.builder()
+                .id(1L)
+                .userId(100L)
+                .iban(new Iban("TR290006200000000000000111"))
+                .ownerName("Ahmet")
+                .balance(Money.of("1000.00", Currency.TRY))
+                .status(AccountStatus.ACTIVE)
+                .build();
+
+        assertNull(account.getVersion());
+    }
 }
 

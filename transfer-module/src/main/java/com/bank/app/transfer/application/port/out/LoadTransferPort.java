@@ -11,7 +11,6 @@ public interface LoadTransferPort {
     List<Transfer> findBySenderAccountId(Long accountId);
     List<Transfer> findBySenderAccountIdAndCreatedAtBetween(Long accountId, LocalDateTime start, LocalDateTime end);
     List<Transfer> findHistory(Long accountId, int page, int size);
-    List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end);
     List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size);
     long countHistory(Long accountId);
 }

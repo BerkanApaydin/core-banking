@@ -52,8 +52,8 @@ class DataSeederTest {
         CommandLineRunner runner = dataSeeder.seedData();
         runner.run();
 
-        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "ahmet123"));
-        verify(registerUserUseCase).execute(new AuthRequest("ayse", "ayse123"));
+        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet123"));
+        verify(registerUserUseCase).execute(new AuthRequest("ayse", "Ayse1234"));
         verify(createAccountPort, atLeastOnce()).execute(any(CreateAccountRequest.class));
     }
 
@@ -97,7 +97,7 @@ class DataSeederTest {
         assertEquals("Ahmet kullanıcısı bulunamadı.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ahmet", "ahmet123"));
+                .execute(new AuthRequest("ahmet", "Ahmet123"));
     }
 
     @Test
@@ -119,7 +119,7 @@ class DataSeederTest {
         assertEquals("Ayşe kullanıcısı bulunamadı.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ayse", "ayse123"));
+                .execute(new AuthRequest("ayse", "Ayse1234"));
     }
 
     @Test

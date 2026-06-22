@@ -260,54 +260,6 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindHistoryBetweenSuccessfully() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
-
-        when(springDataRepo.findHistoryBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
-
-        var result = repository.findHistoryBetween(100L, start, end);
-
-        assertEquals(2, result.size());
-        verify(springDataRepo).findHistoryBetween(100L, start, end);
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenFindHistoryBetweenNotFound() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-
-        when(springDataRepo.findHistoryBetween(999L, start, end)).thenReturn(List.of());
-
-        var result = repository.findHistoryBetween(999L, start, end);
-
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findHistoryBetween(999L, start, end);
-    }
-
-    @Test
-    void shouldFilterOutNullMappingsWhenFindHistoryBetween() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-        TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
-
-        when(springDataRepo.findHistoryBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
-        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
-
-        var result = repository.findHistoryBetween(100L, start, end);
-
-        assertEquals(1, result.size());
-        assertEquals(100L, result.getFirst().getReceiverAccountId());
-        verify(springDataRepo).findHistoryBetween(100L, start, end);
-    }
-
-    @Test
     void shouldFindHistoryBetweenWithPaginationSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);

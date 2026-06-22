@@ -145,4 +145,20 @@ class AccountEdgeCaseTest {
                 "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         assertEquals(42L, account.getUserId());
     }
+
+    @Test
+    void shouldThrowAccountNotActiveExceptionWhenDebitOnClosedAccount() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"),
+                "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.CLOSED);
+        assertThrows(AccountNotActiveException.class,
+                () -> account.debit(Money.of("100.00", Currency.TRY)));
+    }
+
+    @Test
+    void shouldThrowAccountNotActiveExceptionWhenCreditOnClosedAccount() {
+        Account account = new Account(1L, 1L, new Iban("TR290006200000000000000111"),
+                "Ahmet Yılmaz", Money.of("1000.00", Currency.TRY), AccountStatus.CLOSED);
+        assertThrows(AccountNotActiveException.class,
+                () -> account.credit(Money.of("100.00", Currency.TRY)));
+    }
 }
