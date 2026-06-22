@@ -8,9 +8,6 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,8 +15,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Component
-@Transactional(readOnly = true)
 public class GetTransferHistoryUseCaseImpl implements GetTransferHistoryQuery {
 
     private final LoadTransferPort loadTransferPort;

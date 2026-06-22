@@ -2,6 +2,7 @@ package com.bank.app.account.domain;
 
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import java.util.Objects;
 

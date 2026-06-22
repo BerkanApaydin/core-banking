@@ -12,13 +12,8 @@ import com.bank.app.transfer.domain.Transfer;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
-@Component
-@Transactional
 public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
     private final LoadTransferPort loadTransferPort;
@@ -33,7 +28,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
                                  AccountOperationPort accountOperationPort,
                                  EventPublisherPort eventPublisherPort,
                                  SecurityContextPort securityContextPort,
-                                 @Value("${app.transfer.cancellation-window-hours}") int cancellationWindowHours) {
+                                 int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountOperationPort = accountOperationPort;

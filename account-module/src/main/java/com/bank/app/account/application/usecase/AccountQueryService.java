@@ -4,18 +4,12 @@ import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryPort;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.account.application.exception.AccountNotFoundException;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
-@Component
-@Transactional(readOnly = true)
 public class AccountQueryService implements AccountQueryPort {
 
     private final LoadAccountPort loadAccountPort;

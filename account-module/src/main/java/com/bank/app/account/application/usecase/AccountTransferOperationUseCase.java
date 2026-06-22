@@ -8,11 +8,6 @@ import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
-@Component
-@Transactional
 public class AccountTransferOperationUseCase implements AccountTransferOperationPort {
 
     private final LoadAccountPort loadAccountPort;

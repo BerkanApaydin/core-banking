@@ -3,7 +3,6 @@ package com.bank.app.transfer.infrastructure.outbox;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
-import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.adapter.SecurityContextAdapter;
 import com.bank.app.common.outbox.OutboxEventJpaEntity;
@@ -11,7 +10,6 @@ import com.bank.app.common.outbox.OutboxEventJpaRepository;
 import com.bank.app.common.outbox.OutboxProcessor;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
 import com.bank.app.user.infrastructure.persistence.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -35,7 +33,7 @@ import static org.mockito.Mockito.when;
 import org.springframework.boot.test.context.SpringBootTest;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
 
-@SpringBootTest(classes = {com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class})
+@SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class })
 @SuppressWarnings("null")
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -98,10 +96,12 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
                 new BigDecimal("50.00"),
-                Currency.TRY
-        );
+                Currency.TRY);
 
-        placeTransferPort.execute(request);
+        new TransactionTemplate(txManager).execute(status -> {
+            placeTransferPort.execute(request);
+            return null;
+        });
 
         List<OutboxEventJpaEntity> outboxEvents = outboxRepo.findAll();
         assertEquals(1, outboxEvents.size());
@@ -159,9 +159,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     @Test
     void shouldProcessMultipleEventsInOnePoll() throws Exception {
         for (int i = 0; i < 3; i++) {
-            OutboxEventListener.TransferEventPayload payload =
-                    new OutboxEventListener.TransferEventPayload(
-                            100L + i, 1L, 2L, new BigDecimal("10.00"), "TRY");
+            OutboxEventListener.TransferEventPayload payload = new OutboxEventListener.TransferEventPayload(
+                    100L + i, 1L, 2L, new BigDecimal("10.00"), "TRY");
             OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
                     UUID.randomUUID().toString(),
                     "Transfer", String.valueOf(100L + i), "TransferCompletedEvent",

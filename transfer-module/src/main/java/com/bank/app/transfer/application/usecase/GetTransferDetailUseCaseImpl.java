@@ -9,13 +9,8 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.common.exception.AuthorizationException;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Objects;
 
-@Component
-@Transactional(readOnly = true)
 public class GetTransferDetailUseCaseImpl implements GetTransferDetailQuery {
 
     private final LoadTransferPort loadTransferPort;

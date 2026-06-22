@@ -2,7 +2,7 @@ package com.bank.app.account.application.dto;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import org.junit.jupiter.api.Test;

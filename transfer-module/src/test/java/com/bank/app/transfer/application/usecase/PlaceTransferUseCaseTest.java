@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
-import com.bank.app.account.domain.exception.InvalidIbanException;
+import com.bank.app.common.exception.InvalidIbanException;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;

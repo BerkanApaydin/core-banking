@@ -2,7 +2,7 @@ package com.bank.app.account.infrastructure.adapter;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
 import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
 import com.bank.app.account.infrastructure.persistence.AccountMapper;

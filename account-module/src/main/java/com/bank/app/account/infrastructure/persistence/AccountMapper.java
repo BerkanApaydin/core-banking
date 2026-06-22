@@ -2,7 +2,7 @@ package com.bank.app.account.infrastructure.persistence;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import org.slf4j.Logger;

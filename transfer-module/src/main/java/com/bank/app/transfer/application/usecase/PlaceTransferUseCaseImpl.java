@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.dto.TransferRequest;
@@ -17,12 +17,7 @@ import com.bank.app.transfer.domain.TransferParticipants;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
-
-@Component
-@Transactional
 public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
     private final AccountOperationPort accountOperationPort;

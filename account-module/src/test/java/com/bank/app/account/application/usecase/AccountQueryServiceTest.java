@@ -6,7 +6,7 @@ import com.bank.app.account.application.port.in.AccountQueryPort;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.Iban;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,7 +86,7 @@ class AccountQueryServiceTest {
 
     @Test
     void shouldThrowAccountNotFoundExceptionForTransferWhenIbanInvalid() {
-        assertThrows(com.bank.app.account.domain.exception.InvalidIbanException.class,
+        assertThrows(com.bank.app.common.exception.InvalidIbanException.class,
                 () -> accountQueryService.getAccountInfoForTransfer("INVALID_IBAN"));
     }
 
