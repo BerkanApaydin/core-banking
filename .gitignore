@@ -47,6 +47,7 @@ secrets.yml
 .git-hooks/
 node_modules
 /.kotlin/
+.env
 .clauderules
 .cursorrules
 nul

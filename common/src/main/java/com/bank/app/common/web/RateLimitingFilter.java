@@ -1,5 +1,6 @@
 package com.bank.app.common.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -20,13 +22,16 @@ public class RateLimitingFilter implements Filter {
     private final RateLimiter rateLimiter;
     private final MessageSource messageSource;
     private final List<String> rateLimitedPaths;
+    private final ObjectMapper objectMapper;
 
     public RateLimitingFilter(RateLimiter rateLimiter,
                               MessageSource messageSource,
-                              RateLimitProperties rateLimitProperties) {
+                              RateLimitProperties rateLimitProperties,
+                              ObjectMapper objectMapper) {
         this.rateLimiter = rateLimiter;
         this.messageSource = messageSource;
         this.rateLimitedPaths = rateLimitProperties.getPaths();
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -52,11 +57,14 @@ public class RateLimitingFilter implements Filter {
             if (!rateLimiter.tryAcquire(ip)) {
                 String message = messageSource.getMessage("error.rate_limit_exceeded", null,
                         "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.", LocaleContextHolder.getLocale());
+                if (message == null) {
+                    message = "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.";
+                }
                 httpResponse.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
-                httpResponse.getWriter().write(
-                        "{\"status\":429,\"message\":\"" + message + "\"}");
+                String json = objectMapper.writeValueAsString(Map.of("status", 429, "message", message));
+                httpResponse.getWriter().write(json);
                 return;
             }
         }

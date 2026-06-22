@@ -12,6 +12,7 @@ import com.bank.app.transfer.domain.Transfer;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
 public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
@@ -38,6 +39,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     }
 
     @Override
+    @Transactional
     @Retryable(
             retryFor = ConcurrencyFailureException.class,
             maxAttempts = 3,
@@ -51,8 +53,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         Long senderAccountId = transfer.getSenderAccountId();
         Long receiverAccountId = transfer.getReceiverAccountId();
 
-        // Auth check before domain mutation (fail-fast)
-        Long senderUserId =         accountOperationPort.getAccountInfo(senderAccountId).userId();
+        Long senderUserId = accountOperationPort.getAccountInfo(senderAccountId).userId();
         securityContextPort.checkUserAuthorization(senderUserId, "Bu transferi iptal etmeye yetkiniz yok.");
 
         transfer.cancel(cancellationWindowHours);

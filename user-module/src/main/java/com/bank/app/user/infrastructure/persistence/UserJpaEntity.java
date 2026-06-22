@@ -26,6 +26,9 @@ public class UserJpaEntity extends AuditableJpaEntity {
     @Column
     private String phone;
 
+    @Version
+    private Long version;
+
     public UserJpaEntity() {}
 
     public UserJpaEntity(Long id, String username, String password, String role) {
@@ -87,5 +90,13 @@ public class UserJpaEntity extends AuditableJpaEntity {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

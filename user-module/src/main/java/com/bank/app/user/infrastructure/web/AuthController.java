@@ -47,6 +47,7 @@ public class AuthController {
     @Operation(summary = "Kullanıcı girişi yapar", description = "Geçerli kullanıcı bilgileriyle giriş yaparak JWT token üretilmesini sağlar.")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
         String ip = resolveClientIp(httpRequest);
+        String username = request.username();
 
         if (failedLoginAttemptService.isBlocked(ip)) {
             throw new TooManyFailedLoginAttemptsException(
@@ -54,12 +55,24 @@ public class AuthController {
                             + " dakika sonra tekrar deneyin.");
         }
 
+        if (username != null && failedLoginAttemptService.isUsernameBlocked(username)) {
+            throw new TooManyFailedLoginAttemptsException(
+                    "Bu kullanıcı adı için çok fazla başarısız giriş denemesi. Lütfen "
+                            + failedLoginAttemptService.getWindowMinutes() + " dakika sonra tekrar deneyin.");
+        }
+
         try {
             AuthResponse response = loginUserUseCase.execute(request);
             failedLoginAttemptService.reset(ip);
+            if (username != null) {
+                failedLoginAttemptService.resetByUsername(username);
+            }
             return ResponseEntity.ok(response);
         } catch (AuthenticationException e) {
             failedLoginAttemptService.recordFailure(ip);
+            if (username != null) {
+                failedLoginAttemptService.recordFailureByUsername(username);
+            }
             throw e;
         }
     }

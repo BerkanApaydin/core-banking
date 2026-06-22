@@ -7,6 +7,7 @@ import com.bank.app.audit.domain.AuditLog;
 import com.bank.app.common.security.port.out.SecurityContextPort;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
 public class AuditLogger implements AuditLoggerUseCase {
 
     private final SaveAuditLogPort saveAuditLogPort;

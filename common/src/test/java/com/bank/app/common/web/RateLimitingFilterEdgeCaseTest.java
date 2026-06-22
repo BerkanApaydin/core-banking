@@ -1,5 +1,6 @@
 package com.bank.app.common.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,11 +27,13 @@ class RateLimitingFilterEdgeCaseTest {
     @Mock private MessageSource messageSource;
 
     private RateLimitingFilter filter;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         when(request.getMethod()).thenReturn("POST");
-        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties());
+        objectMapper = new ObjectMapper();
+        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper);
     }
 
     @Test
@@ -115,6 +118,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.5");
         when(rateLimiter.tryAcquire("10.0.0.5")).thenReturn(false);
+        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Rate limit exceeded");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);
@@ -132,6 +136,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.5");
         when(rateLimiter.tryAcquire("10.0.0.5")).thenReturn(false);
+        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Rate limit exceeded");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);

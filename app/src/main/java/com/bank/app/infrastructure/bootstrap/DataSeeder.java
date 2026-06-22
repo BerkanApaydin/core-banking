@@ -23,10 +23,11 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Örnek verileri domain use case'leri üzerinden tohumlar — JPA entity bypass kaldırıldı.
+ * Örnek verileri domain use case'leri üzerinden tohumlar — JPA entity bypass
+ * kaldırıldı.
  */
 @Component
-@Profile("!prod & !test")
+@Profile("!prod")
 public class DataSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
@@ -36,8 +37,8 @@ public class DataSeeder {
     private final LoadUserPort loadUserPort;
 
     public DataSeeder(RegisterUserUseCase registerUserUseCase,
-                      CreateAccountUseCase createAccountPort,
-                      LoadUserPort loadUserPort) {
+            CreateAccountUseCase createAccountPort,
+            LoadUserPort loadUserPort) {
         this.registerUserUseCase = registerUserUseCase;
         this.createAccountPort = createAccountPort;
         this.loadUserPort = loadUserPort;
@@ -61,8 +62,8 @@ public class DataSeeder {
                         new BigDecimal("2000.00"), Currency.USD);
             });
 
-            runAsUser(ayse.getId(), ayse.getUsername(), () ->
-                    seedAccountIfAbsent(ayse.getId(), "TR987654321098765432109876", "Ayşe Demir",
+            runAsUser(ayse.getId(), ayse.getUsername(),
+                    () -> seedAccountIfAbsent(ayse.getId(), "TR987654321098765432109876", "Ayşe Demir",
                             new BigDecimal("500.00"), Currency.TRY));
 
             log.info("Veritabanı tohumlama tamamlandı (use case tabanlı).");
@@ -78,7 +79,7 @@ public class DataSeeder {
     }
 
     private void seedAccountIfAbsent(Long userId, String iban, String ownerName,
-                                     BigDecimal balance, Currency currency) {
+            BigDecimal balance, Currency currency) {
         try {
             createAccountPort.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
             log.info("Hesap oluşturuldu: {}", iban);

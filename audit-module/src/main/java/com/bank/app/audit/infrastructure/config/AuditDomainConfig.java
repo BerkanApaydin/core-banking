@@ -11,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 public class AuditDomainConfig {
 
     @Bean
-    public AuditLoggerUseCase auditLoggerUseCase(SaveAuditLogPort saveAuditLogPort, SecurityContextPort securityContextPort) {
+    public AuditLoggerUseCase auditLoggerUseCase(SaveAuditLogPort saveAuditLogPort,
+            SecurityContextPort securityContextPort) {
         return new AuditLogger(saveAuditLogPort, securityContextPort);
     }
 }

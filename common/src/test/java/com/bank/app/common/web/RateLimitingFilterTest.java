@@ -1,5 +1,6 @@
 package com.bank.app.common.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,8 @@ class RateLimitingFilterTest {
         rateLimiter = new CaffeineRateLimiter(10, 10_000);
         messageSource = mock(MessageSource.class);
         when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper);
     }
 
     @Test
@@ -91,7 +93,8 @@ class RateLimitingFilterTest {
             throws IOException, ServletException {
 
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 10_000);
-        RateLimitingFilter filter = new RateLimitingFilter(limiter, messageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter filter = new RateLimitingFilter(limiter, messageSource, new RateLimitProperties(), objectMapper);
 
         FilterChain chain = mock(FilterChain.class);
 
@@ -236,7 +239,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -260,7 +264,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -287,7 +292,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/accounts");
@@ -310,7 +316,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/transfers/send");
@@ -333,7 +340,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -356,7 +364,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -379,7 +388,8 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = new CaffeineRateLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
-        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties());
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource, new RateLimitProperties(), objectMapper);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
