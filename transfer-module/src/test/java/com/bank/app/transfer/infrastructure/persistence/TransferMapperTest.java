@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TransferMapperTest {
 
@@ -56,13 +59,13 @@ class TransferMapperTest {
     }
 
     @Test
-    void shouldReturnNullWhenDomainIsNull() {
-        assertNull(mapper.toJpaEntity(null));
+    void shouldThrowWhenDomainIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> mapper.toJpaEntity(null));
     }
 
     @Test
-    void shouldReturnNullWhenEntityIsNull() {
-        assertNull(mapper.toDomain(null));
+    void shouldThrowWhenEntityIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> mapper.toDomain(null));
     }
 
     @Test

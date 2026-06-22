@@ -102,7 +102,7 @@ public class Transfer {
             );
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (this.createdAt.plusHours(cancellationWindowHours).plusSeconds(5).isBefore(now)) {
+        if (this.createdAt.plusHours(cancellationWindowHours).isBefore(now)) {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
                 new Object[]{this.createdAt, cancellationWindowHours},

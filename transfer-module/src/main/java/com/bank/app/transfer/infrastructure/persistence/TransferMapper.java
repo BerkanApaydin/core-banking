@@ -3,16 +3,14 @@ package com.bank.app.transfer.infrastructure.persistence;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class TransferMapper {
 
-    @Nullable
-    public Transfer toDomain(@Nullable TransferJpaEntity entity) {
+    public Transfer toDomain(TransferJpaEntity entity) {
         if (entity == null) {
-            return null;
+            throw new IllegalArgumentException("TransferJpaEntity null olamaz");
         }
         return new Transfer(
                 entity.getId(),
@@ -24,10 +22,9 @@ public class TransferMapper {
                 entity.getVersion());
     }
 
-    @Nullable
-    public TransferJpaEntity toJpaEntity(@Nullable Transfer domain) {
+    public TransferJpaEntity toJpaEntity(Transfer domain) {
         if (domain == null) {
-            return null;
+            throw new IllegalArgumentException("Transfer domain null olamaz");
         }
         TransferJpaEntity entity = new TransferJpaEntity(
                 domain.getId(),

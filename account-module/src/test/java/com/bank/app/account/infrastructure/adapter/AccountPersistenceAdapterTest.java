@@ -198,14 +198,12 @@ class AccountPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFilterNullEntitiesFromFindAll() {
+    void shouldThrowWhenEntityHasInvalidCurrencyOnFindAll() {
         AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "INVALID", "ACTIVE");
 
         when(springDataRepo.findAll()).thenReturn(List.of(entity1));
 
-        var result = repository.findAll();
-
-        assertTrue(result.isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> repository.findAll());
         verify(springDataRepo).findAll();
     }
 

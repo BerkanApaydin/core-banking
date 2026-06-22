@@ -11,7 +11,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -52,7 +51,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     public List<Account> findAll() {
         return springDataRepo.findAll().stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -60,7 +58,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     public List<Account> findByUserId(Long userId) {
         return springDataRepo.findByUserId(userId).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -71,7 +68,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         }
         return springDataRepo.findAllById(ids).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -82,18 +78,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         }
         if (account.getId() == null) {
             AccountJpaEntity entity = mapper.toJpaEntity(account);
-            if (entity == null) {
-                throw new IllegalArgumentException("Account entity dönüşümü başarısız oldu");
-            }
             AccountJpaEntity savedEntity = springDataRepo.save(entity);
-            if (savedEntity == null) {
-                throw new IllegalStateException("Account entity kaydedilemedi");
-            }
-            Account domain = mapper.toDomain(savedEntity);
-            if (domain == null) {
-                throw new IllegalStateException("Account domain dönüşümü başarısız oldu: " + savedEntity.getId());
-            }
-            return domain;
+            return mapper.toDomain(savedEntity);
         }
 
         AccountJpaEntity entity = springDataRepo.findByIdWithLock(account.getId())
@@ -103,10 +89,6 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         entity.setCurrency(account.getBalance().currency().name());
         entity.setStatus(account.getStatus().name());
 
-        Account domain = mapper.toDomain(entity);
-        if (domain == null) {
-            throw new IllegalStateException("Account domain dönüşümü başarısız oldu: " + entity.getId());
-        }
-        return domain;
+        return mapper.toDomain(entity);
     }
 }

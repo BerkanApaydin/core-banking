@@ -9,7 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AccountMapperTest {
 
@@ -54,13 +58,13 @@ class AccountMapperTest {
     }
 
     @Test
-    void shouldReturnNullWhenDomainIsNull() {
-        assertNull(mapper.toJpaEntity(null));
+    void shouldThrowWhenDomainIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> mapper.toJpaEntity(null));
     }
 
     @Test
-    void shouldReturnNullWhenEntityIsNull() {
-        assertNull(mapper.toDomain(null));
+    void shouldThrowWhenEntityIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> mapper.toDomain(null));
     }
 
     @Test
@@ -128,10 +132,10 @@ class AccountMapperTest {
     }
 
     @Test
-    void shouldReturnNullWhenEntityHasInvalidEnumValue() {
+    void shouldThrowWhenEntityHasInvalidEnumValue() {
         AccountJpaEntity entity = new AccountJpaEntity(9L, 900L, "TR290006200000000000000999",
                 "Invalid", new BigDecimal("100.00"), "INVALID", "ACTIVE");
 
-        assertNull(mapper.toDomain(entity));
+        assertThrows(IllegalArgumentException.class, () -> mapper.toDomain(entity));
     }
 }

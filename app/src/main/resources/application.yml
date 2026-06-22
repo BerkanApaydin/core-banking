@@ -16,8 +16,8 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db
-    username: bank_user
-    password: bank_password
+    username: ${DB_USERNAME:bank_user}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 50 # PostgreSQL optimumu; üstesi context-switch ve lock contention üretiyor
@@ -45,9 +45,9 @@ spring:
       port: ${REDIS_PORT:6379}
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
-  allow-default-secret: true
+  allow-default-secret: ${JWT_ALLOW_DEFAULT_SECRET:false}
 
 app:
   security:

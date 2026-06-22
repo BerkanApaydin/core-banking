@@ -84,7 +84,7 @@ class TransferPersistenceAdapterTest {
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(null);
 
-        assertThrows(IllegalStateException.class, () -> repository.save(domainTransfer));
+        assertThrows(IllegalArgumentException.class, () -> repository.save(domainTransfer));
     }
 
     @Test
@@ -148,7 +148,7 @@ class TransferPersistenceAdapterTest {
     @Test
     @SuppressWarnings("null")
     void shouldThrowExceptionWhenSavingNullTransfer() {
-        assertThrows(IllegalStateException.class, () -> repository.save(null));
+        assertThrows(IllegalArgumentException.class, () -> repository.save(null));
     }
 
     @Test
@@ -186,36 +186,28 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFilterOutNullMappingsWhenFindBySenderAccountId() {
+    void shouldThrowWhenMapperReturnsNullForFindBySenderAccountId() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
-        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(List.of(entity1, entity2));
-        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
+        when(springDataRepo.findBySenderAccountId(100L)).thenReturn(List.of(entity1));
+        lenient().when(mapper.toDomain(entity1)).thenThrow(new IllegalArgumentException("Mapping failed"));
 
-        var result = repository.findBySenderAccountId(100L);
-
-        assertEquals(1, result.size());
-        assertEquals(300L, result.getFirst().getReceiverAccountId());
+        assertThrows(IllegalArgumentException.class, () -> repository.findBySenderAccountId(100L));
         verify(springDataRepo).findBySenderAccountId(100L);
     }
 
     @Test
-    void shouldFilterOutNullMappingsWhenFindBySenderAccountIdAndCreatedAtBetween() {
+    void shouldThrowWhenMapperReturnsNullForFindBySenderAccountIdAndCreatedAtBetween() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);
         LocalDateTime end = now.plusDays(1);
         TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
-        TransferJpaEntity entity2 = new TransferJpaEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
-        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(List.of(entity1, entity2));
-        lenient().when(mapper.toDomain(entity2)).thenReturn(null);
+        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetween(100L, start, end)).thenReturn(List.of(entity1));
+        lenient().when(mapper.toDomain(entity1)).thenThrow(new IllegalArgumentException("Mapping failed"));
 
-        var result = repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
-
-        assertEquals(1, result.size());
-        assertEquals(200L, result.getFirst().getReceiverAccountId());
+        assertThrows(IllegalArgumentException.class, () -> repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end));
         verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
     }
 
@@ -244,18 +236,15 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFilterOutNullMappingsWhenFindHistory() {
+    void shouldThrowWhenMapperReturnsNullForFindHistory() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity1 = new TransferJpaEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY", TransferStatus.COMPLETED, now);
         TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findHistory(eq(100L), any())).thenReturn(List.of(entity1, entity2));
-        lenient().when(mapper.toDomain(entity2)).thenReturn(null);
+        lenient().when(mapper.toDomain(entity2)).thenThrow(new IllegalArgumentException("Mapping failed"));
 
-        var result = repository.findHistory(100L, 0, 10);
-
-        assertEquals(1, result.size());
-        assertEquals(200L, result.getFirst().getReceiverAccountId());
+        assertThrows(IllegalArgumentException.class, () -> repository.findHistory(100L, 0, 10));
         verify(springDataRepo).findHistory(eq(100L), any());
     }
 
@@ -310,7 +299,7 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFilterOutNullMappingsWhenFindHistoryBetweenWithPagination() {
+    void shouldThrowWhenMapperReturnsNullForFindHistoryBetweenWithPagination() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);
         LocalDateTime end = now.plusDays(1);
@@ -318,12 +307,9 @@ class TransferPersistenceAdapterTest {
         TransferJpaEntity entity2 = new TransferJpaEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY", TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findHistoryBetween(eq(100L), eq(start), eq(end), any())).thenReturn(List.of(entity1, entity2));
-        lenient().when(mapper.toDomain(entity1)).thenReturn(null);
+        lenient().when(mapper.toDomain(entity1)).thenThrow(new IllegalArgumentException("Mapping failed"));
 
-        var result = repository.findHistoryBetween(100L, start, end, 0, 10);
-
-        assertEquals(1, result.size());
-        assertEquals(100L, result.getFirst().getReceiverAccountId());
+        assertThrows(IllegalArgumentException.class, () -> repository.findHistoryBetween(100L, start, end, 0, 10));
         verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), any());
     }
 }

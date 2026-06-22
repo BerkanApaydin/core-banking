@@ -1,8 +1,12 @@
 package com.bank.app.user.domain;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public class User {
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[\\d\\s.-]{6,20}$");
+
     private final Long id;
     private final String username;
     private final String password;
@@ -19,6 +23,12 @@ public class User {
         this.username = Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
         this.password = Objects.requireNonNull(password, "Şifre null olamaz");
         this.role = role != null ? role : "ROLE_USER";
+        if (email != null && !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new IllegalArgumentException("Geçersiz email formatı: " + email);
+        }
+        if (phone != null && !PHONE_PATTERN.matcher(phone).matches()) {
+            throw new IllegalArgumentException("Geçersiz telefon numarası formatı: " + phone);
+        }
         this.email = email;
         this.phone = phone;
     }

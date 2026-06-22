@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -30,14 +29,8 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     @Override
     public Transfer save(Transfer domainTransfer) {
         TransferJpaEntity entity = mapper.toJpaEntity(domainTransfer);
-        if (entity != null) {
-            TransferJpaEntity savedEntity = springDataRepo.save(entity);
-            Transfer domain = mapper.toDomain(savedEntity);
-            if (domain != null) {
-                return domain;
-            }
-        }
-        throw new IllegalStateException("Transfer kaydedilemedi.");
+        TransferJpaEntity savedEntity = springDataRepo.save(entity);
+        return mapper.toDomain(savedEntity);
     }
 
     @Override
@@ -54,7 +47,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     public List<Transfer> findBySenderAccountId(Long accountId) {
         return springDataRepo.findBySenderAccountId(accountId).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -63,7 +55,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
             LocalDateTime end) {
         return springDataRepo.findBySenderAccountIdAndCreatedAtBetween(accountId, start, end).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -72,7 +63,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         Pageable pageable = PageRequest.of(page, size);
         return springDataRepo.findHistory(accountId, pageable).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -82,7 +72,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         Pageable pageable = PageRequest.of(page, size);
         return springDataRepo.findHistoryBetween(accountId, start, end, pageable).stream()
                 .map(mapper::toDomain)
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
