@@ -1,5 +1,6 @@
 package com.bank.app.user.infrastructure.security;
 
+import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
-public class FailedLoginAttemptService {
+public class FailedLoginAttemptService implements LoginAttemptPort {
 
     private final Cache<String, AtomicInteger> ipCache;
     private final Cache<String, AtomicInteger> usernameCache;
@@ -31,23 +32,27 @@ public class FailedLoginAttemptService {
                 .build();
     }
 
+    @Override
     public boolean isIpBlocked(String ip) {
         if (maxAttempts < 0) return false;
         AtomicInteger count = ipCache.getIfPresent(ip);
         return count != null && count.get() >= maxAttempts;
     }
 
+    @Override
     public boolean isUsernameBlocked(String username) {
         if (maxAttempts < 0) return false;
         AtomicInteger count = usernameCache.getIfPresent(username);
         return count != null && count.get() >= maxAttempts;
     }
 
-    public boolean isBlocked(String ip) {
-        return isIpBlocked(ip);
+    @Override
+    public void recordFailure(String ip, String username) {
+        recordIpFailure(ip);
+        recordUsernameFailure(username);
     }
 
-    public void recordFailure(String ip) {
+    public void recordIpFailure(String ip) {
         ipCache.asMap().compute(ip, (k, v) -> {
             if (v == null) return new AtomicInteger(1);
             v.incrementAndGet();
@@ -55,7 +60,7 @@ public class FailedLoginAttemptService {
         });
     }
 
-    public void recordFailureByUsername(String username) {
+    public void recordUsernameFailure(String username) {
         usernameCache.asMap().compute(username, (k, v) -> {
             if (v == null) return new AtomicInteger(1);
             v.incrementAndGet();
@@ -63,19 +68,22 @@ public class FailedLoginAttemptService {
         });
     }
 
+    @Override
     public void reset(String ip) {
         ipCache.invalidate(ip);
     }
 
+    @Override
     public void resetByUsername(String username) {
         usernameCache.invalidate(username);
     }
 
-    public int getMaxAttempts() {
-        return maxAttempts;
+    @Override
+    public int getWindowMinutes() {
+        return (int) windowMinutes;
     }
 
-    public long getWindowMinutes() {
-        return windowMinutes;
+    public int getMaxAttempts() {
+        return maxAttempts;
     }
 }

@@ -9,11 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
-/**
- * O5 — Compile-time modül sınırı zorlaması (ArchUnit).
- * Maven multi-module yerine paket düzeyinde bağımlılık kuralları uygulanır.
- */
 class ArchitectureTest {
 
     private static JavaClasses importedClasses;
@@ -62,6 +59,43 @@ class ArchitectureTest {
                 .that().haveSimpleNameEndingWith("UseCase")
                 .should().resideInAPackage("..application..")
                 .allowEmptyShould(true);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void domainShouldNotDependOnOtherModules() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..domain..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.bank.app.account.application..",
+                        "com.bank.app.transfer.application..",
+                        "com.bank.app.user.application..",
+                        "com.bank.app.audit.application..",
+                        "com.bank.app.account.infrastructure..",
+                        "com.bank.app.transfer.infrastructure..",
+                        "com.bank.app.user.infrastructure..",
+                        "com.bank.app.audit.infrastructure..");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void controllersShouldNotContainBusinessLogic() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..infrastructure.web..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "..domain.exception..",
+                        "org.springframework.security.core.AuthenticationException");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void domainShouldNotDependOnWebFramework() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..domain..")
+                .should().dependOnClassesThat().resideInAnyPackage("jakarta.servlet..", "org.springframework.web..");
 
         rule.check(importedClasses);
     }

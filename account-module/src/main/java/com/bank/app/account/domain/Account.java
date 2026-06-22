@@ -125,5 +125,10 @@ public class Account {
     public int hashCode() {
         return id != null ? id.hashCode() : System.identityHashCode(this);
     }
+
+    @Override
+    public String toString() {
+        return "Account{id=" + id + ", iban=" + iban.value() + ", status=" + status + ", balance=" + balance + "}";
+    }
 }
 

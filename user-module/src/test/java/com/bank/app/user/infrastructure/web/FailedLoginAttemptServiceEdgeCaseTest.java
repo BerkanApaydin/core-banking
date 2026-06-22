@@ -12,10 +12,10 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         FailedLoginAttemptService service = new FailedLoginAttemptService(0, 1);
         String ip = "10.0.0.1";
 
-        assertFalse(service.isBlocked(ip));
-        service.recordFailure(ip);
+        assertFalse(service.isIpBlocked(ip));
+        service.recordFailure(ip, "user");
 
-        assertTrue(service.isBlocked(ip));
+        assertTrue(service.isIpBlocked(ip));
     }
 
     @Test
@@ -23,11 +23,11 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         FailedLoginAttemptService service = new FailedLoginAttemptService(-1, 1);
         String ip = "10.0.0.2";
 
-        service.recordFailure(ip);
-        service.recordFailure(ip);
-        service.recordFailure(ip);
+        service.recordFailure(ip, "user");
+        service.recordFailure(ip, "user");
+        service.recordFailure(ip, "user");
 
-        assertFalse(service.isBlocked(ip));
+        assertFalse(service.isIpBlocked(ip));
     }
 
     @Test
@@ -36,13 +36,13 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         String ip1 = "10.0.0.7";
         String ip2 = "10.0.0.8";
 
-        service.recordFailure(ip1);
-        assertFalse(service.isBlocked(ip1));
-        assertFalse(service.isBlocked(ip2));
+        service.recordFailure(ip1, "user1");
+        assertFalse(service.isIpBlocked(ip1));
+        assertFalse(service.isIpBlocked(ip2));
 
-        service.recordFailure(ip1);
-        assertTrue(service.isBlocked(ip1));
-        assertFalse(service.isBlocked(ip2));
+        service.recordFailure(ip1, "user1");
+        assertTrue(service.isIpBlocked(ip1));
+        assertFalse(service.isIpBlocked(ip2));
     }
 
     @Test
@@ -50,13 +50,13 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         FailedLoginAttemptService service = new FailedLoginAttemptService(3, 1);
         String ip = "10.0.0.4";
 
-        service.recordFailure(ip);
-        service.recordFailure(ip);
-        service.recordFailure(ip);
-        assertTrue(service.isBlocked(ip));
+        service.recordFailure(ip, "user");
+        service.recordFailure(ip, "user");
+        service.recordFailure(ip, "user");
+        assertTrue(service.isIpBlocked(ip));
 
         service.reset(ip);
-        assertFalse(service.isBlocked(ip));
+        assertFalse(service.isIpBlocked(ip));
     }
 
     @Test
@@ -65,9 +65,9 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         String ip = "10.0.0.5";
 
         for (int i = 0; i < 100; i++) {
-            service.recordFailure(ip);
+            service.recordFailure(ip, "user");
         }
-        assertFalse(service.isBlocked(ip));
+        assertFalse(service.isIpBlocked(ip));
     }
 
     @Test
@@ -75,10 +75,10 @@ class FailedLoginAttemptServiceEdgeCaseTest {
         FailedLoginAttemptService service = new FailedLoginAttemptService(5, 1);
         String ip = "10.0.0.6";
 
-        assertFalse(service.isBlocked(ip));
+        assertFalse(service.isIpBlocked(ip));
         for (int i = 0; i < 5; i++) {
-            service.recordFailure(ip);
+            service.recordFailure(ip, "user");
         }
-        assertTrue(service.isBlocked(ip));
+        assertTrue(service.isIpBlocked(ip));
     }
 }

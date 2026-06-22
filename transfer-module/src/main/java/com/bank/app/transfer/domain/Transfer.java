@@ -86,6 +86,12 @@ public class Transfer {
         return id != null ? id.hashCode() : System.identityHashCode(this);
     }
 
+    @Override
+    public String toString() {
+        return "Transfer{id=" + id + ", sender=" + senderAccountId + ", receiver=" + receiverAccountId
+                + ", amount=" + amount + ", status=" + status + "}";
+    }
+
     public void cancel(int cancellationWindowHours) {
         cancel(cancellationWindowHours, Clock.systemDefaultZone());
     }

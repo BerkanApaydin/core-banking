@@ -5,4 +5,6 @@ import com.bank.app.user.application.dto.AuthResponse;
 
 public interface LoginUserUseCase {
     AuthResponse execute(AuthRequest request);
+
+    AuthResponse execute(AuthRequest request, String clientIp);
 }

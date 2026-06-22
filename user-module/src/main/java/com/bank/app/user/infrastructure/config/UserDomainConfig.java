@@ -4,6 +4,7 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.usecase.LoginUserUseCaseImpl;
@@ -33,7 +34,8 @@ public class UserDomainConfig {
     }
 
     @Bean
-    public LoginUserUseCase loginUserUseCase(AuthenticationPort authenticationPort, JwtPort jwtPort, LoadUserPort loadUserPort) {
-        return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort);
+    public LoginUserUseCase loginUserUseCase(AuthenticationPort authenticationPort, JwtPort jwtPort,
+                                             LoadUserPort loadUserPort, LoginAttemptPort loginAttemptPort) {
+        return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort, loginAttemptPort);
     }
 }

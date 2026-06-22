@@ -1,8 +1,6 @@
 package com.bank.app.user.infrastructure.web;
 
 import com.bank.app.common.api.ApiVersion;
-import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
-import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
@@ -11,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,13 +24,10 @@ public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUserUseCase loginUserUseCase;
-    private final FailedLoginAttemptService failedLoginAttemptService;
 
-    public AuthController(RegisterUserUseCase registerUserUseCase, LoginUserUseCase loginUserUseCase,
-                          FailedLoginAttemptService failedLoginAttemptService) {
+    public AuthController(RegisterUserUseCase registerUserUseCase, LoginUserUseCase loginUserUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
-        this.failedLoginAttemptService = failedLoginAttemptService;
     }
 
     @PostMapping("/register")
@@ -47,34 +41,8 @@ public class AuthController {
     @Operation(summary = "Kullanıcı girişi yapar", description = "Geçerli kullanıcı bilgileriyle giriş yaparak JWT token üretilmesini sağlar.")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
         String ip = resolveClientIp(httpRequest);
-        String username = request.username();
-
-        if (failedLoginAttemptService.isBlocked(ip)) {
-            throw new TooManyFailedLoginAttemptsException(
-                    "Çok fazla başarısız giriş denemesi. Lütfen " + failedLoginAttemptService.getWindowMinutes()
-                            + " dakika sonra tekrar deneyin.");
-        }
-
-        if (username != null && failedLoginAttemptService.isUsernameBlocked(username)) {
-            throw new TooManyFailedLoginAttemptsException(
-                    "Bu kullanıcı adı için çok fazla başarısız giriş denemesi. Lütfen "
-                            + failedLoginAttemptService.getWindowMinutes() + " dakika sonra tekrar deneyin.");
-        }
-
-        try {
-            AuthResponse response = loginUserUseCase.execute(request);
-            failedLoginAttemptService.reset(ip);
-            if (username != null) {
-                failedLoginAttemptService.resetByUsername(username);
-            }
-            return ResponseEntity.ok(response);
-        } catch (AuthenticationException e) {
-            failedLoginAttemptService.recordFailure(ip);
-            if (username != null) {
-                failedLoginAttemptService.recordFailureByUsername(username);
-            }
-            throw e;
-        }
+        AuthResponse response = loginUserUseCase.execute(request, ip);
+        return ResponseEntity.ok(response);
     }
 
     private String resolveClientIp(HttpServletRequest httpRequest) {

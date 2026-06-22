@@ -7,6 +7,7 @@ import com.bank.app.user.application.exception.UserNotFoundException;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,11 +27,12 @@ class LoginUserUseCaseTest {
     @Mock private AuthenticationPort authenticationPort;
     @Mock private JwtPort jwtPort;
     @Mock private LoadUserPort loadUserPort;
+    @Mock private LoginAttemptPort loginAttemptPort;
     private LoginUserUseCase loginUserUseCase;
 
     @BeforeEach
     void setUp() {
-        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort);
+        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort, loginAttemptPort);
     }
 
     @Test

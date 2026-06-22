@@ -6,7 +6,6 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
-import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,16 +38,12 @@ class AuthControllerIpResolverTest {
     @MockitoBean
     private LoginUserUseCase loginUserPort;
 
-    @MockitoBean
-    private FailedLoginAttemptService failedLoginAttemptService;
-
     @Test
     void shouldUseXForwardedForHeaderWhenPresent() throws Exception {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("203.0.113.195")).thenReturn(false);
-        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+        when(loginUserPort.execute(any(AuthRequest.class), eq("203.0.113.195"))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .header("X-Forwarded-For", "203.0.113.195")
@@ -56,8 +51,7 @@ class AuthControllerIpResolverTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(failedLoginAttemptService).isBlocked("203.0.113.195");
-        verify(failedLoginAttemptService).reset("203.0.113.195");
+        verify(loginUserPort).execute(any(AuthRequest.class), eq("203.0.113.195"));
     }
 
     @Test
@@ -65,8 +59,7 @@ class AuthControllerIpResolverTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("198.51.100.1")).thenReturn(false);
-        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+        when(loginUserPort.execute(any(AuthRequest.class), eq("198.51.100.1"))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .header("X-Forwarded-For", "198.51.100.1, 10.0.0.1, 192.168.1.1")
@@ -74,8 +67,7 @@ class AuthControllerIpResolverTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(failedLoginAttemptService).isBlocked("198.51.100.1");
-        verify(failedLoginAttemptService).reset("198.51.100.1");
+        verify(loginUserPort).execute(any(AuthRequest.class), eq("198.51.100.1"));
     }
 
     @Test
@@ -83,8 +75,7 @@ class AuthControllerIpResolverTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+        when(loginUserPort.execute(any(AuthRequest.class), eq("127.0.0.1"))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .header("X-Forwarded-For", "unknown")
@@ -92,7 +83,7 @@ class AuthControllerIpResolverTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
+        verify(loginUserPort).execute(any(AuthRequest.class), eq("127.0.0.1"));
     }
 
     @Test
@@ -100,15 +91,14 @@ class AuthControllerIpResolverTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+        when(loginUserPort.execute(any(AuthRequest.class), eq("127.0.0.1"))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
+        verify(loginUserPort).execute(any(AuthRequest.class), eq("127.0.0.1"));
     }
 
     @Test
@@ -116,8 +106,7 @@ class AuthControllerIpResolverTest {
         AuthRequest request = new AuthRequest("testuser", "password");
         AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-        when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-        when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+        when(loginUserPort.execute(any(AuthRequest.class), eq("127.0.0.1"))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .header("X-Forwarded-For", "")
@@ -125,6 +114,6 @@ class AuthControllerIpResolverTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(failedLoginAttemptService).isBlocked("127.0.0.1");
+        verify(loginUserPort).execute(any(AuthRequest.class), eq("127.0.0.1"));
     }
 }

@@ -7,7 +7,7 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
-import com.bank.app.user.infrastructure.security.FailedLoginAttemptService;
+import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,9 +44,6 @@ class AuthControllerWebMvcTest {
 
     @MockitoBean
     private LoginUserUseCase loginUserPort;
-
-    @MockitoBean
-    private FailedLoginAttemptService failedLoginAttemptService;
 
     private static class DuplicateUsernameException extends BusinessException {
         DuplicateUsernameException(String messageKey, Object[] args, String defaultMessage) {
@@ -141,9 +138,7 @@ class AuthControllerWebMvcTest {
             AuthRequest request = new AuthRequest("testuser", "password");
             AuthResponse response = new AuthResponse("jwt-token", 100L, "testuser");
 
-            when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-            doNothing().when(failedLoginAttemptService).reset("127.0.0.1");
-            when(loginUserPort.execute(any(AuthRequest.class))).thenReturn(response);
+            when(loginUserPort.execute(any(AuthRequest.class), anyString())).thenReturn(response);
 
             mockMvc.perform(post("/api/v1/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +154,8 @@ class AuthControllerWebMvcTest {
         void shouldReturn429WhenIpBlocked() throws Exception {
             AuthRequest request = new AuthRequest("testuser", "password");
 
-            when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(true);
+            when(loginUserPort.execute(any(AuthRequest.class), anyString()))
+                    .thenThrow(new TooManyFailedLoginAttemptsException("Çok fazla deneme"));
 
             mockMvc.perform(post("/api/v1/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -181,8 +177,7 @@ class AuthControllerWebMvcTest {
         void shouldPropagateAuthException() throws Exception {
             AuthRequest request = new AuthRequest("nobody", "wrong");
 
-            when(failedLoginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
-            when(loginUserPort.execute(any(AuthRequest.class)))
+            when(loginUserPort.execute(any(AuthRequest.class), anyString()))
                     .thenThrow(new BadCredentialsException("Geçersiz kullanıcı adı veya şifre"));
 
             mockMvc.perform(post("/api/v1/auth/login")
