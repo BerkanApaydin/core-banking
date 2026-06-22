@@ -7,7 +7,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.security.port.out.SecurityContextPort;
-import org.springframework.lang.NonNull;
+import java.util.Objects;
 public class AccountTransferOperationUseCase implements AccountTransferOperationPort {
 
     private final LoadAccountPort loadAccountPort;
@@ -52,7 +52,9 @@ public class AccountTransferOperationUseCase implements AccountTransferOperation
         saveAccountPort.save(receiver);
     }
 
-    private LockedAccounts loadAccountsWithLockOrdered(@NonNull Long senderId, @NonNull Long receiverId) {
+    private LockedAccounts loadAccountsWithLockOrdered(Long senderId, Long receiverId) {
+        Objects.requireNonNull(senderId, "senderId null olamaz");
+        Objects.requireNonNull(receiverId, "receiverId null olamaz");
         Account sender;
         Account receiver;
         if (senderId.compareTo(receiverId) < 0) {

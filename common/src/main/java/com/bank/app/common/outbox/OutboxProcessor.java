@@ -44,7 +44,8 @@ public class OutboxProcessor {
             outboxRepo.save(event);
             log.info("Successfully processed outbox event id: {}", event.getId());
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("Failed to process outbox event id: {}. Error: {}", event.getId(), e.getMessage(), e);
+            throw new RuntimeException("Outbox event processing failed", e);
         }
     }
 

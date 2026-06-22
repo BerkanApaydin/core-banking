@@ -1,5 +1,7 @@
 package com.bank.app.common.config;
 
+import jakarta.annotation.PreDestroy;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -10,14 +12,32 @@ import java.util.concurrent.Executor;
 @Configuration
 public class AsyncSecurityConfig implements AsyncConfigurer {
 
+    private ThreadPoolTaskExecutor delegate;
+
     @Override
     public Executor getAsyncExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(20);
-        executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("async-bank-");
-        executor.initialize();
-        return new DelegatingSecurityContextAsyncTaskExecutor(executor);
+        return asyncTaskExecutor();
+    }
+
+    @Bean(name = "asyncTaskExecutor")
+    public Executor asyncTaskExecutor() {
+        if (delegate == null) {
+            delegate = new ThreadPoolTaskExecutor();
+            delegate.setCorePoolSize(5);
+            delegate.setMaxPoolSize(20);
+            delegate.setQueueCapacity(500);
+            delegate.setThreadNamePrefix("async-bank-");
+            delegate.setWaitForTasksToCompleteOnShutdown(true);
+            delegate.setAwaitTerminationSeconds(30);
+            delegate.initialize();
+        }
+        return new DelegatingSecurityContextAsyncTaskExecutor(delegate);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        if (delegate != null) {
+            delegate.shutdown();
+        }
     }
 }

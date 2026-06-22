@@ -14,7 +14,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
-@RestControllerAdvice
+// Consolidated into GlobalExceptionHandler
 public class DataIntegrityExceptionHandler {
 
     private final MessageSource messageSource;

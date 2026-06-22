@@ -8,18 +8,28 @@ import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.usecase.LoginUserUseCaseImpl;
 import com.bank.app.user.application.usecase.RegisterUserUseCaseImpl;
+import com.bank.app.user.infrastructure.decorator.UserUseCaseTransactionDecorator;
 import com.bank.app.common.security.port.out.JwtPort;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class UserDomainConfig {
 
     @Bean
-    @Transactional
-    public RegisterUserUseCase registerUserUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort, PasswordEncoderPort passwordEncoderPort) {
+    @Qualifier("rawRegisterUserUseCase")
+    public RegisterUserUseCase rawRegisterUserUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
+                                                       PasswordEncoderPort passwordEncoderPort) {
         return new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort);
+    }
+
+    @Bean
+    @Primary
+    public UserUseCaseTransactionDecorator registerUserUseCase(
+            @Qualifier("rawRegisterUserUseCase") RegisterUserUseCase registerUserUseCase) {
+        return new UserUseCaseTransactionDecorator(registerUserUseCase);
     }
 
     @Bean

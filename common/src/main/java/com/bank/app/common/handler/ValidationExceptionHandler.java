@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice
+// Consolidated into GlobalExceptionHandler
 public class ValidationExceptionHandler {
 
     private final MessageSource messageSource;

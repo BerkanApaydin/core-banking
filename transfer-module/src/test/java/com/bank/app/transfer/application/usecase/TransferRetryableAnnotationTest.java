@@ -1,9 +1,10 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.transfer.infrastructure.decorator.TransferUseCaseTransactionDecorator;
 import org.junit.jupiter.api.Test;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.lang.reflect.Method;
 
@@ -13,7 +14,7 @@ class TransferRetryableAnnotationTest {
 
     @Test
     void placeTransferUseCaseShouldHaveRetryableAnnotation() throws Exception {
-        Method method = PlaceTransferUseCaseImpl.class
+        Method method = TransferUseCaseTransactionDecorator.class
                 .getMethod("execute", com.bank.app.transfer.application.dto.TransferRequest.class);
 
         Retryable retryable = method.getAnnotation(Retryable.class);
@@ -21,8 +22,8 @@ class TransferRetryableAnnotationTest {
 
         assertTrue(retryable.retryFor().length > 0,
                 "@Retryable should specify retryFor");
-        assertEquals(ConcurrencyFailureException.class, retryable.retryFor()[0],
-                "Should retry on ConcurrencyFailureException");
+        assertEquals(OptimisticLockingFailureException.class, retryable.retryFor()[0],
+                "Should retry on OptimisticLockingFailureException");
         assertEquals(3, retryable.maxAttempts(),
                 "Should have max 3 attempts");
         assertEquals(500, retryable.backoff().delay(),
@@ -33,14 +34,14 @@ class TransferRetryableAnnotationTest {
 
     @Test
     void cancelTransferUseCaseShouldHaveRetryableAnnotation() throws Exception {
-        Method method = CancelTransferUseCaseImpl.class
+        Method method = TransferUseCaseTransactionDecorator.class
                 .getMethod("execute", Long.class);
 
         Retryable retryable = method.getAnnotation(Retryable.class);
         assertNotNull(retryable, "execute method should be annotated with @Retryable");
 
-        assertEquals(ConcurrencyFailureException.class, retryable.retryFor()[0],
-                "Should retry on ConcurrencyFailureException");
+        assertEquals(OptimisticLockingFailureException.class, retryable.retryFor()[0],
+                "Should retry on OptimisticLockingFailureException");
         assertEquals(3, retryable.maxAttempts(),
                 "Should have max 3 attempts");
         assertEquals(500, retryable.backoff().delay(),

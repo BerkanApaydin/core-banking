@@ -14,10 +14,6 @@ import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferParticipants;
-import org.springframework.dao.ConcurrencyFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
@@ -37,12 +33,6 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
     }
 
     @Override
-    @Transactional
-    @Retryable(
-            retryFor = ConcurrencyFailureException.class,
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 500, multiplier = 2)
-    )
     public TransferResponse execute(TransferRequest request) {
         Objects.requireNonNull(request, "Request null olamaz");
 

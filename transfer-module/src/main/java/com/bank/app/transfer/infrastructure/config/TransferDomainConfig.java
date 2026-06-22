@@ -16,10 +16,12 @@ import com.bank.app.transfer.application.usecase.GetTransferDetailUseCaseImpl;
 import com.bank.app.transfer.application.usecase.GetTransferHistoryUseCaseImpl;
 import com.bank.app.transfer.application.usecase.PlaceTransferUseCaseImpl;
 import com.bank.app.transfer.domain.TransferDomainService;
+import com.bank.app.transfer.infrastructure.decorator.TransferUseCaseTransactionDecorator;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class TransferDomainConfig {
@@ -28,42 +30,50 @@ public class TransferDomainConfig {
     private int cancellationWindowHours;
 
     @Bean
-    @Transactional
-    public PlaceTransferUseCase placeTransferUseCase(AccountOperationPort accountOperationPort,
-                                                     SaveTransferPort saveTransferPort,
-                                                     EventPublisherPort eventPublisherPort,
-                                                     TransferDomainService transferDomainService) {
+    @Qualifier("rawPlaceTransferUseCase")
+    public PlaceTransferUseCase rawPlaceTransferUseCase(AccountOperationPort accountOperationPort,
+                                                         SaveTransferPort saveTransferPort,
+                                                         EventPublisherPort eventPublisherPort,
+                                                         TransferDomainService transferDomainService) {
         return new PlaceTransferUseCaseImpl(accountOperationPort, saveTransferPort, eventPublisherPort, transferDomainService);
     }
 
     @Bean
-    @Transactional
-    public CancelTransferUseCase cancelTransferUseCase(LoadTransferPort loadTransferPort,
-                                                       SaveTransferPort saveTransferPort,
-                                                       AccountOperationPort accountOperationPort,
-                                                       EventPublisherPort eventPublisherPort,
-                                                       SecurityContextPort securityContextPort) {
+    @Qualifier("rawCancelTransferUseCase")
+    public CancelTransferUseCase rawCancelTransferUseCase(LoadTransferPort loadTransferPort,
+                                                           SaveTransferPort saveTransferPort,
+                                                           AccountOperationPort accountOperationPort,
+                                                           EventPublisherPort eventPublisherPort,
+                                                           SecurityContextPort securityContextPort) {
         return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountOperationPort, eventPublisherPort, securityContextPort, cancellationWindowHours);
     }
 
     @Bean
+    @Primary
+    public TransferUseCaseTransactionDecorator transferUseCase(
+            @Qualifier("rawPlaceTransferUseCase") PlaceTransferUseCase placeTransferUseCase,
+            @Qualifier("rawCancelTransferUseCase") CancelTransferUseCase cancelTransferUseCase) {
+        return new TransferUseCaseTransactionDecorator(placeTransferUseCase, cancelTransferUseCase);
+    }
+
+    @Bean
     public GenerateTransferReportQuery generateTransferReportQuery(LoadTransferPort loadTransferPort,
-                                                                   AccountOperationPort accountOperationPort,
-                                                                   SecurityContextPort securityContextPort) {
+                                                                    AccountOperationPort accountOperationPort,
+                                                                    SecurityContextPort securityContextPort) {
         return new GenerateTransferReportUseCaseImpl(loadTransferPort, accountOperationPort, securityContextPort);
     }
 
     @Bean
     public GetTransferDetailQuery getTransferDetailQuery(LoadTransferPort loadTransferPort,
-                                                         AccountOperationPort accountOperationPort,
-                                                         SecurityContextPort securityContextPort) {
+                                                          AccountOperationPort accountOperationPort,
+                                                          SecurityContextPort securityContextPort) {
         return new GetTransferDetailUseCaseImpl(loadTransferPort, accountOperationPort, securityContextPort);
     }
 
     @Bean
     public GetTransferHistoryQuery getTransferHistoryQuery(LoadTransferPort loadTransferPort,
-                                                           AccountOperationPort accountOperationPort,
-                                                           SecurityContextPort securityContextPort) {
+                                                            AccountOperationPort accountOperationPort,
+                                                            SecurityContextPort securityContextPort) {
         return new GetTransferHistoryUseCaseImpl(loadTransferPort, accountOperationPort, securityContextPort);
     }
 }

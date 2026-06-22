@@ -9,10 +9,6 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.domain.Transfer;
-import org.springframework.dao.ConcurrencyFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
 public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
@@ -39,12 +35,6 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     }
 
     @Override
-    @Transactional
-    @Retryable(
-            retryFor = ConcurrencyFailureException.class,
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 500, multiplier = 2)
-    )
     public void execute(Long transferId) {
         Objects.requireNonNull(transferId, "Transfer ID null olamaz");
         Transfer transfer = loadTransferPort.findByIdWithLock(transferId)

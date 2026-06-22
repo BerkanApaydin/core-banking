@@ -26,8 +26,12 @@ public class IdempotencyGuard {
         Optional<IdempotencyKeyJpaEntity> existing = repo.findById(key);
         if (existing.isPresent()) {
             IdempotencyKeyJpaEntity entity = existing.get();
-            if ("PENDING".equals(entity.getStatus())) {
+            String status = entity.getStatus();
+            if ("PENDING".equals(status)) {
                 return IdempotencyResult.pending();
+            } else if ("FAILED".equals(status)) {
+                repo.delete(entity);
+                return IdempotencyResult.newRequest();
             } else {
                 return IdempotencyResult.completed(entity.getResponseBody(), entity.getResponseStatus());
             }
@@ -70,7 +74,10 @@ public class IdempotencyGuard {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failRequest(@NonNull String key) {
         Objects.requireNonNull(key, "Idempotency key null olamaz");
-        repo.deleteById(key);
+        repo.findById(key).ifPresent(entity -> {
+            entity.setStatus("FAILED");
+            repo.save(entity);
+        });
     }
 
     public record IdempotencyResult(Status status, String responseBody, Integer responseStatus) {

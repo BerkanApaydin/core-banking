@@ -133,10 +133,24 @@ class IdempotencyTest {
     }
 
     @Test
-    void shouldDeleteKeyOnFailRequest() {
+    void shouldMarkKeyAsFailedOnFailRequest() {
+        IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity("key-1", "PENDING", null, LocalDateTime.now());
+        when(repo.findById("key-1")).thenReturn(Optional.of(entity));
+
         manager.failRequest("key-1");
 
-        verify(repo).deleteById("key-1");
+        assertEquals("FAILED", entity.getStatus());
+        verify(repo).save(entity);
+    }
+
+    @Test
+    void shouldDoNothingWhenFailRequestForNonExistentKey() {
+        when(repo.findById("key-1")).thenReturn(Optional.empty());
+
+        manager.failRequest("key-1");
+
+        verify(repo).findById("key-1");
+        verify(repo, never()).save(any());
     }
 
     @Test
