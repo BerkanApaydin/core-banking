@@ -30,6 +30,11 @@ public class TransferDomainConfig {
     private int cancellationWindowHours;
 
     @Bean
+    public TransferDomainService transferDomainService() {
+        return new TransferDomainService();
+    }
+
+    @Bean
     @Qualifier("rawPlaceTransferUseCase")
     public PlaceTransferUseCase rawPlaceTransferUseCase(AccountOperationPort accountOperationPort,
                                                          SaveTransferPort saveTransferPort,

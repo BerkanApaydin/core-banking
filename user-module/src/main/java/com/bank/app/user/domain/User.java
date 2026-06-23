@@ -13,12 +13,17 @@ public class User {
     private final String role;
     private final String email;
     private final String phone;
+    private final Long version;
 
     public User(Long id, String username, String password, String role) {
         this(id, username, password, role, null, null);
     }
 
     public User(Long id, String username, String password, String role, String email, String phone) {
+        this(id, username, password, role, email, phone, null);
+    }
+
+    public User(Long id, String username, String password, String role, String email, String phone, Long version) {
         this.id = id;
         this.username = Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
         this.password = Objects.requireNonNull(password, "Şifre null olamaz");
@@ -31,6 +36,7 @@ public class User {
         }
         this.email = email;
         this.phone = phone;
+        this.version = version;
     }
 
     public static User create(String username, String password) {
@@ -63,6 +69,10 @@ public class User {
 
     public String getPhone() {
         return phone;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     @Override
