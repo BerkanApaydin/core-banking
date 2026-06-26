@@ -26,6 +26,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String HEADER_AUTHORIZATION = "Authorization";
+    private static final String MSG_TOKEN_REVOKED = "Token has been revoked";
+    private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
+
     private final JwtPort jwtPort;
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistPort tokenBlacklistPort;
@@ -43,19 +48,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        final String authHeader = request.getHeader(HEADER_AUTHORIZATION);
         final String jwt;
         final String username;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        jwt = authHeader.substring(BEARER_PREFIX.length());
 
         if (tokenBlacklistPort.isBlacklisted(jwt)) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, MSG_TOKEN_REVOKED);
             return;
         }
 
@@ -90,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             log.warn("JWT authentication failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, MSG_TOKEN_INVALID);
             return;
         }
         filterChain.doFilter(request, response);

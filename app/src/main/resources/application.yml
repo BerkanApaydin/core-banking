@@ -96,22 +96,4 @@ management:
     health:
       show-details: when_authorized
 
-resilience4j:
-  circuitbreaker:
-    instances:
-      emailNotification:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        permittedNumberOfCallsInHalfOpenState: 3
-        slidingWindowType: COUNT_BASED
-        minimumNumberOfCalls: 5
-        waitDurationInOpenState: 5000
-        failureRateThreshold: 50
-      smsNotification:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        permittedNumberOfCallsInHalfOpenState: 3
-        slidingWindowType: COUNT_BASED
-        minimumNumberOfCalls: 5
-        waitDurationInOpenState: 5000
-        failureRateThreshold: 50
+
