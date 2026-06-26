@@ -5,8 +5,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.lang.NonNull;
+
 public interface LoadTransferPort {
-    Optional<Transfer> findById(Long id);
+    Optional<Transfer> findById(@NonNull Long id);
     Optional<Transfer> findByIdWithLock(Long id);
     List<Transfer> findBySenderAccountId(Long accountId);
     List<Transfer> findBySenderAccountIdAndCreatedAtBetween(Long accountId, LocalDateTime start, LocalDateTime end);

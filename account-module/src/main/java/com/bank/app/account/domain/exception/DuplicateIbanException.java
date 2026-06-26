@@ -1,9 +1,18 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.common.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessException;
 
 public class DuplicateIbanException extends BusinessException {
-    public DuplicateIbanException(String message) {
-        super(message);
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public int getHttpStatusCode() { return 409; }
+
+    public DuplicateIbanException(String iban) {
+        super("error.duplicate_iban", new Object[]{iban}, "Bu IBAN ile zaten bir hesap var: " + iban);
+    }
+
+    public DuplicateIbanException(String messageKey, Object[] args, String defaultMessage) {
+        super(messageKey, args, defaultMessage);
     }
 }

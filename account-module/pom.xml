@@ -21,13 +21,14 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Test dependencies -->
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>user-module</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Test dependencies -->
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>common</artifactId>

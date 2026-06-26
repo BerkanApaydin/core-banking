@@ -4,6 +4,7 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
+import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import java.time.ZoneId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@SuppressWarnings("null")
 @DisplayName("Transfer domain entity")
 class TransferTest {
 
@@ -101,7 +103,7 @@ class TransferTest {
         @Test
         @DisplayName("should complete a PENDING transfer")
         void shouldCompletePending() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
             transfer.complete();
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
         }
@@ -111,8 +113,8 @@ class TransferTest {
         void shouldThrowOnAlreadyCompleted() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
             assertThatThrownBy(transfer::complete)
-                    .isExactlyInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("Sadece PENDING durumundaki transferler tamamlanabilir");
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
+                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: COMPLETED");
         }
 
         @Test
@@ -120,7 +122,7 @@ class TransferTest {
         void shouldThrowOnFailedStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
             assertThatThrownBy(transfer::complete)
-                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: FAILED");
         }
 
@@ -129,17 +131,17 @@ class TransferTest {
         void shouldThrowOnCancelledStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
             assertThatThrownBy(transfer::complete)
-                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: CANCELLED");
         }
 
         @Test
         @DisplayName("should complete only once")
         void shouldCompleteOnlyOnce() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
             transfer.complete();
             assertThatThrownBy(transfer::complete)
-                    .isExactlyInstanceOf(IllegalStateException.class);
+                    .isExactlyInstanceOf(TransferNotPendingException.class);
         }
     }
 
@@ -151,7 +153,7 @@ class TransferTest {
         @DisplayName("should cancel within 24-hour window")
         void shouldCancelWithinWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
-            transfer.cancel(24);
+            transfer.cancel(Clock.systemDefaultZone(), 24);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
@@ -159,15 +161,17 @@ class TransferTest {
         @DisplayName("should cancel at exactly 24-hour window boundary")
         void shouldCancelAtBoundary() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
-            transfer.cancel(24);
+            transfer.cancel(Clock.systemDefaultZone(), 24);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
         @Test
         @DisplayName("should allow cancellation with zero window when just created")
         void shouldCancelWithZeroWindow() {
-            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
-            transfer.cancel(0);
+            LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
+            Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, fixedNow);
+            transfer.cancel(clock, 0);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
@@ -175,7 +179,7 @@ class TransferTest {
         @DisplayName("should throw when transfer is older than 24 hours")
         void shouldThrowAfterWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(25));
-            assertThatThrownBy(() -> transfer.cancel(24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("saat geçtiği için iptal edilemez");
         }
@@ -185,7 +189,7 @@ class TransferTest {
         void shouldThrowJustAfterBoundary() {
             LocalDateTime createdAt = now().minusHours(24).minusMinutes(1);
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            assertThatThrownBy(() -> transfer.cancel(24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("saat geçtiği için iptal edilemez");
         }
@@ -194,7 +198,7 @@ class TransferTest {
         @DisplayName("should throw when window is zero and transfer is old")
         void shouldThrowWithZeroWindowAndOldTransfer() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusMinutes(1));
-            assertThatThrownBy(() -> transfer.cancel(0))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 0))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("saat geçtiği için iptal edilemez");
         }
@@ -203,7 +207,7 @@ class TransferTest {
         @DisplayName("should throw when already cancelled")
         void shouldThrowWhenAlreadyCancelled() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
-            assertThatThrownBy(() -> transfer.cancel(24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferAlreadyCancelledException.class)
                     .hasMessage("Transfer zaten iptal edilmiş. ID: 1");
         }
@@ -212,7 +216,7 @@ class TransferTest {
         @DisplayName("should throw when status is FAILED")
         void shouldThrowOnFailedStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
-            assertThatThrownBy(() -> transfer.cancel(24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("Sadece tamamlanmış transferler iptal edilebilir");
         }
@@ -221,7 +225,7 @@ class TransferTest {
         @DisplayName("should throw when status is PENDING")
         void shouldThrowOnPendingStatus() {
             Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
-            assertThatThrownBy(() -> transfer.cancel(24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("Sadece tamamlanmış transferler iptal edilebilir");
         }
@@ -234,7 +238,7 @@ class TransferTest {
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(1), ZoneId.systemDefault());
 
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            transfer.cancel(24, clock);
+            transfer.cancel(clock, 24);
 
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
@@ -247,8 +251,69 @@ class TransferTest {
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(25 * 3600 + 6), ZoneId.systemDefault());
 
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            assertThatThrownBy(() -> transfer.cancel(24, clock))
+            assertThatThrownBy(() -> transfer.cancel(clock, 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("markFailed")
+    class MarkFailed {
+
+        @Test
+        @DisplayName("should mark PENDING transfer as FAILED")
+        void shouldMarkFailedFromPending() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
+            transfer.markFailed();
+            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("should mark PENDING transfer as FAILED with fixed clock")
+        void shouldMarkFailedFromPendingWithClock() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
+            transfer.markFailed(Clock.systemDefaultZone());
+            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("should throw when marking already COMPLETED transfer as failed")
+        void shouldThrowOnAlreadyCompleted() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
+            assertThatThrownBy(transfer::markFailed)
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
+                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: COMPLETED");
+        }
+
+        @Test
+        @DisplayName("should throw when marking already CANCELLED transfer as failed")
+        void shouldThrowOnCancelledStatus() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
+            assertThatThrownBy(transfer::markFailed)
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
+                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: CANCELLED");
+        }
+
+        @Test
+        @DisplayName("should throw when marking already FAILED transfer as failed")
+        void shouldThrowOnAlreadyFailed() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
+            assertThatThrownBy(transfer::markFailed)
+                    .isExactlyInstanceOf(TransferNotPendingException.class)
+                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: FAILED");
+        }
+    }
+
+    @Nested
+    @DisplayName("cancel no-arg")
+    class CancelNoArg {
+
+        @Test
+        @DisplayName("should cancel using default 24-hour window")
+        void shouldCancelWithDefaultWindow() {
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
+            transfer.cancel();
+            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
     }
 

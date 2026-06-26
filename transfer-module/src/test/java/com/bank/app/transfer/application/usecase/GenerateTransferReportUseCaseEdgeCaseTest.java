@@ -1,12 +1,12 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.application.exception.AccountNotFoundException;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,11 +23,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort accountOperationPort;
+    @Mock private AccountAclPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
 
     private GenerateTransferReportQuery generateTransferReportUseCase;
@@ -60,30 +61,20 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Test
     void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
-        ReportCriteria criteria = new ReportCriteria(null,
-                LocalDateTime.now().minusDays(5), LocalDateTime.now());
-
-        NullPointerException ex = assertThrows(NullPointerException.class,
-                () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Account ID null olamaz", ex.getMessage());
+        assertThrows(NullPointerException.class,
+                () -> new ReportCriteria(null, LocalDateTime.now().minusDays(5), LocalDateTime.now()));
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenStartDateIsNull() {
-        ReportCriteria criteria = new ReportCriteria(1L, null, LocalDateTime.now());
-
-        NullPointerException ex = assertThrows(NullPointerException.class,
-                () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Start date null olamaz", ex.getMessage());
+        assertThrows(NullPointerException.class,
+                () -> new ReportCriteria(1L, null, LocalDateTime.now()));
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenEndDateIsNull() {
-        ReportCriteria criteria = new ReportCriteria(1L, LocalDateTime.now(), null);
-
-        NullPointerException ex = assertThrows(NullPointerException.class,
-                () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("End date null olamaz", ex.getMessage());
+        assertThrows(NullPointerException.class,
+                () -> new ReportCriteria(1L, LocalDateTime.now(), null));
     }
 
     @Test
@@ -102,7 +93,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime now = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, now, now);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -134,7 +125,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -150,7 +141,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -173,7 +164,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now().plusDays(10);
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -190,7 +181,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 200L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 200L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         doThrow(new AccessDeniedException("Bu hesabın raporunu oluşturma yetkiniz yok."))
@@ -207,7 +198,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         doThrow(new AccessDeniedException("Bu işlem için giriş yapmalısınız."))
@@ -223,7 +214,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());

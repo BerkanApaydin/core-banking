@@ -5,7 +5,10 @@ import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
+import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.User;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.user.domain.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RegisterUserUseCase")
 class RegisterUserUseCaseTest {
@@ -35,7 +39,7 @@ class RegisterUserUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort);
+        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT);
     }
 
     @Nested
@@ -57,7 +61,7 @@ class RegisterUserUseCaseTest {
             verify(saveUserPort).save(argThat(user ->
                     "newuser".equals(user.getUsername()) &&
                     "hashedpassword".equals(user.getPassword()) &&
-                    "ROLE_USER".equals(user.getRole())));
+                    user.getRole() == Role.ROLE_USER));
         }
 
         @Test
@@ -73,8 +77,8 @@ class RegisterUserUseCaseTest {
             verify(saveUserPort).save(argThat(user ->
                     "newuser".equals(user.getUsername()) &&
                     "hashedpassword".equals(user.getPassword()) &&
-                    "test@example.com".equals(user.getEmail()) &&
-                    "5551234567".equals(user.getPhone())
+                    user.getEmail() != null && "test@example.com".equals(user.getEmail().value()) &&
+                    user.getPhone() != null && "5551234567".equals(user.getPhone().value())
             ));
         }
 
@@ -117,7 +121,7 @@ class RegisterUserUseCaseTest {
         @DisplayName("should throw when username already exists")
         void shouldThrowOnDuplicateUsername() {
             AuthRequest request = new AuthRequest("existinguser", "password");
-            User existingUser = new User(1L, "existinguser", "hashed", "ROLE_USER");
+            User existingUser = new User(new UserId(1L), "existinguser", "hashed", Role.ROLE_USER);
 
             when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
 

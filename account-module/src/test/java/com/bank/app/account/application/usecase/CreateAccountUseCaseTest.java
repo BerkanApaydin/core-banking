@@ -10,11 +10,12 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.common.exception.InvalidIbanException;
+import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CreateAccountUseCase")
 class CreateAccountUseCaseTest {
@@ -75,7 +77,7 @@ class CreateAccountUseCaseTest {
         void shouldCreateSuccessfully() {
             CreateAccountRequest request = validRequest();
             Iban iban = new Iban(request.iban());
-            Account savedAccount = new Account(1L, USER_ID, iban, OWNER,
+            Account savedAccount = new Account(1L, new UserId(USER_ID), iban, OWNER,
                     new Money(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
 
             doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
@@ -96,10 +98,11 @@ class CreateAccountUseCaseTest {
             verify(saveAccountPort).save(accountCaptor.capture());
             assertThat(accountCaptor.getValue().getIban().value()).isEqualTo(VALID_IBAN);
 
+            verify(eventPublisherPort, times(2)).publish(any());
             verify(eventPublisherPort).publish(eventCaptor.capture());
             AccountCreatedEvent publishedEvent = eventCaptor.getValue();
-            assertThat(publishedEvent.getAccountId()).isEqualTo(1L);
-            assertThat(publishedEvent.getUserId()).isEqualTo(USER_ID);
+            assertThat(publishedEvent.accountId()).isEqualTo(1L);
+            assertThat(publishedEvent.userId().value()).isEqualTo(USER_ID);
         }
     }
 
@@ -154,7 +157,7 @@ class CreateAccountUseCaseTest {
         void shouldThrowOnDuplicateIban() {
             CreateAccountRequest request = validRequest();
             Iban iban = new Iban(request.iban());
-            Account existingAccount = new Account(1L, USER_ID, iban, "Eski Sahip",
+            Account existingAccount = new Account(1L, new UserId(USER_ID), iban, "Eski Sahip",
                     new Money(new BigDecimal("100.00"), Currency.TRY), AccountStatus.ACTIVE);
 
             doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
@@ -162,24 +165,16 @@ class CreateAccountUseCaseTest {
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(DuplicateIbanException.class)
-                    .hasMessage("Bu IBAN ile kayıtlı bir hesap zaten mevcut: " + VALID_IBAN);
+                    .hasMessage("Bu IBAN ile zaten bir hesap var: " + VALID_IBAN);
             verify(saveAccountPort, never()).save(any(Account.class));
         }
 
         @Test
         @DisplayName("should throw when currency is null")
         void shouldThrowOnNullCurrency() {
-            CreateAccountRequest request = new CreateAccountRequest(
-                    USER_ID, VALID_IBAN, OWNER, new BigDecimal("500.00"), null);
-            Iban iban = new Iban(request.iban());
-
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
-            when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> createAccountUseCase.execute(request))
-                    .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Para birimi boş olamaz");
-            verify(saveAccountPort, never()).save(any(Account.class));
+            assertThatThrownBy(() -> new CreateAccountRequest(
+                    USER_ID, VALID_IBAN, OWNER, new BigDecimal("500.00"), null))
+                    .isExactlyInstanceOf(NullPointerException.class);
         }
 
         @Test

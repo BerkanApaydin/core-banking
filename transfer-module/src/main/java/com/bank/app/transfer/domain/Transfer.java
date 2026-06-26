@@ -1,14 +1,22 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.event.DomainEvent;
+import com.bank.app.common.domain.event.DomainEventProvider;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
+import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
-public class Transfer {
+public class Transfer implements DomainEventProvider {
 
+    private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
+    static final int DEFAULT_CANCELLATION_WINDOW_HOURS = 24;
     private final Long id;
     private final Long senderAccountId;
     private final Long receiverAccountId;
@@ -16,6 +24,7 @@ public class Transfer {
     private TransferStatus status;
     private final LocalDateTime createdAt;
     private final Long version;
+    private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
         this(id, senderAccountId, receiverAccountId, amount, status, createdAt, null);
@@ -32,18 +41,28 @@ public class Transfer {
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount) {
-        return create(senderAccountId, receiverAccountId, amount, Clock.systemDefaultZone());
+        return create(senderAccountId, receiverAccountId, amount, DEFAULT_CLOCK);
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
+        Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
+        if (amount.isZero()) {
+            throw new IllegalArgumentException("Transfer tutarı sıfır olamaz");
+        }
         return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
     }
 
     public void complete() {
+        complete(DEFAULT_CLOCK);
+    }
+
+    public void complete(Clock clock) {
         if (this.status != TransferStatus.PENDING) {
-            throw new IllegalStateException("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: " + this.status);
+            throw new TransferNotPendingException(this.status);
         }
         this.status = TransferStatus.COMPLETED;
+        this.domainEvents.add(new TransferCompletedEvent(
+                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
     }
 
     public Long getId() {
@@ -74,6 +93,14 @@ public class Transfer {
         return version;
     }
 
+    public List<DomainEvent> getDomainEvents() {
+        return Collections.unmodifiableList(domainEvents);
+    }
+
+    public void clearDomainEvents() {
+        domainEvents.clear();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -83,7 +110,7 @@ public class Transfer {
 
     @Override
     public int hashCode() {
-        return id != null ? id.hashCode() : System.identityHashCode(this);
+        return id != null ? id.hashCode() : 0;
     }
 
     @Override
@@ -92,11 +119,22 @@ public class Transfer {
                 + ", amount=" + amount + ", status=" + status + "}";
     }
 
-    public void cancel(int cancellationWindowHours) {
-        cancel(cancellationWindowHours, Clock.systemDefaultZone());
+    public void cancel() {
+        cancel(DEFAULT_CLOCK, DEFAULT_CANCELLATION_WINDOW_HOURS);
     }
 
-    public void cancel(int cancellationWindowHours, Clock clock) {
+    public void markFailed() {
+        markFailed(DEFAULT_CLOCK);
+    }
+
+    public void markFailed(Clock clock) {
+        if (this.status != TransferStatus.PENDING) {
+            throw new TransferNotPendingException(this.status);
+        }
+        this.status = TransferStatus.FAILED;
+    }
+
+    public void cancel(Clock clock, int cancellationWindowHours) {
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);
         }
@@ -116,5 +154,7 @@ public class Transfer {
             );
         }
         this.status = TransferStatus.CANCELLED;
+        this.domainEvents.add(new TransferCancelledEvent(
+                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, now));
     }
 }

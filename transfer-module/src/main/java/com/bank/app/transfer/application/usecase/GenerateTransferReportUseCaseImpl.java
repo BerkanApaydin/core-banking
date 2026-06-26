@@ -1,14 +1,15 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
+import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
-import com.bank.app.common.security.port.out.SecurityContextPort;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,20 +19,22 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@ReadOnlyUseCase
 public class GenerateTransferReportUseCaseImpl implements GenerateTransferReportQuery {
 
     private final LoadTransferPort loadTransferPort;
-    private final AccountOperationPort accountOperationPort;
+    private final AccountAclPort accountAclPort;
     private final SecurityContextPort securityContextPort;
 
     public GenerateTransferReportUseCaseImpl(LoadTransferPort loadTransferPort,
-                                         AccountOperationPort accountOperationPort,
+                                         AccountAclPort accountAclPort,
                                          SecurityContextPort securityContextPort) {
         this.loadTransferPort = loadTransferPort;
-        this.accountOperationPort = accountOperationPort;
+        this.accountAclPort = accountAclPort;
         this.securityContextPort = securityContextPort;
     }
 
+    @Override
     public TransferReportResponse execute(ReportCriteria criteria) {
         Objects.requireNonNull(criteria, "Criteria null olamaz");
         Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID null olamaz");
@@ -49,7 +52,7 @@ public class GenerateTransferReportUseCaseImpl implements GenerateTransferReport
         int size = Math.min(criteria.size(), 100);
 
         // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account =         accountOperationPort.getAccountInfo(accountId);
+        AccountInfo account =         accountAclPort.getAccountInfo(accountId);
 
         securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
 
@@ -66,7 +69,7 @@ public class GenerateTransferReportUseCaseImpl implements GenerateTransferReport
                 .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
                 .collect(Collectors.toSet());
 
-        Map<Long, String> ibansMap =         accountOperationPort.getIbansForAccounts(accountIds);
+        Map<Long, String> ibansMap =         accountAclPort.getIbansForAccounts(accountIds);
 
         List<TransferResponse> responseList = transfers.stream()
             .map(transfer -> TransferResponse.from(

@@ -6,9 +6,27 @@ on:
   pull_request:
     branches: [ main, master ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bank_db
+          POSTGRES_USER: bank_user
+          POSTGRES_PASSWORD: bank_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - uses: actions/checkout@v4
@@ -20,15 +38,64 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    - name: Build, Test, and Verify with Maven
-      run: mvn clean verify
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build and Compile
+      run: mvn compile -q
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+
+    - name: Unit Tests (with coverage)
+      run: mvn test jacoco:report -q
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
+
+    - name: Integration Tests
+      run: mvn verify -q
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
+
+    - name: Architecture Tests
+      run: mvn test -pl app -Dtest="ArchitectureTest" -q
+
+    - name: Mutation Tests (PIT)
+      run: mvn pitest:mutationCoverage -Dpitest.skip=false -q
+      continue-on-error: true
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
 
     - name: Upload JaCoCo Coverage Report
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: jacoco-aggregate-report
-        path: coverage/target/site/jacoco-aggregate/
+        name: jacoco-reports
+        path: '**/target/site/jacoco/'
+
+    - name: Upload PIT Mutation Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pit-reports
+        path: '**/target/pit-reports/'
 
     - name: Upload Test Results
       if: always()
@@ -36,3 +103,10 @@ jobs:
       with:
         name: test-results
         path: '**/target/surefire-reports/'
+
+    - name: Upload Failsafe Integration Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: failsafe-reports
+        path: '**/target/failsafe-reports/'

@@ -1,15 +1,14 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.account.application.port.in.AccountTransferOperationPort;
-import com.bank.app.account.infrastructure.persistence.AccountJpaEntity;
-import com.bank.app.account.infrastructure.persistence.AccountJpaRepository;
+import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
+import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
+import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.common.outbox.OutboxEventJpaRepository;
-import com.bank.app.transfer.infrastructure.persistence.TransferJpaEntity;
-import com.bank.app.user.infrastructure.persistence.UserJpaEntity;
-import com.bank.app.user.infrastructure.persistence.UserRepository;
+import com.bank.app.common.adapter.out.outbox.OutboxEventJpaRepository;
+import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
+import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import com.bank.app.common.adapter.SecurityContextAdapter;
+import com.bank.app.common.adapter.out.security.SecurityContextAdapter;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
 
 import java.math.BigDecimal;
@@ -31,17 +30,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 import org.springframework.boot.test.context.SpringBootTest;
 
+@SuppressWarnings("null")
 @SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class })
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
-    private AccountTransferOperationPort accountTransferOperation;
+    private AccountAclPort accountAclPort;
 
     @Autowired
     private AccountJpaRepository accountRepo;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserJpaRepository userRepository;
 
     @Autowired
     private OutboxEventJpaRepository outboxEventRepo;
@@ -71,12 +71,12 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     @BeforeEach
     void setUp() {
         runInNewTx(() -> {
-            user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER"));
+            user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER", null, null, null));
 
             AccountJpaEntity sender = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR290006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE"));
+                    "TR290006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
             AccountJpaEntity receiver = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR290006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE"));
+                    "TR290006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
             senderAccountId = sender.getId();
             receiverAccountId = receiver.getId();
         });
@@ -114,7 +114,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                     latch.await();
                     var tt = new TransactionTemplate(transactionManager);
                     tt.execute(status -> {
-                        accountTransferOperation.executeTransfer(
+                        accountAclPort.debitAndCredit(
                                 senderId, receiverId, new Money(new BigDecimal("10.00"), Currency.TRY));
                         return null;
                     });
@@ -160,7 +160,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
                     latch.await();
                     var tt = new TransactionTemplate(transactionManager);
                     tt.execute(status -> {
-                        accountTransferOperation.executeTransfer(
+                        accountAclPort.debitAndCredit(
                                 senderId, receiverId, new Money(new BigDecimal("250.00"), Currency.TRY));
                         return null;
                     });

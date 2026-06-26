@@ -1,6 +1,6 @@
 package com.bank.app.common.domain;
 
-import com.bank.app.common.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@SuppressWarnings("null")
 @DisplayName("Money value object")
 class MoneyTest {
 
@@ -205,6 +206,29 @@ class MoneyTest {
     }
 
     @Nested
+    @DisplayName("isZero")
+    class IsZero {
+
+        @Test
+        @DisplayName("should return true when amount is zero")
+        void shouldReturnTrueForZero() {
+            assertThat(Money.of("0.00", Currency.TRY).isZero()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return false when amount is non-zero")
+        void shouldReturnFalseForNonZero() {
+            assertThat(Money.of("0.01", Currency.TRY).isZero()).isFalse();
+        }
+
+        @Test
+        @DisplayName("should return false for positive amount")
+        void shouldReturnFalseForPositive() {
+            assertThat(Money.of("100.00", Currency.TRY).isZero()).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("comparison")
     class Comparison {
 
@@ -234,6 +258,13 @@ class MoneyTest {
         void isGreaterThanOrEqualShouldReturnTrueWhenGreater() {
             assertThat(Money.of("200.00", Currency.TRY).isGreaterThanOrEqual(Money.of("100.00", Currency.TRY)))
                     .isTrue();
+        }
+
+        @Test
+        @DisplayName("isGreaterThanOrEqual should return false when less")
+        void isGreaterThanOrEqualShouldReturnFalseWhenLess() {
+            assertThat(Money.of("50.00", Currency.TRY).isGreaterThanOrEqual(Money.of("100.00", Currency.TRY)))
+                    .isFalse();
         }
     }
 

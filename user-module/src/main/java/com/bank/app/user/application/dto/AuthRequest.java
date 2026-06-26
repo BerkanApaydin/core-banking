@@ -1,14 +1,18 @@
 package com.bank.app.user.application.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import java.util.Objects;
 
 public record AuthRequest(
-    @NotBlank(message = "{validation.username.required}") String username,
-    @NotBlank(message = "{validation.password.required}") String password,
-    @Email(message = "{validation.email.invalid}") String email,
+    String username,
+    String password,
+    String email,
     String phone
 ) {
+    public AuthRequest {
+        Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
+        Objects.requireNonNull(password, "Şifre null olamaz");
+    }
+
     public AuthRequest(String username, String password) {
         this(username, password, null, null);
     }

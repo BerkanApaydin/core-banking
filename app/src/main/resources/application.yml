@@ -2,15 +2,27 @@ server:
   shutdown: graceful
   tomcat:
     threads:
-      max: 200 # 50 DB bağlantısı üzerinde daha fazlası beklemeye giriyor; ölçüm: 25 thread = 74ms
+      max: 200
       min-spare: 10
     accept-count: 500
     max-connections: 2000
+    max-swallow-size: 2MB
+    max-http-form-post-size: 2MB
+  compression:
+    enabled: true
+    mime-types: application/json,application/problem+json,text/html,text/css,application/javascript
+    min-response-size: 1024
 
 spring:
+  application:
+    name: clean-architecture-bank
   messages:
     basename: messages
     encoding: UTF-8
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
@@ -33,7 +45,6 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: false
   flyway:
@@ -53,6 +64,10 @@ app:
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
+    failed-login:
+      backend: ${FAILED_LOGIN_BACKEND:caffeine}
+      max-attempts: ${FAILED_LOGIN_MAX_ATTEMPTS:5}
+      window-minutes: ${FAILED_LOGIN_WINDOW_MINUTES:15}
     rate-limit:
       backend: ${RATE_LIMIT_BACKEND:caffeine}
       max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}

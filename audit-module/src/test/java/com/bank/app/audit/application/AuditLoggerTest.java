@@ -1,9 +1,11 @@
 package com.bank.app.audit.application;
 
+import com.bank.app.audit.application.port.in.AuditLoggerUseCase;
 import com.bank.app.audit.application.port.out.SaveAuditLogPort;
+import com.bank.app.audit.application.usecase.AuditLoggerUseCaseImpl;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class AuditLoggerTest {
 
@@ -24,11 +27,11 @@ class AuditLoggerTest {
     @Mock
     private SecurityContextPort securityContextPort;
 
-    private AuditLogger auditLogger;
+    private AuditLoggerUseCase auditLogger;
 
     @BeforeEach
     void setUp() {
-        auditLogger = new AuditLogger(saveAuditLogPort, securityContextPort);
+        auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, securityContextPort);
     }
 
     @Test

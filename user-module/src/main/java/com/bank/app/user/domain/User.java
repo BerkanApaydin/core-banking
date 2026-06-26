@@ -1,53 +1,80 @@
 package com.bank.app.user.domain;
 
+import com.bank.app.common.domain.UserId;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 public class User {
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[\\d\\s.-]{6,20}$");
 
-    private final Long id;
+    private final UserId id;
     private final String username;
-    private final String password;
-    private final String role;
-    private final String email;
-    private final String phone;
+    private String password;
+    private Role role;
+    private EmailAddress email;
+    private PhoneNumber phone;
     private final Long version;
 
-    public User(Long id, String username, String password, String role) {
+    public User(UserId id, String username, String password, Role role) {
         this(id, username, password, role, null, null);
     }
 
-    public User(Long id, String username, String password, String role, String email, String phone) {
+    public User(UserId id, String username, String password, Role role, EmailAddress email, PhoneNumber phone) {
         this(id, username, password, role, email, phone, null);
     }
 
-    public User(Long id, String username, String password, String role, String email, String phone, Long version) {
+    public User(UserId id, String username, String password, Role role, EmailAddress email, PhoneNumber phone, Long version) {
         this.id = id;
-        this.username = Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
+        this.username = validateUsername(username);
         this.password = Objects.requireNonNull(password, "Şifre null olamaz");
-        this.role = role != null ? role : "ROLE_USER";
-        if (email != null && !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new IllegalArgumentException("Geçersiz email formatı: " + email);
-        }
-        if (phone != null && !PHONE_PATTERN.matcher(phone).matches()) {
-            throw new IllegalArgumentException("Geçersiz telefon numarası formatı: " + phone);
-        }
+        this.role = role != null ? role : Role.ROLE_USER;
         this.email = email;
         this.phone = phone;
         this.version = version;
     }
 
     public static User create(String username, String password) {
-        return new User(null, username, password, "ROLE_USER", null, null);
+        return new User(null, username, password, Role.ROLE_USER, null, null);
     }
 
-    public static User create(String username, String password, String email, String phone) {
-        return new User(null, username, password, "ROLE_USER", email, phone);
+    public static User create(String username, String password, EmailAddress email, PhoneNumber phone) {
+        return new User(null, username, password, Role.ROLE_USER, email, phone);
     }
 
-    public Long getId() {
+    private static String validateUsername(String username) {
+        Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
+        if (username.isBlank()) {
+            throw new IllegalArgumentException("Kullanıcı adı boş olamaz");
+        }
+        if (username.trim().length() > 255) {
+            throw new IllegalArgumentException("Kullanıcı adı en fazla 255 karakter olabilir");
+        }
+        return username.trim();
+    }
+
+    public void changePassword(String newEncodedPassword) {
+        Objects.requireNonNull(newEncodedPassword, "Yeni şifre null olamaz");
+        if (newEncodedPassword.isBlank()) {
+            throw new IllegalArgumentException("Şifre boş olamaz");
+        }
+        this.password = newEncodedPassword;
+    }
+
+    public void updateEmail(EmailAddress newEmail) {
+        this.email = Objects.requireNonNull(newEmail, "Email null olamaz");
+    }
+
+    public void updatePhone(PhoneNumber newPhone) {
+        this.phone = Objects.requireNonNull(newPhone, "Telefon null olamaz");
+    }
+
+    public void assignRole(Role newRole) {
+        this.role = Objects.requireNonNull(newRole, "Rol null olamaz");
+    }
+
+    public boolean hasRole(Role requiredRole) {
+        return this.role == requiredRole;
+    }
+
+    public UserId getId() {
         return id;
     }
 
@@ -59,15 +86,15 @@ public class User {
         return password;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public String getEmail() {
+    public EmailAddress getEmail() {
         return email;
     }
 
-    public String getPhone() {
+    public PhoneNumber getPhone() {
         return phone;
     }
 
@@ -79,12 +106,12 @@ public class User {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof User other)) return false;
-        return username.equalsIgnoreCase(other.username);
+        return id != null && id.equals(other.id);
     }
 
     @Override
     public int hashCode() {
-        return username.toLowerCase().hashCode();
+        return id != null ? id.hashCode() : 0;
     }
 
     @Override

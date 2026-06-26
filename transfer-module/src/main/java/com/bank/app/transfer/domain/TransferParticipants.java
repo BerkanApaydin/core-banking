@@ -1,7 +1,6 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Currency;
-import com.bank.app.common.domain.Money;
 import java.util.Objects;
 
 public record TransferParticipants(

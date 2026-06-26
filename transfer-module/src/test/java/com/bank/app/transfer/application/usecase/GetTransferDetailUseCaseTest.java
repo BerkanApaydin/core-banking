@@ -1,11 +1,11 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
-import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.transfer.application.exception.TransferNotFoundException;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.bank.app.common.exception.AuthorizationException;
+import com.bank.app.common.domain.exception.AuthorizationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,16 +27,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class GetTransferDetailUseCaseTest {
 
-    @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort accountOperationPort;
-    @Mock private SecurityContextPort securityContextPort;
+    @Mock
+    private LoadTransferPort loadTransferPort;
+    @Mock
+    private AccountAclPort accountAclPort;
+    @Mock
+    private SecurityContextPort securityContextPort;
     private GetTransferDetailQuery getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
-        getTransferDetailUseCase = new GetTransferDetailUseCaseImpl(loadTransferPort, accountOperationPort, securityContextPort);
+        getTransferDetailUseCase = new GetTransferDetailUseCaseImpl(loadTransferPort, accountAclPort,
+                securityContextPort);
     }
 
     @Test
@@ -51,15 +56,14 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
-        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
-        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
+        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE");
+        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", "ACTIVE");
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
 
@@ -86,15 +90,14 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
-        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
-        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
+        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE");
+        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", "ACTIVE");
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(200L));
 
@@ -121,19 +124,19 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
-        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
-        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
+        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE");
+        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", "ACTIVE");
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
 
-        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AuthorizationException exception = assertThrows(AuthorizationException.class,
+                () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Bu transferin detaylarını görme yetkiniz yok.", exception.getMessage());
     }
 
@@ -142,7 +145,8 @@ class GetTransferDetailUseCaseTest {
         Long transferId = 1L;
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.empty());
 
-        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class,
+                () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Transfer bulunamadı. ID: " + transferId, exception.getMessage());
     }
 
@@ -158,13 +162,14 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenThrow(new AccountNotFoundException(senderAccountId));
+        when(accountAclPort.getAccountInfo(senderAccountId))
+                .thenThrow(new AccountNotFoundException(senderAccountId));
 
-        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + senderAccountId, exception.getMessage());
     }
 
@@ -180,16 +185,17 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
-        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
+        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE");
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenThrow(new AccountNotFoundException(receiverAccountId));
+        when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountAclPort.getAccountInfo(receiverAccountId))
+                .thenThrow(new AccountNotFoundException(receiverAccountId));
 
-        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Hesap bulunamadı. ID: " + receiverAccountId, exception.getMessage());
     }
 
@@ -205,25 +211,26 @@ class GetTransferDetailUseCaseTest {
                 receiverAccountId,
                 new Money(new BigDecimal("150.00"), Currency.TRY),
                 TransferStatus.COMPLETED,
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
 
-        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", true);
-        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", true);
+        AccountInfo sender = new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE");
+        AccountInfo receiver = new AccountInfo(receiverAccountId, 200L, "TRY", "ACTIVE");
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
-        when(accountOperationPort.getAccountInfo(senderAccountId)).thenReturn(sender);
-        when(accountOperationPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
+        when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
+        when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
         when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
 
-        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferDetailUseCase.execute(transferId));
+        AuthorizationException exception = assertThrows(AuthorizationException.class,
+                () -> getTransferDetailUseCase.execute(transferId));
         assertEquals("Oturum bulunamadı.", exception.getMessage());
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
-        NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferDetailUseCase.execute(null));
+        NullPointerException exception = assertThrows(NullPointerException.class,
+                () -> getTransferDetailUseCase.execute(null));
         assertEquals("Transfer ID null olamaz", exception.getMessage());
     }
 }

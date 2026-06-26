@@ -1,6 +1,6 @@
 package com.bank.app.common.domain;
 
-import com.bank.app.common.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
@@ -30,38 +30,39 @@ public record Money(
     }
 
     public Money add(Money other) {
-        Objects.requireNonNull(other, "Toplanacak para nesnesi null olamaz");
-        if (this.currency != other.currency) {
-            throw new CurrencyMismatchException(
-                    this.currency + " ile " + other.currency + " toplanamaz");
-        }
+        requireSameCurrency(other, "toplanamaz");
         return new Money(this.amount.add(other.amount), this.currency);
     }
 
     public Money subtract(Money other) {
-        Objects.requireNonNull(other, "Çıkarılacak para nesnesi null olamaz");
-        if (this.currency != other.currency) {
-            throw new CurrencyMismatchException(
-                    this.currency + " ile " + other.currency + " çıkarılamaz");
-        }
+        requireSameCurrency(other, "çıkarılamaz");
         return new Money(this.amount.subtract(other.amount), this.currency);
     }
 
     public boolean isGreaterThan(Money other) {
-        Objects.requireNonNull(other, "Karşılaştırılacak para nesnesi null olamaz");
-        if (this.currency != other.currency) {
-            throw new CurrencyMismatchException(
-                    this.currency + " ile " + other.currency + " karşılaştırılamaz");
-        }
+        requireSameCurrency(other, "karşılaştırılamaz");
         return this.amount.compareTo(other.amount) > 0;
     }
 
     public boolean isGreaterThanOrEqual(Money other) {
-        Objects.requireNonNull(other, "Karşılaştırılacak para nesnesi null olamaz");
+        requireSameCurrency(other, "karşılaştırılamaz");
+        return this.amount.compareTo(other.amount) >= 0;
+    }
+
+    private void requireSameCurrency(Money other, String operation) {
+        Objects.requireNonNull(other, "Para nesnesi null olamaz");
         if (this.currency != other.currency) {
             throw new CurrencyMismatchException(
-                    this.currency + " ile " + other.currency + " karşılaştırılamaz");
+                    this.currency + " ile " + other.currency + " " + operation);
         }
-        return this.amount.compareTo(other.amount) >= 0;
+    }
+
+    public boolean isZero() {
+        return this.amount.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    @Override
+    public String toString() {
+        return amount + " " + currency;
     }
 }

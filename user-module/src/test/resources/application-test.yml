@@ -1,9 +1,13 @@
 jwt:
-  allow-default-secret: true
-  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971
 
 app:
   security:
+    password:
+      min-length: 8
+      require-uppercase: true
+      require-lowercase: true
+      require-digit: true
     cors:
       allowed-origins: http://localhost:3000
 

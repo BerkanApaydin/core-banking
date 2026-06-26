@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
-import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -10,7 +10,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,11 +26,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class GetTransferHistoryUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort accountOperationPort;
+    @Mock private AccountAclPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
     private GetTransferHistoryQuery getTransferHistoryUseCase;
 
@@ -42,7 +43,7 @@ class GetTransferHistoryUseCaseTest {
 
     @Test
     void shouldReturnTransferHistorySuccessfully() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
@@ -69,7 +70,7 @@ class GetTransferHistoryUseCaseTest {
 
     @Test
     void shouldThrowAccessDeniedExceptionWhenUserIsNotOwnerOfAccount() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         doThrow(new AccessDeniedException("Bu hesabın işlem geçmişini görme yetkiniz yok."))
@@ -81,7 +82,7 @@ class GetTransferHistoryUseCaseTest {
 
     @Test
     void shouldCapPageSizeAtMaxLimit() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
@@ -98,7 +99,7 @@ class GetTransferHistoryUseCaseTest {
 
     @Test
     void shouldCapNegativePageToZero() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
 
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());

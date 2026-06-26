@@ -8,6 +8,8 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.domain.User;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.user.domain.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,10 +46,10 @@ class DataSeederTest {
 
     @Test
     void shouldSeedUsersAndAccountsViaUseCases() throws Exception {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
-        User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
-        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.empty(), Optional.of(ahmet));
-        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.empty(), Optional.of(ayse));
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.empty()).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.empty()).thenReturn(Optional.of(ayse));
 
         CommandLineRunner runner = dataSeeder.seedData();
         runner.run();
@@ -59,8 +61,8 @@ class DataSeederTest {
 
     @Test
     void shouldSkipExistingUsers() throws Exception {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
-        User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
 
@@ -72,8 +74,8 @@ class DataSeederTest {
 
     @Test
     void shouldSkipDuplicateAccounts() throws Exception {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
-        User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
         doThrow(new DuplicateIbanException("exists")).when(createAccountPort)
@@ -86,7 +88,7 @@ class DataSeederTest {
     @Test
     void shouldThrowWhenAhmetCannotBeLoadedAfterRegistration() {
         when(loadUserPort.findByUsername("ahmet"))
-                .thenReturn(Optional.empty(), Optional.empty());
+                .thenReturn(Optional.empty()).thenReturn(Optional.empty());
 
         CommandLineRunner runner = dataSeeder.seedData();
 
@@ -102,13 +104,13 @@ class DataSeederTest {
 
     @Test
     void shouldThrowWhenAyseCannotBeLoadedAfterRegistration() {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
 
         when(loadUserPort.findByUsername("ahmet"))
-                .thenReturn(Optional.empty(), Optional.of(ahmet));
+                .thenReturn(Optional.empty()).thenReturn(Optional.of(ahmet));
 
         when(loadUserPort.findByUsername("ayse"))
-                .thenReturn(Optional.empty(), Optional.empty());
+                .thenReturn(Optional.empty()).thenReturn(Optional.empty());
 
         CommandLineRunner runner = dataSeeder.seedData();
 
@@ -124,8 +126,8 @@ class DataSeederTest {
 
     @Test
     void shouldClearSecurityContextAfterExecution() throws Exception {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
-        User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
 
         when(loadUserPort.findByUsername("ahmet"))
                 .thenReturn(Optional.of(ahmet));
@@ -142,8 +144,8 @@ class DataSeederTest {
 
     @Test
     void shouldContinueWhenOnlySomeAccountsAlreadyExist() throws Exception {
-        User ahmet = new User(1L, "ahmet", "encoded", "ROLE_USER");
-        User ayse = new User(2L, "ayse", "encoded", "ROLE_USER");
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
         AccountResponse response = mock(AccountResponse.class);
 
         when(loadUserPort.findByUsername("ahmet"))

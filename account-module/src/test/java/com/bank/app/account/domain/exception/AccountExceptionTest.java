@@ -5,12 +5,15 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SuppressWarnings("null")
 class AccountExceptionTest {
 
     @Test
     void shouldCreateInvalidCurrencyException() {
         InvalidCurrencyException ex = new InvalidCurrencyException("XYZ");
-        assertEquals("XYZ", ex.getMessage());
+        assertEquals("Ge\u00e7ersiz para birimi: XYZ", ex.getMessage());
+        assertEquals("error.invalid_currency", ex.getMessageKey());
+        assertArrayEquals(new Object[]{"XYZ"}, ex.getArgs());
     }
 
     @Test

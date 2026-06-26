@@ -13,8 +13,13 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+  tracing:
+    sampling:
+      probability: 1.0
 
 app:
   security:
     rate-limit:
+      backend: redis
+    failed-login:
       backend: redis

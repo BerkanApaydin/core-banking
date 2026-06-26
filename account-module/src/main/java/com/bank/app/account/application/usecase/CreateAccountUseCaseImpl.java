@@ -10,13 +10,22 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
+import com.bank.app.common.application.UseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.event.AuditEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
+@UseCase
 public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(CreateAccountUseCaseImpl.class);
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
@@ -39,20 +48,29 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
         Iban iban = new Iban(request.iban());
         if (loadAccountPort.findByIban(iban).isPresent()) {
-            throw new DuplicateIbanException("Bu IBAN ile kayıtlı bir hesap zaten mevcut: " + iban.value());
+            throw new DuplicateIbanException(iban.value());
         }
 
         Currency currency = request.currency();
 
         Money balance = new Money(request.initialBalance(), currency);
-        Account account = new Account(null, request.userId(), iban, request.ownerName(), balance, AccountStatus.ACTIVE);
+        Account account = new Account(null, new UserId(request.userId()), iban, request.ownerName(), balance, AccountStatus.ACTIVE);
 
         Account savedAccount = saveAccountPort.save(account);
 
         eventPublisherPort.publish(new AccountCreatedEvent(
-            savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban().value(),
-            savedAccount.getOwnerName(), savedAccount.getBalance()
+            savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban(),
+            savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now()
         ));
+        eventPublisherPort.publish(new AuditEvent("ACCOUNT_CREATED",
+            String.format("Yeni hesap oluşturuldu. ID: %d, IBAN: %s, Kullanıcı ID: %d, Bakiye: %s %s",
+                savedAccount.getId(), savedAccount.getIban().value(), savedAccount.getUserId().value(),
+                savedAccount.getBalance().amount(), savedAccount.getBalance().currency()),
+            LocalDateTime.now()));
+
+        log.info("Account created: id={}, iban={}, owner={}, userId={}",
+            savedAccount.getId(), savedAccount.getIban().value(),
+            savedAccount.getOwnerName(), savedAccount.getUserId().value());
 
         return AccountResponse.from(savedAccount);
     }

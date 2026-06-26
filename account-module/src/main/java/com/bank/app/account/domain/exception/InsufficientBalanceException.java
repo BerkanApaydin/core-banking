@@ -1,8 +1,9 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.common.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessException;
 
 public class InsufficientBalanceException extends BusinessException {
+    private static final long serialVersionUID = 1L;
     public InsufficientBalanceException(String message) {
         super(message);
     }

@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
-import com.bank.app.transfer.application.port.out.AccountOperationPort;
-import com.bank.app.transfer.application.port.out.AccountOperationPort.AccountInfo;
+import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -10,7 +10,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.security.port.out.SecurityContextPort;
+import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +28,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class GenerateTransferReportUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
-    @Mock private AccountOperationPort accountOperationPort;
+    @Mock private AccountAclPort accountOperationPort;
     @Mock private SecurityContextPort securityContextPort;
     private GenerateTransferReportQuery generateTransferReportUseCase;
 
@@ -48,7 +49,7 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
@@ -83,7 +84,7 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
         doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
@@ -107,7 +108,7 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", true);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
 
         doThrow(new AccessDeniedException("Bu hesabın raporunu oluşturma yetkiniz yok."))

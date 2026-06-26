@@ -5,14 +5,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.bank.app.common.exception.AuthorizationException;
+import com.bank.app.common.adapter.out.security.SecurityContextAdapter;
+import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import com.bank.app.common.security.CustomUserDetails;
+import com.bank.app.common.adapter.out.security.CustomUserDetails;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class SecurityContextAdapterTest {
 
     private SecurityContextAdapter securityUtils;

@@ -1,26 +1,26 @@
 package com.bank.app.account.domain;
 
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.event.DomainEvent;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
-public class AccountCreatedEvent {
-    private final Long accountId;
-    private final Long userId;
-    private final String iban;
-    private final String ownerName;
-    private final Money balance;
-
-    public AccountCreatedEvent(Long accountId, Long userId, String iban, String ownerName, Money balance) {
-        this.accountId = Objects.requireNonNull(accountId, "accountId null olamaz");
-        this.userId = Objects.requireNonNull(userId, "userId null olamaz");
-        this.iban = Objects.requireNonNull(iban, "iban null olamaz");
-        this.ownerName = Objects.requireNonNull(ownerName, "ownerName null olamaz");
-        this.balance = Objects.requireNonNull(balance, "balance null olamaz");
+public record AccountCreatedEvent(
+    Long accountId,
+    UserId userId,
+    Iban iban,
+    String ownerName,
+    Money balance,
+    LocalDateTime occurredAt
+) implements DomainEvent {
+    public AccountCreatedEvent {
+        Objects.requireNonNull(accountId);
+        Objects.requireNonNull(userId);
+        Objects.requireNonNull(iban);
+        Objects.requireNonNull(ownerName);
+        Objects.requireNonNull(balance);
+        Objects.requireNonNull(occurredAt);
     }
-
-    public Long getAccountId() { return accountId; }
-    public Long getUserId() { return userId; }
-    public String getIban() { return iban; }
-    public String getOwnerName() { return ownerName; }
-    public Money getBalance() { return balance; }
 }

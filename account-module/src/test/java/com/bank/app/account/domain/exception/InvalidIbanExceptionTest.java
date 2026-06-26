@@ -1,11 +1,12 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.common.exception.BusinessException;
-import com.bank.app.common.exception.InvalidIbanException;
+import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.InvalidIbanException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SuppressWarnings("null")
 class InvalidIbanExceptionTest {
 
     @Test

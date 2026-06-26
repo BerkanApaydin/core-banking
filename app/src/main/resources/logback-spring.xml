@@ -17,6 +17,8 @@
                             "logger": "%logger",
                             "message": "%message",
                             "correlationId": "%mdc{correlationId}",
+                            "traceId": "%mdc{traceId}",
+                            "spanId": "%mdc{spanId}",
                             "exception": "%exception"
                             }
                         </pattern>
@@ -29,7 +31,7 @@
     <springProfile name="!prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - [CorrelationID: %X{correlationId}] - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - [CorrelationID: %X{correlationId}] [TraceID: %X{traceId}] - %msg%n</pattern>
             </encoder>
         </appender>
     </springProfile>

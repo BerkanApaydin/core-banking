@@ -2,6 +2,7 @@ package com.bank.app.common;
 
 import java.math.BigDecimal;
 
+@SuppressWarnings("null")
 public final class TestConstants {
 
     public static final String IBAN_SENDER = "TR290006200000000000000111";

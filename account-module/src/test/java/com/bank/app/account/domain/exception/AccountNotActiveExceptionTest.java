@@ -1,10 +1,11 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.common.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SuppressWarnings("null")
 class AccountNotActiveExceptionTest {
 
     @Test

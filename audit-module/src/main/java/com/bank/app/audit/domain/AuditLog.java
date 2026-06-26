@@ -1,5 +1,6 @@
 package com.bank.app.audit.domain;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -19,7 +20,11 @@ public class AuditLog {
     }
 
     public static AuditLog create(String username, AuditAction action, String details) {
-        return new AuditLog(null, username, action, details, LocalDateTime.now());
+        return create(username, action, details, Clock.systemDefaultZone());
+    }
+
+    public static AuditLog create(String username, AuditAction action, String details, Clock clock) {
+        return new AuditLog(null, username, action, details, LocalDateTime.now(clock));
     }
 
     public Long getId() {

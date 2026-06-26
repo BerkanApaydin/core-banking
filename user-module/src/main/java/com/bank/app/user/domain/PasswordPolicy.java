@@ -7,6 +7,12 @@ public record PasswordPolicy(int minLength, boolean requireUppercase, boolean re
 
     public static final PasswordPolicy DEFAULT = new PasswordPolicy(8, true, true, true);
 
+    public PasswordPolicy {
+        if (minLength < 1) {
+            throw new IllegalArgumentException("minLength en az 1 olmalıdır: " + minLength);
+        }
+    }
+
     public List<String> validate(String rawPassword) {
         List<String> errors = new ArrayList<>();
         if (rawPassword == null || rawPassword.isBlank()) {
