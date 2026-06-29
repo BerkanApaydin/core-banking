@@ -20,10 +20,11 @@
 
     <modules>
         <module>common</module>
-        <module>account-module</module>
-        <module>transfer-module</module>
-        <module>user-module</module>
-        <module>audit-module</module>
+        <module>infrastructure</module>
+        <module>account</module>
+        <module>transfer</module>
+        <module>user</module>
+        <module>audit</module>
         <module>app</module>
     </modules>
 

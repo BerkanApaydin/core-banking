@@ -142,7 +142,7 @@ class ArchitectureTest {
                 .layer("Domain").definedBy("..domain..")
                 .layer("Application").definedBy("..application..")
                 .layer("Adapter").definedBy("..adapter..")
-                .layer("Infrastructure").definedBy("..infrastructure..")
+                .layer("Infrastructure").definedBy("..infrastructure..", "..bootstrap..")
                 .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "Infrastructure")
                 .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
                 .whereLayer("Adapter").mayOnlyBeAccessedByLayers("Infrastructure")
@@ -305,6 +305,16 @@ class ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..application..")
                 .should().dependOnClassesThat().haveSimpleNameEndingWith("JpaEntity");
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void applicationLayerShouldNotDependOnSpringTransaction() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..application..")
+                .should().dependOnClassesThat().resideInAnyPackage("org.springframework.transaction..")
+                .allowEmptyShould(true);
 
         rule.check(importedClasses);
     }

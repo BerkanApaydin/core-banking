@@ -22,22 +22,27 @@
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
-            <artifactId>account-module</artifactId>
+            <artifactId>infrastructure</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
-            <artifactId>transfer-module</artifactId>
+            <artifactId>account</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
-            <artifactId>user-module</artifactId>
+            <artifactId>transfer</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
-            <artifactId>audit-module</artifactId>
+            <artifactId>user</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>audit</artifactId>
             <version>${project.version}</version>
         </dependency>
 

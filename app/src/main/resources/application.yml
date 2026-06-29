@@ -92,7 +92,7 @@ app:
     caffeine:
       account-info:
         maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
-        expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}s
+        expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}
 
 management:
   endpoints:
