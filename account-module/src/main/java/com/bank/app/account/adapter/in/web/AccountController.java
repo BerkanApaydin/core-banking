@@ -45,7 +45,7 @@ public class AccountController {
     }
 
     @PostMapping
-    @Operation(summary = "Yeni hesap oluşturur", description = "Verilen bilgiler ve doğrulanmış IBAN ile yeni bir hesap açılmasını sağlar.")
+    @Operation(summary = "Creates a new account", description = "Opens a new account with the given information and verified IBAN.")
     public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountWebRequest webRequest) {
         CreateAccountRequest request = new CreateAccountRequest(
                 webRequest.userId(), webRequest.iban(), webRequest.ownerName(),
@@ -54,7 +54,7 @@ public class AccountController {
     }
 
     @GetMapping
-    @Operation(summary = "Tüm hesapları listeler")
+    @Operation(summary = "Lists all accounts")
     public ResponseEntity<List<AccountResponse>> listAccounts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

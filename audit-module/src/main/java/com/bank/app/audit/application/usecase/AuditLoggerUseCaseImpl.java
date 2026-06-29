@@ -5,7 +5,7 @@ import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 import com.bank.app.common.application.UseCase;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,11 +15,11 @@ public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
     private static final Logger log = LoggerFactory.getLogger(AuditLoggerUseCaseImpl.class);
 
     private final SaveAuditLogPort saveAuditLogPort;
-    private final SecurityContextPort securityContextPort;
+    private final UserContextService userContextService;
 
-    public AuditLoggerUseCaseImpl(SaveAuditLogPort saveAuditLogPort, SecurityContextPort securityContextPort) {
+    public AuditLoggerUseCaseImpl(SaveAuditLogPort saveAuditLogPort, UserContextService userContextService) {
         this.saveAuditLogPort = saveAuditLogPort;
-        this.securityContextPort = securityContextPort;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -38,6 +38,6 @@ public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
     }
 
     private String getCurrentUsername() {
-        return securityContextPort.getCurrentUsername().orElse("system");
+        return userContextService.getCurrentUsername().orElse("system");
     }
 }

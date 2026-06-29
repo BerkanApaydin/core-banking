@@ -1,7 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -9,6 +8,7 @@ import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,37 +24,34 @@ public class GenerateTransferReportUseCaseImpl implements GenerateTransferReport
 
     private final LoadTransferPort loadTransferPort;
     private final AccountAclPort accountAclPort;
-    private final SecurityContextPort securityContextPort;
+    private final TransferAuthorizationService transferAuthorizationService;
 
     public GenerateTransferReportUseCaseImpl(LoadTransferPort loadTransferPort,
                                          AccountAclPort accountAclPort,
-                                         SecurityContextPort securityContextPort) {
+                                         TransferAuthorizationService transferAuthorizationService) {
         this.loadTransferPort = loadTransferPort;
         this.accountAclPort = accountAclPort;
-        this.securityContextPort = securityContextPort;
+        this.transferAuthorizationService = transferAuthorizationService;
     }
 
     @Override
     public TransferReportResponse execute(ReportCriteria criteria) {
-        Objects.requireNonNull(criteria, "Criteria null olamaz");
-        Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID null olamaz");
-        LocalDateTime startDate = Objects.requireNonNull(criteria.startDate(), "Start date null olamaz");
-        LocalDateTime endDate = Objects.requireNonNull(criteria.endDate(), "End date null olamaz");
+        Objects.requireNonNull(criteria, "Criteria must not be null");
+        Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID must not be null");
+        LocalDateTime startDate = Objects.requireNonNull(criteria.startDate(), "Start date must not be null");
+        LocalDateTime endDate = Objects.requireNonNull(criteria.endDate(), "End date must not be null");
 
         if (startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Başlangıç tarihi bitiş tarihinden sonra olamaz.");
+            throw new IllegalArgumentException("Start date must not be after end date.");
         }
         if (startDate.plusMonths(12).isBefore(endDate)) {
-            throw new IllegalArgumentException("Rapor aralığı en fazla 12 ay olabilir.");
+            throw new IllegalArgumentException("Report range must be at most 12 months.");
         }
 
         int page = Math.max(criteria.page(), 0);
         int size = Math.min(criteria.size(), 100);
 
-        // Load account metadata through the internal service (decoupled from domain Account entity)
-        AccountInfo account =         accountAclPort.getAccountInfo(accountId);
-
-        securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın raporunu oluşturma yetkiniz yok.");
+        AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId, "You are not authorized to generate a report for this account.");
 
         List<Transfer> transfers = loadTransferPort.findHistoryBetween(
             accountId,

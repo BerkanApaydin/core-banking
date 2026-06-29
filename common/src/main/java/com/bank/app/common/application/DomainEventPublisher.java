@@ -15,7 +15,7 @@ public final class DomainEventPublisher {
         List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
         provider.clearDomainEvents();
         for (DomainEvent event : events) {
-            port.publish(Objects.requireNonNull(event, "Domain event null olamaz"));
+            port.publish(Objects.requireNonNull(event, "Domain event must not be null"));
         }
     }
 }

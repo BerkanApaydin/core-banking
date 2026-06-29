@@ -5,7 +5,7 @@ import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.application.usecase.AuditLoggerUseCaseImpl;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,13 +25,13 @@ class AuditLoggerTest {
     @Mock
     private SaveAuditLogPort saveAuditLogPort;
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     private AuditLoggerUseCase auditLogger;
 
     @BeforeEach
     void setUp() {
-        auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, securityContextPort);
+        auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, userContextService);
     }
 
     @Test
@@ -49,7 +49,7 @@ class AuditLoggerTest {
 
     @Test
     void shouldUseSystemUserWhenNoAuthentication() {
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.empty());
+        when(userContextService.getCurrentUsername()).thenReturn(Optional.empty());
 
         auditLogger.log(AuditAction.TRANSFER_EXECUTED, "Transfer executed");
 
@@ -66,7 +66,7 @@ class AuditLoggerTest {
 
     @Test
     void shouldLogWithCurrentUsernameWhenAuthenticated() {
-        when(securityContextPort.getCurrentUsername()).thenReturn(Optional.of("jane.doe"));
+        when(userContextService.getCurrentUsername()).thenReturn(Optional.of("jane.doe"));
 
         auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
 

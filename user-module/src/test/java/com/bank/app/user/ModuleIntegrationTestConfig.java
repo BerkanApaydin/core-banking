@@ -3,7 +3,7 @@ package com.bank.app.user;
 import com.bank.app.common.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.common.adapter.out.security.TokenBlacklistAdapter;
-import com.bank.app.common.support.ModuleTestConfig;
+import com.bank.app.common.adapter.config.ModuleTestConfig;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 

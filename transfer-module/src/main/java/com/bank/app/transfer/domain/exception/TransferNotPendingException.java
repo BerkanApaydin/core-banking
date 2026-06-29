@@ -6,6 +6,6 @@ public class TransferNotPendingException extends BusinessException {
     private static final long serialVersionUID = 1L;
     public TransferNotPendingException(Enum<?> currentStatus) {
         super("error.transfer_not_pending", new Object[]{currentStatus},
-              "Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: " + currentStatus);
+              "Only PENDING transfers can be completed. Current status: " + currentStatus);
     }
 }

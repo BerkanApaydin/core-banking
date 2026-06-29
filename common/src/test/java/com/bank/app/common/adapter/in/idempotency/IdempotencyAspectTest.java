@@ -1,7 +1,7 @@
 package com.bank.app.common.adapter.in.idempotency;
 
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +32,7 @@ class IdempotencyAspectTest {
     private IdempotencyGuard idempotencyGuard;
 
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -52,7 +52,7 @@ class IdempotencyAspectTest {
     void setUp() {
         aspect = new IdempotencyAspect(
                 idempotencyGuard,
-                securityContextPort,
+                userContextService,
                 objectMapper);
     }
 
@@ -123,7 +123,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.empty());
 
         assertThrows(
@@ -136,7 +136,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -163,7 +163,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -190,7 +190,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -207,7 +207,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -239,7 +239,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -262,7 +262,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -285,7 +285,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -310,7 +310,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -333,7 +333,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -355,7 +355,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))
@@ -377,7 +377,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(securityContextPort.getCurrentUsername())
+        when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
         when(idempotencyGuard.startRequest("user_abc"))

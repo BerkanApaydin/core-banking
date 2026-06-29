@@ -96,7 +96,7 @@ class DataSeederTest {
                 IllegalStateException.class,
                 () -> runner.run());
 
-        assertEquals("Ahmet kullanıcısı bulunamadı.", ex.getMessage());
+        assertEquals("User Ahmet not found.", ex.getMessage());
 
         verify(registerUserUseCase)
                 .execute(new AuthRequest("ahmet", "Ahmet123"));
@@ -118,7 +118,7 @@ class DataSeederTest {
                 IllegalStateException.class,
                 () -> runner.run());
 
-        assertEquals("Ayşe kullanıcısı bulunamadı.", ex.getMessage());
+        assertEquals("User Ayşe not found.", ex.getMessage());
 
         verify(registerUserUseCase)
                 .execute(new AuthRequest("ayse", "Ayse1234"));

@@ -5,7 +5,7 @@ import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.transfer.application.exception.TransferNotFoundException;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
@@ -35,13 +35,13 @@ class GetTransferDetailUseCaseTest {
     @Mock
     private AccountAclPort accountAclPort;
     @Mock
-    private SecurityContextPort securityContextPort;
+    private TransferAuthorizationService transferAuthorizationService;
     private GetTransferDetailQuery getTransferDetailUseCase;
 
     @BeforeEach
     void setUp() {
         getTransferDetailUseCase = new GetTransferDetailUseCaseImpl(loadTransferPort, accountAclPort,
-                securityContextPort);
+                transferAuthorizationService);
     }
 
     @Test
@@ -64,8 +64,6 @@ class GetTransferDetailUseCaseTest {
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
-
-        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(100L));
 
         TransferDetailResponse response = getTransferDetailUseCase.execute(transferId);
 
@@ -99,8 +97,6 @@ class GetTransferDetailUseCaseTest {
         when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(200L));
-
         TransferDetailResponse response = getTransferDetailUseCase.execute(transferId);
 
         assertNotNull(response);
@@ -133,11 +129,12 @@ class GetTransferDetailUseCaseTest {
         when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.of(300L));
+        doThrow(new AuthorizationException("You are not authorized to view this transfer's details."))
+                .when(transferAuthorizationService).authorizeTransferAccess(eq(100L), eq(200L), anyString());
 
         AuthorizationException exception = assertThrows(AuthorizationException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Bu transferin detaylarını görme yetkiniz yok.", exception.getMessage());
+        assertEquals("You are not authorized to view this transfer's details.", exception.getMessage());
     }
 
     @Test
@@ -147,7 +144,7 @@ class GetTransferDetailUseCaseTest {
 
         TransferNotFoundException exception = assertThrows(TransferNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Transfer bulunamadı. ID: " + transferId, exception.getMessage());
+        assertEquals("Transfer not found. ID: " + transferId, exception.getMessage());
     }
 
     @Test
@@ -170,7 +167,7 @@ class GetTransferDetailUseCaseTest {
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Hesap bulunamadı. ID: " + senderAccountId, exception.getMessage());
+        assertEquals("Account not found. ID: " + senderAccountId, exception.getMessage());
     }
 
     @Test
@@ -196,7 +193,7 @@ class GetTransferDetailUseCaseTest {
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Hesap bulunamadı. ID: " + receiverAccountId, exception.getMessage());
+        assertEquals("Account not found. ID: " + receiverAccountId, exception.getMessage());
     }
 
     @Test
@@ -220,17 +217,18 @@ class GetTransferDetailUseCaseTest {
         when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountAclPort.getAccountInfo(receiverAccountId)).thenReturn(receiver);
 
-        when(securityContextPort.getCurrentUserId()).thenReturn(Optional.empty());
+        doThrow(new AuthorizationException("Session not found."))
+                .when(transferAuthorizationService).authorizeTransferAccess(eq(100L), eq(200L), anyString());
 
         AuthorizationException exception = assertThrows(AuthorizationException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Oturum bulunamadı.", exception.getMessage());
+        assertEquals("Session not found.", exception.getMessage());
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
         NullPointerException exception = assertThrows(NullPointerException.class,
                 () -> getTransferDetailUseCase.execute(null));
-        assertEquals("Transfer ID null olamaz", exception.getMessage());
+        assertEquals("Transfer ID must not be null", exception.getMessage());
     }
 }

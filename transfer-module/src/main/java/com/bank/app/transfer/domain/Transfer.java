@@ -32,11 +32,11 @@ public class Transfer implements DomainEventProvider {
 
     public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
         this.id = id;
-        this.senderAccountId = Objects.requireNonNull(senderAccountId, "Gönderici hesap ID null olamaz");
-        this.receiverAccountId = Objects.requireNonNull(receiverAccountId, "Alıcı hesap ID null olamaz");
-        this.amount = Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
-        this.status = Objects.requireNonNull(status, "Durum null olamaz");
-        this.createdAt = Objects.requireNonNull(createdAt, "Oluşturulma tarihi null olamaz");
+        this.senderAccountId = Objects.requireNonNull(senderAccountId, "Sender account ID must not be null");
+        this.receiverAccountId = Objects.requireNonNull(receiverAccountId, "Receiver account ID must not be null");
+        this.amount = Objects.requireNonNull(amount, "Transfer amount must not be null");
+        this.status = Objects.requireNonNull(status, "Status must not be null");
+        this.createdAt = Objects.requireNonNull(createdAt, "Created date must not be null");
         this.version = version;
     }
 
@@ -45,9 +45,9 @@ public class Transfer implements DomainEventProvider {
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
-        Objects.requireNonNull(amount, "Transfer tutarı null olamaz");
+        Objects.requireNonNull(amount, "Transfer amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Transfer tutarı sıfır olamaz");
+            throw new IllegalArgumentException("Transfer amount must not be zero");
         }
         return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
     }
@@ -93,10 +93,12 @@ public class Transfer implements DomainEventProvider {
         return version;
     }
 
+    @Override
     public List<DomainEvent> getDomainEvents() {
         return Collections.unmodifiableList(domainEvents);
     }
 
+    @Override
     public void clearDomainEvents() {
         domainEvents.clear();
     }
@@ -142,7 +144,7 @@ public class Transfer implements DomainEventProvider {
             throw new TransferNotCancellableException(
                 "error.transfer_not_cancellable",
                 new Object[]{this.status},
-                "Sadece tamamlanmış transferler iptal edilebilir. Mevcut durum: " + this.status
+                "Only completed transfers can be cancelled. Current status: " + this.status
             );
         }
         LocalDateTime now = LocalDateTime.now(clock);
@@ -150,7 +152,7 @@ public class Transfer implements DomainEventProvider {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
                 new Object[]{this.createdAt, cancellationWindowHours},
-                "Transfer üzerinden " + cancellationWindowHours + " saat geçtiği için iptal edilemez. Oluşturulma zamanı: " + this.createdAt
+                "Transfer was created " + cancellationWindowHours + " hours ago, cancellation window has passed. Created at: " + this.createdAt
             );
         }
         this.status = TransferStatus.CANCELLED;

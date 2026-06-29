@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.InvalidIbanException;
@@ -11,6 +11,7 @@ import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -50,7 +51,7 @@ class PlaceTransferUseCaseImplTest {
     private EventPublisherPort eventPublisherPort;
 
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     private TransferDomainService transferDomainService;
 
@@ -70,9 +71,11 @@ class PlaceTransferUseCaseImplTest {
     @BeforeEach
     void setUp() {
         transferDomainService = new TransferDomainService();
+        TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
+                accountAclPort, userContextService);
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
                 accountAclPort, saveTransferPort, eventPublisherPort,
-                transferDomainService, securityContextPort);
+                transferDomainService, transferAuthorizationService);
     }
 
     private AccountInfo senderInfo() {
@@ -100,7 +103,7 @@ class PlaceTransferUseCaseImplTest {
         @DisplayName("should place transfer successfully")
         void shouldPlaceTransferSuccessfully() {
             stubAccountLookup();
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
@@ -121,8 +124,8 @@ class PlaceTransferUseCaseImplTest {
 
             verify(accountAclPort).getAccountInfoForTransfer(SENDER_IBAN);
             verify(accountAclPort).getAccountInfoForTransfer(RECEIVER_IBAN);
-            verify(securityContextPort).checkUserAuthorization(SENDER_USER_ID,
-                    "Bu hesaptan transfer yapmaya yetkiniz yok.");
+            verify(userContextService).checkUserAuthorization(SENDER_USER_ID,
+                    "You are not authorized to transfer from this account.");
             verify(accountAclPort).debitAndCredit(SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
                     new Money(AMOUNT, Currency.TRY));
             verify(saveTransferPort, times(2)).save(any(Transfer.class));
@@ -133,7 +136,7 @@ class PlaceTransferUseCaseImplTest {
         @DisplayName("should create a PENDING transfer initially then mark COMPLETED")
         void shouldCreatePendingThenComplete() {
             stubAccountLookup();
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
@@ -161,7 +164,7 @@ class PlaceTransferUseCaseImplTest {
         void shouldThrowOnNullRequest() {
             assertThatThrownBy(() -> placeTransferUseCase.execute(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Request null olamaz");
+                    .hasMessage("Request must not be null");
         }
 
         @Test
@@ -180,7 +183,7 @@ class PlaceTransferUseCaseImplTest {
         void shouldThrowOnSameAccount() {
             AccountInfo sameInfo = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "TRY", "ACTIVE");
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(sameInfo);
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             TransferRequest request = new TransferRequest(SENDER_IBAN, SENDER_IBAN, AMOUNT, Currency.TRY);
             assertThatThrownBy(() -> placeTransferUseCase.execute(request))
@@ -193,7 +196,7 @@ class PlaceTransferUseCaseImplTest {
             AccountInfo usdSender = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "USD", "ACTIVE");
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(usdSender);
             when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN)).thenReturn(receiverInfo());
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
                     .isInstanceOf(CurrencyMismatchException.class);
@@ -207,9 +210,9 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should throw when sender is not authorized")
         void shouldThrowWhenNotAuthorized() {
-            stubAccountLookup();
+            when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(senderInfo());
             doThrow(new org.springframework.security.access.AccessDeniedException("yetki yok"))
-                    .when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+                    .when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
                     .isExactlyInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -226,7 +229,7 @@ class PlaceTransferUseCaseImplTest {
         @DisplayName("should mark transfer as FAILED when debitAndCredit throws exception")
         void shouldMarkFailedOnDebitException() {
             stubAccountLookup();
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
@@ -249,7 +252,7 @@ class PlaceTransferUseCaseImplTest {
         @DisplayName("should not complete transfer when debitAndCredit fails")
         void shouldNotCompleteOnFailure() {
             stubAccountLookup();
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);

@@ -7,6 +7,7 @@ import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.port.in.ExecuteTransferUseCase;
 import com.bank.app.account.application.port.in.ReverseTransferUseCase;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.application.usecase.CreateAccountUseCaseImpl;
 import com.bank.app.account.application.usecase.GetAccountByIdQueryHandler;
 import com.bank.app.account.application.usecase.GetAccountByIbanQueryHandler;
@@ -17,53 +18,60 @@ import com.bank.app.account.application.usecase.AccountQueryUseCaseImpl;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableCaching
 public class AccountBeanConfig {
 
     @Bean
     public CreateAccountUseCase createAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-            EventPublisherPort eventPublisherPort, SecurityContextPort securityContextPort) {
-        return new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, eventPublisherPort, securityContextPort);
+            EventPublisherPort eventPublisherPort, AccountAuthorizationService accountAuthorizationService) {
+        return new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, eventPublisherPort, accountAuthorizationService);
+    }
+
+    @Bean
+    public AccountAuthorizationService accountAuthorizationService(UserContextService userContextService) {
+        return new AccountAuthorizationService(userContextService);
     }
 
     @Bean
     public ExecuteTransferUseCase executeTransferUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
-            SecurityContextPort securityContextPort,
+            AccountAuthorizationService accountAuthorizationService,
             EventPublisherPort eventPublisherPort) {
-        return new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort, securityContextPort,
+        return new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
                 eventPublisherPort);
     }
 
     @Bean
     public ReverseTransferUseCase reverseTransferUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
-            SecurityContextPort securityContextPort,
+            AccountAuthorizationService accountAuthorizationService,
             EventPublisherPort eventPublisherPort) {
-        return new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort, securityContextPort,
+        return new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
                 eventPublisherPort);
     }
 
     @Bean
     public GetAccountByIdQuery getAccountByIdQuery(LoadAccountPort loadAccountPort,
-            SecurityContextPort securityContextPort) {
-        return new GetAccountByIdQueryHandler(loadAccountPort, securityContextPort);
+            AccountAuthorizationService accountAuthorizationService) {
+        return new GetAccountByIdQueryHandler(loadAccountPort, accountAuthorizationService);
     }
 
     @Bean
     public GetAccountByIbanQuery getAccountByIbanQuery(LoadAccountPort loadAccountPort,
-            SecurityContextPort securityContextPort) {
-        return new GetAccountByIbanQueryHandler(loadAccountPort, securityContextPort);
+            AccountAuthorizationService accountAuthorizationService) {
+        return new GetAccountByIbanQueryHandler(loadAccountPort, accountAuthorizationService);
     }
 
     @Bean
     public GetAccountsByUserQuery getAccountsByUserQuery(LoadAccountPort loadAccountPort,
-            SecurityContextPort securityContextPort) {
-        return new GetAccountsByUserQueryHandler(loadAccountPort, securityContextPort);
+            AccountAuthorizationService accountAuthorizationService) {
+        return new GetAccountsByUserQueryHandler(loadAccountPort, accountAuthorizationService);
     }
 
     @Bean

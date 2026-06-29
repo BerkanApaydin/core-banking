@@ -1,6 +1,6 @@
 package com.bank.app.transfer;
 
-import com.bank.app.common.support.ModuleTestConfig;
+import com.bank.app.common.adapter.config.ModuleTestConfig;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.ComponentScan;

@@ -34,7 +34,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     @Override
     public void execute(AuthRequest request) {
         if (loadUserPort.findByUsername(request.username()).isPresent()) {
-            throw new IllegalArgumentException("Kullanıcı adı zaten kullanımda.");
+            throw new IllegalArgumentException("Username already in use.");
         }
 
         List<String> policyErrors = passwordPolicy.validate(request.password());

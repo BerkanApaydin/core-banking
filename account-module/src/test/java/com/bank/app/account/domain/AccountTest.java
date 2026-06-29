@@ -202,7 +202,7 @@ class AccountTest {
             Account account = activeAccount(1000);
             assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Düşülecek tutar sıfır olamaz");
+                    .hasMessage("Debit amount must not be zero");
         }
 
         @Test
@@ -294,7 +294,7 @@ class AccountTest {
             Account account = activeAccount(1000);
             assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Eklenecek tutar sıfır olamaz");
+                    .hasMessage("Credit amount must not be zero");
         }
 
         @Test

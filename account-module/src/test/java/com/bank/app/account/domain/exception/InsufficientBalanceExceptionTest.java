@@ -10,8 +10,8 @@ class InsufficientBalanceExceptionTest {
 
     @Test
     void shouldCreateWithSimpleMessage() {
-        InsufficientBalanceException ex = new InsufficientBalanceException("Yetersiz bakiye");
-        assertEquals("Yetersiz bakiye", ex.getMessage());
+        InsufficientBalanceException ex = new InsufficientBalanceException("Insufficient balance");
+        assertEquals("Insufficient balance", ex.getMessage());
     }
 
     @Test
@@ -27,13 +27,13 @@ class InsufficientBalanceExceptionTest {
 
     @Test
     void shouldBeBusinessException() {
-        InsufficientBalanceException ex = new InsufficientBalanceException("Yetersiz bakiye");
+        InsufficientBalanceException ex = new InsufficientBalanceException("Insufficient balance");
         assertInstanceOf(BusinessException.class, ex);
     }
 
     @Test
     void shouldReturnCorrectErrorCode() {
-        InsufficientBalanceException ex = new InsufficientBalanceException("Yetersiz bakiye");
+        InsufficientBalanceException ex = new InsufficientBalanceException("Insufficient balance");
         assertEquals("INSUFFICIENT_BALANCE", ex.getErrorCode());
     }
 }

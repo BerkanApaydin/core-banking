@@ -1,7 +1,7 @@
 package com.bank.app.transfer.adapter.config;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
@@ -10,6 +10,7 @@ import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.usecase.CancelTransferUseCaseImpl;
 import com.bank.app.transfer.application.usecase.GenerateTransferReportUseCaseImpl;
 import com.bank.app.transfer.application.usecase.GetTransferDetailUseCaseImpl;
@@ -34,12 +35,18 @@ public class TransferBeanConfig {
     }
 
     @Bean
+    public TransferAuthorizationService transferAuthorizationService(AccountAclPort accountAclPort,
+                                                                      UserContextService userContextService) {
+        return new TransferAuthorizationService(accountAclPort, userContextService);
+    }
+
+    @Bean
     public PlaceTransferUseCase placeTransferUseCase(AccountAclPort accountAclPort,
                                                        SaveTransferPort saveTransferPort,
                                                        EventPublisherPort eventPublisherPort,
                                                        TransferDomainService transferDomainService,
-                                                       SecurityContextPort securityContextPort) {
-        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, eventPublisherPort, transferDomainService, securityContextPort);
+                                                       TransferAuthorizationService transferAuthorizationService) {
+        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, eventPublisherPort, transferDomainService, transferAuthorizationService);
     }
 
     @Bean
@@ -47,28 +54,28 @@ public class TransferBeanConfig {
                                                         SaveTransferPort saveTransferPort,
                                                         AccountAclPort accountAclPort,
                                                         EventPublisherPort eventPublisherPort,
-                                                        SecurityContextPort securityContextPort) {
-        return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountAclPort, eventPublisherPort, securityContextPort, transferProperties.cancellationWindowHours());
+                                                        TransferAuthorizationService transferAuthorizationService) {
+        return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountAclPort, eventPublisherPort, transferAuthorizationService, transferProperties.cancellationWindowHours());
     }
 
     @Bean
     public GenerateTransferReportQuery generateTransferReportQuery(LoadTransferPort loadTransferPort,
                                                                      AccountAclPort accountAclPort,
-                                                                     SecurityContextPort securityContextPort) {
-        return new GenerateTransferReportUseCaseImpl(loadTransferPort, accountAclPort, securityContextPort);
+                                                                     TransferAuthorizationService transferAuthorizationService) {
+        return new GenerateTransferReportUseCaseImpl(loadTransferPort, accountAclPort, transferAuthorizationService);
     }
 
     @Bean
     public GetTransferDetailQuery getTransferDetailQuery(LoadTransferPort loadTransferPort,
                                                            AccountAclPort accountAclPort,
-                                                           SecurityContextPort securityContextPort) {
-        return new GetTransferDetailUseCaseImpl(loadTransferPort, accountAclPort, securityContextPort);
+                                                           TransferAuthorizationService transferAuthorizationService) {
+        return new GetTransferDetailUseCaseImpl(loadTransferPort, accountAclPort, transferAuthorizationService);
     }
 
     @Bean
     public GetTransferHistoryQuery getTransferHistoryQuery(LoadTransferPort loadTransferPort,
                                                              AccountAclPort accountAclPort,
-                                                             SecurityContextPort securityContextPort) {
-        return new GetTransferHistoryUseCaseImpl(loadTransferPort, accountAclPort, securityContextPort);
+                                                             TransferAuthorizationService transferAuthorizationService) {
+        return new GetTransferHistoryUseCaseImpl(loadTransferPort, accountAclPort, transferAuthorizationService);
     }
 }

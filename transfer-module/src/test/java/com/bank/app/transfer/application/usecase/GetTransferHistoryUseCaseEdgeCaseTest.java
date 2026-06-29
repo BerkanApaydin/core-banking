@@ -1,31 +1,24 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.application.exception.AccountNotFoundException;
-import com.bank.app.common.adapter.out.security.SecurityContextAdapter;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
-import com.bank.app.common.adapter.out.security.CustomUserDetails;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.common.domain.exception.AuthorizationException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,32 +29,20 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         private LoadTransferPort loadTransferPort;
         @Mock
         private AccountAclPort accountAclPort;
-
-        private SecurityContextPort securityContextPort;
+        @Mock
+        private TransferAuthorizationService transferAuthorizationService;
         private GetTransferHistoryQuery getTransferHistoryUseCase;
 
         @BeforeEach
         void setUp() {
-                securityContextPort = new SecurityContextAdapter();
                 getTransferHistoryUseCase = new GetTransferHistoryUseCaseImpl(
-                                loadTransferPort, accountAclPort, securityContextPort);
-
-                CustomUserDetails principal = new CustomUserDetails(100L, "test_user",
-                                "password", Collections.emptyList());
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(principal, null,
-                                Collections.emptyList());
-                SecurityContextHolder.getContext().setAuthentication(auth);
-        }
-
-        @AfterEach
-        void tearDown() {
-                SecurityContextHolder.clearContext();
+                                loadTransferPort, accountAclPort, transferAuthorizationService);
         }
 
         @Test
         void shouldReturnEmptyListWhenNoTransfersFound() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt()))
                                 .thenReturn(Collections.emptyList());
                 when(loadTransferPort.countHistory(1L)).thenReturn(0L);
@@ -75,7 +56,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         @Test
         void shouldReturnEmptyListWithPaginationWhenNoTransfersFound() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistory(eq(1L), eq(0), eq(10)))
                                 .thenReturn(Collections.emptyList());
                 when(loadTransferPort.countHistory(1L)).thenReturn(0L);
@@ -88,7 +69,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
 
         @Test
         void shouldThrowAccountNotFoundExceptionWhenAccountDoesNotExist() {
-                when(accountAclPort.getAccountInfo(1L))
+                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
                                 .thenThrow(new AccountNotFoundException(1L));
 
                 assertThrows(AccountNotFoundException.class,
@@ -98,12 +79,12 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
 
         @Test
         void shouldThrowAccessDeniedExceptionWhenUserIsNotOwner() {
-                AccountInfo account = new AccountInfo(1L, 200L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                doThrow(new AuthorizationException("You are not authorized to view this account's transaction history."))
+                        .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
                 AuthorizationException ex = assertThrows(AuthorizationException.class,
                                 () -> getTransferHistoryUseCase.execute(1L));
-                assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", ex.getMessage());
+                assertEquals("You are not authorized to view this account's transaction history.", ex.getMessage());
                 verifyNoInteractions(loadTransferPort);
         }
 
@@ -111,8 +92,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
                 NullPointerException ex = assertThrows(NullPointerException.class,
                                 () -> getTransferHistoryUseCase.execute(null));
-                assertEquals("Account ID null olamaz", ex.getMessage());
-                verifyNoInteractions(accountAclPort);
+                assertEquals("Account ID must not be null", ex.getMessage());
         }
 
         @Test
@@ -124,7 +104,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         @Test
         void shouldCallFindHistoryWithCorrectPagination() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                                 .thenReturn(Collections.emptyList());
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -138,7 +118,7 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
         @Test
         void shouldDefaultToPage0AndSize20() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
                                 .thenReturn(Collections.emptyList());
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -151,10 +131,8 @@ class GetTransferHistoryUseCaseEdgeCaseTest {
 
         @Test
         void shouldThrowAccessDeniedExceptionWhenNotLoggedIn() {
-                SecurityContextHolder.clearContext();
-
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(accountAclPort.getAccountInfo(1L)).thenReturn(account);
+                doThrow(new AuthorizationException("Session not found."))
+                        .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
                 assertThrows(AuthorizationException.class,
                                 () -> getTransferHistoryUseCase.execute(1L));

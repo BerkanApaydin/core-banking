@@ -21,7 +21,7 @@ public class IdempotencyGuard {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IdempotencyResult startRequest(String key) {
-        Objects.requireNonNull(key, "Idempotency key null olamaz");
+        Objects.requireNonNull(key, "Idempotency key must not be null");
         Optional<Entry> existing = idempotencyPort.findById(key);
         if (existing.isPresent()) {
             Entry entry = existing.get();
@@ -51,13 +51,13 @@ public class IdempotencyGuard {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeRequest(String key, String responseBody, int responseStatus) {
-        Objects.requireNonNull(key, "Idempotency key null olamaz");
+        Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markCompleted(key, responseBody, responseStatus);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failRequest(String key) {
-        Objects.requireNonNull(key, "Idempotency key null olamaz");
+        Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markFailed(key);
     }
 

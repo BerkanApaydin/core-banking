@@ -1,13 +1,13 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import java.util.List;
 import java.util.Map;
@@ -21,14 +21,14 @@ public class GetTransferHistoryUseCaseImpl implements GetTransferHistoryQuery {
 
     private final LoadTransferPort loadTransferPort;
     private final AccountAclPort accountAclPort;
-    private final SecurityContextPort securityContextPort;
+    private final TransferAuthorizationService transferAuthorizationService;
 
     public GetTransferHistoryUseCaseImpl(LoadTransferPort loadTransferPort,
                                      AccountAclPort accountAclPort,
-                                     SecurityContextPort securityContextPort) {
+                                     TransferAuthorizationService transferAuthorizationService) {
         this.loadTransferPort = loadTransferPort;
         this.accountAclPort = accountAclPort;
-        this.securityContextPort = securityContextPort;
+        this.transferAuthorizationService = transferAuthorizationService;
     }
 
     @Override
@@ -38,14 +38,12 @@ public class GetTransferHistoryUseCaseImpl implements GetTransferHistoryQuery {
 
     @Override
     public PagedResponse<TransferResponse> execute(Long accountId, int page, int size) {
-        Objects.requireNonNull(accountId, "Account ID null olamaz");
+        Objects.requireNonNull(accountId, "Account ID must not be null");
 
         int cappedPage = Math.max(page, 0);
         int cappedSize = Math.max(Math.min(size, 100), 1);
 
-        AccountInfo account = accountAclPort.getAccountInfo(accountId);
-
-        securityContextPort.checkUserAuthorization(account.userId(), "Bu hesabın işlem geçmişini görme yetkiniz yok.");
+        AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId, "You are not authorized to view this account's transaction history.");
 
         List<Transfer> transfers = loadTransferPort.findHistory(accountId, cappedPage, cappedSize);
 

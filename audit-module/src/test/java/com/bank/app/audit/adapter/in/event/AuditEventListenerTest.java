@@ -29,47 +29,47 @@ class AuditEventListenerTest {
 
     @Test
     void shouldLogAuditEvent() {
-        AuditEvent event = new AuditEvent("ACCOUNT_CREATED", "Yeni hesap oluşturuldu", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("ACCOUNT_CREATED", "New account created", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), eq("Yeni hesap oluşturuldu"));
+        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
     }
 
     @Test
     void shouldLogTransferExecuted() {
-        AuditEvent event = new AuditEvent("TRANSFER_EXECUTED", "Para transferi gerçekleştirildi", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("TRANSFER_EXECUTED", "Transfer executed", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_EXECUTED), eq("Para transferi gerçekleştirildi"));
+        verify(auditLogger).log(eq(AuditAction.TRANSFER_EXECUTED), eq("Transfer executed"));
     }
 
     @Test
     void shouldLogTransferCancelled() {
-        AuditEvent event = new AuditEvent("TRANSFER_CANCELLED", "Transfer iptal edildi", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("TRANSFER_CANCELLED", "Transfer cancelled", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), eq("Transfer iptal edildi"));
+        verify(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), eq("Transfer cancelled"));
     }
 
     @Test
     void shouldLogAccountDebited() {
-        AuditEvent event = new AuditEvent("ACCOUNT_DEBITED", "Hesaptan para çekildi", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("ACCOUNT_DEBITED", "Amount withdrawn from account", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_DEBITED), eq("Hesaptan para çekildi"));
+        verify(auditLogger).log(eq(AuditAction.ACCOUNT_DEBITED), eq("Amount withdrawn from account"));
     }
 
     @Test
     void shouldLogAccountCredited() {
-        AuditEvent event = new AuditEvent("ACCOUNT_CREDITED", "Hesaba para yatırıldı", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("ACCOUNT_CREDITED", "Amount deposited to account", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREDITED), eq("Hesaba para yatırıldı"));
+        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREDITED), eq("Amount deposited to account"));
     }
 
     @Test

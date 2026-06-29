@@ -25,12 +25,12 @@ class AuditLogTest {
 
     @Test
     void shouldCreateAuditLogWithFactoryMethod() {
-        AuditLog log = AuditLog.create("testuser", AuditAction.TRANSFER_CANCELLED, "Transfer 10 iptal edildi");
+        AuditLog log = AuditLog.create("testuser", AuditAction.TRANSFER_CANCELLED, "Transfer 10 cancelled");
 
         assertNull(log.getId());
         assertEquals("testuser", log.getUsername());
         assertEquals(AuditAction.TRANSFER_CANCELLED, log.getAction());
-        assertEquals("Transfer 10 iptal edildi", log.getDetails());
+        assertEquals("Transfer 10 cancelled", log.getDetails());
         assertNotNull(log.getTimestamp());
     }
 

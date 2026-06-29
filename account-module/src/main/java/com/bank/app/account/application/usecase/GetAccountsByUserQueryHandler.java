@@ -3,26 +3,24 @@ package com.bank.app.account.application.usecase;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
-import com.bank.app.common.domain.exception.AuthorizationException;
 import java.util.List;
 
 @ReadOnlyUseCase
 public class GetAccountsByUserQueryHandler implements GetAccountsByUserQuery {
 
     private final LoadAccountPort loadAccountPort;
-    private final SecurityContextPort securityContextPort;
+    private final AccountAuthorizationService accountAuthorizationService;
 
-    public GetAccountsByUserQueryHandler(LoadAccountPort loadAccountPort, SecurityContextPort securityContextPort) {
+    public GetAccountsByUserQueryHandler(LoadAccountPort loadAccountPort, AccountAuthorizationService accountAuthorizationService) {
         this.loadAccountPort = loadAccountPort;
-        this.securityContextPort = securityContextPort;
+        this.accountAuthorizationService = accountAuthorizationService;
     }
 
     @Override
     public List<AccountResponse> execute(int page, int size) {
-        Long currentUserId = securityContextPort.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("Bu işlem için giriş yapmalısınız."));
+        Long currentUserId = accountAuthorizationService.getCurrentUserId();
         return loadAccountPort.findByUserId(currentUserId).stream()
                 .map(AccountResponse::from)
                 .toList();

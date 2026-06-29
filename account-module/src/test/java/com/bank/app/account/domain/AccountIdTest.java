@@ -28,7 +28,7 @@ class AccountIdTest {
         void shouldRejectNull() {
             assertThatThrownBy(() -> new AccountId(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Account ID null olamaz");
+                    .hasMessage("Account ID must not be null");
         }
     }
 

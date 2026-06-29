@@ -11,11 +11,11 @@ public record TransferParticipants(
         String receiverIban,
         Currency receiverCurrency) {
     public TransferParticipants {
-        Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
-        Objects.requireNonNull(senderIban, "Gönderici IBAN null olamaz");
-        Objects.requireNonNull(senderCurrency, "Gönderici para birimi null olamaz");
-        Objects.requireNonNull(receiverId, "Alıcı ID null olamaz");
-        Objects.requireNonNull(receiverIban, "Alıcı IBAN null olamaz");
-        Objects.requireNonNull(receiverCurrency, "Alıcı para birimi null olamaz");
+        Objects.requireNonNull(senderId, "Sender ID must not be null");
+        Objects.requireNonNull(senderIban, "Sender IBAN must not be null");
+        Objects.requireNonNull(senderCurrency, "Sender currency must not be null");
+        Objects.requireNonNull(receiverId, "Receiver ID must not be null");
+        Objects.requireNonNull(receiverIban, "Receiver IBAN must not be null");
+        Objects.requireNonNull(receiverCurrency, "Receiver currency must not be null");
     }
 }

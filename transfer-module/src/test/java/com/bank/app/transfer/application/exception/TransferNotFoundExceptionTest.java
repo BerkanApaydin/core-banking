@@ -11,7 +11,7 @@ class TransferNotFoundExceptionTest {
     @Test
     void shouldCreateWithId() {
         TransferNotFoundException ex = new TransferNotFoundException(42L);
-        assertEquals("Transfer bulunamadı. ID: 42", ex.getMessage());
+        assertEquals("Transfer not found. ID: 42", ex.getMessage());
         assertEquals("error.transfer_not_found", ex.getMessageKey());
         assertArrayEquals(new Object[]{42L}, ex.getArgs());
     }

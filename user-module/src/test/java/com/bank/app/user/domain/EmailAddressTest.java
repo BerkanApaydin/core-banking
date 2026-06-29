@@ -47,7 +47,7 @@ class EmailAddressTest {
         void shouldRejectNull() {
             assertThatThrownBy(() -> new EmailAddress(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Email null olamaz");
+                    .hasMessage("Email must not be null");
         }
 
         @ParameterizedTest(name = "should reject invalid email: {0}")

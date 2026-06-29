@@ -34,7 +34,7 @@ import io.swagger.v3.oas.annotations.Operation;
 @RestController
 @ApiVersion("v1")
 @RequestMapping("/transfers")
-@Tag(name = "Transfer API", description = "Para transfer işlemlerini yöneten API")
+@Tag(name = "Transfer API", description = "API for managing money transfers")
 public class TransferController {
 
     private final PlaceTransferUseCase placeTransferUseCase;
@@ -57,7 +57,7 @@ public class TransferController {
 
     @PostMapping
     @Idempotent
-    @Operation(summary = "Para transferi gerçekleştirir", description = "Gönderici ve alıcı IBAN bilgileriyle para transfer işlemini başlatır ve kaydeder. Idempotency-Key başlığıyla tekrarlı istekler önlenebilir.")
+    @Operation(summary = "Executes a money transfer", description = "Initiates and records a money transfer with sender and receiver IBAN information. Duplicate requests can be prevented with the Idempotency-Key header.")
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferWebRequest webRequest) {
         TransferRequest request = new TransferRequest(
                 webRequest.senderIban(), webRequest.receiverIban(),
@@ -68,20 +68,20 @@ public class TransferController {
 
     @PostMapping("/{id}/cancel")
     @Idempotent
-    @Operation(summary = "Mevcut bir transferi iptal eder", description = "Gönderilen transfer ID'sine ait tamamlanmış işlemi 24 saat içinde iptal eder ve bakiyeleri iade eder.")
+    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within 24 hours by transfer ID and refunds balances.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
         cancelTransferUseCase.execute(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Transfer detaylarını sorgular")
+    @Operation(summary = "Queries transfer details")
     public ResponseEntity<TransferDetailResponse> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(getTransferDetailQuery.execute(id));
     }
 
     @GetMapping("/history/{accountId}")
-    @Operation(summary = "Hesabın transfer geçmişini listeler")
+    @Operation(summary = "Lists the transfer history of an account")
     public ResponseEntity<PagedResponse<TransferResponse>> getHistory(
             @PathVariable Long accountId,
             @RequestParam(defaultValue = "0") int page,
@@ -90,7 +90,7 @@ public class TransferController {
     }
 
     @GetMapping("/report")
-    @Operation(summary = "Tarih aralığına göre transfer raporu üretir")
+    @Operation(summary = "Generates a transfer report by date range")
     public ResponseEntity<TransferReportResponse> getReport(
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,

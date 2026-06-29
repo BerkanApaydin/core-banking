@@ -51,7 +51,7 @@ class UserDetailsAdapterTest {
 
         UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class,
                 () -> service.loadUserByUsername("john"));
-        assertEquals("Kullanıcı bulunamadı: john", exception.getMessage());
+        assertEquals("User not found: john", exception.getMessage());
     }
 }
 

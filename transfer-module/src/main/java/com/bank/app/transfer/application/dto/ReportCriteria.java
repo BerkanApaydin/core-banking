@@ -14,9 +14,9 @@ public record ReportCriteria(
         Objects.requireNonNull(accountId);
         Objects.requireNonNull(startDate);
         Objects.requireNonNull(endDate);
-        if (page < 0) throw new IllegalArgumentException("Sayfa numarası negatif olamaz: " + page);
-        if (size < 1) throw new IllegalArgumentException("Sayfa boyutu en az 1 olmalıdır: " + size);
-        if (size > 100) throw new IllegalArgumentException("Sayfa boyutu en fazla 100 olabilir: " + size);
+        if (page < 0) throw new IllegalArgumentException("Page number must not be negative: " + page);
+        if (size < 1) throw new IllegalArgumentException("Page size must be at least 1: " + size);
+        if (size > 100) throw new IllegalArgumentException("Page size must be at most 100: " + size);
     }
 
     public ReportCriteria(Long accountId, LocalDateTime startDate, LocalDateTime endDate) {

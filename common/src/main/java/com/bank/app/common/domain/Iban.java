@@ -12,7 +12,7 @@ public record Iban(String value) {
     }
 
     public Iban {
-        Objects.requireNonNull(value, "IBAN boş olamaz");
+        Objects.requireNonNull(value, "IBAN must not be null");
         value = normalize(value);
         if (!ibanPattern.matcher(value).matches()) {
             throw new InvalidIbanException("Geçersiz IBAN formatı: " + value);

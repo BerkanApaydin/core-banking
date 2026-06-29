@@ -11,10 +11,10 @@ public record Money(
     private static final int MAX_SCALE = 2;
 
     public Money {
-        Objects.requireNonNull(amount, "Tutar boş olamaz");
-        Objects.requireNonNull(currency, "Para birimi boş olamaz");
+        Objects.requireNonNull(amount, "Amount must not be null");
+        Objects.requireNonNull(currency, "Currency must not be null");
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Para tutarı negatif olamaz");
+            throw new IllegalArgumentException("Amount must not be negative");
         }
         if (amount.scale() > MAX_SCALE) {
             throw new IllegalArgumentException("Para en fazla " + MAX_SCALE + " ondalık basamak olabilir");
@@ -50,7 +50,7 @@ public record Money(
     }
 
     private void requireSameCurrency(Money other, String operation) {
-        Objects.requireNonNull(other, "Para nesnesi null olamaz");
+        Objects.requireNonNull(other, "Money object must not be null");
         if (this.currency != other.currency) {
             throw new CurrencyMismatchException(
                     this.currency + " ile " + other.currency + " " + operation);

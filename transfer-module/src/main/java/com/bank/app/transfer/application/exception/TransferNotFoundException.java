@@ -9,6 +9,6 @@ public class TransferNotFoundException extends BusinessException {
     public int getHttpStatusCode() { return 404; }
 
     public TransferNotFoundException(Long id) {
-        super("error.transfer_not_found", new Object[]{id}, "Transfer bulunamadı. ID: " + id);
+        super("error.transfer_not_found", new Object[]{id}, "Transfer not found. ID: " + id);
     }
 }

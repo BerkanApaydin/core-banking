@@ -2,7 +2,6 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.UseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.event.DomainEventProvider;
@@ -11,6 +10,7 @@ import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,34 +27,33 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     private final SaveTransferPort saveTransferPort;
     private final AccountAclPort accountAclPort;
     private final EventPublisherPort eventPublisherPort;
-    private final SecurityContextPort securityContextPort;
+    private final TransferAuthorizationService transferAuthorizationService;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCaseImpl(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
                                  AccountAclPort accountAclPort,
                                  EventPublisherPort eventPublisherPort,
-                                 SecurityContextPort securityContextPort,
+                                 TransferAuthorizationService transferAuthorizationService,
                                  int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountAclPort = accountAclPort;
         this.eventPublisherPort = eventPublisherPort;
-        this.securityContextPort = securityContextPort;
+        this.transferAuthorizationService = transferAuthorizationService;
         this.cancellationWindowHours = cancellationWindowHours;
     }
 
     @Override
     public void execute(Long transferId) {
-        Objects.requireNonNull(transferId, "Transfer ID null olamaz");
+        Objects.requireNonNull(transferId, "Transfer ID must not be null");
         Transfer transfer = loadTransferPort.findByIdWithLock(transferId)
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
         Long senderAccountId = transfer.getSenderAccountId();
         Long receiverAccountId = transfer.getReceiverAccountId();
 
-        Long senderUserId = accountAclPort.getAccountInfo(senderAccountId).userId();
-        securityContextPort.checkUserAuthorization(senderUserId, "Bu transferi iptal etmeye yetkiniz yok.");
+        transferAuthorizationService.authorizeByAccountId(senderAccountId);
 
         transfer.cancel(Clock.systemDefaultZone(), cancellationWindowHours);
 
@@ -62,12 +61,12 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         saveTransferPort.save(transfer);
 
-        log.info("Transfer iptal edildi: id={}, amount={}",
+        log.info("Transfer cancelled: id={}, amount={}",
             transfer.getId(), transfer.getAmount());
 
         publishEvents(transfer);
         eventPublisherPort.publish(new AuditEvent("TRANSFER_CANCELLED",
-            String.format("Transfer iptal edildi. Transfer ID: %d, Tutar: %s %s",
+            String.format("Transfer cancelled. Transfer ID: %d, Amount: %s %s",
                 transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency()),
             java.time.LocalDateTime.now()));
     }
@@ -76,7 +75,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
         provider.clearDomainEvents();
         for (DomainEvent event : events) {
-            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event null olamaz"));
+            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event must not be null"));
         }
     }
 }

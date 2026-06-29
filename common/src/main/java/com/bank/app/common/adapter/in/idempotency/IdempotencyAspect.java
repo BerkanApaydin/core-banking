@@ -2,7 +2,7 @@ package com.bank.app.common.adapter.in.idempotency;
 
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,14 +22,14 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class IdempotencyAspect {
 
     private final IdempotencyGuard idempotencyGuard;
-    private final SecurityContextPort securityContextPort;
+    private final UserContextService userContextService;
     private final ObjectMapper objectMapper;
 
     public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
-            SecurityContextPort securityContextPort,
+            UserContextService userContextService,
             ObjectMapper objectMapper) {
         this.idempotencyGuard = idempotencyGuard;
-        this.securityContextPort = securityContextPort;
+        this.userContextService = userContextService;
         this.objectMapper = objectMapper;
     }
 
@@ -47,7 +47,7 @@ public class IdempotencyAspect {
             return joinPoint.proceed();
         }
 
-        String username = securityContextPort.getCurrentUsername()
+        String username = userContextService.getCurrentUsername()
                 .orElseThrow(() -> new AuthorizationException("Giriş yapmalısınız."));
         String key = username + "_" + idempotencyKeyHeader;
 

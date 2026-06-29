@@ -8,11 +8,11 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.application.UseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
@@ -30,21 +30,21 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
     private final EventPublisherPort eventPublisherPort;
-    private final SecurityContextPort securityContextPort;
+    private final AccountAuthorizationService accountAuthorizationService;
 
-    public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, EventPublisherPort eventPublisherPort, SecurityContextPort securityContextPort) {
+    public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, EventPublisherPort eventPublisherPort, AccountAuthorizationService accountAuthorizationService) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.eventPublisherPort = eventPublisherPort;
-        this.securityContextPort = securityContextPort;
+        this.accountAuthorizationService = accountAuthorizationService;
     }
 
     @Override
     public AccountResponse execute(CreateAccountRequest request) {
-        Objects.requireNonNull(request, "Request null olamaz");
-        
+        Objects.requireNonNull(request, "Request must not be null");
+
         // Authorization check: User can only create accounts for themselves
-        securityContextPort.checkUserAuthorization(request.userId(), "Başka bir kullanıcı adına hesap oluşturamazsınız.");
+        accountAuthorizationService.authorizeUserAction(request.userId(), "You cannot create an account on behalf of another user.");
 
         Iban iban = new Iban(request.iban());
         if (loadAccountPort.findByIban(iban).isPresent()) {
@@ -63,7 +63,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
             savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now()
         ));
         eventPublisherPort.publish(new AuditEvent("ACCOUNT_CREATED",
-            String.format("Yeni hesap oluşturuldu. ID: %d, IBAN: %s, Kullanıcı ID: %d, Bakiye: %s %s",
+            String.format("New account created. ID: %d, IBAN: %s, User ID: %d, Balance: %s %s",
                 savedAccount.getId(), savedAccount.getIban().value(), savedAccount.getUserId().value(),
                 savedAccount.getBalance().amount(), savedAccount.getBalance().currency()),
             LocalDateTime.now()));

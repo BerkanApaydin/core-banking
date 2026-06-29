@@ -13,10 +13,10 @@ public class AuditLog {
 
     public AuditLog(Long id, String username, AuditAction action, String details, LocalDateTime timestamp) {
         this.id = id;
-        this.username = Objects.requireNonNull(username, "Username null olamaz");
-        this.action = Objects.requireNonNull(action, "Action null olamaz");
-        this.details = Objects.requireNonNull(details, "Details null olamaz");
-        this.timestamp = Objects.requireNonNull(timestamp, "Timestamp null olamaz");
+        this.username = Objects.requireNonNull(username, "Username must not be null");
+        this.action = Objects.requireNonNull(action, "Action must not be null");
+        this.details = Objects.requireNonNull(details, "Details must not be null");
+        this.timestamp = Objects.requireNonNull(timestamp, "Timestamp must not be null");
     }
 
     public static AuditLog create(String username, AuditAction action, String details) {

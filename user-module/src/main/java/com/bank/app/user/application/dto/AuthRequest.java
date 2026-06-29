@@ -9,8 +9,8 @@ public record AuthRequest(
     String phone
 ) {
     public AuthRequest {
-        Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
-        Objects.requireNonNull(password, "Şifre null olamaz");
+        Objects.requireNonNull(username, "Username must not be null");
+        Objects.requireNonNull(password, "Password must not be null");
     }
 
     public AuthRequest(String username, String password) {

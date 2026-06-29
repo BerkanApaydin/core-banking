@@ -11,7 +11,7 @@ class AccountExceptionTest {
     @Test
     void shouldCreateInvalidCurrencyException() {
         InvalidCurrencyException ex = new InvalidCurrencyException("XYZ");
-        assertEquals("Ge\u00e7ersiz para birimi: XYZ", ex.getMessage());
+        assertEquals("Invalid currency: XYZ", ex.getMessage());
         assertEquals("error.invalid_currency", ex.getMessageKey());
         assertArrayEquals(new Object[]{"XYZ"}, ex.getArgs());
     }
@@ -35,7 +35,7 @@ class AccountExceptionTest {
         AccountNotFoundException ex = new AccountNotFoundException("TR290006200000000000000111");
         assertEquals("error.account_not_found", ex.getMessageKey());
         assertArrayEquals(new Object[]{"TR290006200000000000000111"}, ex.getArgs());
-        assertEquals("Hesap bulunamad\u0131. IBAN: TR290006200000000000000111", ex.getMessage());
+        assertEquals("Account not found. IBAN: TR290006200000000000000111", ex.getMessage());
         assertEquals("ACCOUNT_NOT_FOUND", ex.getErrorCode());
     }
 
@@ -44,7 +44,7 @@ class AccountExceptionTest {
         AccountNotFoundException ex = new AccountNotFoundException(42L);
         assertEquals("error.account_not_found", ex.getMessageKey());
         assertArrayEquals(new Object[]{42L}, ex.getArgs());
-        assertEquals("Hesap bulunamad\u0131. ID: 42", ex.getMessage());
+        assertEquals("Account not found. ID: 42", ex.getMessage());
         assertEquals("ACCOUNT_NOT_FOUND", ex.getErrorCode());
     }
 }

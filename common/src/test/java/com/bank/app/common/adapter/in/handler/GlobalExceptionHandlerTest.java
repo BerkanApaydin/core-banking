@@ -78,7 +78,7 @@ class GlobalExceptionHandlerTest {
         BusinessException ex = mock(BusinessException.class);
         when(ex.getMessageKey()).thenReturn("error.account_not_found_iban");
         when(ex.getArgs()).thenReturn(new Object[]{"TR1"});
-        when(ex.getMessage()).thenReturn("Hesap bulunamadı. IBAN: TR1");
+        when(ex.getMessage()).thenReturn("Account not found. IBAN: TR1");
         when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
@@ -88,7 +88,7 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
-        assertEquals("Hesap bulunamadı. IBAN: TR1", response.getBody().getProperties().get("message"));
+        assertEquals("Account not found. IBAN: TR1", response.getBody().getProperties().get("message"));
     }
 
     @Test

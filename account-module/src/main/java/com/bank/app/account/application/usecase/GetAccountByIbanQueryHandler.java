@@ -4,9 +4,9 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.application.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.Iban;
 import java.util.Objects;
 
@@ -14,20 +14,20 @@ import java.util.Objects;
 public class GetAccountByIbanQueryHandler implements GetAccountByIbanQuery {
 
     private final LoadAccountPort loadAccountPort;
-    private final SecurityContextPort securityContextPort;
+    private final AccountAuthorizationService accountAuthorizationService;
 
-    public GetAccountByIbanQueryHandler(LoadAccountPort loadAccountPort, SecurityContextPort securityContextPort) {
+    public GetAccountByIbanQueryHandler(LoadAccountPort loadAccountPort, AccountAuthorizationService accountAuthorizationService) {
         this.loadAccountPort = loadAccountPort;
-        this.securityContextPort = securityContextPort;
+        this.accountAuthorizationService = accountAuthorizationService;
     }
 
     @Override
     public AccountResponse execute(String ibanValue) {
-        Objects.requireNonNull(ibanValue, "IBAN null olamaz");
+        Objects.requireNonNull(ibanValue, "IBAN must not be null");
         Iban iban = new Iban(ibanValue);
         Account account = loadAccountPort.findByIban(iban)
             .orElseThrow(() -> new AccountNotFoundException(ibanValue));
-        securityContextPort.checkUserAuthorization(account.getUserId().value(), "Bu hesaba erişim yetkiniz yok.");
+        accountAuthorizationService.authorizeAccountOwner(account, "Bu hesaba erişim yetkiniz yok");
         return AccountResponse.from(account);
     }
 }

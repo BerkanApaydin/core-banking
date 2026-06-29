@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public record UserId(Long value) {
     public UserId {
-        Objects.requireNonNull(value, "Kullanıcı ID null olamaz");
+        Objects.requireNonNull(value, "User ID must not be null");
         if (value <= 0) {
             throw new IllegalArgumentException("Kullanıcı ID pozitif olmalıdır: " + value);
         }

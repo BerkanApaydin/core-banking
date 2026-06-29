@@ -15,7 +15,7 @@ import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,7 +47,7 @@ class CreateAccountUseCaseTest {
     @Mock
     private EventPublisherPort eventPublisherPort;
     @Mock
-    private SecurityContextPort securityContextPort;
+    private AccountAuthorizationService accountAuthorizationService;
 
     @Captor
     private ArgumentCaptor<AccountCreatedEvent> eventCaptor;
@@ -61,7 +61,7 @@ class CreateAccountUseCaseTest {
     @BeforeEach
     void setUp() {
         createAccountUseCase = new CreateAccountUseCaseImpl(
-                loadAccountPort, saveAccountPort, eventPublisherPort, securityContextPort);
+                loadAccountPort, saveAccountPort, eventPublisherPort, accountAuthorizationService);
     }
 
     private CreateAccountRequest validRequest() {
@@ -80,7 +80,7 @@ class CreateAccountUseCaseTest {
             Account savedAccount = new Account(1L, new UserId(USER_ID), iban, OWNER,
                     new Money(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
 
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
+            doNothing().when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
             when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
             when(saveAccountPort.save(any(Account.class))).thenReturn(savedAccount);
 
@@ -116,12 +116,12 @@ class CreateAccountUseCaseTest {
             CreateAccountRequest request = new CreateAccountRequest(
                     200L, VALID_IBAN, OWNER, new BigDecimal("500.00"), Currency.TRY);
 
-            doThrow(new AccessDeniedException("Başka bir kullanıcı adına hesap oluşturamazsınız."))
-                    .when(securityContextPort).checkUserAuthorization(eq(200L), anyString());
+            doThrow(new AccessDeniedException("You cannot create an account on behalf of another user."))
+                    .when(accountAuthorizationService).authorizeUserAction(eq(200L), anyString());
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(AccessDeniedException.class)
-                    .hasMessage("Başka bir kullanıcı adına hesap oluşturamazsınız.");
+                    .hasMessage("You cannot create an account on behalf of another user.");
             verify(saveAccountPort, never()).save(any(Account.class));
         }
 
@@ -130,12 +130,12 @@ class CreateAccountUseCaseTest {
         void shouldThrowWhenNotLoggedIn() {
             CreateAccountRequest request = validRequest();
 
-            doThrow(new AccessDeniedException("Oturum bulunamadı."))
-                    .when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
+            doThrow(new AccessDeniedException("Session not found."))
+                    .when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(AccessDeniedException.class)
-                    .hasMessage("Oturum bulunamadı.");
+                    .hasMessage("Session not found.");
             verify(saveAccountPort, never()).save(any(Account.class));
         }
     }
@@ -149,7 +149,7 @@ class CreateAccountUseCaseTest {
         void shouldThrowOnNullRequest() {
             assertThatThrownBy(() -> createAccountUseCase.execute(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Request null olamaz");
+                    .hasMessage("Request must not be null");
         }
 
         @Test
@@ -160,12 +160,12 @@ class CreateAccountUseCaseTest {
             Account existingAccount = new Account(1L, new UserId(USER_ID), iban, "Eski Sahip",
                     new Money(new BigDecimal("100.00"), Currency.TRY), AccountStatus.ACTIVE);
 
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
+            doNothing().when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
             when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(existingAccount));
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(DuplicateIbanException.class)
-                    .hasMessage("Bu IBAN ile zaten bir hesap var: " + VALID_IBAN);
+                    .hasMessage("An account already exists with this IBAN: " + VALID_IBAN);
             verify(saveAccountPort, never()).save(any(Account.class));
         }
 
@@ -183,7 +183,7 @@ class CreateAccountUseCaseTest {
             CreateAccountRequest request = new CreateAccountRequest(
                     USER_ID, "INVALID_IBAN", OWNER, new BigDecimal("500.00"), Currency.TRY);
 
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(USER_ID), anyString());
+            doNothing().when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(InvalidIbanException.class);

@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.account.application.exception.AccountNotFoundException;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.common.application.port.out.AccountAclPort;
@@ -29,14 +29,14 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountAclPort accountOperationPort;
-    @Mock private SecurityContextPort securityContextPort;
+    @Mock private TransferAuthorizationService transferAuthorizationService;
 
     private GenerateTransferReportQuery generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
         generateTransferReportUseCase = new GenerateTransferReportUseCaseImpl(
-                loadTransferPort, accountOperationPort, securityContextPort);
+                loadTransferPort, accountOperationPort, transferAuthorizationService);
     }
 
     @Test
@@ -45,7 +45,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(999L, start, end);
 
-        when(accountOperationPort.getAccountInfo(999L))
+        when(transferAuthorizationService.authorizeAccountAccess(eq(999L), anyString()))
                 .thenThrow(new AccountNotFoundException(999L));
 
         assertThrows(AccountNotFoundException.class,
@@ -56,7 +56,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
     void shouldThrowNullPointerExceptionWhenCriteriaIsNull() {
         NullPointerException ex = assertThrows(NullPointerException.class,
                 () -> generateTransferReportUseCase.execute(null));
-        assertEquals("Criteria null olamaz", ex.getMessage());
+        assertEquals("Criteria must not be null", ex.getMessage());
     }
 
     @Test
@@ -85,7 +85,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Başlangıç tarihi bitiş tarihinden sonra olamaz.", ex.getMessage());
+        assertEquals("Start date must not be after end date.", ex.getMessage());
     }
 
     @Test
@@ -94,8 +94,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, now, now);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -114,7 +113,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Rapor aralığı en fazla 12 ay olabilir.", ex.getMessage());
+        assertEquals("Report range must be at most 12 months.", ex.getMessage());
     }
 
     @Test
@@ -126,8 +125,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -142,8 +140,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -165,8 +162,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -181,15 +177,12 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 200L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-
-        doThrow(new AccessDeniedException("Bu hesabın raporunu oluşturma yetkiniz yok."))
-                .when(securityContextPort).checkUserAuthorization(eq(200L), anyString());
+        doThrow(new AccessDeniedException("You are not authorized to generate a report for this account."))
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Bu hesabın raporunu oluşturma yetkiniz yok.", ex.getMessage());
+        assertEquals("You are not authorized to generate a report for this account.", ex.getMessage());
     }
 
     @Test
@@ -198,11 +191,8 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-
-        doThrow(new AccessDeniedException("Bu işlem için giriş yapmalısınız."))
-                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        doThrow(new AccessDeniedException("Session not found."))
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
         assertThrows(AccessDeniedException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -215,8 +205,7 @@ class GenerateTransferReportUseCaseEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());

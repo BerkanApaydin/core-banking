@@ -88,7 +88,7 @@ class UserTest {
         void shouldRejectBlankUsername() {
             assertThatThrownBy(() -> new User(new UserId(1L), "   ", "password", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Kullanıcı adı boş olamaz");
+                    .hasMessage("Username must not be empty");
         }
 
         @Test
@@ -96,7 +96,7 @@ class UserTest {
         void shouldRejectEmptyUsername() {
             assertThatThrownBy(() -> new User(new UserId(1L), "", "password", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Kullanıcı adı boş olamaz");
+                    .hasMessage("Username must not be empty");
         }
 
         @Test
@@ -134,7 +134,7 @@ class UserTest {
             User user = User.create("testuser", "password");
             assertThatThrownBy(() -> user.changePassword(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Yeni şifre null olamaz");
+                    .hasMessage("New password must not be null");
         }
 
         @Test
@@ -143,7 +143,7 @@ class UserTest {
             User user = User.create("testuser", "password");
             assertThatThrownBy(() -> user.changePassword("   "))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Şifre boş olamaz");
+                    .hasMessage("Password must not be empty");
         }
 
         @Test
@@ -160,7 +160,7 @@ class UserTest {
             User user = User.create("testuser", "password");
             assertThatThrownBy(() -> user.updateEmail(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Email null olamaz");
+                    .hasMessage("Email must not be null");
         }
 
         @Test
@@ -177,7 +177,7 @@ class UserTest {
             User user = User.create("testuser", "password");
             assertThatThrownBy(() -> user.updatePhone(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Telefon null olamaz");
+                    .hasMessage("Phone must not be null");
         }
 
         @Test
@@ -194,7 +194,7 @@ class UserTest {
             User user = User.create("testuser", "password");
             assertThatThrownBy(() -> user.assignRole(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Rol null olamaz");
+                    .hasMessage("Role must not be null");
         }
 
         @Test

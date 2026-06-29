@@ -3,10 +3,11 @@ package com.bank.app.account.application.usecase;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -37,7 +38,7 @@ class ReverseTransferUseCaseImplTest {
     private SaveAccountPort saveAccountPort;
 
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     @Mock
     private EventPublisherPort eventPublisherPort;
@@ -49,8 +50,9 @@ class ReverseTransferUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
+        AccountAuthorizationService accountAuthorizationService = new AccountAuthorizationService(userContextService);
         useCase = new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort,
-                securityContextPort, eventPublisherPort);
+                accountAuthorizationService, eventPublisherPort);
 
         sender = Account.builder()
                 .id(1L).userId(new UserId(10L))
@@ -84,7 +86,7 @@ class ReverseTransferUseCaseImplTest {
 
             verify(loadAccountPort).findByIdWithLock(1L);
             verify(loadAccountPort).findByIdWithLock(2L);
-            verify(securityContextPort).checkUserAuthorization(10L, "Bu işlem için yetkiniz yok.");
+            verify(userContextService).checkUserAuthorization(10L, "You are not authorized for this operation.");
             assertEquals(Money.of("1000.00", Currency.TRY), sender.getBalance());
             assertEquals(Money.of("500.00", Currency.TRY), receiver.getBalance());
             verify(saveAccountPort).save(sender);

@@ -9,10 +9,10 @@ class TransferNotCancellableExceptionTest {
 
     @Test
     void shouldCreateWithMessageKeyAndArgs() {
-        TransferNotCancellableException ex = new TransferNotCancellableException("error.transfer_not_cancellable", new Object[]{1L}, "Transfer iptal edilemez: 1");
+        TransferNotCancellableException ex = new TransferNotCancellableException("error.transfer_not_cancellable", new Object[]{1L}, "Transfer cannot be cancelled: 1");
         assertEquals("error.transfer_not_cancellable", ex.getMessageKey());
         assertArrayEquals(new Object[]{1L}, ex.getArgs());
-        assertEquals("Transfer iptal edilemez: 1", ex.getMessage());
+        assertEquals("Transfer cannot be cancelled: 1", ex.getMessage());
     }
 
     @Test

@@ -163,7 +163,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
                     .isExactlyInstanceOf(UserNotFoundException.class)
-                    .hasMessage("Kullanıcı bulunamadı");
+                    .hasMessage("User not found");
 
             verify(authenticationPort).authenticate(anyString(), anyString());
             verify(loadUserPort).findByUsername(USERNAME);

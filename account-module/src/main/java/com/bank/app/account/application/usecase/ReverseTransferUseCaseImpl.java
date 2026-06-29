@@ -4,10 +4,10 @@ import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.ReverseTransferUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.application.UseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
@@ -25,22 +25,22 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final SecurityContextPort securityContextPort;
+    private final AccountAuthorizationService accountAuthorizationService;
     private final EventPublisherPort eventPublisherPort;
 
     public ReverseTransferUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-                                      SecurityContextPort securityContextPort, EventPublisherPort eventPublisherPort) {
+                                      AccountAuthorizationService accountAuthorizationService, EventPublisherPort eventPublisherPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.securityContextPort = securityContextPort;
+        this.accountAuthorizationService = accountAuthorizationService;
         this.eventPublisherPort = eventPublisherPort;
     }
 
     @Override
     public void execute(Long senderId, Long receiverId, Money amount) {
-        Objects.requireNonNull(senderId, "Gönderici ID null olamaz");
-        Objects.requireNonNull(receiverId, "Alıcı ID null olamaz");
-        Objects.requireNonNull(amount, "Tutar null olamaz");
+        Objects.requireNonNull(senderId, "Sender ID must not be null");
+        Objects.requireNonNull(receiverId, "Receiver ID must not be null");
+        Objects.requireNonNull(amount, "Amount must not be null");
 
         OrderedPair<Account> pair = OrderedPair.from(
                 senderId, () -> loadAccountPort.findByIdWithLock(senderId)
@@ -52,7 +52,7 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
         Account sender = senderFirst ? pair.lowerIdItem() : pair.higherIdItem();
         Account receiver = senderFirst ? pair.higherIdItem() : pair.lowerIdItem();
 
-        securityContextPort.checkUserAuthorization(sender.getUserId().value(), "Bu işlem için yetkiniz yok.");
+        accountAuthorizationService.authorizeAccountOwner(sender, "You are not authorized for this operation.");
 
         sender.credit(amount);
         receiver.debit(amount);
@@ -63,7 +63,7 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
         publishEvents(sender);
         publishEvents(receiver);
         eventPublisherPort.publish(new AuditEvent("TRANSFER_CANCELLED",
-            String.format("Transfer iptal edildi (reverse). Gönderen: %d, Alan: %d, Tutar: %s %s",
+            String.format("Transfer reversed. Sender: %d, Receiver: %d, Amount: %s %s",
                 senderId, receiverId, amount.amount(), amount.currency()),
             java.time.LocalDateTime.now()));
 
@@ -75,7 +75,7 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
         List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
         provider.clearDomainEvents();
         for (DomainEvent event : events) {
-            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event null olamaz"));
+            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event must not be null"));
         }
     }
 }

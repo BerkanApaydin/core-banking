@@ -32,17 +32,17 @@ public class Account implements DomainEventProvider {
 
     public Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status, Long version) {
         this.id = id;
-        this.userId = Objects.requireNonNull(userId, "UserId null olamaz");
-        this.iban = Objects.requireNonNull(iban, "IBAN null olamaz");
-        this.ownerName = Objects.requireNonNull(ownerName, "OwnerName null olamaz");
+        this.userId = Objects.requireNonNull(userId, "UserId must not be null");
+        this.iban = Objects.requireNonNull(iban, "IBAN must not be null");
+        this.ownerName = Objects.requireNonNull(ownerName, "Owner name must not be null");
         if (ownerName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Sahip adı boş olamaz");
+            throw new IllegalArgumentException("Owner name must not be empty");
         }
         if (ownerName.trim().length() > 255) {
             throw new IllegalArgumentException("Sahip adı en fazla 255 karakter olabilir");
         }
-        this.balance = Objects.requireNonNull(balance, "Bakiye null olamaz");
-        this.status = Objects.requireNonNull(status, "Hesap durumu null olamaz");
+        this.balance = Objects.requireNonNull(balance, "Balance must not be null");
+        this.status = Objects.requireNonNull(status, "Account status must not be null");
         this.version = version;
     }
 
@@ -105,9 +105,9 @@ public class Account implements DomainEventProvider {
     }
 
     public void debit(Money amount, Clock clock) {
-        Objects.requireNonNull(amount, "Düşülecek tutar null olamaz");
+        Objects.requireNonNull(amount, "Debit amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Düşülecek tutar sıfır olamaz");
+            throw new IllegalArgumentException("Debit amount must not be zero");
         }
         if (!isActive()) {
             throw new AccountNotActiveException(this.iban.value());
@@ -129,9 +129,9 @@ public class Account implements DomainEventProvider {
     }
 
     public void credit(Money amount, Clock clock) {
-        Objects.requireNonNull(amount, "Eklenecek tutar null olamaz");
+        Objects.requireNonNull(amount, "Credit amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Eklenecek tutar sıfır olamaz");
+            throw new IllegalArgumentException("Credit amount must not be zero");
         }
         if (!isActive()) {
             throw new AccountNotActiveException(this.iban.value());
@@ -167,7 +167,7 @@ public class Account implements DomainEventProvider {
             throw new InsufficientBalanceException(
                 "error.account_close_balance_not_zero",
                 new Object[]{this.balance.amount(), this.balance.currency().name()},
-                "Kapatma için bakiye sıfır olmalıdır. Mevcut: " + this.balance.amount() + " " + this.balance.currency()
+                "Balance must be zero for closure. Current: " + this.balance.amount() + " " + this.balance.currency()
             );
         }
         this.status = AccountStatus.CLOSED;
@@ -178,10 +178,12 @@ public class Account implements DomainEventProvider {
         return version;
     }
 
+    @Override
     public List<DomainEvent> getDomainEvents() {
         return Collections.unmodifiableList(domainEvents);
     }
 
+    @Override
     public void clearDomainEvents() {
         domainEvents.clear();
     }

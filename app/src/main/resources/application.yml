@@ -14,6 +14,8 @@ server:
     min-response-size: 1024
 
 spring:
+  profiles:
+    active: dev
   application:
     name: clean-architecture-bank
   messages:
@@ -86,6 +88,11 @@ app:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
     max-retries: ${OUTBOX_MAX_RETRIES:5}
     use-skip-locked: ${OUTBOX_USE_SKIP_LOCKED:true}
+  cache:
+    caffeine:
+      account-info:
+        maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
+        expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}s
 
 management:
   endpoints:

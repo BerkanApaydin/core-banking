@@ -113,7 +113,7 @@ class MoneyTest {
         void shouldRejectNegativeAmount(String value) {
             assertThatThrownBy(() -> new Money(new BigDecimal(value), Currency.TRY))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Para tutarı negatif olamaz");
+                    .hasMessage("Amount must not be negative");
         }
 
         @Test
@@ -183,7 +183,7 @@ class MoneyTest {
             assertThatThrownBy(() ->
                     Money.of("50.00", Currency.TRY).subtract(Money.of("100.00", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Para tutarı negatif olamaz");
+                    .hasMessage("Amount must not be negative");
         }
 
         @Test

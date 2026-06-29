@@ -1,4 +1,4 @@
-package com.bank.app.common.support;
+package com.bank.app.common.adapter.config;
 
 import com.bank.app.common.adapter.in.config.JpaAuditingConfig;
 import com.bank.app.common.adapter.in.handler.GlobalExceptionHandler;

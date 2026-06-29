@@ -25,25 +25,16 @@ import jakarta.servlet.http.HttpServletResponse;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private static final String AUTH_WHITELIST = "/api/v1/auth/**";
-    private static final String SWAGGER_WHITELIST = "/v3/api-docs/**";
-    private static final String SWAGGER_UI = "/swagger-ui/**";
-    private static final String SWAGGER_HTML = "/swagger-ui.html";
-    private static final String ACTUATOR_HEALTH = "/actuator/health/**";
-    private static final String STATIC_RESOURCES = "/";
-    private static final String INDEX_HTML = "/index.html";
-    private static final String APP_JS = "/app.js";
-    private static final String STYLE_CSS = "/style.css";
-    private static final String FAVICON = "/favicon.ico";
-    private static final String ERROR_PATH = "/error";
-
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+    private final SecurityProperties securityProperties;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
-                          UserDetailsService userDetailsService) {
+                          UserDetailsService userDetailsService,
+                          SecurityProperties securityProperties) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
+        this.securityProperties = securityProperties;
     }
 
     @Bean
@@ -53,12 +44,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    STATIC_RESOURCES, INDEX_HTML, APP_JS, STYLE_CSS, FAVICON,
-                    AUTH_WHITELIST,
-                    SWAGGER_WHITELIST, SWAGGER_UI, SWAGGER_HTML,
-                    ACTUATOR_HEALTH,
-                    ERROR_PATH)
+                .requestMatchers(securityProperties.whitelistPaths().toArray(new String[0]))
                 .permitAll()
                 .anyRequest().authenticated())
             .sessionManagement(session -> session

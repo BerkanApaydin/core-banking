@@ -10,7 +10,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,13 +34,13 @@ class GenerateTransferReportUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountAclPort accountOperationPort;
-    @Mock private SecurityContextPort securityContextPort;
+    @Mock private TransferAuthorizationService transferAuthorizationService;
     private GenerateTransferReportQuery generateTransferReportUseCase;
 
     @BeforeEach
     void setUp() {
         generateTransferReportUseCase = new GenerateTransferReportUseCaseImpl(loadTransferPort, accountOperationPort,
-                securityContextPort);
+                transferAuthorizationService);
     }
 
     @Test
@@ -50,8 +50,7 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222",
@@ -85,8 +84,7 @@ class GenerateTransferReportUseCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
 
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100))
@@ -108,14 +106,11 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(info);
-
-        doThrow(new AccessDeniedException("Bu hesabın raporunu oluşturma yetkiniz yok."))
-                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        doThrow(new AccessDeniedException("You are not authorized to generate a report for this account."))
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Bu hesabın raporunu oluşturma yetkiniz yok.", exception.getMessage());
+        assertEquals("You are not authorized to generate a report for this account.", exception.getMessage());
     }
 
     @Test
@@ -124,9 +119,9 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
             () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Başlangıç tarihi bitiş tarihinden sonra olamaz.", exception.getMessage());
+        assertEquals("Start date must not be after end date.", exception.getMessage());
     }
 
     @Test
@@ -135,14 +130,14 @@ class GenerateTransferReportUseCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
             () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Rapor aralığı en fazla 12 ay olabilir.", exception.getMessage());
+        assertEquals("Report range must be at most 12 months.", exception.getMessage());
     }
 
     @Test
     void shouldThrowNullPointerExceptionWhenCriteriaIsNull() {
         NullPointerException exception = assertThrows(NullPointerException.class, () -> generateTransferReportUseCase.execute(null));
-        assertEquals("Criteria null olamaz", exception.getMessage());
+        assertEquals("Criteria must not be null", exception.getMessage());
     }
 }

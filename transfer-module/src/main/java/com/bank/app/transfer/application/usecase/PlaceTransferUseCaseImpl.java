@@ -3,23 +3,21 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.common.application.DomainEventPublisher;
 import com.bank.app.common.application.UseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferParticipants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 @UseCase
@@ -31,32 +29,29 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
     private final SaveTransferPort saveTransferPort;
     private final EventPublisherPort eventPublisherPort;
     private final TransferDomainService transferDomainService;
-    private final SecurityContextPort securityContextPort;
+    private final TransferAuthorizationService transferAuthorizationService;
 
     public PlaceTransferUseCaseImpl(AccountAclPort accountAclPort,
             SaveTransferPort saveTransferPort,
             EventPublisherPort eventPublisherPort,
             TransferDomainService transferDomainService,
-            SecurityContextPort securityContextPort) {
+            TransferAuthorizationService transferAuthorizationService) {
         this.accountAclPort = accountAclPort;
         this.saveTransferPort = saveTransferPort;
         this.eventPublisherPort = eventPublisherPort;
         this.transferDomainService = transferDomainService;
-        this.securityContextPort = securityContextPort;
+        this.transferAuthorizationService = transferAuthorizationService;
     }
 
     @Override
     public TransferResponse execute(TransferRequest request) {
-        Objects.requireNonNull(request, "Request null olamaz");
+        Objects.requireNonNull(request, "Request must not be null");
 
         String senderIban = Iban.normalize(request.senderIban());
         String receiverIban = Iban.normalize(request.receiverIban());
 
-        AccountInfo senderInfo = accountAclPort.getAccountInfoForTransfer(senderIban);
-        AccountInfo receiverInfo = accountAclPort.getAccountInfoForTransfer(receiverIban);
-
-        securityContextPort.checkUserAuthorization(senderInfo.userId(),
-                "Bu hesaptan transfer yapmaya yetkiniz yok.");
+        AccountInfo senderInfo = transferAuthorizationService.authorizeSender(senderIban);
+        AccountInfo receiverInfo = transferAuthorizationService.getReceiverInfo(receiverIban);
 
         Money amount = new Money(request.amount(), request.currency());
 
@@ -72,11 +67,6 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
             Transfer completedTransfer = saveTransferPort.save(savedTransfer);
 
             DomainEventPublisher.publishEvents(savedTransfer, eventPublisherPort);
-            eventPublisherPort.publish(new AuditEvent("TRANSFER_EXECUTED",
-                String.format("Para transferi gerçekleştirildi. Transfer ID: %d, Tutar: %s %s",
-                    completedTransfer.getId(), completedTransfer.getAmount().amount(),
-                    completedTransfer.getAmount().currency()),
-                LocalDateTime.now()));
 
             log.info("Transfer completed: id={}, senderId={}, receiverId={}, amount={} {}",
                 completedTransfer.getId(), completedTransfer.getSenderAccountId(),

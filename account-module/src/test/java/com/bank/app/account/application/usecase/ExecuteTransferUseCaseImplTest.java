@@ -3,12 +3,13 @@ package com.bank.app.account.application.usecase;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -43,7 +44,7 @@ class ExecuteTransferUseCaseImplTest {
     private SaveAccountPort saveAccountPort;
 
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     @Mock
     private EventPublisherPort eventPublisherPort;
@@ -61,8 +62,9 @@ class ExecuteTransferUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
+        AccountAuthorizationService accountAuthorizationService = new AccountAuthorizationService(userContextService);
         useCase = new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort,
-                securityContextPort, eventPublisherPort);
+                accountAuthorizationService, eventPublisherPort);
 
         sender = Account.builder()
                 .id(1L).userId(new UserId(10L))
@@ -96,7 +98,7 @@ class ExecuteTransferUseCaseImplTest {
 
             verify(loadAccountPort).findByIdWithLock(1L);
             verify(loadAccountPort).findByIdWithLock(2L);
-            verify(securityContextPort).checkUserAuthorization(10L, "Bu hesaptan transfer yapmaya yetkiniz yok.");
+            verify(userContextService).checkUserAuthorization(10L, "You are not authorized to transfer from this account.");
             assertEquals(Money.of("800.00", Currency.TRY), sender.getBalance());
             assertEquals(Money.of("700.00", Currency.TRY), receiver.getBalance());
             verify(saveAccountPort).save(sender);

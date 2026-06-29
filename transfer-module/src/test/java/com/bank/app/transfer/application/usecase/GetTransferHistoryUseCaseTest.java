@@ -10,7 +10,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,13 +32,13 @@ class GetTransferHistoryUseCaseTest {
 
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private AccountAclPort accountOperationPort;
-    @Mock private SecurityContextPort securityContextPort;
+    @Mock private TransferAuthorizationService transferAuthorizationService;
     private GetTransferHistoryQuery getTransferHistoryUseCase;
 
     @BeforeEach
     void setUp() {
         getTransferHistoryUseCase = new GetTransferHistoryUseCaseImpl(loadTransferPort, accountOperationPort,
-                securityContextPort);
+                transferAuthorizationService);
     }
 
     @Test
@@ -47,8 +47,7 @@ class GetTransferHistoryUseCaseTest {
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
@@ -70,22 +69,18 @@ class GetTransferHistoryUseCaseTest {
 
     @Test
     void shouldThrowAccessDeniedExceptionWhenUserIsNotOwnerOfAccount() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        doThrow(new AccessDeniedException("Bu hesabın işlem geçmişini görme yetkiniz yok."))
-                .when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        doThrow(new AccessDeniedException("You are not authorized to view this account's transaction history."))
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () -> getTransferHistoryUseCase.execute(1L));
-        assertEquals("Bu hesabın işlem geçmişini görme yetkiniz yok.", exception.getMessage());
+        assertEquals("You are not authorized to view this account's transaction history.", exception.getMessage());
     }
 
     @Test
     void shouldCapPageSizeAtMaxLimit() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
 
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
@@ -101,8 +96,7 @@ class GetTransferHistoryUseCaseTest {
     void shouldCapNegativePageToZero() {
         AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
 
-        when(accountOperationPort.getAccountInfo(1L)).thenReturn(account);
-        doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
@@ -117,6 +111,6 @@ class GetTransferHistoryUseCaseTest {
     @Test
     void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
         NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
-        assertEquals("Account ID null olamaz", exception.getMessage());
+        assertEquals("Account ID must not be null", exception.getMessage());
     }
 }

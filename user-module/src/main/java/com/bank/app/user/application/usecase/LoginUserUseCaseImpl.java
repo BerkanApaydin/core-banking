@@ -56,7 +56,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         try {
             authenticationPort.authenticate(username, request.password());
             User user = loadUserPort.findByUsername(username)
-                    .orElseThrow(() -> new UserNotFoundException("Kullanıcı bulunamadı"));
+                    .orElseThrow(() -> new UserNotFoundException("User not found"));
             String token = jwtPort.generateToken(user.getId().value(), user.getUsername(), user.getRole().name());
             if (clientIp != null) loginAttemptPort.reset(clientIp);
             loginAttemptPort.resetByUsername(username);

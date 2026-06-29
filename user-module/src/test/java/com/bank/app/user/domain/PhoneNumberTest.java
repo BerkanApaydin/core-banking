@@ -48,7 +48,7 @@ class PhoneNumberTest {
         void shouldRejectNull() {
             assertThatThrownBy(() -> new PhoneNumber(null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Telefon numarası null olamaz");
+                    .hasMessage("Phone number must not be null");
         }
 
         @ParameterizedTest(name = "should reject invalid phone: {0}")

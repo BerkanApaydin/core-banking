@@ -9,7 +9,7 @@ public class DuplicateIbanException extends BusinessException {
     public int getHttpStatusCode() { return 409; }
 
     public DuplicateIbanException(String iban) {
-        super("error.duplicate_iban", new Object[]{iban}, "Bu IBAN ile zaten bir hesap var: " + iban);
+        super("error.duplicate_iban", new Object[]{iban}, "An account already exists with this IBAN: " + iban);
     }
 
     public DuplicateIbanException(String messageKey, Object[] args, String defaultMessage) {

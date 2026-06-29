@@ -127,7 +127,7 @@ class RegisterUserUseCaseTest {
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Kullanıcı adı zaten kullanımda.");
+                    .hasMessage("Username already in use.");
 
             verify(loadUserPort).findByUsername("existinguser");
             verifyNoInteractions(passwordEncoderPort);
@@ -141,7 +141,7 @@ class RegisterUserUseCaseTest {
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("en az");
+                    .hasMessageContaining("at least");
 
             verify(loadUserPort).findByUsername("newuser");
             verifyNoInteractions(passwordEncoderPort);

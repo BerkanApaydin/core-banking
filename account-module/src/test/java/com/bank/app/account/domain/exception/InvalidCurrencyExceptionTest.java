@@ -11,7 +11,7 @@ class InvalidCurrencyExceptionTest {
     @Test
     void shouldCreateWithCurrency() {
         InvalidCurrencyException ex = new InvalidCurrencyException("XYZ");
-        assertEquals("Geçersiz para birimi: XYZ", ex.getMessage());
+        assertEquals("Invalid currency: XYZ", ex.getMessage());
         assertEquals("error.invalid_currency", ex.getMessageKey());
         assertArrayEquals(new Object[]{"XYZ"}, ex.getArgs());
     }

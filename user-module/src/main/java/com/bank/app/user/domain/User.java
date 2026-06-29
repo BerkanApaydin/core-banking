@@ -24,7 +24,7 @@ public class User {
     public User(UserId id, String username, String password, Role role, EmailAddress email, PhoneNumber phone, Long version) {
         this.id = id;
         this.username = validateUsername(username);
-        this.password = Objects.requireNonNull(password, "Şifre null olamaz");
+        this.password = Objects.requireNonNull(password, "Password must not be null");
         this.role = role != null ? role : Role.ROLE_USER;
         this.email = email;
         this.phone = phone;
@@ -40,9 +40,9 @@ public class User {
     }
 
     private static String validateUsername(String username) {
-        Objects.requireNonNull(username, "Kullanıcı adı null olamaz");
+        Objects.requireNonNull(username, "Username must not be null");
         if (username.isBlank()) {
-            throw new IllegalArgumentException("Kullanıcı adı boş olamaz");
+            throw new IllegalArgumentException("Username must not be empty");
         }
         if (username.trim().length() > 255) {
             throw new IllegalArgumentException("Kullanıcı adı en fazla 255 karakter olabilir");
@@ -51,23 +51,23 @@ public class User {
     }
 
     public void changePassword(String newEncodedPassword) {
-        Objects.requireNonNull(newEncodedPassword, "Yeni şifre null olamaz");
+        Objects.requireNonNull(newEncodedPassword, "New password must not be null");
         if (newEncodedPassword.isBlank()) {
-            throw new IllegalArgumentException("Şifre boş olamaz");
+            throw new IllegalArgumentException("Password must not be empty");
         }
         this.password = newEncodedPassword;
     }
 
     public void updateEmail(EmailAddress newEmail) {
-        this.email = Objects.requireNonNull(newEmail, "Email null olamaz");
+        this.email = Objects.requireNonNull(newEmail, "Email must not be null");
     }
 
     public void updatePhone(PhoneNumber newPhone) {
-        this.phone = Objects.requireNonNull(newPhone, "Telefon null olamaz");
+        this.phone = Objects.requireNonNull(newPhone, "Phone must not be null");
     }
 
     public void assignRole(Role newRole) {
-        this.role = Objects.requireNonNull(newRole, "Rol null olamaz");
+        this.role = Objects.requireNonNull(newRole, "Role must not be null");
     }
 
     public boolean hasRole(Role requiredRole) {

@@ -114,7 +114,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
             assertThatThrownBy(transfer::complete)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: COMPLETED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
         }
 
         @Test
@@ -123,7 +123,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
             assertThatThrownBy(transfer::complete)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: FAILED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
         }
 
         @Test
@@ -132,7 +132,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
             assertThatThrownBy(transfer::complete)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: CANCELLED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
         }
 
         @Test
@@ -181,7 +181,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(25));
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("saat geçtiği için iptal edilemez");
+                    .hasMessageContaining("cancellation window has passed");
         }
 
         @Test
@@ -191,7 +191,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("saat geçtiği için iptal edilemez");
+                    .hasMessageContaining("cancellation window has passed");
         }
 
         @Test
@@ -200,7 +200,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusMinutes(1));
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 0))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("saat geçtiği için iptal edilemez");
+                    .hasMessageContaining("cancellation window has passed");
         }
 
         @Test
@@ -209,7 +209,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferAlreadyCancelledException.class)
-                    .hasMessage("Transfer zaten iptal edilmiş. ID: 1");
+                    .hasMessage("Transfer already cancelled. ID: 1");
         }
 
         @Test
@@ -218,7 +218,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("Sadece tamamlanmış transferler iptal edilebilir");
+                    .hasMessageContaining("Only completed transfers can be cancelled");
         }
 
         @Test
@@ -227,7 +227,7 @@ class TransferTest {
             Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("Sadece tamamlanmış transferler iptal edilebilir");
+                    .hasMessageContaining("Only completed transfers can be cancelled");
         }
 
         @Test
@@ -282,7 +282,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
             assertThatThrownBy(transfer::markFailed)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: COMPLETED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
         }
 
         @Test
@@ -291,7 +291,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
             assertThatThrownBy(transfer::markFailed)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: CANCELLED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
         }
 
         @Test
@@ -300,7 +300,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
             assertThatThrownBy(transfer::markFailed)
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Sadece PENDING durumundaki transferler tamamlanabilir. Mevcut durum: FAILED");
+                    .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
         }
     }
 

@@ -10,8 +10,8 @@ class TransferCurrencyMismatchExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        TransferCurrencyMismatchException ex = new TransferCurrencyMismatchException("Para birimleri uyuşmuyor");
-        assertEquals("Para birimleri uyuşmuyor", ex.getMessage());
+        TransferCurrencyMismatchException ex = new TransferCurrencyMismatchException("Currencies do not match");
+        assertEquals("Currencies do not match", ex.getMessage());
     }
 
     @Test

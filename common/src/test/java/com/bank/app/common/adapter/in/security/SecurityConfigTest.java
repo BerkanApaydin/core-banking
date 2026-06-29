@@ -15,13 +15,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-import com.bank.app.common.adapter.in.config.CorsProperties;
-import java.util.List;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -29,12 +26,14 @@ class SecurityConfigTest {
 
     @Mock private JwtAuthenticationFilter jwtAuthFilter;
     @Mock private UserDetailsService userDetailsService;
+    @Mock private CorsConfigurationSource corsConfigurationSource;
     private SecurityConfig securityConfig;
+    private SecurityProperties securityProperties;
 
     @BeforeEach
     void setUp() {
-        securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService,
-                new CorsProperties(List.of("http://localhost:3000")));
+        securityProperties = new SecurityProperties(null);
+        securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService, securityProperties);
     }
 
     @Test
@@ -51,18 +50,11 @@ class SecurityConfigTest {
     }
 
     @Test
-    void shouldCreateCorsConfigurationSourceBean() {
-        CorsConfigurationSource source = securityConfig.corsConfigurationSource();
-        assertNotNull(source);
-        assertNotNull(source.getCorsConfiguration(new MockHttpServletRequest()));
-    }
-
-    @Test
     void shouldCreateSecurityFilterChain() throws Exception {
         HttpSecurity http = mock(HttpSecurity.class, RETURNS_DEEP_STUBS);
         when(http.build()).thenReturn(mock(DefaultSecurityFilterChain.class));
 
-        SecurityFilterChain chain = securityConfig.securityFilterChain(http);
+        SecurityFilterChain chain = securityConfig.securityFilterChain(http, corsConfigurationSource);
         assertNotNull(chain);
 
         verify(http).build();

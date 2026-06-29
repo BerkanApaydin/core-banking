@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.AuthorizationException;
@@ -11,6 +11,7 @@ import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
@@ -40,14 +41,16 @@ class CancelTransferUseCaseTest {
     @Mock
     private EventPublisherPort eventPublisherPort;
     @Mock
-    private SecurityContextPort securityContextPort;
+    private UserContextService userContextService;
 
     private CancelTransferUseCase cancelTransferUseCase;
 
     @BeforeEach
     void setUp() {
+        TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
+                accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
-                accountAclPort, eventPublisherPort, securityContextPort, 72);
+                accountAclPort, eventPublisherPort, transferAuthorizationService, 72);
     }
 
     @Test
@@ -65,7 +68,7 @@ class CancelTransferUseCaseTest {
 
         cancelTransferUseCase.execute(transferId);
 
-        verify(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+        verify(userContextService).checkUserAuthorization(eq(100L), anyString());
         verify(accountAclPort).reverseBalancesForCancellation(senderAccountId, receiverAccountId, amount);
         verify(saveTransferPort).save(transfer);
         verify(eventPublisherPort, times(2)).publish(any());
@@ -91,7 +94,7 @@ class CancelTransferUseCaseTest {
         when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId))
                 .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
-        doThrow(new AuthorizationException("yetki yok")).when(securityContextPort)
+        doThrow(new AuthorizationException("yetki yok")).when(userContextService)
                 .checkUserAuthorization(eq(100L), anyString());
 
         assertThrows(AuthorizationException.class, () -> cancelTransferUseCase.execute(transferId));

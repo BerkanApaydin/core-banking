@@ -11,7 +11,7 @@ public enum AuditAction {
 
     public static AuditAction fromString(String value) {
         if (value == null) {
-            throw new IllegalArgumentException("Audit action null olamaz");
+            throw new IllegalArgumentException("Audit action must not be null");
         }
         return valueOf(value);
     }

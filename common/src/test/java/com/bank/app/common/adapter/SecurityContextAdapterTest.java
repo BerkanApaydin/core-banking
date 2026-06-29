@@ -161,7 +161,7 @@ class SecurityContextAdapterTest {
         AuthorizationException ex = assertThrows(AuthorizationException.class, () -> {
             securityUtils.checkUserAuthorization(42L, "Error message");
         });
-        assertEquals("Oturum bulunamadı.", ex.getMessage());
+        assertEquals("Session not found.", ex.getMessage());
     }
 
     @Test

@@ -50,9 +50,9 @@ public class DataSeeder {
             seedUser("ayse", "Ayse1234");
 
             var ahmet = loadUserPort.findByUsername("ahmet")
-                    .orElseThrow(() -> new IllegalStateException("Ahmet kullanıcısı bulunamadı."));
+                    .orElseThrow(() -> new IllegalStateException("User Ahmet not found."));
             var ayse = loadUserPort.findByUsername("ayse")
-                    .orElseThrow(() -> new IllegalStateException("Ayşe kullanıcısı bulunamadı."));
+                    .orElseThrow(() -> new IllegalStateException("User Ayşe not found."));
 
             runAsUser(ahmet.getId().value(), ahmet.getUsername(), () -> {
                 seedAccountIfAbsent(ahmet.getId().value(), "TR123456789012345678901234", "Ahmet Yılmaz",

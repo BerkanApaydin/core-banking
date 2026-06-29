@@ -4,6 +4,7 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Iban;
@@ -11,7 +12,6 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.common.domain.exception.AuthorizationException;
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,7 +35,7 @@ class GetAccountByIbanQueryHandlerTest {
     @Mock
     private LoadAccountPort loadAccountPort;
     @Mock
-    private SecurityContextPort securityContextPort;
+    private AccountAuthorizationService accountAuthorizationService;
 
     private GetAccountByIbanQuery query;
 
@@ -43,7 +43,7 @@ class GetAccountByIbanQueryHandlerTest {
 
     @BeforeEach
     void setUp() {
-        query = new GetAccountByIbanQueryHandler(loadAccountPort, securityContextPort);
+        query = new GetAccountByIbanQueryHandler(loadAccountPort, accountAuthorizationService);
     }
 
     @Nested
@@ -57,7 +57,7 @@ class GetAccountByIbanQueryHandlerTest {
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             Iban iban = new Iban(VALID_IBAN);
             when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
-            doNothing().when(securityContextPort).checkUserAuthorization(eq(100L), anyString());
+            doNothing().when(accountAuthorizationService).authorizeAccountOwner(any(), anyString());
 
             AccountResponse response = query.execute(VALID_IBAN);
 
@@ -84,8 +84,8 @@ class GetAccountByIbanQueryHandlerTest {
             Account account = new Account(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             when(loadAccountPort.findByIban(any())).thenReturn(Optional.of(account));
-            doThrow(new AuthorizationException("Yetki yok")).when(securityContextPort)
-                    .checkUserAuthorization(eq(100L), anyString());
+            doThrow(new AuthorizationException("Yetki yok")).when(accountAuthorizationService)
+                    .authorizeAccountOwner(any(), anyString());
 
             assertThatThrownBy(() -> query.execute(VALID_IBAN))
                     .isExactlyInstanceOf(AuthorizationException.class);

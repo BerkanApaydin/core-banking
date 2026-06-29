@@ -50,7 +50,7 @@ class TransferDomainServiceTest {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
                     participants, Money.of("100.00", Currency.TRY)))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
-                    .hasMessage("Aynı hesaba transfer yapılamaz: TR1");
+                    .hasMessage("Cannot transfer to the same account: TR1");
         }
 
         @Test
@@ -63,7 +63,7 @@ class TransferDomainServiceTest {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
                     participants, Money.of("100.00", Currency.TRY)))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
-                    .hasMessage("Aynı hesaba transfer yapılamaz: tr123");
+                    .hasMessage("Cannot transfer to the same account: tr123");
         }
 
         @Test
@@ -75,7 +75,7 @@ class TransferDomainServiceTest {
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Transfer tutarı null olamaz");
+                    .hasMessage("Transfer amount must not be null");
         }
 
         @Test
@@ -83,7 +83,7 @@ class TransferDomainServiceTest {
         void shouldThrowNullPointerExceptionWhenParticipantsIsNull() {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(null, Money.of("100.00", Currency.TRY)))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Transfer katılımcıları null olamaz");
+                    .hasMessage("Transfer participants must not be null");
         }
 
         @Test
@@ -96,7 +96,7 @@ class TransferDomainServiceTest {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
                     participants, Money.of("100.00", Currency.TRY)))
                     .isInstanceOf(CurrencyMismatchException.class)
-                    .hasMessage("Gönderici hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor.");
+                    .hasMessage("Sender account currency (USD) does not match transfer amount currency (TRY).");
         }
 
         @Test
@@ -109,7 +109,7 @@ class TransferDomainServiceTest {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
                     participants, Money.of("100.00", Currency.TRY)))
                     .isInstanceOf(CurrencyMismatchException.class)
-                    .hasMessage("Alıcı hesap para birimi (USD) ile transfer tutarı para birimi (TRY) eşleşmiyor.");
+                    .hasMessage("Receiver account currency (USD) does not match transfer amount currency (TRY).");
         }
 
         @Test
@@ -119,7 +119,7 @@ class TransferDomainServiceTest {
                     1L, null, Currency.TRY,
                     2L, "TR2", Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Gönderici IBAN null olamaz");
+                    .hasMessage("Sender IBAN must not be null");
         }
 
         @Test
@@ -129,7 +129,7 @@ class TransferDomainServiceTest {
                     1L, "TR1", Currency.TRY,
                     2L, null, Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Alıcı IBAN null olamaz");
+                    .hasMessage("Receiver IBAN must not be null");
         }
 
         @Test
@@ -139,7 +139,7 @@ class TransferDomainServiceTest {
                     1L, "TR1", null,
                     2L, "TR2", Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Gönderici para birimi null olamaz");
+                    .hasMessage("Sender currency must not be null");
         }
 
         @Test
@@ -149,7 +149,7 @@ class TransferDomainServiceTest {
                     1L, "TR1", Currency.TRY,
                     2L, "TR2", null))
                     .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Alıcı para birimi null olamaz");
+                    .hasMessage("Receiver currency must not be null");
         }
 
         @Test
@@ -162,7 +162,7 @@ class TransferDomainServiceTest {
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
                     participants, Money.of("0.00", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Transfer tutarı sıfır olamaz");
+                    .hasMessage("Transfer amount must not be zero");
         }
     }
 }

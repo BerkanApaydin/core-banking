@@ -9,27 +9,27 @@ public record PasswordPolicy(int minLength, boolean requireUppercase, boolean re
 
     public PasswordPolicy {
         if (minLength < 1) {
-            throw new IllegalArgumentException("minLength en az 1 olmalıdır: " + minLength);
+            throw new IllegalArgumentException("minLength must be at least 1: " + minLength);
         }
     }
 
     public List<String> validate(String rawPassword) {
         List<String> errors = new ArrayList<>();
         if (rawPassword == null || rawPassword.isBlank()) {
-            errors.add("Şifre boş olamaz");
+            errors.add("Password must not be empty");
             return errors;
         }
         if (rawPassword.length() < minLength) {
-            errors.add("Şifre en az " + minLength + " karakter olmalıdır");
+            errors.add("Password must be at least " + minLength + " characters");
         }
         if (requireUppercase && !rawPassword.chars().anyMatch(Character::isUpperCase)) {
-            errors.add("Şifre en az bir büyük harf içermelidir");
+            errors.add("Password must contain at least one uppercase letter");
         }
         if (requireLowercase && !rawPassword.chars().anyMatch(Character::isLowerCase)) {
-            errors.add("Şifre en az bir küçük harf içermelidir");
+            errors.add("Password must contain at least one lowercase letter");
         }
         if (requireDigit && !rawPassword.chars().anyMatch(Character::isDigit)) {
-            errors.add("Şifre en az bir rakam içermelidir");
+            errors.add("Password must contain at least one digit");
         }
         return errors;
     }

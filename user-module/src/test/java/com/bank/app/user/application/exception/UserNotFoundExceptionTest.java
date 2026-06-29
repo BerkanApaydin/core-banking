@@ -9,8 +9,8 @@ class UserNotFoundExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        UserNotFoundException ex = new UserNotFoundException("Kullanıcı bulunamadı: testuser");
-        assertEquals("Kullanıcı bulunamadı: testuser", ex.getMessage());
+        UserNotFoundException ex = new UserNotFoundException("User not found: testuser");
+        assertEquals("User not found: testuser", ex.getMessage());
     }
 
     @Test
