@@ -15,10 +15,6 @@
     <description>Shared domain primitives, base interfaces, and port contracts</description>
 
     <dependencies>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-        </dependency>
         <!-- Test dependencies needed by shared test base classes -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

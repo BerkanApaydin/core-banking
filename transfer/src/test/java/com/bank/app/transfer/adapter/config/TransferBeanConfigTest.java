@@ -22,7 +22,7 @@ class TransferBeanConfigTest {
     @Mock private UserContextService userContextService;
     @Mock private LoadTransferPort loadTransferPort;
 
-    private final TransferProperties transferProperties = new TransferProperties(24);
+    private final TransferProperties transferProperties = new TransferProperties(24, 3, 500L, 2000L);
 
     @Test
     void shouldCreateTransferDomainServiceBean() {

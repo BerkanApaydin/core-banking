@@ -1,6 +1,6 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
@@ -13,7 +13,8 @@ import com.bank.app.user.domain.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
-@UseCase
+
+@TransactionalUseCase
 public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(RegisterUserUseCaseImpl.class);

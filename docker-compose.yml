@@ -22,35 +22,13 @@ services:
     image: redis:7-alpine
     container_name: bank-redis
     ports:
-      - "6379:6379"
+      - "6389:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
-
-  app:
-    build: .
-    container_name: bank-app
-    ports:
-      - "8080:8080"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      SPRING_PROFILES_ACTIVE: prod
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      RATE_LIMIT_BACKEND: redis
-      FAILED_LOGIN_BACKEND: redis
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      JWT_ALLOW_DEFAULT_SECRET: "false"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
 
 volumes:
   postgres_data:

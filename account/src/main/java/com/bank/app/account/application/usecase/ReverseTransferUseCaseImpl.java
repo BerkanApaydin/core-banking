@@ -6,7 +6,7 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Objects;
 
-@UseCase
+@TransactionalUseCase
 public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(ReverseTransferUseCaseImpl.class);

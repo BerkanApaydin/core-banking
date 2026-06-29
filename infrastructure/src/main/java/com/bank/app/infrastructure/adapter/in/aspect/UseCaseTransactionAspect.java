@@ -32,15 +32,7 @@ public class UseCaseTransactionAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
-        TransactionStatus status = transactionManager.getTransaction(def);
-        try {
-            Object result = joinPoint.proceed();
-            transactionManager.commit(status);
-            return result;
-        } catch (Throwable ex) {
-            transactionManager.rollback(status);
-            throw ex;
-        }
+        return executeWithTransaction(joinPoint, def);
     }
 
     @Around("readOnlyUseCaseMethod() && !auditUseCaseMethod()")
@@ -48,15 +40,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setReadOnly(true);
-        TransactionStatus status = transactionManager.getTransaction(def);
-        try {
-            Object result = joinPoint.proceed();
-            transactionManager.commit(status);
-            return result;
-        } catch (Throwable ex) {
-            transactionManager.rollback(status);
-            throw ex;
-        }
+        return executeWithTransaction(joinPoint, def);
     }
 
     @Around("auditUseCaseMethod()")
@@ -64,6 +48,10 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return executeWithTransaction(joinPoint, def);
+    }
+
+    private Object executeWithTransaction(ProceedingJoinPoint joinPoint, DefaultTransactionDefinition def) throws Throwable {
         TransactionStatus status = transactionManager.getTransaction(def);
         try {
             Object result = joinPoint.proceed();

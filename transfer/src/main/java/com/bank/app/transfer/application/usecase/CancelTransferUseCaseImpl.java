@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.event.DomainEvent;
@@ -18,7 +18,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 
-@UseCase
+@TransactionalUseCase
 public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CancelTransferUseCaseImpl.class);

@@ -13,9 +13,15 @@ import java.util.Optional;
 @Component
 public class TransferUseCaseRetryAspect {
 
-    private static final int MAX_ATTEMPTS = 3;
-    private static final long INITIAL_DELAY_MS = 500;
-    private static final long MAX_DELAY_MS = 2000;
+    private final TransferProperties transferProperties;
+
+    public TransferUseCaseRetryAspect() {
+        this.transferProperties = new TransferProperties(24, 3, 500, 2000);
+    }
+
+    public TransferUseCaseRetryAspect(TransferProperties transferProperties) {
+        this.transferProperties = transferProperties;
+    }
 
     @Pointcut("execution(* com.bank.app.transfer.application.usecase.PlaceTransferUseCaseImpl.execute(..))")
     void placeTransferMethod() {
@@ -27,17 +33,17 @@ public class TransferUseCaseRetryAspect {
 
     @Around("placeTransferMethod() || cancelTransferMethod()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
-        long delay = INITIAL_DELAY_MS;
+        long delay = transferProperties.initialDelayMs();
         Throwable lastException = null;
 
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        for (int attempt = 1; attempt <= transferProperties.maxAttempts(); attempt++) {
             try {
                 return joinPoint.proceed();
             } catch (OptimisticLockingFailureException e) {
                 lastException = e;
-                if (attempt < MAX_ATTEMPTS) {
+                if (attempt < transferProperties.maxAttempts()) {
                     Thread.sleep(delay);
-                    delay = Math.min(delay * 2, MAX_DELAY_MS);
+                    delay = Math.min(delay * 2, transferProperties.maxDelayMs());
                 }
             }
         }

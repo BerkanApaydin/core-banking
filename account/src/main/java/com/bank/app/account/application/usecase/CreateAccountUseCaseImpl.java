@@ -11,7 +11,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-@UseCase
+@TransactionalUseCase
 public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CreateAccountUseCaseImpl.class);
