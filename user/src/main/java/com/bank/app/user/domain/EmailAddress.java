@@ -9,7 +9,7 @@ public record EmailAddress(String value) {
     public EmailAddress {
         Objects.requireNonNull(value, "Email must not be null");
         if (!EMAIL_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Geçersiz email formatı: " + value);
+            throw new IllegalArgumentException("Invalid email format: " + value);
         }
     }
 

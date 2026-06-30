@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.DomainEventPublisher;
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
-@UseCase
+@TransactionalUseCase
 public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PlaceTransferUseCaseImpl.class);

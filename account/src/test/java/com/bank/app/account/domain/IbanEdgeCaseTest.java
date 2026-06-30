@@ -42,14 +42,14 @@ class IbanEdgeCaseTest {
     void shouldThrowWhenIbanDoesNotStartWithTR() {
         InvalidIbanException ex = assertThrows(InvalidIbanException.class,
                 () -> new Iban("US290006200000000000000111"));
-        assertTrue(ex.getMessage().contains("Geçersiz IBAN formatı"));
+        assertTrue(ex.getMessage().contains("Invalid IBAN format"));
     }
 
     @Test
     void shouldThrowWhenIbanIsWhitespace() {
         InvalidIbanException ex = assertThrows(InvalidIbanException.class,
                 () -> new Iban("   "));
-        assertTrue(ex.getMessage().contains("Geçersiz IBAN formatı"));
+        assertTrue(ex.getMessage().contains("Invalid IBAN format"));
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
+import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -266,6 +267,81 @@ class PlaceTransferUseCaseImplTest {
                     .isExactlyInstanceOf(RuntimeException.class);
 
             verify(eventPublisherPort, never()).publish(any());
+        }
+
+        @Test
+        @DisplayName("should throw when receiver account lookup fails")
+        void shouldThrowOnReceiverNotFound() {
+            when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(senderInfo());
+            when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN))
+                    .thenThrow(new RuntimeException("Receiver not found"));
+
+            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
+                    .isExactlyInstanceOf(RuntimeException.class)
+                    .hasMessage("Receiver not found");
+
+            verify(accountAclPort).getAccountInfoForTransfer(SENDER_IBAN);
+            verify(accountAclPort).getAccountInfoForTransfer(RECEIVER_IBAN);
+            verify(saveTransferPort, never()).save(any());
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
+            verify(eventPublisherPort, never()).publish(any());
+        }
+
+        @Test
+        @DisplayName("should throw when first save fails before debit")
+        void shouldThrowWhenInitialSaveFails() {
+            stubAccountLookup();
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            when(saveTransferPort.save(any(Transfer.class)))
+                    .thenThrow(new RuntimeException("Database unavailable"));
+
+            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
+                    .isExactlyInstanceOf(RuntimeException.class)
+                    .hasMessage("Database unavailable");
+
+            verify(saveTransferPort, times(1)).save(any(Transfer.class));
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
+            verify(eventPublisherPort, never()).publish(any());
+        }
+
+        @Test
+        @DisplayName("should throw TransferNotPendingException when event publishing fails after complete")
+        void shouldThrowWhenEventPublishFails() {
+            stubAccountLookup();
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            when(saveTransferPort.save(any(Transfer.class)))
+                    .thenAnswer(invocation -> {
+                        Transfer t = invocation.getArgument(0);
+                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                                t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
+                    });
+            doThrow(new RuntimeException("Event bus unavailable"))
+                    .when(eventPublisherPort).publish(any());
+
+            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
+                    .isExactlyInstanceOf(TransferNotPendingException.class);
+
+            verify(accountAclPort).debitAndCredit(eq(SENDER_ACCOUNT_ID), eq(RECEIVER_ACCOUNT_ID),
+                    any(Money.class));
+            verify(saveTransferPort, times(2)).save(transferCaptor.capture());
+            Transfer completedTransfer = transferCaptor.getAllValues().get(1);
+            assertThat(completedTransfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
+        }
+
+        @Test
+        @DisplayName("should throw when receiver currency does not match sender")
+        void shouldThrowOnReceiverCurrencyMismatch() {
+            AccountInfo trySender = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "TRY", "ACTIVE");
+            AccountInfo usdReceiver = new AccountInfo(RECEIVER_ACCOUNT_ID, RECEIVER_USER_ID, "USD", "ACTIVE");
+            when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(trySender);
+            when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN)).thenReturn(usdReceiver);
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+
+            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
+                    .isInstanceOf(CurrencyMismatchException.class);
+
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
+            verify(saveTransferPort, never()).save(any());
         }
     }
 }

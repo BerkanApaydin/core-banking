@@ -64,7 +64,7 @@ class EmailAddressTest {
         void shouldRejectInvalidEmails(String email) {
             assertThatThrownBy(() -> new EmailAddress(email))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Geçersiz email formatı");
+                    .hasMessageContaining("Invalid email format");
         }
     }
 

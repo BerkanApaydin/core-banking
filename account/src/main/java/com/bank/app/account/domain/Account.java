@@ -3,19 +3,15 @@ package com.bank.app.account.domain;
 import com.bank.app.account.domain.exception.AccountClosedException;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
+import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.common.domain.event.DomainEventProvider;
 import com.bank.app.common.domain.UserId;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 
-public class Account implements DomainEventProvider {
+public class Account extends BaseAggregateRoot {
     private final Long id;
     private final UserId userId;
     private final Iban iban;
@@ -24,7 +20,6 @@ public class Account implements DomainEventProvider {
     private AccountStatus status;
     private final Long version;
     private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
-    private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     public Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status) {
         this(id, userId, iban, ownerName, balance, status, null);
@@ -39,7 +34,7 @@ public class Account implements DomainEventProvider {
             throw new IllegalArgumentException("Owner name must not be empty");
         }
         if (ownerName.trim().length() > 255) {
-            throw new IllegalArgumentException("Sahip adı en fazla 255 karakter olabilir");
+            throw new IllegalArgumentException("Owner name can be at most 255 characters");
         }
         this.balance = Objects.requireNonNull(balance, "Balance must not be null");
         this.status = Objects.requireNonNull(status, "Account status must not be null");
@@ -116,12 +111,12 @@ public class Account implements DomainEventProvider {
             throw new InsufficientBalanceException(
                 "error.insufficient_balance",
                 new Object[]{this.balance.amount(), this.balance.currency().name(), amount.amount(), amount.currency().name()},
-                "Bakiye yetersiz. Mevcut: " + this.balance.amount() + " " + this.balance.currency() +
-                ", İstenen: " + amount.amount() + " " + amount.currency()
+                "Insufficient balance. Current: " + this.balance.amount() + " " + this.balance.currency() +
+                ", Requested: " + amount.amount() + " " + amount.currency()
             );
         }
         this.balance = this.balance.subtract(amount);
-        this.domainEvents.add(new AccountDebitedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
+        registerEvent(new AccountDebitedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
     }
 
     public void credit(Money amount) {
@@ -137,7 +132,7 @@ public class Account implements DomainEventProvider {
             throw new AccountNotActiveException(this.iban.value());
         }
         this.balance = this.balance.add(amount);
-        this.domainEvents.add(new AccountCreditedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
+        registerEvent(new AccountCreditedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
     }
 
     public void suspend() {
@@ -152,7 +147,7 @@ public class Account implements DomainEventProvider {
             return;
         }
         this.status = AccountStatus.SUSPENDED;
-        this.domainEvents.add(new AccountSuspendedEvent(this.id, LocalDateTime.now(clock)));
+        registerEvent(new AccountSuspendedEvent(this.id, LocalDateTime.now(clock)));
     }
 
     public void close() {
@@ -171,21 +166,11 @@ public class Account implements DomainEventProvider {
             );
         }
         this.status = AccountStatus.CLOSED;
-        this.domainEvents.add(new AccountClosedEvent(this.id, this.balance, LocalDateTime.now(clock)));
+        registerEvent(new AccountClosedEvent(this.id, this.balance, LocalDateTime.now(clock)));
     }
 
     public Long getVersion() {
         return version;
-    }
-
-    @Override
-    public List<DomainEvent> getDomainEvents() {
-        return Collections.unmodifiableList(domainEvents);
-    }
-
-    @Override
-    public void clearDomainEvents() {
-        domainEvents.clear();
     }
 
     @Override

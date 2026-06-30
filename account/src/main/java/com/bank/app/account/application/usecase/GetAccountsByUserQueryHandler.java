@@ -5,7 +5,8 @@ import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.ReadOnlyUseCase;
-import java.util.List;
+import com.bank.app.common.application.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
 
 @ReadOnlyUseCase
 public class GetAccountsByUserQueryHandler implements GetAccountsByUserQuery {
@@ -19,10 +20,12 @@ public class GetAccountsByUserQueryHandler implements GetAccountsByUserQuery {
     }
 
     @Override
-    public List<AccountResponse> execute(int page, int size) {
+    public PageResponse<AccountResponse> execute(int page, int size) {
         Long currentUserId = accountAuthorizationService.getCurrentUserId();
-        return loadAccountPort.findByUserId(currentUserId).stream()
+        var accountPage = loadAccountPort.findByUserId(currentUserId, PageRequest.of(page, size));
+        var responses = accountPage.getContent().stream()
                 .map(AccountResponse::from)
                 .toList();
+        return PageResponse.of(responses, accountPage.getNumber(), accountPage.getSize(), accountPage.getTotalElements());
     }
 }

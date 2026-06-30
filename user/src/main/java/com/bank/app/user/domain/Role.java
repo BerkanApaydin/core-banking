@@ -11,7 +11,7 @@ public enum Role {
         try {
             return Role.valueOf(value);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Geçersiz rol: " + value);
+            throw new IllegalArgumentException("Invalid role: " + value);
         }
     }
 }

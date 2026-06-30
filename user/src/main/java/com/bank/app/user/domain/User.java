@@ -45,7 +45,7 @@ public class User {
             throw new IllegalArgumentException("Username must not be empty");
         }
         if (username.trim().length() > 255) {
-            throw new IllegalArgumentException("Kullanıcı adı en fazla 255 karakter olabilir");
+            throw new IllegalArgumentException("Username can be at most 255 characters");
         }
         return username.trim();
     }

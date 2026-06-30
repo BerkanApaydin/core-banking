@@ -95,7 +95,7 @@ class AccountTest {
             assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, longName, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Sahip adı en fazla 255 karakter olabilir");
+                    .hasMessage("Owner name can be at most 255 characters");
         }
 
         @Test
@@ -159,7 +159,7 @@ class AccountTest {
             Account account = activeAccount(100);
             assertThatThrownBy(() -> account.debit(Money.of("101.00", Currency.TRY)))
                     .isExactlyInstanceOf(InsufficientBalanceException.class)
-                    .hasMessage("Bakiye yetersiz. Mevcut: 100.00 TRY, İstenen: 101.00 TRY");
+                    .hasMessage("Insufficient balance. Current: 100.00 TRY, Requested: 101.00 TRY");
         }
 
         @Test

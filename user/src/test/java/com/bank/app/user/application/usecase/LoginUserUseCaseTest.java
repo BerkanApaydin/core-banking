@@ -126,8 +126,8 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class)
-                    .hasMessageContaining("Çok fazla başarısız giriş denemesi")
-                    .hasMessageContaining("15 dakika");
+                    .hasMessageContaining("Too many failed login attempts from this IP")
+                    .hasMessageContaining("15 minutes");
 
             verifyNoInteractions(authenticationPort);
         }
@@ -143,7 +143,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class)
-                    .hasMessageContaining("Çok fazla başarısız giriş denemesi");
+                    .hasMessageContaining("Too many failed login attempts for this username");
 
             verifyNoInteractions(authenticationPort);
         }
@@ -223,7 +223,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
                     .isExactlyInstanceOf(AuthenticationFailedException.class)
-                    .hasMessageContaining("Geçersiz kullanıcı adı veya şifre");
+                    .hasMessageContaining("Invalid username or password.");
 
             verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
         }
@@ -238,7 +238,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
                     .isExactlyInstanceOf(AuthenticationFailedException.class)
-                    .hasMessageContaining("Geçersiz kullanıcı adı veya şifre");
+                    .hasMessageContaining("Invalid username or password.");
 
             verify(loginAttemptPort, never()).recordFailure(any(), any());
         }

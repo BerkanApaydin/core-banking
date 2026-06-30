@@ -9,7 +9,7 @@ public record PhoneNumber(String value) {
     public PhoneNumber {
         Objects.requireNonNull(value, "Phone number must not be null");
         if (!PHONE_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Geçersiz telefon numarası formatı: " + value);
+            throw new IllegalArgumentException("Invalid phone number format: " + value);
         }
     }
 

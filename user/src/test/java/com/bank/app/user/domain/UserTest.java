@@ -105,7 +105,7 @@ class UserTest {
             String longUsername = "a".repeat(256);
             assertThatThrownBy(() -> new User(new UserId(1L), longUsername, "password", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Kullanıcı adı en fazla 255 karakter olabilir");
+                    .hasMessage("Username can be at most 255 characters");
         }
 
         @Test

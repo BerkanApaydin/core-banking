@@ -62,7 +62,7 @@ class PhoneNumberTest {
         void shouldRejectInvalidPhones(String phone) {
             assertThatThrownBy(() -> new PhoneNumber(phone))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Geçersiz telefon numarası formatı");
+                    .hasMessageContaining("Invalid phone number format");
         }
     }
 

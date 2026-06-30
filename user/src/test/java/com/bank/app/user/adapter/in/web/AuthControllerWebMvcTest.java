@@ -196,7 +196,7 @@ class AuthControllerWebMvcTest {
             AuthRequest request = new AuthRequest("nobody", "wrong");
 
             when(loginUserPort.execute(any(AuthRequest.class), anyString()))
-                    .thenThrow(new BadCredentialsException("Geçersiz kullanıcı adı veya şifre"));
+                    .thenThrow(new BadCredentialsException("Invalid username or password"));
 
             mockMvc.perform(post("/api/v1/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)

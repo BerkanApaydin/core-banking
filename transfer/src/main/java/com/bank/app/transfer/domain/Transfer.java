@@ -1,19 +1,15 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.common.domain.event.DomainEventProvider;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 
-public class Transfer implements DomainEventProvider {
+public class Transfer extends BaseAggregateRoot {
 
     private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
     static final int DEFAULT_CANCELLATION_WINDOW_HOURS = 24;
@@ -24,7 +20,6 @@ public class Transfer implements DomainEventProvider {
     private TransferStatus status;
     private final LocalDateTime createdAt;
     private final Long version;
-    private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
         this(id, senderAccountId, receiverAccountId, amount, status, createdAt, null);
@@ -61,7 +56,7 @@ public class Transfer implements DomainEventProvider {
             throw new TransferNotPendingException(this.status);
         }
         this.status = TransferStatus.COMPLETED;
-        this.domainEvents.add(new TransferCompletedEvent(
+        registerEvent(new TransferCompletedEvent(
                 this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
     }
 
@@ -91,16 +86,6 @@ public class Transfer implements DomainEventProvider {
 
     public Long getVersion() {
         return version;
-    }
-
-    @Override
-    public List<DomainEvent> getDomainEvents() {
-        return Collections.unmodifiableList(domainEvents);
-    }
-
-    @Override
-    public void clearDomainEvents() {
-        domainEvents.clear();
     }
 
     @Override
@@ -156,7 +141,7 @@ public class Transfer implements DomainEventProvider {
             );
         }
         this.status = TransferStatus.CANCELLED;
-        this.domainEvents.add(new TransferCancelledEvent(
+        registerEvent(new TransferCancelledEvent(
                 this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, now));
     }
 }

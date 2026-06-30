@@ -156,8 +156,10 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                         mockMvc.perform(get("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$[0].iban", is("TR290006200000000000000888")))
-                                        .andExpect(jsonPath("$[0].ownerName", is("Fatma Demir")));
+                                        .andExpect(jsonPath("$.content[0].iban", is("TR290006200000000000000888")))
+                                        .andExpect(jsonPath("$.content[0].ownerName", is("Fatma Demir")))
+                                        .andExpect(jsonPath("$.page", is(0)))
+                                        .andExpect(jsonPath("$.totalElements", is(1)));
                 }
         }
 

@@ -1,6 +1,6 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.UseCase;
+import com.bank.app.common.application.ReadOnlyUseCase;
 import com.bank.app.common.application.port.out.security.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -14,7 +14,7 @@ import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-@UseCase
+@ReadOnlyUseCase
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(LoginUserUseCaseImpl.class);
@@ -43,14 +43,14 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
         if (clientIp != null && loginAttemptPort.isIpBlocked(clientIp)) {
             throw new TooManyFailedLoginAttemptsException(
-                    "Çok fazla başarısız giriş denemesi. Lütfen "
-                    + loginAttemptPort.getWindowMinutes() + " dakika sonra tekrar deneyin.");
+                    "Too many failed login attempts from this IP. Please try again in "
+                    + loginAttemptPort.getWindowMinutes() + " minutes.");
         }
 
         if (username != null && loginAttemptPort.isUsernameBlocked(username)) {
             throw new TooManyFailedLoginAttemptsException(
-                    "Bu kullanıcı adı için çok fazla başarısız giriş denemesi. Lütfen "
-                    + loginAttemptPort.getWindowMinutes() + " dakika sonra tekrar deneyin.");
+                    "Too many failed login attempts for this username. Please try again in "
+                    + loginAttemptPort.getWindowMinutes() + " minutes.");
         }
 
         try {
@@ -69,7 +69,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         } catch (Exception e) {
             log.warn("Unexpected error during login: username={}, clientIp={}", username, clientIp, e);
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
-            throw new AuthenticationFailedException("Geçersiz kullanıcı adı veya şifre.", e);
+            throw new AuthenticationFailedException("Invalid username or password.", e);
         }
     }
 }

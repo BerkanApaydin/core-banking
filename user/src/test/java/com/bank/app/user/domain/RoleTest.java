@@ -42,7 +42,7 @@ class RoleTest {
         void shouldThrowForInvalidRole() {
             assertThatThrownBy(() -> Role.fromString("INVALID_ROLE"))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Geçersiz rol");
+                    .hasMessageContaining("Invalid role");
         }
 
         @Test

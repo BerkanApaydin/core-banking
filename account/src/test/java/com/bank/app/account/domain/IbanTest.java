@@ -24,12 +24,12 @@ class IbanTest {
     @Test
     void shouldThrowInvalidIbanExceptionWhenFormatIsInvalid() {
         InvalidIbanException ex1 = assertThrows(InvalidIbanException.class, () -> new Iban("TR29000"));
-        assertEquals("Geçersiz IBAN formatı: TR29000", ex1.getMessage());
+        assertEquals("Invalid IBAN format: TR29000", ex1.getMessage());
         InvalidIbanException ex2 = assertThrows(InvalidIbanException.class,
                 () -> new Iban("US290006200000000000000111"));
-        assertEquals("Geçersiz IBAN formatı: US290006200000000000000111", ex2.getMessage());
+        assertEquals("Invalid IBAN format: US290006200000000000000111", ex2.getMessage());
         InvalidIbanException ex3 = assertThrows(InvalidIbanException.class,
                 () -> new Iban("TR29000620000000000000011A"));
-        assertEquals("Geçersiz IBAN formatı: TR29000620000000000000011A", ex3.getMessage());
+        assertEquals("Invalid IBAN format: TR29000620000000000000011A", ex3.getMessage());
     }
 }

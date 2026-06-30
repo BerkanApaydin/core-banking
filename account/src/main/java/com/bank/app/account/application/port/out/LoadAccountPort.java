@@ -2,6 +2,8 @@ package com.bank.app.account.application.port.out;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +21,7 @@ public interface LoadAccountPort {
 
     List<Account> findAll();
 
-    List<Account> findByUserId(Long userId);
+    Page<Account> findByUserId(Long userId, Pageable pageable);
 
     List<Account> findByIds(Collection<Long> ids);
 }

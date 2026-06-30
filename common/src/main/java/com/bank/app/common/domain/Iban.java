@@ -15,7 +15,7 @@ public record Iban(String value) {
         Objects.requireNonNull(value, "IBAN must not be null");
         value = normalize(value);
         if (!ibanPattern.matcher(value).matches()) {
-            throw new InvalidIbanException("Geçersiz IBAN formatı: " + value);
+            throw new InvalidIbanException("Invalid IBAN format: " + value);
         }
     }
 

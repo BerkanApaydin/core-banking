@@ -1,8 +1,8 @@
 package com.bank.app.account.application.port.in;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import java.util.List;
+import com.bank.app.common.application.dto.PageResponse;
 
 public interface GetAccountsByUserQuery {
-    List<AccountResponse> execute(int page, int size);
+    PageResponse<AccountResponse> execute(int page, int size);
 }

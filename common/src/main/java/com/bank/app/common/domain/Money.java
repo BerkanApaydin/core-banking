@@ -17,7 +17,7 @@ public record Money(
             throw new IllegalArgumentException("Amount must not be negative");
         }
         if (amount.scale() > MAX_SCALE) {
-            throw new IllegalArgumentException("Para en fazla " + MAX_SCALE + " ondalık basamak olabilir");
+            throw new IllegalArgumentException("Amount can have at most " + MAX_SCALE + " decimal places");
         }
     }
 

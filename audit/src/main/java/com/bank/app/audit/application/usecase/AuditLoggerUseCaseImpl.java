@@ -4,12 +4,11 @@ import com.bank.app.audit.application.port.in.AuditLoggerUseCase;
 import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
-import com.bank.app.common.application.UseCase;
+
 import com.bank.app.common.application.service.UserContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@UseCase
 public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(AuditLoggerUseCaseImpl.class);

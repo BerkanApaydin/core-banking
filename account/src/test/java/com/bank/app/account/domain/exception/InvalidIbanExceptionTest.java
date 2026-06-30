@@ -11,8 +11,8 @@ class InvalidIbanExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        InvalidIbanException ex = new InvalidIbanException("Geçersiz IBAN: XYZ");
-        assertEquals("Geçersiz IBAN: XYZ", ex.getMessage());
+        InvalidIbanException ex = new InvalidIbanException("Invalid IBAN: XYZ");
+        assertEquals("Invalid IBAN: XYZ", ex.getMessage());
         assertNull(ex.getMessageKey());
         assertNull(ex.getArgs());
     }

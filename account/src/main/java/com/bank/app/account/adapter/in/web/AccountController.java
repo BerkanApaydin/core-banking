@@ -7,6 +7,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersion;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,12 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 
-import java.util.List;
-
 @RestController
 @ApiVersion("v1")
 @RequestMapping("/accounts")
-@Tag(name = "Account API", description = "Hesap yönetimi işlemlerini yöneten API")
+@Tag(name = "Account API", description = "API for managing bank accounts")
 public class AccountController {
 
     private final CreateAccountUseCase createAccountUseCase;
@@ -54,21 +53,21 @@ public class AccountController {
     }
 
     @GetMapping
-    @Operation(summary = "Lists all accounts")
-    public ResponseEntity<List<AccountResponse>> listAccounts(
+    @Operation(summary = "Lists all accounts with pagination")
+    public ResponseEntity<PageResponse<AccountResponse>> listAccounts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(getAccountsByUserQuery.execute(page, size));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Hesap ID'sine göre hesabı sorgular")
+    @Operation(summary = "Queries account by ID")
     public ResponseEntity<AccountResponse> getAccountById(@PathVariable Long id) {
         return ResponseEntity.ok(getAccountByIdQuery.execute(id));
     }
 
     @GetMapping("/iban/{iban}")
-    @Operation(summary = "IBAN numarasına göre hesabı sorgular")
+    @Operation(summary = "Queries account by IBAN")
     public ResponseEntity<AccountResponse> getAccountByIban(@PathVariable String iban) {
         return ResponseEntity.ok(getAccountByIbanQuery.execute(iban));
     }

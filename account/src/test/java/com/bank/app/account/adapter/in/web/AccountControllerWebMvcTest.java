@@ -7,6 +7,7 @@ import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -127,17 +129,24 @@ class AccountControllerWebMvcTest {
         class ListAccounts {
 
                 @Test
-                @DisplayName("should return 200 with account list")
+                @DisplayName("should return 200 with paginated account list")
                 void shouldReturn200() throws Exception {
                         AccountResponse a1 = new AccountResponse(1L, 100L, "TR290006200000000000000111",
                                         "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
-                        when(getAccountsByUserQuery.execute(0, 20)).thenReturn(List.of(a1));
+                        PageResponse<AccountResponse> page = PageResponse.of(List.of(a1), 0, 20, 1);
+                        when(getAccountsByUserQuery.execute(anyInt(), anyInt())).thenReturn(page);
 
                         mockMvc.perform(get("/api/v1/accounts"))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$[0].id").value(1L))
-                                        .andExpect(jsonPath("$[0].iban").value("TR290006200000000000000111"))
-                                        .andExpect(jsonPath("$[0].ownerName").value("Ali"));
+                                        .andExpect(jsonPath("$.content[0].id").value(1L))
+                                        .andExpect(jsonPath("$.content[0].iban").value("TR290006200000000000000111"))
+                                        .andExpect(jsonPath("$.content[0].ownerName").value("Ali"))
+                                        .andExpect(jsonPath("$.page").value(0))
+                                        .andExpect(jsonPath("$.size").value(20))
+                                        .andExpect(jsonPath("$.totalElements").value(1))
+                                        .andExpect(jsonPath("$.totalPages").value(1))
+                                        .andExpect(jsonPath("$.first").value(true))
+                                        .andExpect(jsonPath("$.last").value(true));
                 }
         }
 
