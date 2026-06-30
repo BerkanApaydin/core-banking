@@ -14,5 +14,12 @@ public interface OutboxPort {
 
     record EventEntry(String id, String aggregateType, String aggregateId, String eventType,
                       String payload, int retryCount, boolean processed, boolean deadLetter,
-                      String lastError, int partition, LocalDateTime createdAt) {}
+                      String lastError, int partition, LocalDateTime createdAt, LocalDateTime processedAt) {
+        public EventEntry(String id, String aggregateType, String aggregateId, String eventType,
+                          String payload, int retryCount, boolean processed, boolean deadLetter,
+                          String lastError, int partition, LocalDateTime createdAt) {
+            this(id, aggregateType, aggregateId, eventType, payload, retryCount, processed, deadLetter,
+                 lastError, partition, createdAt, null);
+        }
+    }
 }

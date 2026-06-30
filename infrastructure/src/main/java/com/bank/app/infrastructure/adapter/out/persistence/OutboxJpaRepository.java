@@ -26,7 +26,7 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
     Optional<OutboxJpaEntity> findByIdForUpdate(@Param("id") String id);
 
     @Modifying
-    @Query("UPDATE OutboxJpaEntity e SET e.processed = true WHERE e.id = :id")
+    @Query("UPDATE OutboxJpaEntity e SET e.processed = true, e.processedAt = CURRENT_TIMESTAMP WHERE e.id = :id")
     void markProcessed(@Param("id") String id);
 
     @Modifying

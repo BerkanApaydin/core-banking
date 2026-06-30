@@ -66,7 +66,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
                 entity.getId(), entity.getAggregateType(), entity.getAggregateId(),
                 entity.getEventType(), entity.getPayload(), entity.getRetryCount(),
                 entity.isProcessed(), entity.isDeadLetter(), entity.getLastError(),
-                entity.getPartition(), entity.getCreatedAt()
+                entity.getPartition(), entity.getCreatedAt(), entity.getProcessedAt()
         );
     }
 }

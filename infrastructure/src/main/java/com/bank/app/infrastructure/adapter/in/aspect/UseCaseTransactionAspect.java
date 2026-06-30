@@ -53,12 +53,17 @@ public class UseCaseTransactionAspect {
 
     private Object executeWithTransaction(ProceedingJoinPoint joinPoint, DefaultTransactionDefinition def) throws Throwable {
         TransactionStatus status = transactionManager.getTransaction(def);
+        boolean isNew = status.isNewTransaction();
         try {
             Object result = joinPoint.proceed();
-            transactionManager.commit(status);
+            if (isNew) {
+                transactionManager.commit(status);
+            }
             return result;
         } catch (Throwable ex) {
-            transactionManager.rollback(status);
+            if (isNew) {
+                transactionManager.rollback(status);
+            }
             throw ex;
         }
     }

@@ -36,7 +36,7 @@ class UseCaseTransactionAspectTest {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         when(joinPoint.getSignature()).thenReturn(signature);
         when(signature.toShortString()).thenReturn("testSignature");
-
+        when(transactionStatus.isNewTransaction()).thenReturn(true);
     }
 
     @Test

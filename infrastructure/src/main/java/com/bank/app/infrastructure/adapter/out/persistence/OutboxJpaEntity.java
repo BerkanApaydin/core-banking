@@ -32,6 +32,9 @@ public class OutboxJpaEntity {
     @Column(nullable = false)
     private boolean processed;
 
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
 
@@ -50,6 +53,12 @@ public class OutboxJpaEntity {
     public OutboxJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
                            String payload, LocalDateTime createdAt, boolean processed,
                            int retryCount, boolean deadLetter, String lastError, int partition) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, processed, null, retryCount, deadLetter, lastError, partition);
+    }
+
+    public OutboxJpaEntity(String id, String aggregateType, String aggregateId, String eventType,
+                           String payload, LocalDateTime createdAt, boolean processed, LocalDateTime processedAt,
+                           int retryCount, boolean deadLetter, String lastError, int partition) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -57,6 +66,7 @@ public class OutboxJpaEntity {
         this.payload = payload;
         this.createdAt = createdAt;
         this.processed = processed;
+        this.processedAt = processedAt;
         this.retryCount = retryCount;
         this.deadLetter = deadLetter;
         this.lastError = lastError;
@@ -117,6 +127,14 @@ public class OutboxJpaEntity {
 
     public void setProcessed(boolean processed) {
         this.processed = processed;
+    }
+
+    public LocalDateTime getProcessedAt() {
+        return processedAt;
+    }
+
+    public void setProcessedAt(LocalDateTime processedAt) {
+        this.processedAt = processedAt;
     }
 
     public int getRetryCount() {
