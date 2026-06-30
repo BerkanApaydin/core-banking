@@ -81,9 +81,9 @@ public class DataSeeder {
             BigDecimal balance, Currency currency) {
         try {
             createAccountPort.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
-            log.info("Account created: {}", iban);
+            log.info("Account created");
         } catch (DuplicateIbanException ex) {
-            log.debug("Account already exists, skipping: {}", iban);
+            log.debug("Account already exists, skipping");
         }
     }
 

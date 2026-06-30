@@ -1,6 +1,8 @@
 package com.bank.app.transfer.adapter.in.config;
 
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -19,8 +21,10 @@ class TransferBeanConfigTest {
     @Mock private AccountAclPort accountAclPort;
     @Mock private SaveTransferPort saveTransferPort;
     @Mock private EventPublisherPort eventPublisherPort;
+    @Mock private AuditEventPort auditEventPort;
     @Mock private UserContextService userContextService;
     @Mock private LoadTransferPort loadTransferPort;
+    @Mock private DomainEventPublisherService domainEventPublisherService;
 
     private final TransferProperties transferProperties = new TransferProperties(24, 3, 500L, 2000L);
 
@@ -41,7 +45,7 @@ class TransferBeanConfigTest {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         assertNotNull(config.placeTransferUseCase(accountAclPort, saveTransferPort,
-                eventPublisherPort, config.transferDomainService(), authService));
+                config.transferDomainService(), authService, domainEventPublisherService));
     }
 
     @Test
@@ -49,7 +53,7 @@ class TransferBeanConfigTest {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         assertNotNull(config.cancelTransferUseCase(loadTransferPort, saveTransferPort,
-                accountAclPort, eventPublisherPort, authService));
+                accountAclPort, eventPublisherPort, auditEventPort, authService, domainEventPublisherService));
     }
 
     @Test

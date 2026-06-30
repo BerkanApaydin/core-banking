@@ -12,6 +12,7 @@ import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -30,12 +31,16 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
     private final EventPublisherPort eventPublisherPort;
+    private final AuditEventPort auditEventPort;
     private final AccountAuthorizationService accountAuthorizationService;
 
-    public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort, EventPublisherPort eventPublisherPort, AccountAuthorizationService accountAuthorizationService) {
+    public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
+                                    EventPublisherPort eventPublisherPort, AuditEventPort auditEventPort,
+                                    AccountAuthorizationService accountAuthorizationService) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.eventPublisherPort = eventPublisherPort;
+        this.auditEventPort = auditEventPort;
         this.accountAuthorizationService = accountAuthorizationService;
     }
 
@@ -62,15 +67,12 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
             savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban(),
             savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now()
         ));
-        eventPublisherPort.publish(new AuditEvent("ACCOUNT_CREATED",
-            String.format("New account created. ID: %d, IBAN: %s, User ID: %d, Balance: %s %s",
-                savedAccount.getId(), savedAccount.getIban().value(), savedAccount.getUserId().value(),
-                savedAccount.getBalance().amount(), savedAccount.getBalance().currency()),
+        auditEventPort.publish(new AuditEvent("ACCOUNT_CREATED",
+            String.format("New account created. ID: %d",
+                savedAccount.getId()),
             LocalDateTime.now()));
 
-        log.info("Account created: id={}, iban={}, owner={}, userId={}",
-            savedAccount.getId(), savedAccount.getIban().value(),
-            savedAccount.getOwnerName(), savedAccount.getUserId().value());
+        log.info("Account created: id={}", savedAccount.getId());
 
         return AccountResponse.from(savedAccount);
     }

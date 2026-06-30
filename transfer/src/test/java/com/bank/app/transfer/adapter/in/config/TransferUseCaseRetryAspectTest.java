@@ -19,7 +19,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("TransferUseCaseRetryAspect")
 class TransferUseCaseRetryAspectTest {
 
-    private final TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect();
+    private final TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
+            new TransferProperties(24, 3, 500, 2000));
 
     @Mock
     private ProceedingJoinPoint joinPoint;

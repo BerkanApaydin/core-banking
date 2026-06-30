@@ -19,9 +19,12 @@ public interface LoadAccountPort {
 
     Optional<Account> findByIdWithLock(Long id);
 
+    @Deprecated(since = "1.0", forRemoval = false)
     List<Account> findAll();
 
     Page<Account> findByUserId(Long userId, Pageable pageable);
+
+    Page<Account> findAll(Pageable pageable);
 
     List<Account> findByIds(Collection<Long> ids);
 }

@@ -15,10 +15,6 @@ public class TransferUseCaseRetryAspect {
 
     private final TransferProperties transferProperties;
 
-    public TransferUseCaseRetryAspect() {
-        this.transferProperties = new TransferProperties(24, 3, 500, 2000);
-    }
-
     public TransferUseCaseRetryAspect(TransferProperties transferProperties) {
         this.transferProperties = transferProperties;
     }

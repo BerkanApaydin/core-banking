@@ -1,8 +1,9 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.service.DomainEventPublisher;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -14,6 +15,7 @@ import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -25,20 +27,26 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     private final SaveTransferPort saveTransferPort;
     private final AccountAclPort accountAclPort;
     private final EventPublisherPort eventPublisherPort;
+    private final AuditEventPort auditEventPort;
     private final TransferAuthorizationService transferAuthorizationService;
+    private final DomainEventPublisherService domainEventPublisherService;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCaseImpl(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
                                  AccountAclPort accountAclPort,
                                  EventPublisherPort eventPublisherPort,
+                                 AuditEventPort auditEventPort,
                                  TransferAuthorizationService transferAuthorizationService,
+                                 DomainEventPublisherService domainEventPublisherService,
                                  int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountAclPort = accountAclPort;
         this.eventPublisherPort = eventPublisherPort;
+        this.auditEventPort = auditEventPort;
         this.transferAuthorizationService = transferAuthorizationService;
+        this.domainEventPublisherService = domainEventPublisherService;
         this.cancellationWindowHours = cancellationWindowHours;
     }
 
@@ -59,14 +67,12 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         saveTransferPort.save(transfer);
 
-        log.info("Transfer cancelled: id={}, amount={}",
-            transfer.getId(), transfer.getAmount());
+        log.info("Transfer cancelled: id={}", transfer.getId());
 
-        DomainEventPublisher.publishEvents(transfer, eventPublisherPort);
-        eventPublisherPort.publish(new AuditEvent("TRANSFER_CANCELLED",
-            String.format("Transfer cancelled. Transfer ID: %d, Amount: %s %s",
-                transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency()),
-            java.time.LocalDateTime.now()));
+        domainEventPublisherService.publishEvents(transfer);
+        auditEventPort.publish(new AuditEvent("TRANSFER_CANCELLED",
+            String.format("Transfer cancelled. Transfer ID: %d", transfer.getId()),
+            LocalDateTime.now()));
     }
 
 }

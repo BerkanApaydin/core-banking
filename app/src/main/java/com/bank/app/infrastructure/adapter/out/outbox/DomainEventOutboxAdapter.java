@@ -8,10 +8,10 @@ import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.infrastructure.adapter.out.event.SpringEventPublisherAdapter;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,32 +27,20 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
 
     private static final Logger log = LoggerFactory.getLogger(DomainEventOutboxAdapter.class);
 
-    private final SpringEventPublisherAdapter springAdapter;
     private final OutboxPort outboxPort;
     private final ObjectMapper objectMapper;
 
-    public DomainEventOutboxAdapter(SpringEventPublisherAdapter springAdapter,
-                                    OutboxPort outboxPort, ObjectMapper objectMapper) {
-        this.springAdapter = springAdapter;
+    public DomainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper) {
         this.outboxPort = outboxPort;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void publish(DomainEvent event) {
-        springAdapter.publish(event);
-        persistToOutbox(event);
-    }
-
-    private void persistToOutbox(DomainEvent event) {
-        try {
-            OutboxPort.EventEntry entry = toOutboxEntry(event);
-            outboxPort.save(entry);
-            log.debug("Stored outbox event: type={}, aggregateType={}, id={}",
-                    entry.eventType(), entry.aggregateType(), entry.id());
-        } catch (Exception e) {
-            log.error("Failed to store outbox event: {}", e.getMessage(), e);
-        }
+        OutboxPort.EventEntry entry = toOutboxEntry(event);
+        outboxPort.save(entry);
+        log.debug("Stored outbox event: type={}, aggregateType={}, id={}",
+                entry.eventType(), entry.aggregateType(), entry.id());
     }
 
     private OutboxPort.EventEntry toOutboxEntry(DomainEvent event) {
@@ -74,9 +62,9 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
     private String serialize(Object event) {
         try {
             return objectMapper.writeValueAsString(event);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.error("Failed to serialize domain event: {}", event.getClass().getSimpleName(), e);
-            return "{}";
+            throw new RuntimeException("Failed to serialize domain event: " + event.getClass().getSimpleName(), e);
         }
     }
 

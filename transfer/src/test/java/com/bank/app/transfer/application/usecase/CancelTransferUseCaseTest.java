@@ -1,6 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -41,7 +43,11 @@ class CancelTransferUseCaseTest {
     @Mock
     private EventPublisherPort eventPublisherPort;
     @Mock
+    private AuditEventPort auditEventPort;
+    @Mock
     private UserContextService userContextService;
+    @Mock
+    private DomainEventPublisherService domainEventPublisherService;
 
     private CancelTransferUseCase cancelTransferUseCase;
 
@@ -50,7 +56,7 @@ class CancelTransferUseCaseTest {
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
-                accountAclPort, eventPublisherPort, transferAuthorizationService, 72);
+                accountAclPort, eventPublisherPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, 72);
     }
 
     @Test
@@ -71,7 +77,8 @@ class CancelTransferUseCaseTest {
         verify(userContextService).checkUserAuthorization(eq(100L), anyString());
         verify(accountAclPort).reverseBalancesForCancellation(senderAccountId, receiverAccountId, amount);
         verify(saveTransferPort).save(transfer);
-        verify(eventPublisherPort, times(2)).publish(any());
+        verify(domainEventPublisherService).publishEvents(transfer);
+        verify(auditEventPort).publish(any());
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
     }
 

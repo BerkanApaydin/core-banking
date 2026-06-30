@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -16,7 +16,6 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
-import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +28,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,10 +47,10 @@ class PlaceTransferUseCaseImplTest {
     private SaveTransferPort saveTransferPort;
 
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private UserContextService userContextService;
 
     @Mock
-    private UserContextService userContextService;
+    private DomainEventPublisherService domainEventPublisherService;
 
     private TransferDomainService transferDomainService;
 
@@ -75,8 +73,8 @@ class PlaceTransferUseCaseImplTest {
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
-                accountAclPort, saveTransferPort, eventPublisherPort,
-                transferDomainService, transferAuthorizationService);
+                accountAclPort, saveTransferPort,
+                transferDomainService, transferAuthorizationService, domainEventPublisherService);
     }
 
     private AccountInfo senderInfo() {
@@ -130,7 +128,7 @@ class PlaceTransferUseCaseImplTest {
             verify(accountAclPort).debitAndCredit(SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
                     new Money(AMOUNT, Currency.TRY));
             verify(saveTransferPort, times(2)).save(any(Transfer.class));
-            verify(eventPublisherPort, atLeastOnce()).publish(any());
+            verify(domainEventPublisherService).publishEvents(any());
         }
 
         @Test
@@ -227,8 +225,8 @@ class PlaceTransferUseCaseImplTest {
     class FailureHandling {
 
         @Test
-        @DisplayName("should not mark transfer as FAILED when debitAndCredit throws (transaction rolls back)")
-        void shouldNotMarkFailedOnDebitException() {
+        @DisplayName("should compensate with reverseBalances when debitAndCredit fails after PENDING save")
+        void shouldCompensateOnDebitFailure() {
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -246,26 +244,8 @@ class PlaceTransferUseCaseImplTest {
 
             verify(saveTransferPort, times(1)).save(any());
             verify(accountAclPort).debitAndCredit(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("should not complete transfer when debitAndCredit fails")
-        void shouldNotCompleteOnFailure() {
-            stubAccountLookup();
-            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
-            when(saveTransferPort.save(any(Transfer.class)))
-                    .thenAnswer(invocation -> {
-                        Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
-                                t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
-                    });
-            doThrow(new RuntimeException("Service down"))
-                    .when(accountAclPort).debitAndCredit(any(), any(), any());
-
-            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
-                    .isExactlyInstanceOf(RuntimeException.class);
-
-            verify(eventPublisherPort, never()).publish(any());
+            verify(accountAclPort).reverseBalancesForCancellation(any(), any(), any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
         }
 
         @Test
@@ -283,7 +263,7 @@ class PlaceTransferUseCaseImplTest {
             verify(accountAclPort).getAccountInfoForTransfer(RECEIVER_IBAN);
             verify(saveTransferPort, never()).save(any());
             verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
-            verify(eventPublisherPort, never()).publish(any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
         }
 
         @Test
@@ -300,12 +280,12 @@ class PlaceTransferUseCaseImplTest {
 
             verify(saveTransferPort, times(1)).save(any(Transfer.class));
             verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
-            verify(eventPublisherPort, never()).publish(any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
         }
 
         @Test
-        @DisplayName("should throw original RuntimeException when event publishing fails after complete")
-        void shouldThrowWhenEventPublishFails() {
+        @DisplayName("should compensate with reverseBalances when event publishing fails after complete")
+        void shouldCompensateWhenEventPublishFails() {
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -315,7 +295,7 @@ class PlaceTransferUseCaseImplTest {
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
             doThrow(new RuntimeException("Event bus unavailable"))
-                    .when(eventPublisherPort).publish(any());
+                    .when(domainEventPublisherService).publishEvents(any());
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
                     .isExactlyInstanceOf(RuntimeException.class)
@@ -323,7 +303,10 @@ class PlaceTransferUseCaseImplTest {
 
             verify(accountAclPort).debitAndCredit(eq(SENDER_ACCOUNT_ID), eq(RECEIVER_ACCOUNT_ID),
                     any(Money.class));
+            verify(accountAclPort).reverseBalancesForCancellation(eq(SENDER_ACCOUNT_ID), eq(RECEIVER_ACCOUNT_ID),
+                    any(Money.class));
             verify(saveTransferPort, times(2)).save(transferCaptor.capture());
+            verify(domainEventPublisherService).publishEvents(any());
         }
 
         @Test

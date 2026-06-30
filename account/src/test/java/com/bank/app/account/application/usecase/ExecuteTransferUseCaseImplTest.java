@@ -8,6 +8,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
@@ -49,6 +50,9 @@ class ExecuteTransferUseCaseImplTest {
     @Mock
     private EventPublisherPort eventPublisherPort;
 
+    @Mock
+    private AuditEventPort auditEventPort;
+
     private ExecuteTransferUseCaseImpl useCase;
 
     private Account sender;
@@ -64,7 +68,7 @@ class ExecuteTransferUseCaseImplTest {
     void setUp() {
         AccountAuthorizationService accountAuthorizationService = new AccountAuthorizationService(userContextService);
         useCase = new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort,
-                accountAuthorizationService, eventPublisherPort);
+                accountAuthorizationService, eventPublisherPort, auditEventPort);
 
         sender = Account.builder()
                 .id(1L).userId(new UserId(10L))
@@ -103,7 +107,8 @@ class ExecuteTransferUseCaseImplTest {
             assertEquals(Money.of("700.00", Currency.TRY), receiver.getBalance());
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
-            verify(eventPublisherPort, times(3)).publish(any());
+            verify(eventPublisherPort, times(2)).publish(any());
+            verify(auditEventPort).publish(any());
         }
 
         @Test

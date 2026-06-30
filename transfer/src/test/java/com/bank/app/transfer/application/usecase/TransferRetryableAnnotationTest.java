@@ -27,7 +27,8 @@ class TransferRetryableAnnotationTest {
 
         @Test
         void aspectShouldRetryOnOptimisticLockingFailure() {
-                TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect();
+                TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
+                        new com.bank.app.transfer.adapter.in.config.TransferProperties(24, 3, 500, 2000));
                 assertNotNull(aspect);
         }
 }

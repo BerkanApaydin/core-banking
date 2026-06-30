@@ -3,6 +3,7 @@ package com.bank.app.account.adapter.in.config;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.service.UserContextService;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ class AccountBeanConfigTest {
     @Mock private LoadAccountPort loadAccountPort;
     @Mock private SaveAccountPort saveAccountPort;
     @Mock private EventPublisherPort eventPublisherPort;
+    @Mock private AuditEventPort auditEventPort;
     @Mock private UserContextService userContextService;
     @Mock private AccountAuthorizationService accountAuthorizationService;
 
@@ -31,7 +33,7 @@ class AccountBeanConfigTest {
     void shouldCreateCreateAccountUseCaseBean() {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
-        assertNotNull(config.createAccountUseCase(loadAccountPort, saveAccountPort, eventPublisherPort, authService));
+        assertNotNull(config.createAccountUseCase(loadAccountPort, saveAccountPort, eventPublisherPort, auditEventPort, authService));
     }
 
     @Test
@@ -39,7 +41,7 @@ class AccountBeanConfigTest {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
         assertNotNull(config.executeTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, eventPublisherPort));
+                authService, eventPublisherPort, auditEventPort));
     }
 
     @Test
@@ -47,7 +49,7 @@ class AccountBeanConfigTest {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
         assertNotNull(config.reverseTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, eventPublisherPort));
+                authService, eventPublisherPort, auditEventPort));
     }
 
     @Test

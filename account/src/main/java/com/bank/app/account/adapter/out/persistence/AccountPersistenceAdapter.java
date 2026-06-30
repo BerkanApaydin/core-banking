@@ -50,10 +50,17 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
+    @Deprecated(since = "1.0", forRemoval = false)
     public List<Account> findAll() {
         return repository.findAll().stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Page<Account> findAll(Pageable pageable) {
+        return repository.findAll(pageable)
+                .map(mapper::toDomain);
     }
 
     @Override

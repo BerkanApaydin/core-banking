@@ -1,8 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.service.DomainEventPublisher;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -27,20 +26,20 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
     private final AccountAclPort accountAclPort;
     private final SaveTransferPort saveTransferPort;
-    private final EventPublisherPort eventPublisherPort;
     private final TransferDomainService transferDomainService;
     private final TransferAuthorizationService transferAuthorizationService;
+    private final DomainEventPublisherService domainEventPublisherService;
 
     public PlaceTransferUseCaseImpl(AccountAclPort accountAclPort,
             SaveTransferPort saveTransferPort,
-            EventPublisherPort eventPublisherPort,
             TransferDomainService transferDomainService,
-            TransferAuthorizationService transferAuthorizationService) {
+            TransferAuthorizationService transferAuthorizationService,
+            DomainEventPublisherService domainEventPublisherService) {
         this.accountAclPort = accountAclPort;
         this.saveTransferPort = saveTransferPort;
-        this.eventPublisherPort = eventPublisherPort;
         this.transferDomainService = transferDomainService;
         this.transferAuthorizationService = transferAuthorizationService;
+        this.domainEventPublisherService = domainEventPublisherService;
     }
 
     @Override
@@ -60,19 +59,26 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
         Transfer savedTransfer = saveTransferPort.save(transfer);
 
-        accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        try {
+            accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-        savedTransfer.complete();
-        Transfer completedTransfer = saveTransferPort.save(savedTransfer);
+            savedTransfer.complete();
+            saveTransferPort.save(savedTransfer);
+            domainEventPublisherService.publishEvents(savedTransfer);
+        } catch (Exception e) {
+            try {
+                accountAclPort.reverseBalancesForCancellation(senderInfo.id(), receiverInfo.id(), amount);
+            } catch (Exception compensationError) {
+                log.error("Compensation reversal failed for transfer: id={}", savedTransfer.getId(), compensationError);
+            }
+            throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+        }
 
-        DomainEventPublisher.publishEvents(savedTransfer, eventPublisherPort);
+        log.info("Transfer completed: id={}, senderId={}, receiverId={}",
+            savedTransfer.getId(), savedTransfer.getSenderAccountId(),
+            savedTransfer.getReceiverAccountId());
 
-        log.info("Transfer completed: id={}, senderId={}, receiverId={}, amount={} {}",
-            completedTransfer.getId(), completedTransfer.getSenderAccountId(),
-            completedTransfer.getReceiverAccountId(),
-            completedTransfer.getAmount().amount(), completedTransfer.getAmount().currency());
-
-        return TransferResponse.from(completedTransfer, senderIban, receiverIban);
+        return TransferResponse.from(savedTransfer, senderIban, receiverIban);
     }
 
     private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,

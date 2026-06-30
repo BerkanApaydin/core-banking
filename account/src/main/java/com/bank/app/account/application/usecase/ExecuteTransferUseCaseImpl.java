@@ -6,12 +6,14 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
 
 @TransactionalUseCase
 public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
@@ -21,13 +23,16 @@ public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
     private final SaveAccountPort saveAccountPort;
     private final AccountAuthorizationService accountAuthorizationService;
     private final EventPublisherPort eventPublisherPort;
+    private final AuditEventPort auditEventPort;
 
     public ExecuteTransferUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-            AccountAuthorizationService accountAuthorizationService, EventPublisherPort eventPublisherPort) {
+            AccountAuthorizationService accountAuthorizationService, EventPublisherPort eventPublisherPort,
+            AuditEventPort auditEventPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.accountAuthorizationService = accountAuthorizationService;
         this.eventPublisherPort = eventPublisherPort;
+        this.auditEventPort = auditEventPort;
     }
 
     @Override
@@ -42,12 +47,12 @@ public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
         receiver.credit(amount);
 
         TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
-        eventPublisherPort.publish(new AuditEvent("TRANSFER_EXECUTED",
-            String.format("Transfer completed. Sender: %d, Receiver: %d, Amount: %s %s",
-                senderId, receiverId, amount.amount(), amount.currency()),
-            java.time.LocalDateTime.now()));
+        auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
+            String.format("Transfer completed. Sender: %d, Receiver: %d",
+                senderId, receiverId),
+            LocalDateTime.now()));
 
-        log.info("Transfer executed: senderId={}, receiverId={}, amount={}",
-            senderId, receiverId, amount);
+        log.info("Transfer executed: senderId={}, receiverId={}",
+            senderId, receiverId);
     }
 }
