@@ -20,13 +20,13 @@ class UserIdTest {
     @Test
     void shouldThrowWhenValueIsZero() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new UserId(0L));
-        assertTrue(ex.getMessage().contains("pozitif"));
+        assertTrue(ex.getMessage().contains("positive"));
     }
 
     @Test
     void shouldThrowWhenValueIsNegative() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new UserId(-1L));
-        assertTrue(ex.getMessage().contains("pozitif"));
+        assertTrue(ex.getMessage().contains("positive"));
     }
 
     @Test

@@ -4,21 +4,23 @@ WORKDIR /build
 # Copy parent pom and module poms to cache dependencies
 COPY pom.xml ./
 COPY common/pom.xml ./common/
-COPY account-module/pom.xml ./account-module/
-COPY transfer-module/pom.xml ./transfer-module/
-COPY user-module/pom.xml ./user-module/
-COPY audit-module/pom.xml ./audit-module/
+COPY infrastructure/pom.xml ./infrastructure/
+COPY account/pom.xml ./account/
+COPY transfer/pom.xml ./transfer/
+COPY user/pom.xml ./user/
+COPY audit/pom.xml ./audit/
 COPY app/pom.xml ./app/
 
 # Run dependency resolution
-RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B -pl app -am
 
 # Copy source code of all modules
 COPY common/src ./common/src
-COPY account-module/src ./account-module/src
-COPY transfer-module/src ./transfer-module/src
-COPY user-module/src ./user-module/src
-COPY audit-module/src ./audit-module/src
+COPY infrastructure/src ./infrastructure/src
+COPY account/src ./account/src
+COPY transfer/src ./transfer/src
+COPY user/src ./user/src
+COPY audit/src ./audit/src
 COPY app/src ./app/src
 
 # Package the project
@@ -34,4 +36,4 @@ WORKDIR /app
 COPY --from=builder /build/app/target/*.jar app.jar
 EXPOSE 8080
 
-ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

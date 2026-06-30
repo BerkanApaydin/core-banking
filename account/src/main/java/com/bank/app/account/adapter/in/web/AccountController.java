@@ -8,7 +8,7 @@ import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.common.application.dto.PageResponse;
-import com.bank.app.infrastructure.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.api.ApiVersion;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -218,7 +218,7 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("Only completed transfers can be cancelled");
+                    .hasMessageContaining("already failed");
         }
 
         @Test
@@ -227,7 +227,7 @@ class TransferTest {
             Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
-                    .hasMessageContaining("Only completed transfers can be cancelled");
+                    .hasMessageContaining("still pending");
         }
 
         @Test

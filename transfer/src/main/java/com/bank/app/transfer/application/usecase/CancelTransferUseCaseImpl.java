@@ -1,11 +1,10 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.TransactionalUseCase;
+import com.bank.app.common.application.service.DomainEventPublisher;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.event.AuditEvent;
-import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.common.domain.event.DomainEventProvider;
-import com.bank.app.transfer.application.exception.TransferNotFoundException;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -15,7 +14,6 @@ import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.Clock;
-import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -64,18 +62,11 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         log.info("Transfer cancelled: id={}, amount={}",
             transfer.getId(), transfer.getAmount());
 
-        publishEvents(transfer);
+        DomainEventPublisher.publishEvents(transfer, eventPublisherPort);
         eventPublisherPort.publish(new AuditEvent("TRANSFER_CANCELLED",
             String.format("Transfer cancelled. Transfer ID: %d, Amount: %s %s",
                 transfer.getId(), transfer.getAmount().amount(), transfer.getAmount().currency()),
             java.time.LocalDateTime.now()));
     }
 
-    private void publishEvents(DomainEventProvider provider) {
-        List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
-        provider.clearDomainEvents();
-        for (DomainEvent event : events) {
-            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event must not be null"));
-        }
-    }
 }

@@ -19,10 +19,10 @@ public class UseCaseTransactionAspect {
         this.transactionManager = transactionManager;
     }
 
-    @Pointcut("@within(com.bank.app.common.application.ReadOnlyUseCase)")
+    @Pointcut("@within(com.bank.app.common.application.port.in.ReadOnlyUseCase)")
     void readOnlyUseCaseMethod() {}
 
-    @Pointcut("@within(com.bank.app.common.application.TransactionalUseCase)")
+    @Pointcut("@within(com.bank.app.common.application.port.in.TransactionalUseCase)")
     void transactionalUseCaseMethod() {}
 
     @Pointcut("within(com.bank.app.audit.application.usecase..*)")

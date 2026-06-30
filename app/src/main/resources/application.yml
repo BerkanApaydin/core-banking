@@ -79,6 +79,9 @@ app:
         - /api/v1/auth/register
         - /api/v1/accounts
         - /api/v1/transfers
+  security:
+    token-blacklist:
+      backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
   idempotency:
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}

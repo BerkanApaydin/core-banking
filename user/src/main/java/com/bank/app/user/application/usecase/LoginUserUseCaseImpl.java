@@ -1,7 +1,7 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.security.JwtPort;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
+import com.bank.app.common.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -9,7 +9,7 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.domain.User;
-import com.bank.app.user.application.exception.UserNotFoundException;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import org.slf4j.Logger;

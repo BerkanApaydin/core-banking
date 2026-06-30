@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.api;
 
+import com.bank.app.common.adapter.in.api.ApiVersion;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;

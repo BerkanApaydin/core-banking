@@ -1,6 +1,6 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

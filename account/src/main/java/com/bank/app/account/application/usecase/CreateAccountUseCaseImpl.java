@@ -11,7 +11,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.common.application.TransactionalUseCase;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;

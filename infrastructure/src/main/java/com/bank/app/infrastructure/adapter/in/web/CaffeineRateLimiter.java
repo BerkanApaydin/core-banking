@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.security.rate-limit.backend", havingValue = "caffeine", matchIfMissing = true)
 public class CaffeineRateLimiter implements RateLimiter {
 
     private final int maxRequests;

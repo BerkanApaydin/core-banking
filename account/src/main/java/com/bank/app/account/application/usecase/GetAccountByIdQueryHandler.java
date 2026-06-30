@@ -1,12 +1,12 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import java.util.Objects;
 
 @ReadOnlyUseCase

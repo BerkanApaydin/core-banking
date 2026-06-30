@@ -1,6 +1,6 @@
 package com.bank.app.common.application.service;
 
-import com.bank.app.common.application.port.out.security.SecurityContextPort;
+import com.bank.app.common.application.port.out.SecurityContextPort;
 import java.util.Optional;
 
 public class UserContextService {

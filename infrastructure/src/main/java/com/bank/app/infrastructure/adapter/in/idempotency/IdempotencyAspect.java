@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
+import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
@@ -48,7 +49,7 @@ public class IdempotencyAspect {
         }
 
         String username = userContextService.getCurrentUsername()
-                .orElseThrow(() -> new AuthorizationException("Giriş yapmalısınız."));
+                .orElseThrow(() -> new AuthorizationException("You must be logged in."));
         String key = username + "_" + idempotencyKeyHeader;
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
@@ -57,7 +58,7 @@ public class IdempotencyAspect {
             return buildCachedResponse(result);
         } else if (result.isPending()) {
             throw new ConcurrentRequestException("error.concurrent_request", null,
-                    "Bu işlem şu anda gerçekleştiriliyor. Lütfen bekleyin.");
+                    "This operation is currently being processed. Please wait.");
         }
 
         try {
@@ -98,7 +99,7 @@ public class IdempotencyAspect {
             JsonNode cachedBody = objectMapper.readValue(body, JsonNode.class);
             return ResponseEntity.status(status).body(cachedBody);
         } catch (Exception e) {
-            throw new RuntimeException("Idempotent cache yanıtı çözümlenemedi", e);
+            throw new RuntimeException("Failed to resolve idempotent cache response", e);
         }
     }
 }

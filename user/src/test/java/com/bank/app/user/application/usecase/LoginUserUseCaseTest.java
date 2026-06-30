@@ -1,9 +1,9 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.port.out.security.JwtPort;
+import com.bank.app.common.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.exception.UserNotFoundException;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;

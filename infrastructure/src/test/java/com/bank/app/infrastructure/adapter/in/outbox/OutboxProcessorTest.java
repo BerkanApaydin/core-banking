@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.outbox;
 
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventHandler;
+import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ class OutboxProcessorTest {
     private OutboxPort outboxPort;
 
     @Mock
-    private OutboxEventHandler handler;
+    private OutboxEventPort handler;
 
     private OutboxProcessor outboxProcessor;
 

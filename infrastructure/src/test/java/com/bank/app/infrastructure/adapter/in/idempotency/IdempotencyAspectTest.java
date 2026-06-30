@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
+import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
 import com.fasterxml.jackson.databind.JsonNode;

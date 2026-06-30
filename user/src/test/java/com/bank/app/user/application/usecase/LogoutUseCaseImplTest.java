@@ -1,7 +1,7 @@
 package com.bank.app.user.application.usecase;
+import com.bank.app.common.application.port.out.JwtPort;
 
-import com.bank.app.common.application.port.out.security.JwtPort;
-import com.bank.app.common.application.port.out.security.TokenBlacklistPort;
+import com.bank.app.common.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class CorrelationIdFilter implements Filter {
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     private static final String MDC_KEY = "correlationId";

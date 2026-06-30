@@ -126,10 +126,15 @@ public class Transfer extends BaseAggregateRoot {
             throw new TransferAlreadyCancelledException(this.id);
         }
         if (this.status != TransferStatus.COMPLETED) {
+            String detail = switch (this.status) {
+                case PENDING -> "Transfer is still pending and cannot be cancelled. Cancel is only available for completed transfers.";
+                case FAILED -> "Transfer has already failed and cannot be cancelled.";
+                default -> "Only completed transfers can be cancelled. Current status: " + this.status;
+            };
             throw new TransferNotCancellableException(
                 "error.transfer_not_cancellable",
                 new Object[]{this.status},
-                "Only completed transfers can be cancelled. Current status: " + this.status
+                detail
             );
         }
         LocalDateTime now = LocalDateTime.now(clock);

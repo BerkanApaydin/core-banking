@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;

@@ -227,8 +227,8 @@ class PlaceTransferUseCaseImplTest {
     class FailureHandling {
 
         @Test
-        @DisplayName("should mark transfer as FAILED when debitAndCredit throws exception")
-        void shouldMarkFailedOnDebitException() {
+        @DisplayName("should not mark transfer as FAILED when debitAndCredit throws (transaction rolls back)")
+        void shouldNotMarkFailedOnDebitException() {
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -244,9 +244,8 @@ class PlaceTransferUseCaseImplTest {
                     .isExactlyInstanceOf(RuntimeException.class)
                     .hasMessage("Account service unavailable");
 
-            verify(saveTransferPort, times(2)).save(transferCaptor.capture());
-            Transfer failedTransfer = transferCaptor.getAllValues().get(1);
-            assertThat(failedTransfer.getStatus()).isEqualTo(TransferStatus.FAILED);
+            verify(saveTransferPort, times(1)).save(any());
+            verify(accountAclPort).debitAndCredit(any(), any(), any());
         }
 
         @Test
@@ -305,7 +304,7 @@ class PlaceTransferUseCaseImplTest {
         }
 
         @Test
-        @DisplayName("should throw TransferNotPendingException when event publishing fails after complete")
+        @DisplayName("should throw original RuntimeException when event publishing fails after complete")
         void shouldThrowWhenEventPublishFails() {
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
@@ -319,13 +318,12 @@ class PlaceTransferUseCaseImplTest {
                     .when(eventPublisherPort).publish(any());
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
-                    .isExactlyInstanceOf(TransferNotPendingException.class);
+                    .isExactlyInstanceOf(RuntimeException.class)
+                    .hasMessage("Event bus unavailable");
 
             verify(accountAclPort).debitAndCredit(eq(SENDER_ACCOUNT_ID), eq(RECEIVER_ACCOUNT_ID),
                     any(Money.class));
             verify(saveTransferPort, times(2)).save(transferCaptor.capture());
-            Transfer completedTransfer = transferCaptor.getAllValues().get(1);
-            assertThat(completedTransfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
         }
 
         @Test

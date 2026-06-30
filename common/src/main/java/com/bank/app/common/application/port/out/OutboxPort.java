@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OutboxPort {
+    void save(EventEntry entry);
     List<EventEntry> findAndLockUnprocessed(int limit, int partition);
     Optional<EventEntry> findByIdForUpdateSkipLocked(String id);
     void markProcessed(String id);

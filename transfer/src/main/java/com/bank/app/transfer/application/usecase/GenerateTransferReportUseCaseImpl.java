@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;

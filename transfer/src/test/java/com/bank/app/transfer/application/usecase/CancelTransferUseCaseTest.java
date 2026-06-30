@@ -5,7 +5,7 @@ import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.AuthorizationException;
-import com.bank.app.transfer.application.exception.TransferNotFoundException;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;

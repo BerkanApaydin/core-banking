@@ -1,21 +1,17 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.ReverseTransferUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.TransactionalUseCase;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
-import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.common.domain.event.DomainEventProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -38,30 +34,18 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
 
     @Override
     public void execute(Long senderId, Long receiverId, Money amount) {
-        Objects.requireNonNull(senderId, "Sender ID must not be null");
-        Objects.requireNonNull(receiverId, "Receiver ID must not be null");
         Objects.requireNonNull(amount, "Amount must not be null");
 
-        OrderedPair<Account> pair = OrderedPair.from(
-                senderId, () -> loadAccountPort.findByIdWithLock(senderId)
-                        .orElseThrow(() -> new AccountNotFoundException(senderId)),
-                receiverId, () -> loadAccountPort.findByIdWithLock(receiverId)
-                        .orElseThrow(() -> new AccountNotFoundException(receiverId)));
-
-        boolean senderFirst = senderId < receiverId;
-        Account sender = senderFirst ? pair.lowerIdItem() : pair.higherIdItem();
-        Account receiver = senderFirst ? pair.higherIdItem() : pair.lowerIdItem();
+        OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
+        Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
+        Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
 
         accountAuthorizationService.authorizeAccountOwner(sender, "You are not authorized for this operation.");
 
         sender.credit(amount);
         receiver.debit(amount);
 
-        saveAccountPort.save(sender);
-        saveAccountPort.save(receiver);
-
-        publishEvents(sender);
-        publishEvents(receiver);
+        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
         eventPublisherPort.publish(new AuditEvent("TRANSFER_CANCELLED",
             String.format("Transfer reversed. Sender: %d, Receiver: %d, Amount: %s %s",
                 senderId, receiverId, amount.amount(), amount.currency()),
@@ -69,13 +53,5 @@ public class ReverseTransferUseCaseImpl implements ReverseTransferUseCase {
 
         log.info("Transfer reversed: senderId={}, receiverId={}, amount={}",
             senderId, receiverId, amount);
-    }
-
-    private void publishEvents(DomainEventProvider provider) {
-        List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
-        provider.clearDomainEvents();
-        for (DomainEvent event : events) {
-            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event must not be null"));
-        }
     }
 }

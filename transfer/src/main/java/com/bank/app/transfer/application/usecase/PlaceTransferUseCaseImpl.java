@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.DomainEventPublisher;
-import com.bank.app.common.application.TransactionalUseCase;
+import com.bank.app.common.application.service.DomainEventPublisher;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -60,26 +60,19 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
         Transfer savedTransfer = saveTransferPort.save(transfer);
 
-        try {
-            accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-            savedTransfer.complete();
-            Transfer completedTransfer = saveTransferPort.save(savedTransfer);
+        savedTransfer.complete();
+        Transfer completedTransfer = saveTransferPort.save(savedTransfer);
 
-            DomainEventPublisher.publishEvents(savedTransfer, eventPublisherPort);
+        DomainEventPublisher.publishEvents(savedTransfer, eventPublisherPort);
 
-            log.info("Transfer completed: id={}, senderId={}, receiverId={}, amount={} {}",
-                completedTransfer.getId(), completedTransfer.getSenderAccountId(),
-                completedTransfer.getReceiverAccountId(),
-                completedTransfer.getAmount().amount(), completedTransfer.getAmount().currency());
+        log.info("Transfer completed: id={}, senderId={}, receiverId={}, amount={} {}",
+            completedTransfer.getId(), completedTransfer.getSenderAccountId(),
+            completedTransfer.getReceiverAccountId(),
+            completedTransfer.getAmount().amount(), completedTransfer.getAmount().currency());
 
-            return TransferResponse.from(completedTransfer, senderIban, receiverIban);
-        } catch (Exception e) {
-            savedTransfer.markFailed();
-            saveTransferPort.save(savedTransfer);
-            log.error("Transfer failed after debit, marked as FAILED: id={}", savedTransfer.getId(), e);
-            throw e;
-        }
+        return TransferResponse.from(completedTransfer, senderIban, receiverIban);
     }
 
     private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,

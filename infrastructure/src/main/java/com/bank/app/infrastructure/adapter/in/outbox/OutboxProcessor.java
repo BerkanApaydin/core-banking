@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.outbox;
 
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventHandler;
+import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import org.slf4j.Logger;
@@ -19,9 +19,9 @@ public class OutboxProcessor {
     private static final Logger log = LoggerFactory.getLogger(OutboxProcessor.class);
 
     private final OutboxPort outboxPort;
-    private final List<OutboxEventHandler> handlers;
+    private final List<OutboxEventPort> handlers;
 
-    public OutboxProcessor(OutboxPort outboxPort, List<OutboxEventHandler> handlers) {
+    public OutboxProcessor(OutboxPort outboxPort, List<OutboxEventPort> handlers) {
         this.outboxPort = outboxPort;
         this.handlers = handlers;
     }
@@ -35,7 +35,7 @@ public class OutboxProcessor {
         }
 
         try {
-            OutboxEventHandler handler = handlers.stream()
+            OutboxEventPort handler = handlers.stream()
                     .filter(h -> h.supports(event.eventType()))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("No handler for event type: " + event.eventType()));

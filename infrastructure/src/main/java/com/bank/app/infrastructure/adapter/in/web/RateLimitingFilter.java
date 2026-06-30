@@ -52,7 +52,9 @@ public class RateLimitingFilter implements Filter {
         String path = httpRequest.getRequestURI();
 
         boolean isWriteOperation = "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method);
-        if (!isWriteOperation) {
+        boolean isExpensiveRead = "GET".equals(method) && (path.endsWith("/report") || path.contains("/history/"));
+
+        if (!isWriteOperation && !isExpensiveRead) {
             chain.doFilter(request, response);
             return;
         }
@@ -63,10 +65,7 @@ public class RateLimitingFilter implements Filter {
 
             if (!rateLimiter.tryAcquire(ip)) {
                 String message = messageSource.getMessage("error.rate_limit_exceeded", null,
-                        "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.", LocaleContextHolder.getLocale());
-                if (message == null) {
-                    message = "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.";
-                }
+                        "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
                 httpResponse.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");

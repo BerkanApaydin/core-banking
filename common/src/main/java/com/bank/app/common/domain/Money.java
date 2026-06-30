@@ -30,22 +30,22 @@ public record Money(
     }
 
     public Money add(Money other) {
-        requireSameCurrency(other, "toplanamaz");
+        requireSameCurrency(other, "cannot be added");
         return new Money(this.amount.add(other.amount), this.currency);
     }
 
     public Money subtract(Money other) {
-        requireSameCurrency(other, "çıkarılamaz");
+        requireSameCurrency(other, "cannot be subtracted");
         return new Money(this.amount.subtract(other.amount), this.currency);
     }
 
     public boolean isGreaterThan(Money other) {
-        requireSameCurrency(other, "karşılaştırılamaz");
+        requireSameCurrency(other, "cannot be compared");
         return this.amount.compareTo(other.amount) > 0;
     }
 
     public boolean isGreaterThanOrEqual(Money other) {
-        requireSameCurrency(other, "karşılaştırılamaz");
+        requireSameCurrency(other, "cannot be compared");
         return this.amount.compareTo(other.amount) >= 0;
     }
 
@@ -53,7 +53,7 @@ public record Money(
         Objects.requireNonNull(other, "Money object must not be null");
         if (this.currency != other.currency) {
             throw new CurrencyMismatchException(
-                    this.currency + " ile " + other.currency + " " + operation);
+                    this.currency + " and " + other.currency + " " + operation);
         }
     }
 

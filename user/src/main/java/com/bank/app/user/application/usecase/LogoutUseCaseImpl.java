@@ -2,8 +2,8 @@ package com.bank.app.user.application.usecase;
 
 
 import com.bank.app.user.application.port.in.LogoutUseCase;
-import com.bank.app.common.application.port.out.security.TokenBlacklistPort;
-import com.bank.app.common.application.port.out.security.JwtPort;
+import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.bank.app.common.application.port.out.JwtPort;
 
 public class LogoutUseCaseImpl implements LogoutUseCase {
 

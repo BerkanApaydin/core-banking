@@ -36,8 +36,7 @@ dump.rdb
 interpolated*.xml
 lib/
 manifest.yml
-out
-!**/port/out/
+/out
 overridedb.*
 test-results/
 .flattened-pom.xml
@@ -62,4 +61,5 @@ dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 /load_tests/
+*.log
 run.err

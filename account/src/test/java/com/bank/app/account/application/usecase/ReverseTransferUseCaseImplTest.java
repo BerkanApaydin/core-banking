@@ -1,6 +1,6 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;

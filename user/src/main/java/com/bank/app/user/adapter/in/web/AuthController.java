@@ -1,6 +1,6 @@
 package com.bank.app.user.adapter.in.web;
 
-import com.bank.app.infrastructure.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;

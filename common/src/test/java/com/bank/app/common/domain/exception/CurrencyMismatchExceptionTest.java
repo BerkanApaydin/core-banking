@@ -9,8 +9,8 @@ class CurrencyMismatchExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        CurrencyMismatchException ex = new CurrencyMismatchException("TRY ile USD toplanamaz");
-        assertEquals("TRY ile USD toplanamaz", ex.getMessage());
+        CurrencyMismatchException ex = new CurrencyMismatchException("TRY and USD cannot be added");
+        assertEquals("TRY and USD cannot be added", ex.getMessage());
         assertNull(ex.getMessageKey());
         assertNull(ex.getArgs());
     }

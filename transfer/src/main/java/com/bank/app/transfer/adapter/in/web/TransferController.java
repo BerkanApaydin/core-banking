@@ -1,6 +1,6 @@
 package com.bank.app.transfer.adapter.in.web;
 
-import com.bank.app.infrastructure.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
 import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferRequest;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
-import com.bank.app.infrastructure.adapter.in.idempotency.Idempotent;
+import com.bank.app.common.adapter.in.idempotency.Idempotent;
 
 import java.time.LocalDateTime;
 

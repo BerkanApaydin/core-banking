@@ -1,7 +1,7 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.application.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;

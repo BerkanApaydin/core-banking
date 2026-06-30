@@ -1,6 +1,6 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.TransactionalUseCase;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;

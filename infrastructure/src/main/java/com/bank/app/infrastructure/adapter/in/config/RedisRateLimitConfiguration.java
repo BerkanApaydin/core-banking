@@ -40,5 +40,8 @@ public class RedisRateLimitConfiguration {
 
         @ConditionalOnProperty(name = "app.security.failed-login.backend", havingValue = "redis")
         static class LoginAttemptRedis {}
+
+        @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "redis")
+        static class TokenBlacklistRedis {}
     }
 }

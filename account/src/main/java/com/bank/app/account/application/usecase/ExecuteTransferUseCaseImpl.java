@@ -1,20 +1,17 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.application.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.in.ExecuteTransferUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.DomainEventPublisher;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.TransactionalUseCase;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.Objects;
 
 @TransactionalUseCase
 public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
@@ -35,28 +32,16 @@ public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
 
     @Override
     public void execute(Long senderId, Long receiverId, Money amount) {
-        Objects.requireNonNull(senderId, "senderId must not be null");
-        Objects.requireNonNull(receiverId, "receiverId must not be null");
-
-        OrderedPair<Account> pair = OrderedPair.from(
-                senderId, () -> loadAccountPort.findByIdWithLock(senderId)
-                        .orElseThrow(() -> new AccountNotFoundException(senderId)),
-                receiverId, () -> loadAccountPort.findByIdWithLock(receiverId)
-                        .orElseThrow(() -> new AccountNotFoundException(receiverId)));
-
-        boolean senderFirst = senderId < receiverId;
-        Account sender = senderFirst ? pair.lowerIdItem() : pair.higherIdItem();
-        Account receiver = senderFirst ? pair.higherIdItem() : pair.lowerIdItem();
+        OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
+        Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
+        Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
 
         accountAuthorizationService.authorizeAccountOwner(sender,
                 "You are not authorized to transfer from this account.");
         sender.debit(amount);
         receiver.credit(amount);
-        saveAccountPort.save(sender);
-        saveAccountPort.save(receiver);
 
-        DomainEventPublisher.publishEvents(sender, eventPublisherPort);
-        DomainEventPublisher.publishEvents(receiver, eventPublisherPort);
+        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
         eventPublisherPort.publish(new AuditEvent("TRANSFER_EXECUTED",
             String.format("Transfer completed. Sender: %d, Receiver: %d, Amount: %s %s",
                 senderId, receiverId, amount.amount(), amount.currency()),

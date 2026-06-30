@@ -6,7 +6,7 @@ public record UserId(Long value) {
     public UserId {
         Objects.requireNonNull(value, "User ID must not be null");
         if (value <= 0) {
-            throw new IllegalArgumentException("Kullanıcı ID pozitif olmalıdır: " + value);
+            throw new IllegalArgumentException("User ID must be positive: " + value);
         }
     }
 

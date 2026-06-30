@@ -4,7 +4,7 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
-import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.common.application.dto.PageResponse;
 import org.springframework.data.domain.PageRequest;
 

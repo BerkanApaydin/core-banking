@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.common.application.ReadOnlyUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
-import com.bank.app.transfer.application.exception.TransferNotFoundException;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;

@@ -187,7 +187,7 @@ public class Account extends BaseAggregateRoot {
 
     @Override
     public String toString() {
-        return "Account{id=" + id + ", iban=" + iban.value() + ", status=" + status + ", balance=" + balance + "}";
+        return "Account{id=" + id + ", iban=" + iban + ", status=" + status + ", balance=" + balance + "}";
     }
 }
 
