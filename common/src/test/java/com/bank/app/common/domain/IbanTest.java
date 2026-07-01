@@ -2,7 +2,8 @@ package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("null")
 class IbanTest {
@@ -10,64 +11,68 @@ class IbanTest {
     @Test
     void shouldCreateWithValidIban() {
         Iban iban = new Iban("TR290006200000000000000123");
-        assertEquals("TR290006200000000000000123", iban.value());
+        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
     }
 
     @Test
     void shouldNormalizeIbanWithSpaces() {
         Iban iban = new Iban("TR29 0006 2000 0000 0000 0001 23");
-        assertEquals("TR290006200000000000000123", iban.value());
+        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
     }
 
     @Test
     void shouldNormalizeIbanToUpperCase() {
         Iban iban = new Iban("tr290006200000000000000123");
-        assertEquals("TR290006200000000000000123", iban.value());
+        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
     }
 
     @Test
     void shouldThrowWhenNull() {
-        assertThrows(NullPointerException.class, () -> new Iban(null));
+        assertThatThrownBy(() -> new Iban(null))
+                .isExactlyInstanceOf(NullPointerException.class);
     }
 
     @Test
     void shouldThrowWhenInvalidFormat() {
-        assertThrows(InvalidIbanException.class, () -> new Iban("INVALID"));
+        assertThatThrownBy(() -> new Iban("INVALID"))
+                .isExactlyInstanceOf(InvalidIbanException.class);
     }
 
     @Test
     void shouldThrowWhenTooShort() {
-        assertThrows(InvalidIbanException.class, () -> new Iban("TR12"));
+        assertThatThrownBy(() -> new Iban("TR12"))
+                .isExactlyInstanceOf(InvalidIbanException.class);
     }
 
     @Test
     void shouldBeEqualWhenSameIban() {
-        assertEquals(new Iban("TR290006200000000000000123"), new Iban("TR290006200000000000000123"));
+        assertThat(new Iban("TR290006200000000000000123"))
+                .isEqualTo(new Iban("TR290006200000000000000123"));
     }
 
     @Test
     void shouldNotBeEqualWhenDifferentIban() {
-        assertNotEquals(new Iban("TR290006200000000000000123"), new Iban("TR290006200000000000000456"));
+        assertThat(new Iban("TR290006200000000000000123"))
+                .isNotEqualTo(new Iban("TR290006200000000000000456"));
     }
 
     @Test
     void toStringShouldMaskMiddleDigits() {
         Iban iban = new Iban("TR290006200000000000000123");
         String masked = iban.toString();
-        assertTrue(masked.contains("*******"), "Maskelenmeli: " + masked);
-        assertTrue(masked.startsWith("TR290006"), "İlk 8 karakter korunmalı: " + masked);
-        assertTrue(masked.endsWith("0123"), "Son 4 karakter korunmalı: " + masked);
+        assertThat(masked).contains("*******")
+                .startsWith("TR290006")
+                .endsWith("0123");
     }
 
     @Test
     void toStringShouldHandleShortIban() {
         Iban iban = new Iban("TR123456789012345678901234");
-        String masked = iban.toString();
-        assertTrue(masked.contains("*******"), "Maskelenmeli: " + masked);
+        assertThat(iban.toString()).contains("*******");
     }
 
     @Test
     void normalizeShouldReturnNullWhenNull() {
-        assertNull(Iban.normalize(null));
+        assertThat(Iban.normalize(null)).isNull();
     }
 }

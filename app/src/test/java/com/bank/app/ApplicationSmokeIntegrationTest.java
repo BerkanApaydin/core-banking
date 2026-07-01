@@ -22,7 +22,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ApplicationSmokeTest extends AbstractSpringBootIntegrationTest {
+class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
     private TestRestTemplate restTemplate;

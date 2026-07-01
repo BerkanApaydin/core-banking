@@ -70,7 +70,7 @@ class TransferTest {
         }
 
         @ParameterizedTest(name = "should reject null: {0}")
-        @ValueSource(strings = {"senderAccountId", "receiverAccountId", "amount", "status", "createdAt"})
+        @ValueSource(strings = { "senderAccountId", "receiverAccountId", "amount", "status", "createdAt" })
         @DisplayName("should reject null constructor arguments")
         void shouldRejectNullArgs(String field) {
             assertThatThrownBy(() -> {
@@ -106,6 +106,23 @@ class TransferTest {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
             transfer.complete();
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
+        }
+
+        @Test
+        @DisplayName("should complete with fixed clock and emit event with timestamp")
+        void shouldCompleteWithClock() {
+            LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
+            Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+            Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
+
+            transfer.complete(clock);
+
+            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
+            assertThat(transfer.getDomainEvents())
+                    .hasSize(1)
+                    .allMatch(e -> e instanceof TransferCompletedEvent);
+            TransferCompletedEvent event = (TransferCompletedEvent) transfer.getDomainEvents().getFirst();
+            assertThat(event.occurredAt()).isEqualTo(fixedNow);
         }
 
         @Test

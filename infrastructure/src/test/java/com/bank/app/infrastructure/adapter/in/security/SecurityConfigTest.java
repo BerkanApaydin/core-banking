@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -24,9 +23,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SecurityConfigTest {
 
-    @Mock private JwtAuthenticationFilter jwtAuthFilter;
-    @Mock private UserDetailsService userDetailsService;
-    @Mock private CorsConfigurationSource corsConfigurationSource;
+    @Mock
+    private JwtAuthenticationFilter jwtAuthFilter;
+    @Mock
+    private UserDetailsService userDetailsService;
+    @Mock
+    private CorsConfigurationSource corsConfigurationSource;
     private SecurityConfig securityConfig;
     private SecurityProperties securityProperties;
 

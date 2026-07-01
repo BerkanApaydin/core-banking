@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("null")
 class CreateAccountRequestTest {
@@ -16,11 +16,11 @@ class CreateAccountRequestTest {
                 1L, "TR290006200000000000000111", "Ahmet Yılmaz",
                 new BigDecimal("1000.00"), Currency.TRY);
 
-        assertEquals(1L, request.userId());
-        assertEquals("TR290006200000000000000111", request.iban());
-        assertEquals("Ahmet Yılmaz", request.ownerName());
-        assertEquals(0, new BigDecimal("1000.00").compareTo(request.initialBalance()));
-        assertEquals(Currency.TRY, request.currency());
+        assertThat(request.userId()).isEqualTo(1L);
+        assertThat(request.iban()).isEqualTo("TR290006200000000000000111");
+        assertThat(request.ownerName()).isEqualTo("Ahmet Yılmaz");
+        assertThat(request.initialBalance()).isEqualByComparingTo("1000.00");
+        assertThat(request.currency()).isEqualTo(Currency.TRY);
     }
 
     @Test
@@ -29,7 +29,7 @@ class CreateAccountRequestTest {
                 1L, "TR290006200000000000000111", "Ahmet",
                 BigDecimal.ZERO, Currency.USD);
 
-        assertEquals(0, BigDecimal.ZERO.compareTo(request.initialBalance()));
+        assertThat(request.initialBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
@@ -38,7 +38,7 @@ class CreateAccountRequestTest {
             CreateAccountRequest request = new CreateAccountRequest(
                     1L, "TR290006200000000000000111", "Test",
                     new BigDecimal("100.00"), currency);
-            assertEquals(currency, request.currency());
+            assertThat(request.currency()).isEqualTo(currency);
         }
     }
 }

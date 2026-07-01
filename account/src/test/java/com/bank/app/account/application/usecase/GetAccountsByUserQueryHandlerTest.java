@@ -28,7 +28,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,7 +48,8 @@ class GetAccountsByUserQueryHandlerTest {
     }
 
     private Account account(Long id, Long userId, String iban, BigDecimal balance, AccountStatus status) {
-        return new Account(id, new UserId(userId), new Iban(iban), "Owner" + id, Money.of(balance, Currency.TRY), status);
+        return new Account(id, new UserId(userId), new Iban(iban), "Owner" + id, Money.of(balance, Currency.TRY),
+                status);
     }
 
     @Nested
@@ -59,8 +59,10 @@ class GetAccountsByUserQueryHandlerTest {
         @Test
         @DisplayName("should return accounts for current user")
         void shouldReturnAccountsForCurrentUser() {
-            Account account1 = account(1L, 100L, "TR290006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-            Account account2 = account(2L, 100L, "TR290006200000000000000222", new BigDecimal("300.00"), AccountStatus.ACTIVE);
+            Account account1 = account(1L, 100L, "TR290006200000000000000111", new BigDecimal("500.00"),
+                    AccountStatus.ACTIVE);
+            Account account2 = account(2L, 100L, "TR290006200000000000000222", new BigDecimal("300.00"),
+                    AccountStatus.ACTIVE);
 
             when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
             when(loadAccountPort.findByUserId(100L, PageRequest.of(0, 20)))
@@ -97,7 +99,8 @@ class GetAccountsByUserQueryHandlerTest {
         @Test
         @DisplayName("should throw AuthorizationException when user is not logged in")
         void shouldThrowWhenNotLoggedIn() {
-            when(accountAuthorizationService.getCurrentUserId()).thenThrow(new AuthorizationException("Bu işlem için giriş yapmalısınız."));
+            when(accountAuthorizationService.getCurrentUserId())
+                    .thenThrow(new AuthorizationException("Bu işlem için giriş yapmalısınız."));
 
             assertThatThrownBy(() -> query.execute(0, 20))
                     .isExactlyInstanceOf(AuthorizationException.class)

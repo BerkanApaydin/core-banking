@@ -25,7 +25,8 @@ import java.util.Optional;
 
 import org.mockito.InOrder;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -91,8 +92,8 @@ class ReverseTransferUseCaseImplTest {
             verify(loadAccountPort).findByIdWithLock(1L);
             verify(loadAccountPort).findByIdWithLock(2L);
             verify(userContextService).checkUserAuthorization(10L, "You are not authorized for this operation.");
-            assertEquals(Money.of("1000.00", Currency.TRY), sender.getBalance());
-            assertEquals(Money.of("500.00", Currency.TRY), receiver.getBalance());
+            assertThat(sender.getBalance()).isEqualTo(Money.of("1000.00", Currency.TRY));
+            assertThat(receiver.getBalance()).isEqualTo(Money.of("500.00", Currency.TRY));
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
             verify(eventPublisherPort, times(2)).publish(any());
@@ -104,8 +105,8 @@ class ReverseTransferUseCaseImplTest {
         void shouldThrowWhenSenderNotFound() {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
@@ -114,29 +115,29 @@ class ReverseTransferUseCaseImplTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
         @DisplayName("should throw NullPointerException when senderId is null")
         void shouldThrowOnNullSenderId() {
-            assertThrows(NullPointerException.class,
-                    () -> useCase.execute(null, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(null, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("should throw NullPointerException when receiverId is null")
         void shouldThrowOnNullReceiverId() {
-            assertThrows(NullPointerException.class,
-                    () -> useCase.execute(1L, null, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, null, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("should throw NullPointerException when amount is null")
         void shouldThrowOnNullAmount() {
-            assertThrows(NullPointerException.class,
-                    () -> useCase.execute(1L, 2L, null));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, null))
+                    .isExactlyInstanceOf(NullPointerException.class);
         }
 
         @Test
@@ -170,8 +171,8 @@ class ReverseTransferUseCaseImplTest {
         void shouldThrowWhenReceiverNotFoundWithReversedOrder() {
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(5L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(5L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
@@ -180,8 +181,8 @@ class ReverseTransferUseCaseImplTest {
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
             when(loadAccountPort.findByIdWithLock(5L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(5L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(5L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
@@ -193,8 +194,8 @@ class ReverseTransferUseCaseImplTest {
 
             useCase.execute(1L, 2L, amount);
 
-            assertTrue(sender.getDomainEvents().isEmpty());
-            assertTrue(receiver.getDomainEvents().isEmpty());
+            assertThat(sender.getDomainEvents()).isEmpty();
+            assertThat(receiver.getDomainEvents()).isEmpty();
         }
     }
 }

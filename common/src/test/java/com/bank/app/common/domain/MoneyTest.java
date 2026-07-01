@@ -60,7 +60,7 @@ class MoneyTest {
         @DisplayName("should have scale of 2")
         void shouldHaveScale2() {
             Money money = Money.of("100.00", Currency.TRY);
-            org.junit.jupiter.api.Assertions.assertEquals(2, money.amount().scale());
+            assertThat(money.amount().scale()).isEqualTo(2);
         }
 
         @Test

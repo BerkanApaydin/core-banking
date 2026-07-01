@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings("null")
 @SpringBootTest(classes = com.bank.app.common.TestApplication.class)
-class IdempotencyConcurrencyTest extends AbstractSpringBootIntegrationTest {
+class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @MockitoBean
     private UserDetailsService userDetailsService;

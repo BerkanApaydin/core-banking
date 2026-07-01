@@ -27,7 +27,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,71 +59,71 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Autowired
         private ObjectMapper objectMapper;
 
-    @Autowired
-    private IdempotencyKeyJpaRepository idempotencyKeyRepo;
+        @Autowired
+        private IdempotencyKeyJpaRepository idempotencyKeyRepo;
 
-    @Autowired
-    private PlatformTransactionManager transactionManager;
+        @Autowired
+        private PlatformTransactionManager transactionManager;
 
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+        @Autowired
+        private JwtTokenProvider jwtTokenProvider;
 
-    @Autowired
-    private EntityManager entityManager;
+        @Autowired
+        private EntityManager entityManager;
 
-    private String jwtToken;
-    private Long u3Id;
+        private String jwtToken;
+        private Long u3Id;
 
-    void saveIdempotencyKeyInNewTransaction(IdempotencyKeyJpaEntity entity) {
-        var template = new TransactionTemplate(transactionManager);
-        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        template.execute(status -> {
-            idempotencyKeyRepo.save(entity);
-            return null;
-        });
-    }
+        void saveIdempotencyKeyInNewTransaction(IdempotencyKeyJpaEntity entity) {
+                var template = new TransactionTemplate(transactionManager);
+                template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                template.execute(status -> {
+                        idempotencyKeyRepo.save(entity);
+                        return null;
+                });
+        }
 
-    @BeforeEach
-    void setUp() {
-        SecurityContextHolder.clearContext();
-        LocaleContextHolder.setLocale(java.util.Locale.of("tr", "TR"), true);
+        @BeforeEach
+        void setUp() {
+                SecurityContextHolder.clearContext();
+                LocaleContextHolder.setLocale(java.util.Locale.of("tr", "TR"), true);
 
-        var template = new TransactionTemplate(transactionManager);
-        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                var template = new TransactionTemplate(transactionManager);
+                template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
-        Long[] userIds = template.execute(status -> {
-            UserJpaEntity u1 = userRepository.save(
-                    new UserJpaEntity(null, "u1", "pass", "ROLE_USER", null, null, null));
-            UserJpaEntity u2 = userRepository.save(
-                    new UserJpaEntity(null, "u2", "pass", "ROLE_USER", null, null, null));
-            UserJpaEntity u3 = userRepository.save(
-                    new UserJpaEntity(null, "u3", "pass", "ROLE_USER", null, null, null));
+                Long[] userIds = template.execute(status -> {
+                        UserJpaEntity u1 = userRepository.save(
+                                        new UserJpaEntity(null, "u1", "pass", "ROLE_USER", null, null, null));
+                        UserJpaEntity u2 = userRepository.save(
+                                        new UserJpaEntity(null, "u2", "pass", "ROLE_USER", null, null, null));
+                        UserJpaEntity u3 = userRepository.save(
+                                        new UserJpaEntity(null, "u3", "pass", "ROLE_USER", null, null, null));
 
-            accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
-                    new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
-            accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
-                    new BigDecimal("500.00"), "TRY", "ACTIVE", null));
-            accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
-                    new BigDecimal("500.00"), "TRY", "SUSPENDED", null));
-            u3Id = u3.getId();
-            return new Long[]{u1.getId(), u2.getId(), u3.getId()};
-        });
+                        accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
+                                        new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                        accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
+                                        new BigDecimal("500.00"), "TRY", "ACTIVE", null));
+                        accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
+                                        new BigDecimal("500.00"), "TRY", "SUSPENDED", null));
+                        u3Id = u3.getId();
+                        return new Long[] { u1.getId(), u2.getId(), u3.getId() };
+                });
 
-        jwtToken = jwtTokenProvider.generateToken(userIds[0], "u1");
-    }
+                jwtToken = jwtTokenProvider.generateToken(userIds[0], "u1");
+        }
 
-    @AfterEach
-    void tearDown() {
-        var template = new TransactionTemplate(transactionManager);
-        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        template.execute(status -> {
-            idempotencyKeyRepo.deleteAll();
-            accountRepo.deleteAll();
-            userRepository.deleteAll();
-            return null;
-        });
-        SecurityContextHolder.clearContext();
-    }
+        @AfterEach
+        void tearDown() {
+                var template = new TransactionTemplate(transactionManager);
+                template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                template.execute(status -> {
+                        idempotencyKeyRepo.deleteAll();
+                        accountRepo.deleteAll();
+                        userRepository.deleteAll();
+                        return null;
+                });
+                SecurityContextHolder.clearContext();
+        }
 
         @Test
         void shouldPerformTransferSuccessfully() throws Exception {
@@ -139,8 +138,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andReturn();
-
-        
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)

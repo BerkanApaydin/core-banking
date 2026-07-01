@@ -1,6 +1,5 @@
 package com.bank.app.account.domain.exception;
 
-import com.bank.app.account.domain.exception.AccountNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,7 +12,7 @@ class AccountExceptionTest {
         InvalidCurrencyException ex = new InvalidCurrencyException("XYZ");
         assertEquals("Invalid currency: XYZ", ex.getMessage());
         assertEquals("error.invalid_currency", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"XYZ"}, ex.getArgs());
+        assertArrayEquals(new Object[] { "XYZ" }, ex.getArgs());
     }
 
     @Test
@@ -24,17 +23,17 @@ class AccountExceptionTest {
 
     @Test
     void shouldCreateInsufficientBalanceExceptionWithKeyAndArgs() {
-        InsufficientBalanceException ex = new InsufficientBalanceException("key", new Object[]{"arg"}, "default");
+        InsufficientBalanceException ex = new InsufficientBalanceException("key", new Object[] { "arg" }, "default");
         assertEquals("default", ex.getMessage());
         assertEquals("key", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"arg"}, ex.getArgs());
+        assertArrayEquals(new Object[] { "arg" }, ex.getArgs());
     }
 
     @Test
     void shouldCreateAccountNotFoundExceptionWithIban() {
         AccountNotFoundException ex = new AccountNotFoundException("TR290006200000000000000111");
         assertEquals("error.account_not_found", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"TR290006200000000000000111"}, ex.getArgs());
+        assertArrayEquals(new Object[] { "TR290006200000000000000111" }, ex.getArgs());
         assertEquals("Account not found. IBAN: TR290006200000000000000111", ex.getMessage());
         assertEquals("ACCOUNT_NOT_FOUND", ex.getErrorCode());
     }
@@ -43,7 +42,7 @@ class AccountExceptionTest {
     void shouldCreateAccountNotFoundExceptionWithId() {
         AccountNotFoundException ex = new AccountNotFoundException(42L);
         assertEquals("error.account_not_found", ex.getMessageKey());
-        assertArrayEquals(new Object[]{42L}, ex.getArgs());
+        assertArrayEquals(new Object[] { 42L }, ex.getArgs());
         assertEquals("Account not found. ID: 42", ex.getMessage());
         assertEquals("ACCOUNT_NOT_FOUND", ex.getErrorCode());
     }

@@ -31,7 +31,6 @@ import org.mockito.InOrder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -103,8 +102,8 @@ class ExecuteTransferUseCaseImplTest {
             verify(loadAccountPort).findByIdWithLock(1L);
             verify(loadAccountPort).findByIdWithLock(2L);
             verify(userContextService).checkUserAuthorization(10L, "You are not authorized to transfer from this account.");
-            assertEquals(Money.of("800.00", Currency.TRY), sender.getBalance());
-            assertEquals(Money.of("700.00", Currency.TRY), receiver.getBalance());
+            assertThat(sender.getBalance()).isEqualTo(Money.of("800.00", Currency.TRY));
+            assertThat(receiver.getBalance()).isEqualTo(Money.of("700.00", Currency.TRY));
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
             verify(eventPublisherPort, times(2)).publish(any());
@@ -174,8 +173,8 @@ class ExecuteTransferUseCaseImplTest {
         void shouldThrowWhenSenderNotFound() {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
@@ -184,8 +183,8 @@ class ExecuteTransferUseCaseImplTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
-            assertThrows(AccountNotFoundException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
@@ -201,8 +200,8 @@ class ExecuteTransferUseCaseImplTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
 
-            assertThrows(AccountNotActiveException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("100.00", Currency.TRY)))
+                    .isExactlyInstanceOf(AccountNotActiveException.class);
         }
 
         @Test
@@ -211,8 +210,8 @@ class ExecuteTransferUseCaseImplTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(sender));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiver));
 
-            assertThrows(InsufficientBalanceException.class,
-                    () -> useCase.execute(1L, 2L, Money.of("99999.00", Currency.TRY)));
+            assertThatThrownBy(() -> useCase.execute(1L, 2L, Money.of("99999.00", Currency.TRY)))
+                    .isExactlyInstanceOf(InsufficientBalanceException.class);
         }
 
         @Test
@@ -238,8 +237,8 @@ class ExecuteTransferUseCaseImplTest {
 
             useCase.execute(1L, 2L, amount);
 
-            assertTrue(sender.getDomainEvents().isEmpty());
-            assertTrue(receiver.getDomainEvents().isEmpty());
+            assertThat(sender.getDomainEvents()).isEmpty();
+            assertThat(receiver.getDomainEvents()).isEmpty();
         }
     }
 }

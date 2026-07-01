@@ -37,7 +37,7 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     }
 
     @Override
-    public void markCompleted(@NonNull String key, String responseBody, int responseStatus) {
+    public void markCompleted(String key, String responseBody, int responseStatus) {
         repository.findById(key).ifPresent(entity -> {
             entity.setStatus("COMPLETED");
             entity.setResponseBody(responseBody);
@@ -47,7 +47,7 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     }
 
     @Override
-    public void markFailed(@NonNull String key) {
+    public void markFailed(String key) {
         repository.findById(key).ifPresent(entity -> {
             entity.setStatus("FAILED");
             repository.save(entity);
@@ -55,7 +55,7 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     }
 
     @Override
-    public void deleteById(@NonNull String key) {
+    public void deleteById(String key) {
         repository.deleteById(key);
     }
 

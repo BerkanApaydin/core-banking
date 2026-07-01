@@ -1,28 +1,28 @@
 package com.bank.app.common.domain;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("null")
 class CurrencyTest {
 
     @Test
     void shouldHaveTryCurrency() {
-        assertEquals("TRY", Currency.TRY.name());
+        assertThat(Currency.TRY.name()).isEqualTo("TRY");
     }
 
     @Test
     void shouldHaveUsdCurrency() {
-        assertEquals("USD", Currency.USD.name());
+        assertThat(Currency.USD.name()).isEqualTo("USD");
     }
 
     @Test
     void shouldHaveEurCurrency() {
-        assertEquals("EUR", Currency.EUR.name());
+        assertThat(Currency.EUR.name()).isEqualTo("EUR");
     }
 
     @Test
     void shouldHaveThreeValues() {
-        assertEquals(3, Currency.values().length);
+        assertThat(Currency.values()).hasSize(3);
     }
 }

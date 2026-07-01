@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("null")
 class AccountJpaEntityTest {
@@ -13,13 +13,13 @@ class AccountJpaEntityTest {
     void shouldCreateAccountJpaEntity() {
         AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, "TRY", "ACTIVE", null);
 
-        assertEquals(1L, entity.getId());
-        assertEquals(2L, entity.getUserId());
-        assertEquals("IBAN", entity.getIban());
-        assertEquals("name", entity.getOwnerName());
-        assertEquals(BigDecimal.TEN, entity.getBalance());
-        assertEquals("TRY", entity.getCurrency());
-        assertEquals("ACTIVE", entity.getStatus());
+        assertThat(entity.getId()).isEqualTo(1L);
+        assertThat(entity.getUserId()).isEqualTo(2L);
+        assertThat(entity.getIban()).isEqualTo("IBAN");
+        assertThat(entity.getOwnerName()).isEqualTo("name");
+        assertThat(entity.getBalance()).isEqualByComparingTo(BigDecimal.TEN);
+        assertThat(entity.getCurrency()).isEqualTo("TRY");
+        assertThat(entity.getStatus()).isEqualTo("ACTIVE");
 
         AccountJpaEntity empty = new AccountJpaEntity();
         empty.setId(10L);
@@ -31,13 +31,13 @@ class AccountJpaEntityTest {
         empty.setStatus("SUSPENDED");
         empty.setVersion(5L);
 
-        assertEquals(10L, empty.getId());
-        assertEquals(20L, empty.getUserId());
-        assertEquals("IBAN2", empty.getIban());
-        assertEquals("name2", empty.getOwnerName());
-        assertEquals(BigDecimal.ONE, empty.getBalance());
-        assertEquals("USD", empty.getCurrency());
-        assertEquals("SUSPENDED", empty.getStatus());
-        assertEquals(5L, empty.getVersion());
+        assertThat(empty.getId()).isEqualTo(10L);
+        assertThat(empty.getUserId()).isEqualTo(20L);
+        assertThat(empty.getIban()).isEqualTo("IBAN2");
+        assertThat(empty.getOwnerName()).isEqualTo("name2");
+        assertThat(empty.getBalance()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(empty.getCurrency()).isEqualTo("USD");
+        assertThat(empty.getStatus()).isEqualTo("SUSPENDED");
+        assertThat(empty.getVersion()).isEqualTo(5L);
     }
 }

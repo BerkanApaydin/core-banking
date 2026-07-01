@@ -7,6 +7,7 @@ import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;
@@ -166,6 +167,16 @@ class AccountControllerWebMvcTest {
                                         .andExpect(jsonPath("$.id").value(1L))
                                         .andExpect(jsonPath("$.iban").value("TR290006200000000000000111"));
                 }
+
+                @Test
+                @DisplayName("should return 404 when account not found")
+                void shouldReturn404() throws Exception {
+                        when(getAccountByIdQuery.execute(999L))
+                                        .thenThrow(new AccountNotFoundException(999L));
+
+                        mockMvc.perform(get("/api/v1/accounts/999"))
+                                        .andExpect(status().isNotFound());
+                }
         }
 
         @Nested
@@ -182,6 +193,16 @@ class AccountControllerWebMvcTest {
                         mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000111"))
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.iban").value("TR290006200000000000000111"));
+                }
+
+                @Test
+                @DisplayName("should return 404 when iban not found")
+                void shouldReturn404() throws Exception {
+                        when(getAccountByIbanQuery.execute("TR290006200000000000000999"))
+                                        .thenThrow(new AccountNotFoundException("TR290006200000000000000999"));
+
+                        mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000999"))
+                                        .andExpect(status().isNotFound());
                 }
         }
 }

@@ -3,8 +3,6 @@ package com.bank.app.transfer.adapter.out.outbox;
 import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxPoller;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaEntity;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaRepository;
 import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
@@ -65,9 +63,9 @@ class OutboxPatternTest {
     }
 
     private static EventEntry eventEntry(String id, String aggregateType, String aggregateId,
-                                          String eventType, String payload, LocalDateTime createdAt,
-                                          boolean processed, LocalDateTime processedAt,
-                                          int retryCount, boolean deadLetter, String lastError) {
+            String eventType, String payload, LocalDateTime createdAt,
+            boolean processed, LocalDateTime processedAt,
+            int retryCount, boolean deadLetter, String lastError) {
         return new EventEntry(id, aggregateType, aggregateId, eventType, payload,
                 retryCount, processed, deadLetter, lastError, 0, createdAt);
     }
@@ -105,7 +103,7 @@ class OutboxPatternTest {
     }
 
     private static String transferCompletedJson(long transferId, long senderId, long receiverId,
-                                                 BigDecimal amount, String currency) throws Exception {
+            BigDecimal amount, String currency) throws Exception {
         ObjectMapper mapper = createMapper();
         return mapper.writeValueAsString(new TransferCompletedEvent(
                 transferId, senderId, receiverId,

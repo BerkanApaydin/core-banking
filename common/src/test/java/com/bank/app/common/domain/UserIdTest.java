@@ -1,7 +1,8 @@
 package com.bank.app.common.domain;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("null")
 class UserIdTest {
@@ -9,43 +10,46 @@ class UserIdTest {
     @Test
     void shouldCreateWithValidValue() {
         UserId userId = new UserId(42L);
-        assertEquals(42L, userId.value());
+        assertThat(userId.value()).isEqualTo(42L);
     }
 
     @Test
     void shouldThrowWhenValueIsNull() {
-        assertThrows(NullPointerException.class, () -> new UserId(null));
+        assertThatThrownBy(() -> new UserId(null))
+                .isExactlyInstanceOf(NullPointerException.class);
     }
 
     @Test
     void shouldThrowWhenValueIsZero() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new UserId(0L));
-        assertTrue(ex.getMessage().contains("positive"));
+        assertThatThrownBy(() -> new UserId(0L))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
     }
 
     @Test
     void shouldThrowWhenValueIsNegative() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new UserId(-1L));
-        assertTrue(ex.getMessage().contains("positive"));
+        assertThatThrownBy(() -> new UserId(-1L))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
     }
 
     @Test
     void shouldBeEqualWhenSameValue() {
-        assertEquals(new UserId(1L), new UserId(1L));
+        assertThat(new UserId(1L)).isEqualTo(new UserId(1L));
     }
 
     @Test
     void shouldNotBeEqualWhenDifferentValue() {
-        assertNotEquals(new UserId(1L), new UserId(2L));
+        assertThat(new UserId(1L)).isNotEqualTo(new UserId(2L));
     }
 
     @Test
     void shouldHaveSameHashCodeWhenSameValue() {
-        assertEquals(new UserId(1L).hashCode(), new UserId(1L).hashCode());
+        assertThat(new UserId(1L)).hasSameHashCodeAs(new UserId(1L));
     }
 
     @Test
     void shouldReturnStringRepresentation() {
-        assertEquals("42", new UserId(42L).toString());
+        assertThat(new UserId(42L).toString()).isEqualTo("42");
     }
 }

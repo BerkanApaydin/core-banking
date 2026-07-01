@@ -4,21 +4,29 @@ import com.bank.app.common.domain.Currency;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CreateAccountWebRequestTest {
 
+    private static ValidatorFactory factory;
     private static Validator validator;
 
     @BeforeAll
     static void setUp() {
-        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
-            validator = factory.getValidator();
+        factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
+    }
+
+    @AfterAll
+    static void tearDown() {
+        if (factory != null) {
+            factory.close();
         }
     }
 
@@ -27,11 +35,11 @@ class CreateAccountWebRequestTest {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
                 1L, "TR290006200000000000000123", "Ahmet Yılmaz",
                 new BigDecimal("1000.00"), Currency.TRY);
-        assertEquals(1L, request.userId());
-        assertEquals("TR290006200000000000000123", request.iban());
-        assertEquals("Ahmet Yılmaz", request.ownerName());
-        assertEquals(new BigDecimal("1000.00"), request.initialBalance());
-        assertEquals(Currency.TRY, request.currency());
+        assertThat(request.userId()).isEqualTo(1L);
+        assertThat(request.iban()).isEqualTo("TR290006200000000000000123");
+        assertThat(request.ownerName()).isEqualTo("Ahmet Yılmaz");
+        assertThat(request.initialBalance()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(request.currency()).isEqualTo(Currency.TRY);
     }
 
     @Test
@@ -40,7 +48,7 @@ class CreateAccountWebRequestTest {
                 null, "TR290006200000000000000123", "Ahmet",
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 
     @Test
@@ -48,7 +56,7 @@ class CreateAccountWebRequestTest {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
                 1L, "", "Ahmet", new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 
     @Test
@@ -56,7 +64,7 @@ class CreateAccountWebRequestTest {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
                 1L, "invalid", "Ahmet", new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 
     @Test
@@ -65,7 +73,7 @@ class CreateAccountWebRequestTest {
                 1L, "TR290006200000000000000123", "",
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 
     @Test
@@ -73,7 +81,7 @@ class CreateAccountWebRequestTest {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
                 1L, "TR290006200000000000000123", "Ahmet", null, Currency.TRY);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 
     @Test
@@ -82,6 +90,6 @@ class CreateAccountWebRequestTest {
                 1L, "TR290006200000000000000123", "Ahmet",
                 new BigDecimal("1000.00"), null);
         var violations = validator.validate(request);
-        assertFalse(violations.isEmpty());
+        assertThat(violations).isNotEmpty();
     }
 }

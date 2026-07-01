@@ -421,7 +421,7 @@ class AccountTest {
         }
 
         @Test
-        @DisplayName("should close SUSPENDED account with zero balance")
+        @DisplayName("should close SUSPENDED account with zero balance and record timestamp")
         void shouldCloseSuspendedAccount() {
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
@@ -432,6 +432,8 @@ class AccountTest {
             assertThat(account.getDomainEvents())
                     .hasSize(1)
                     .allMatch(e -> e instanceof AccountClosedEvent);
+            AccountClosedEvent event = (AccountClosedEvent) account.getDomainEvents().getFirst();
+            assertThat(event.occurredAt()).isEqualTo(fixedNow);
         }
     }
 

@@ -10,11 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("null")
 class AccountMapperTest {
@@ -29,15 +26,15 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertNotNull(entity);
-        assertEquals(1L, entity.getId());
-        assertEquals(100L, entity.getUserId());
-        assertEquals("TR290006200000000000000111", entity.getIban());
-        assertEquals("Ahmet", entity.getOwnerName());
-        assertEquals(new BigDecimal("1000.00"), entity.getBalance());
-        assertEquals("TRY", entity.getCurrency());
-        assertEquals("ACTIVE", entity.getStatus());
-        assertEquals(3L, entity.getVersion());
+        assertThat(entity).isNotNull();
+        assertThat(entity.getId()).isEqualTo(1L);
+        assertThat(entity.getUserId()).isEqualTo(100L);
+        assertThat(entity.getIban()).isEqualTo("TR290006200000000000000111");
+        assertThat(entity.getOwnerName()).isEqualTo("Ahmet");
+        assertThat(entity.getBalance()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(entity.getCurrency()).isEqualTo("TRY");
+        assertThat(entity.getStatus()).isEqualTo("ACTIVE");
+        assertThat(entity.getVersion()).isEqualTo(3L);
     }
 
     @Test
@@ -47,26 +44,28 @@ class AccountMapperTest {
 
         Account domain = mapper.toDomain(entity);
 
-        assertNotNull(domain);
-        assertEquals(2L, domain.getId());
-        assertEquals(200L, domain.getUserId().value());
-        assertEquals("TR290006200000000000000222", domain.getIban().value());
-        assertEquals("Mehmet", domain.getOwnerName());
-        assertEquals(new BigDecimal("500.00"), domain.getBalance().amount());
-        assertEquals(Currency.USD, domain.getBalance().currency());
-        assertEquals(AccountStatus.SUSPENDED, domain.getStatus());
-        assertFalse(domain.isActive());
-        assertEquals(5L, domain.getVersion());
+        assertThat(domain).isNotNull();
+        assertThat(domain.getId()).isEqualTo(2L);
+        assertThat(domain.getUserId().value()).isEqualTo(200L);
+        assertThat(domain.getIban().value()).isEqualTo("TR290006200000000000000222");
+        assertThat(domain.getOwnerName()).isEqualTo("Mehmet");
+        assertThat(domain.getBalance().amount()).isEqualByComparingTo(new BigDecimal("500.00"));
+        assertThat(domain.getBalance().currency()).isEqualTo(Currency.USD);
+        assertThat(domain.getStatus()).isEqualTo(AccountStatus.SUSPENDED);
+        assertThat(domain.isActive()).isFalse();
+        assertThat(domain.getVersion()).isEqualTo(5L);
     }
 
     @Test
     void shouldThrowWhenDomainIsNull() {
-        assertThrows(IllegalArgumentException.class, () -> mapper.toJpaEntity(null));
+        assertThatThrownBy(() -> mapper.toJpaEntity(null))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shouldThrowWhenEntityIsNull() {
-        assertThrows(IllegalArgumentException.class, () -> mapper.toDomain(null));
+        assertThatThrownBy(() -> mapper.toDomain(null))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -77,7 +76,7 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertNull(entity.getVersion());
+        assertThat(entity.getVersion()).isNull();
     }
 
     @Test
@@ -87,7 +86,7 @@ class AccountMapperTest {
 
         Account domain = mapper.toDomain(entity);
 
-        assertNull(domain.getVersion());
+        assertThat(domain.getVersion()).isNull();
     }
 
     @Test
@@ -98,7 +97,7 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertEquals("EUR", entity.getCurrency());
+        assertThat(entity.getCurrency()).isEqualTo("EUR");
     }
 
     @Test
@@ -108,7 +107,7 @@ class AccountMapperTest {
 
         Account domain = mapper.toDomain(entity);
 
-        assertEquals(Currency.EUR, domain.getBalance().currency());
+        assertThat(domain.getBalance().currency()).isEqualTo(Currency.EUR);
     }
 
     @Test
@@ -118,8 +117,8 @@ class AccountMapperTest {
 
         Account domain = mapper.toDomain(entity);
 
-        assertEquals(AccountStatus.CLOSED, domain.getStatus());
-        assertFalse(domain.isActive());
+        assertThat(domain.getStatus()).isEqualTo(AccountStatus.CLOSED);
+        assertThat(domain.isActive()).isFalse();
     }
 
     @Test
@@ -130,7 +129,7 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertEquals("CLOSED", entity.getStatus());
+        assertThat(entity.getStatus()).isEqualTo("CLOSED");
     }
 
     @Test
@@ -138,6 +137,7 @@ class AccountMapperTest {
         AccountJpaEntity entity = new AccountJpaEntity(9L, 900L, "TR290006200000000000000999",
                 "Invalid", new BigDecimal("100.00"), "INVALID", "ACTIVE", null);
 
-        assertThrows(IllegalArgumentException.class, () -> mapper.toDomain(entity));
+        assertThatThrownBy(() -> mapper.toDomain(entity))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 }
