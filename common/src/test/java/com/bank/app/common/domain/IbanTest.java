@@ -72,6 +72,17 @@ class IbanTest {
     }
 
     @Test
+    void toStringShouldReturnValueWhenLengthLessThanEight() {
+        Iban.configurePattern("^[A-Z0-9]{1,}$");
+        try {
+            Iban iban = new Iban("TR12");
+            assertThat(iban.toString()).isEqualTo("TR12");
+        } finally {
+            Iban.configurePattern("^TR[0-9]{24}$");
+        }
+    }
+
+    @Test
     void normalizeShouldReturnNullWhenNull() {
         assertThat(Iban.normalize(null)).isNull();
     }

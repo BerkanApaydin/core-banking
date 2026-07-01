@@ -206,4 +206,11 @@ class TransferAccountHelperTest {
             assertThat(receiver.getDomainEvents()).isEmpty();
         }
     }
+
+    @Test
+    @DisplayName("should have accessible constructor")
+    void shouldHaveAccessibleConstructor() {
+        TransferAccountHelper helper = new TransferAccountHelper();
+        assertThat(helper).isNotNull();
+    }
 }

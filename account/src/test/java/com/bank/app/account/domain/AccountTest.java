@@ -380,6 +380,17 @@ class AccountTest {
             assertThatThrownBy(account::suspend)
                     .isExactlyInstanceOf(AccountClosedException.class);
         }
+
+        @Test
+        @DisplayName("should suspend with default clock")
+        void shouldSuspendWithDefaultClock() {
+            Account account = activeAccount(1000);
+            account.suspend();
+            assertThat(account.getStatus()).isEqualTo(AccountStatus.SUSPENDED);
+            assertThat(account.getDomainEvents())
+                    .hasSize(1)
+                    .allMatch(e -> e instanceof AccountSuspendedEvent);
+        }
     }
 
     @Nested
@@ -434,6 +445,18 @@ class AccountTest {
                     .allMatch(e -> e instanceof AccountClosedEvent);
             AccountClosedEvent event = (AccountClosedEvent) account.getDomainEvents().getFirst();
             assertThat(event.occurredAt()).isEqualTo(fixedNow);
+        }
+
+        @Test
+        @DisplayName("should close active account with zero balance using default clock")
+        void shouldCloseWithDefaultClock() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
+                    AccountStatus.ACTIVE);
+            account.close();
+            assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
+            assertThat(account.getDomainEvents())
+                    .hasSize(1)
+                    .allMatch(e -> e instanceof AccountClosedEvent);
         }
     }
 
@@ -500,6 +523,30 @@ class AccountTest {
                     AccountStatus.ACTIVE);
             assertThat(a1.hashCode()).isEqualTo(a2.hashCode());
             assertThat(a1.hashCode()).isNotEqualTo(a3.hashCode());
+        }
+
+        @Test
+        @DisplayName("equals should return true for same reference")
+        void equalsWhenSameReference() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+                    AccountStatus.ACTIVE);
+            assertThat(account).isEqualTo(account);
+        }
+
+        @Test
+        @DisplayName("hashCode should return 0 when id is null")
+        void hashCodeWhenNullId() {
+            Account account = new Account(null, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+                    AccountStatus.ACTIVE);
+            assertThat(account.hashCode()).isZero();
+        }
+
+        @Test
+        @DisplayName("toString should contain account fields")
+        void toStringShouldContainFields() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+                    AccountStatus.ACTIVE);
+            assertThat(account.toString()).contains("id=1", "iban=", "status=ACTIVE", "balance=");
         }
     }
 

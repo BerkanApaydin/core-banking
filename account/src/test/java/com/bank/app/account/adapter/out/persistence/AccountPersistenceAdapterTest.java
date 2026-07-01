@@ -144,5 +144,22 @@ class AccountPersistenceAdapterTest {
             verify(springDataRepo).findByIdIn(List.of(1L, 2L));
         }
     }
+
+    @Test
+    @DisplayName("should return all accounts")
+    void shouldFindAll() {
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111",
+                "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 100L, "TR290006200000000000000222",
+                "Mehmet", new BigDecimal("500.00"), "USD", "ACTIVE", null);
+        when(springDataRepo.findAll()).thenReturn(List.of(entity1, entity2));
+
+        List<Account> result = repository.findAll();
+
+        assertEquals(2, result.size());
+        assertEquals("Ahmet", result.get(0).getOwnerName());
+        assertEquals("Mehmet", result.get(1).getOwnerName());
+        verify(springDataRepo).findAll();
+    }
 }
 

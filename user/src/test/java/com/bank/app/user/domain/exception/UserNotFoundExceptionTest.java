@@ -18,4 +18,10 @@ class UserNotFoundExceptionTest {
         UserNotFoundException ex = new UserNotFoundException("test");
         assertInstanceOf(RuntimeException.class, ex);
     }
+
+    @Test
+    void shouldReturn404HttpStatusCode() {
+        UserNotFoundException ex = new UserNotFoundException("test");
+        assertEquals(404, ex.getHttpStatusCode());
+    }
 }

@@ -83,4 +83,15 @@ class AuditActionTest {
         AuditAction action = AuditAction.valueOf("ACCOUNT_CLOSED");
         assertEquals(AuditAction.ACCOUNT_CLOSED, action);
     }
+
+    @Test
+    void shouldResolveFromString() {
+        AuditAction action = AuditAction.fromString("ACCOUNT_CREATED");
+        assertEquals(AuditAction.ACCOUNT_CREATED, action);
+    }
+
+    @Test
+    void shouldThrowWhenFromStringIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> AuditAction.fromString(null));
+    }
 }

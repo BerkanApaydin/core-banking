@@ -114,4 +114,30 @@ class JwtTokenProviderTest {
         String token = shortLived.generateToken(1L, "testUser");
         assertFalse(shortLived.isTokenValid(token));
     }
+
+    @Test
+    void shouldThrowWhenSecretIsTooShort() {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"test"});
+        JwtTokenProvider provider = new JwtTokenProvider(environment, "c2hvcnQ=", 86400000L, false);
+        assertThrows(IllegalStateException.class, () -> provider.validateSecret());
+    }
+
+    @Test
+    void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
+        JwtTokenProvider provider = new JwtTokenProvider(environment, SECRET, 86400000L, true);
+        javax.crypto.SecretKey key = io.jsonwebtoken.security.Keys.hmacShaKeyFor(
+                io.jsonwebtoken.io.Decoders.BASE64.decode(SECRET));
+        String token = io.jsonwebtoken.Jwts.builder()
+                .subject("testUser")
+                .issuedAt(new java.util.Date())
+                .expiration(new java.util.Date(System.currentTimeMillis() + 86400000L))
+                .signWith(key)
+                .compact();
+        assertNull(provider.extractUserId(token));
+    }
+
+    @Test
+    void shouldReturnExpirationMs() {
+        assertEquals(86400000L, jwtTokenProvider.getExpirationMs());
+    }
 }

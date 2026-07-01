@@ -261,5 +261,24 @@ class UserTest {
             User user2 = User.create("newuser", "pass");
             assertThat(user1).isNotEqualTo(user2);
         }
+
+        @Test
+        @DisplayName("hashCode should return 0 when id is null")
+        void hashCodeWhenIdNull() {
+            User user = User.create("newuser", "pass");
+            assertThat(user.hashCode()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("toString")
+    class ToStringMethod {
+
+        @Test
+        @DisplayName("should include id, username and role")
+        void shouldIncludeKeyFields() {
+            User user = new User(new UserId(5L), "testuser", "pass", Role.ROLE_ADMIN);
+            assertThat(user).hasToString("User{id=5, username='testuser', role='ROLE_ADMIN'}");
+        }
     }
 }

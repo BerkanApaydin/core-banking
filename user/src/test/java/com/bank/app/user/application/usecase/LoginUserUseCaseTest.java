@@ -243,4 +243,5 @@ class LoginUserUseCaseTest {
             verify(loginAttemptPort, never()).recordFailure(any(), any());
         }
     }
+
 }

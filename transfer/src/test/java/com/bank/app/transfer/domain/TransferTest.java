@@ -376,5 +376,36 @@ class TransferTest {
             Transfer t2 = new Transfer(1L, 3L, 4L, Money.of("200.00", Currency.USD), TransferStatus.PENDING, now());
             assertThat(t1).hasSameHashCodeAs(t2);
         }
+
+        @Test
+        @DisplayName("equals should return false when this.id is null and other.id is not null")
+        void notEqualsWhenThisIdIsNull() {
+            Transfer t1 = Transfer.create(1L, 2L, AMOUNT);
+            Transfer t2 = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
+            assertThat(t1).isNotEqualTo(t2);
+        }
+
+        @Test
+        @DisplayName("hashCode should return 0 when id is null")
+        void hashCodeWithNullId() {
+            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            assertThat(transfer.hashCode()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("toString")
+    class ToString {
+
+        @Test
+        @DisplayName("should include id, sender, receiver, amount, and status")
+        void shouldIncludeFields() {
+            Transfer transfer = new Transfer(1L, 10L, 20L, AMOUNT, TransferStatus.COMPLETED, now());
+            assertThat(transfer.toString())
+                    .contains("id=1")
+                    .contains("sender=10")
+                    .contains("receiver=20")
+                    .contains("status=COMPLETED");
+        }
     }
 }

@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -35,6 +36,7 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.BusinessException;
@@ -459,6 +461,18 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("GENERAL_INTERNAL_ERROR", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldHandleNoResourceFoundException() {
+        NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/api/resource");
+
+        ResponseEntity<ProblemDetail> response = handler.handleNoResourceFoundException(ex, null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("RESOURCE_NOT_FOUND", response.getBody().getProperties().get("code"));
+        assertTrue(((String) response.getBody().getProperties().get("message")).contains("/api/resource"));
     }
 
     @Test

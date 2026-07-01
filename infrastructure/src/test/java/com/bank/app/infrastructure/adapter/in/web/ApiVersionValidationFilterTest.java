@@ -131,4 +131,45 @@ class ApiVersionValidationFilterTest {
         verify(chain).doFilter(request, response);
         assertEquals(200, response.getStatus());
     }
+
+    @Test
+    void shouldReturn406ForInvalidVersionFormat() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/auth/login");
+        request.addHeader("X-API-Version", "invalid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(406, response.getStatus());
+        assertTrue(response.getContentAsString().contains("API version mismatch"));
+    }
+
+    @Test
+    void shouldAllowWhenVersionHeaderMatchesApiRootPath() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v2");
+        request.addHeader("X-API-Version", "v2");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void shouldAllowWhenPathHasNoVersionSegmentAndNoHeader() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertEquals(200, response.getStatus());
+    }
 }

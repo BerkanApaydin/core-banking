@@ -167,6 +167,43 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
+    void shouldUpdateExistingTransfer() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
+        TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
+                "COMPLETED", 1L, now);
+        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
+                "COMPLETED", 2L, now);
+
+        when(springDataRepo.findById(10L)).thenReturn(Optional.of(existingEntity));
+        when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
+
+        Transfer result = repository.save(domainTransfer);
+
+        assertNotNull(result);
+        assertEquals(10L, result.getId());
+        assertEquals(1L, result.getSenderAccountId());
+        assertEquals(2L, result.getReceiverAccountId());
+        assertEquals(TransferStatus.COMPLETED, result.getStatus());
+        verify(springDataRepo).findById(10L);
+        verify(springDataRepo).save(any(TransferJpaEntity.class));
+    }
+
+    @Test
+    void shouldThrowWhenUpdatingNonExistentTransfer() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer domainTransfer = new Transfer(999L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
+
+        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> repository.save(domainTransfer));
+        assertEquals("Transfer not found: 999", ex.getMessage());
+        verify(springDataRepo).findById(999L);
+        verify(springDataRepo, never()).save(any());
+    }
+
+    @Test
     void shouldFindByIdWithLockSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
