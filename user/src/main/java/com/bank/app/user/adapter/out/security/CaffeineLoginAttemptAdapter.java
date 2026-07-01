@@ -4,12 +4,14 @@ import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
+@ConditionalOnProperty(name = "app.security.failed-login.backend", havingValue = "caffeine", matchIfMissing = true)
 public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
 
     private final Cache<String, AtomicInteger> ipCache;

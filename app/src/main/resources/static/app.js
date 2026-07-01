@@ -1,6 +1,264 @@
 // --- Configuration ---
 const API_BASE = '/api/v1';
 
+// --- i18n Translations ---
+const translations = {
+    en: {
+        'app.title': 'X Bank - Digital Banking',
+        'welcome': 'Welcome',
+        'welcome.subtitle': 'Please log in to continue.',
+        'auth.login': 'Login',
+        'auth.register': 'Register',
+        'auth.username': 'Username',
+        'auth.password': 'Password',
+        'auth.username.placeholder': 'Enter your username',
+        'auth.password.placeholder': 'Enter your password',
+        'auth.register.username.placeholder': 'Choose a new username',
+        'auth.register.password.placeholder': 'Set a strong password',
+        'auth.password.hint': 'Password must be at least 8 characters, contain at least one uppercase letter, one lowercase letter, and one digit.',
+        'auth.register.submit': 'Create Account & Register',
+        'auth.login.submit': 'Login',
+        'auth.login.success': 'Login successful. Welcome!',
+        'auth.login.failed': 'Login failed: ',
+        'auth.register.success': 'Registration completed successfully. You can now log in.',
+        'auth.register.failed': 'Registration failed: ',
+        'auth.logout': 'Logout',
+        'auth.logout.success': 'Logged out successfully.',
+        'auth.session_expired': 'Your session has expired, please log in again.',
+        'nav.accounts': 'My Accounts',
+        'nav.transfer': 'Money Transfer',
+        'nav.reports': 'Analytics & Report',
+        'nav.user.role': 'Customer',
+        'account.title': 'Account Management',
+        'account.subtitle': 'View your active bank accounts and create new ones.',
+        'account.open_new': 'Open New Account',
+        'account.balance_label': 'Available Balance',
+        'account.active': 'Active',
+        'account.inactive': 'Inactive',
+        'account.no_accounts': 'No accounts found. You can start by opening a new account.',
+        'account.load_error': 'Account information could not be loaded. Please refresh the page.',
+        'account.created': 'Your account has been successfully created.',
+        'account.iban_hint': 'Enter a 26-character IBAN starting with "TR".',
+        'account.iban_must_be_26': 'IBAN number must be exactly 26 characters.',
+        'transfer.title': 'Money Transfer',
+        'transfer.subtitle': 'Transfer securely and instantly between your accounts or to other IBANs.',
+        'transfer.sender_label': 'Sender Account',
+        'transfer.sender_placeholder': 'Select sender',
+        'transfer.recipient_type': 'Recipient Account Type',
+        'transfer.recipient_registered': 'Registered Account',
+        'transfer.recipient_manual': 'Enter Manual IBAN',
+        'transfer.recipient_label': 'Recipient Account',
+        'transfer.recipient_placeholder': 'Select recipient',
+        'transfer.recipient_iban': 'Recipient IBAN',
+        'transfer.amount': 'Amount',
+        'transfer.currency': 'Currency',
+        'transfer.submit': 'Complete Transfer',
+        'transfer.swap_title': 'Swap Accounts',
+        'transfer.swap_warning': 'You can only swap when two registered accounts are selected.',
+        'transfer.select_sender': 'Please select a sender account.',
+        'transfer.insufficient_balance': 'Sender account balance is insufficient for this transaction.',
+        'transfer.select_recipient': 'Please select a recipient account.',
+        'transfer.cannot_same': 'Cannot transfer to the same account.',
+        'transfer.currency_mismatch': 'Cannot transfer between accounts with mismatched currencies.',
+        'transfer.valid_iban': 'Enter a valid 26-digit recipient IBAN.',
+        'transfer.cannot_sender': 'Cannot transfer to the sender account.',
+        'transfer.success': 'Transfer completed successfully!',
+        'transfer.limit': 'Limit',
+        'transfer.info_title': 'Transaction Information',
+        'transfer.info_instant': 'Your transfers are processed instantly 7/24 via FAST infrastructure.',
+        'transfer.info_cancel': 'Per our security standards, transfers made within the last 24 hours can be cancelled.',
+        'transfer.info_currency': 'Inter-account transfers require matching currencies.',
+        'transfer.cancel_confirm': 'Are you sure you want to cancel this transfer and refund the money?',
+        'transfer.cancelled': 'Transfer successfully cancelled and balances updated.',
+        'transfer.cancelled_prefix': '[CANCELLED] ',
+        'transfer.outgoing': 'Transfer: Recipient IBAN ({0})',
+        'transfer.incoming': 'Incoming Transfer: Sender IBAN ({0})',
+        'transfer.cancel_btn': 'Cancel',
+        'report.title': 'Analytics & Account Details',
+        'report.subtitle': 'Review your account activity and generate detailed reports for specific date ranges.',
+        'report.account_label': 'Account to Review',
+        'report.account_placeholder': 'Select account',
+        'report.history_tab': 'Account History',
+        'report.generator_tab': 'Report Generator',
+        'report.history_title': 'Recent Account History',
+        'report.history_empty': 'Select an account from the left to view transaction history.',
+        'report.generator_title': 'Date-Based Report Generation',
+        'report.start_date': 'Start Date',
+        'report.end_date': 'End Date',
+        'report.generate': 'Generate Report',
+        'report.select_account_first': 'Please select an account first.',
+        'report.stat_count': 'Total Transactions',
+        'report.stat_volume': 'Total Volume',
+        'report.no_transactions': 'No transactions found in the selected date range.',
+        'report.table_date': 'Date',
+        'report.table_description': 'Description',
+        'report.table_status': 'Status',
+        'report.table_amount': 'Amount',
+        'report.status_completed': 'COMPLETED',
+        'report.status_cancelled': 'CANCELLED',
+        'report.history_none': 'No transaction history found for this account.',
+        'report.history_loading': 'Loading transactions...',
+        'report.load_error': 'Account history could not be loaded.',
+        'modal.create_title': 'Create New Account',
+        'modal.owner_name': 'Account Holder Name',
+        'modal.owner_placeholder': 'e.g. John Doe',
+        'modal.iban': 'IBAN Number',
+        'modal.iban_placeholder': 'TR000000000000000000000000',
+        'modal.balance': 'Initial Balance',
+        'modal.currency': 'Currency',
+        'modal.cancel': 'Cancel',
+        'modal.create': 'Create Account',
+        'general.error': 'An error occurred.',
+        'general.loading': 'Loading...',
+    },
+    tr: {
+        'app.title': 'X Bank - Dijital Bankacılık',
+        'welcome': 'Hoş Geldiniz',
+        'welcome.subtitle': 'Devam etmek için lütfen giriş yapın.',
+        'auth.login': 'Giriş Yap',
+        'auth.register': 'Kayıt Ol',
+        'auth.username': 'Kullanıcı Adı',
+        'auth.password': 'Şifre',
+        'auth.username.placeholder': 'Kullanıcı adınızı girin',
+        'auth.password.placeholder': 'Şifrenizi girin',
+        'auth.register.username.placeholder': 'Yeni bir kullanıcı adı seçin',
+        'auth.register.password.placeholder': 'Güçlü bir şifre belirleyin',
+        'auth.password.hint': 'Şifre en az 8 karakter olmalı, en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.',
+        'auth.register.submit': 'Hesap Oluştur & Kaydol',
+        'auth.login.submit': 'Giriş Yap',
+        'auth.login.success': 'Giriş başarılı. Hoş geldiniz!',
+        'auth.login.failed': 'Giriş başarısız: ',
+        'auth.register.success': 'Kayıt başarıyla tamamlandı. Şimdi giriş yapabilirsiniz.',
+        'auth.register.failed': 'Kayıt başarısız: ',
+        'auth.logout': 'Çıkış Yap',
+        'auth.logout.success': 'Başarıyla çıkış yapıldı.',
+        'auth.session_expired': 'Oturumunuz süresi doldu, lütfen tekrar giriş yapın.',
+        'nav.accounts': 'Hesaplarım',
+        'nav.transfer': 'Para Transferi',
+        'nav.reports': 'Analitik & Rapor',
+        'nav.user.role': 'Müşteri',
+        'account.title': 'Hesap Yönetimi',
+        'account.subtitle': 'Aktif banka hesaplarınızı görüntüleyin ve yeni hesap açın.',
+        'account.open_new': 'Yeni Hesap Aç',
+        'account.balance_label': 'Kullanılabilir Bakiye',
+        'account.active': 'Aktif',
+        'account.inactive': 'Pasif',
+        'account.no_accounts': 'Hiç hesap bulunamadı. Yeni bir hesap açarak başlayabilirsiniz.',
+        'account.load_error': 'Hesap bilgileri yüklenemedi. Lütfen sayfayı yenileyin.',
+        'account.created': 'Hesabınız başarıyla oluşturuldu.',
+        'account.iban_hint': '"TR" ile başlayan 26 karakterli bir IBAN girin.',
+        'account.iban_must_be_26': 'IBAN numarası tam olarak 26 karakter olmalıdır.',
+        'transfer.title': 'Para Transferi',
+        'transfer.subtitle': 'Hesaplarınız arasında veya diğer IBAN\'lara güvenli ve anında transfer yapın.',
+        'transfer.sender_label': 'Gönderen Hesap',
+        'transfer.sender_placeholder': 'Göndereni seçin',
+        'transfer.recipient_type': 'Alıcı Hesap Türü',
+        'transfer.recipient_registered': 'Kayıtlı Hesap',
+        'transfer.recipient_manual': 'Manuel IBAN Gir',
+        'transfer.recipient_label': 'Alıcı Hesap',
+        'transfer.recipient_placeholder': 'Alıcıyı seçin',
+        'transfer.recipient_iban': 'Alıcı IBAN',
+        'transfer.amount': 'Tutar',
+        'transfer.currency': 'Para Birimi',
+        'transfer.submit': 'Transferi Tamamla',
+        'transfer.swap_title': 'Hesapları Değiştir',
+        'transfer.swap_warning': 'Sadece iki kayıtlı hesap seçiliyken değişim yapabilirsiniz.',
+        'transfer.select_sender': 'Lütfen bir gönderen hesabı seçin.',
+        'transfer.insufficient_balance': 'Gönderen hesap bakiyesi bu işlem için yetersiz.',
+        'transfer.select_recipient': 'Lütfen bir alıcı hesabı seçin.',
+        'transfer.cannot_same': 'Aynı hesaba transfer yapılamaz.',
+        'transfer.currency_mismatch': 'Para birimleri eşleşmeyen hesaplar arasında transfer yapılamaz.',
+        'transfer.valid_iban': 'Geçerli 26 haneli bir alıcı IBAN\'ı girin.',
+        'transfer.cannot_sender': 'Gönderen hesaba transfer yapılamaz.',
+        'transfer.success': 'Transfer başarıyla tamamlandı!',
+        'transfer.limit': 'Limit',
+        'transfer.info_title': 'İşlem Bilgileri',
+        'transfer.info_instant': 'Transferleriniz FAST altyapısı ile 7/24 anında işlenir.',
+        'transfer.info_cancel': 'Güvenlik standartlarımız gereği son 24 saat içinde yapılan transferler iptal edilebilir.',
+        'transfer.info_currency': 'Hesaplar arası transferlerde para birimleri eşleşmelidir.',
+        'transfer.cancel_confirm': 'Bu transferi iptal edip parayı iade etmek istediğinize emin misiniz?',
+        'transfer.cancelled': 'Transfer başarıyla iptal edildi ve bakiyeler güncellendi.',
+        'transfer.cancelled_prefix': '[İPTAL EDİLDİ] ',
+        'transfer.outgoing': 'Transfer: Alıcı IBAN ({0})',
+        'transfer.incoming': 'Gelen Transfer: Gönderen IBAN ({0})',
+        'transfer.cancel_btn': 'İptal Et',
+        'report.title': 'Analitik & Hesap Detayları',
+        'report.subtitle': 'Hesap aktivitelerinizi inceleyin ve belirli tarih aralıkları için detaylı raporlar oluşturun.',
+        'report.account_label': 'İncelenecek Hesap',
+        'report.account_placeholder': 'Hesap seçin',
+        'report.history_tab': 'Hesap Geçmişi',
+        'report.generator_tab': 'Rapor Oluşturucu',
+        'report.history_title': 'Son Hesap Hareketleri',
+        'report.history_empty': 'İşlem geçmişini görüntülemek için soldan bir hesap seçin.',
+        'report.generator_title': 'Tarih Bazlı Rapor Oluşturma',
+        'report.start_date': 'Başlangıç Tarihi',
+        'report.end_date': 'Bitiş Tarihi',
+        'report.generate': 'Rapor Oluştur',
+        'report.select_account_first': 'Lütfen önce bir hesap seçin.',
+        'report.stat_count': 'Toplam İşlem',
+        'report.stat_volume': 'Toplam Hacim',
+        'report.no_transactions': 'Seçilen tarih aralığında işlem bulunamadı.',
+        'report.table_date': 'Tarih',
+        'report.table_description': 'Açıklama',
+        'report.table_status': 'Durum',
+        'report.table_amount': 'Tutar',
+        'report.status_completed': 'TAMAMLANDI',
+        'report.status_cancelled': 'İPTAL EDİLDİ',
+        'report.history_none': 'Bu hesap için işlem geçmişi bulunamadı.',
+        'report.history_loading': 'İşlemler yükleniyor...',
+        'report.load_error': 'Hesap geçmişi yüklenemedi.',
+        'modal.create_title': 'Yeni Hesap Oluştur',
+        'modal.owner_name': 'Hesap Sahibi Adı',
+        'modal.owner_placeholder': 'Örn: Ahmet Yılmaz',
+        'modal.iban': 'IBAN Numarası',
+        'modal.iban_placeholder': 'TR000000000000000000000000',
+        'modal.balance': 'Başlangıç Bakiyesi',
+        'modal.currency': 'Para Birimi',
+        'modal.cancel': 'İptal',
+        'modal.create': 'Hesap Oluştur',
+        'general.error': 'Bir hata oluştu.',
+        'general.loading': 'Yükleniyor...',
+    }
+};
+
+let currentLang = localStorage.getItem('lang') || 'en';
+
+function __(key, ...args) {
+    let text = (translations[currentLang] && translations[currentLang][key])
+        || (translations['en'] && translations['en'][key])
+        || key;
+    if (args.length > 0) {
+        args.forEach((arg, i) => {
+            text = text.replace(`{${i}}`, arg);
+        });
+    }
+    return text;
+}
+
+function setLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    document.documentElement.lang = lang;
+    translateStaticPage();
+    document.dispatchEvent(new CustomEvent('languagechange', { detail: { lang } }));
+}
+
+function translateStaticPage() {
+    document.title = __('app.title');
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.placeholder = __(key);
+        } else {
+            el.textContent = __(key);
+        }
+    });
+}
+
+function getLanguage() {
+    return currentLang;
+}
+
 // --- State Management ---
 let accounts = [];
 let activeTab = 'accounts-section';
@@ -16,6 +274,13 @@ const alertContainer = document.getElementById('alert-container');
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    const savedLang = localStorage.getItem('lang');
+    if (savedLang) {
+        currentLang = savedLang;
+        document.documentElement.lang = savedLang;
+    }
+    translateStaticPage();
+    initLanguageSwitcher();
     initNavigation();
     initModal();
     initTransferForm();
@@ -23,6 +288,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     checkAuthStatus();
 });
+
+function initLanguageSwitcher() {
+    const switcher = document.getElementById('language-switcher');
+    if (switcher) {
+        switcher.value = currentLang;
+        switcher.addEventListener('change', (e) => {
+            setLanguage(e.target.value);
+        });
+    }
+}
 
 // --- Alert System ---
 function showAlert(message, type = 'success') {
@@ -99,6 +374,7 @@ async function fetchApi(endpoint, options = {}) {
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
+        headers['Accept-Language'] = getLanguage();
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers
@@ -106,7 +382,7 @@ async function fetchApi(endpoint, options = {}) {
 
         if (response.status === 401) {
             logout();
-            throw new Error('Your session has expired, please log in again.');
+            throw new Error(__('auth.session_expired'));
         }
 
         const text = await response.text();
@@ -121,7 +397,7 @@ async function fetchApi(endpoint, options = {}) {
 
         if (!response.ok) {
             // Handle error messages from GlobalExceptionHandler
-            throw new Error((data && data.message) ? data.message : 'An error occurred.');
+            throw new Error((data && data.message) ? data.message : __('general.error'));
         }
 
         return data;
@@ -144,7 +420,7 @@ async function loadAccounts() {
             listElement.innerHTML = `
                 <div class="empty-state" style="grid-column: 1 / -1;">
                     <span class="empty-icon">💳</span>
-                    <p>No accounts found. You can start by opening a new account.</p>
+                    <p>${__('account.no_accounts')}</p>
                 </div>
             `;
             return;
@@ -163,7 +439,7 @@ async function loadAccounts() {
                     <div class="card-chip"></div>
                 </div>
                 <div class="card-body">
-                    <span class="card-balance-label">Available Balance</span>
+                    <span class="card-balance-label">${__('account.balance_label')}</span>
                     <div class="card-balance">
                         <span>${formatMoney(acc.balance)}</span>
                         <span class="card-currency">${escapeHtml(acc.currency)}</span>
@@ -172,7 +448,7 @@ async function loadAccounts() {
                 <div class="card-footer">
                     <span class="card-iban">${escapeHtml(formatIbanDisplay(acc.iban))}</span>
                     <span class="card-status-badge ${acc.active ? 'badge-active' : 'badge-inactive'}">
-                        ${acc.active ? 'Active' : 'Inactive'}
+                        ${acc.active ? __('account.active') : __('account.inactive')}
                     </span>
                 </div>
             `;
@@ -192,7 +468,7 @@ async function loadAccounts() {
         listElement.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1; color: var(--danger);">
                 <span class="empty-icon">⚠️</span>
-                <p>Account information could not be loaded. Please refresh the page.</p>
+                <p>${__('account.load_error')}</p>
             </div>
         `;
     }
@@ -248,7 +524,7 @@ function initModal() {
         const currency = document.getElementById('acc-currency').value;
 
         if (iban.length !== 26) {
-            showAlert('IBAN number must be exactly 26 characters.', 'danger');
+            showAlert(__('account.iban_must_be_26'), 'danger');
             return;
         }
 
@@ -261,7 +537,7 @@ function initModal() {
                 body: JSON.stringify({ userId: parseInt(userId), iban, ownerName, initialBalance: balance, currency })
             });
 
-            showAlert('Your account has been successfully created.');
+            showAlert(__('account.created'));
             closeModal();
             loadAccounts();
         } catch (err) {
@@ -283,8 +559,8 @@ function populateTransferDropdowns() {
     const prevSender = senderSelect.value;
     const prevReceiver = receiverSelect.value;
 
-    senderSelect.innerHTML = '<option value="" disabled selected>Select sender</option>';
-    receiverSelect.innerHTML = '<option value="" disabled selected>Select recipient</option>';
+    senderSelect.innerHTML = `<option value="" disabled selected>${__('transfer.sender_placeholder')}</option>`;
+    receiverSelect.innerHTML = `<option value="" disabled selected>${__('transfer.recipient_placeholder')}</option>`;
 
     const activeAccounts = accounts.filter(a => a.active);
 
@@ -322,7 +598,7 @@ function updateSenderBalance() {
 
     const selectedAcc = accounts.find(a => a.id == select.value);
     if (selectedAcc) {
-        indicator.textContent = `Limit: ${formatMoney(selectedAcc.balance)} ${selectedAcc.currency}`;
+        indicator.textContent = `${__('transfer.limit')}: ${formatMoney(selectedAcc.balance)} ${selectedAcc.currency}`;
         currencySelect.value = selectedAcc.currency;
     } else {
         indicator.textContent = '';
@@ -381,7 +657,7 @@ function initTransferForm() {
             receiverSelect.value = temp;
             updateSenderBalance();
         } else {
-            showAlert('You can only swap when two registered accounts are selected.', 'warning');
+            showAlert(__('transfer.swap_warning'), 'warning');
         }
     });
 
@@ -396,12 +672,12 @@ function initTransferForm() {
 
         const senderAcc = accounts.find(a => a.id == senderId);
         if (!senderAcc) {
-            showAlert('Please select a sender account.', 'danger');
+            showAlert(__('transfer.select_sender'), 'danger');
             return;
         }
 
         if (amount > senderAcc.balance) {
-            showAlert('Sender account balance is insufficient for this transaction.', 'danger');
+            showAlert(__('transfer.insufficient_balance'), 'danger');
             return;
         }
 
@@ -410,26 +686,26 @@ function initTransferForm() {
             const receiverId = receiverSelect.value;
             const receiverAcc = accounts.find(a => a.id == receiverId);
             if (!receiverAcc) {
-                showAlert('Please select a recipient account.', 'danger');
+                showAlert(__('transfer.select_recipient'), 'danger');
                 return;
             }
             if (senderId === receiverId) {
-                showAlert('Cannot transfer to the same account.', 'danger');
+                showAlert(__('transfer.cannot_same'), 'danger');
                 return;
             }
             if (senderAcc.currency !== receiverAcc.currency) {
-                showAlert('Cannot transfer between accounts with mismatched currencies.', 'danger');
+                showAlert(__('transfer.currency_mismatch'), 'danger');
                 return;
             }
             receiverIban = receiverAcc.iban;
         } else {
             receiverIban = manualIbanInput.value.trim();
             if (receiverIban.length !== 26) {
-                showAlert('Enter a valid 26-digit recipient IBAN.', 'danger');
+                showAlert(__('transfer.valid_iban'), 'danger');
                 return;
             }
             if (senderAcc.iban === receiverIban) {
-                showAlert('Cannot transfer to the sender account.', 'danger');
+                showAlert(__('transfer.cannot_sender'), 'danger');
                 return;
             }
         }
@@ -451,7 +727,7 @@ function initTransferForm() {
                 })
             });
 
-            showAlert(`Transfer completed successfully! (Amount: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
+            showAlert(`${__('transfer.success')} (${__('transfer.amount')}: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
             form.reset();
             transferIdempotencyKey = crypto.randomUUID();
             document.getElementById('sender-balance-indicator').textContent = '';
@@ -472,7 +748,7 @@ function populateReportDropdown() {
     const reportSelect = document.getElementById('report-account-select');
     const prevVal = reportSelect.value;
 
-    reportSelect.innerHTML = '<option value="" disabled selected>Select account</option>';
+    reportSelect.innerHTML = `<option value="" disabled selected>${__('report.account_placeholder')}</option>`;
 
     accounts.forEach(acc => {
         const option = document.createElement('option');
@@ -532,7 +808,7 @@ function initReportSection() {
         const endDate = document.getElementById('report-end-date').value;
 
         if (!accountId) {
-            showAlert('Please select an account first.', 'warning');
+            showAlert(__('report.select_account_first'), 'warning');
             return;
         }
 
@@ -547,7 +823,7 @@ function initReportSection() {
 
 async function loadAccountHistory(accountId) {
     const historyList = document.getElementById('transaction-history-list');
-    historyList.innerHTML = '<div class="empty-state"><span class="spinner"></span><p>Loading transactions...</p></div>';
+    historyList.innerHTML = `<div class="empty-state"><span class="spinner"></span><p>${__('report.history_loading')}</p></div>`;
 
     const selectedAcc = accounts.find(a => a.id == accountId);
     if (!selectedAcc) return;
@@ -561,7 +837,7 @@ async function loadAccountHistory(accountId) {
             historyList.innerHTML = `
                 <div class="empty-state">
                     <span class="empty-icon">🔍</span>
-                    <p>No transaction history found for this account.</p>
+                    <p>${__('report.history_none')}</p>
                 </div>
             `;
             return;
@@ -605,15 +881,15 @@ async function loadAccountHistory(accountId) {
                     <div class="history-badge ${badgeClass}">${badgeIcon}</div>
                     <div class="history-meta">
                         <span class="history-title">
-                            ${isCancelled ? '[CANCELLED] ' : ''}
-                            ${isOutgoing ? `Transfer: Recipient IBAN (${escapeHtml(formatIbanDisplay(t.receiverIban))})` : `Incoming Transfer: Sender IBAN (${escapeHtml(formatIbanDisplay(t.senderIban))})`}
+                            ${isCancelled ? __('transfer.cancelled_prefix') : ''}
+                            ${isOutgoing ? __('transfer.outgoing', escapeHtml(formatIbanDisplay(t.receiverIban))) : __('transfer.incoming', escapeHtml(formatIbanDisplay(t.senderIban)))}
                         </span>
                         <span class="history-sub">${formatDate(t.createdAt)}</span>
                     </div>
                 </div>
                 <div class="history-right">
                     <span class="history-amount ${amountClass}">${prefix}${formatMoney(t.amount)} ${escapeHtml(t.currency)}</span>
-                    ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">Cancel</button>` : ''}
+                    ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">${__('transfer.cancel_btn')}</button>` : ''}
                 </div>
             `;
 
@@ -624,7 +900,7 @@ async function loadAccountHistory(accountId) {
         historyList.innerHTML = `
             <div class="empty-state" style="color: var(--danger);">
                 <span class="empty-icon">⚠️</span>
-                <p>Account history could not be loaded.</p>
+                <p>${__('report.load_error')}</p>
             </div>
         `;
     }
@@ -632,13 +908,13 @@ async function loadAccountHistory(accountId) {
 
 // Exposed to global window scope so it can be called from dynamic HTML
 window.cancelTransfer = async function (transferId, accountId) {
-    if (!confirm('Are you sure you want to cancel this transfer and refund the money?')) {
+    if (!confirm(__('transfer.cancel_confirm'))) {
         return;
     }
 
     try {
         await fetchApi(`/transfers/${transferId}/cancel`, { method: 'POST' });
-        showAlert('Transfer successfully cancelled and balances updated.');
+        showAlert(__('transfer.cancelled'));
 
         // Reload all data
         await loadAccounts();
@@ -662,7 +938,7 @@ function renderReportResults(report) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="4" class="text-muted" style="text-align: center; padding: 2rem;">
-                    No transactions found in the selected date range.
+                    ${__('report.no_transactions')}
                 </td>
             </tr>
         `;
@@ -672,7 +948,7 @@ function renderReportResults(report) {
 
             const isCancelled = t.status === 'CANCELLED';
             const statusBadge = `<span class="card-status-badge ${isCancelled ? 'badge-inactive' : 'badge-active'}">
-                ${isCancelled ? 'CANCELLED' : 'COMPLETED'}
+                ${isCancelled ? __('report.status_cancelled') : __('report.status_completed')}
             </span>`;
 
             tr.innerHTML = `
@@ -701,7 +977,8 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 function formatMoney(amount) {
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    const locale = currentLang === 'tr' ? 'tr-TR' : 'en-US';
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 
 function formatIbanDisplay(iban) {
@@ -711,7 +988,8 @@ function formatIbanDisplay(iban) {
 
 function formatDate(dateString) {
     const d = new Date(dateString);
-    return d.toLocaleString('en-US', {
+    const locale = currentLang === 'tr' ? 'tr-TR' : 'en-US';
+    return d.toLocaleString(locale, {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -791,10 +1069,10 @@ function initAuth() {
             localStorage.setItem('userId', userId);
             localStorage.setItem('username', username);
 
-            showAlert('Login successful. Welcome!');
+            showAlert(__('auth.login.success'));
             checkAuthStatus();
         } catch (err) {
-            showAlert('Login failed: ' + err.message, 'danger');
+            showAlert(__('auth.login.failed') + err.message, 'danger');
         } finally {
             loginSpinner.classList.add('d-none');
             btnLoginSubmit.disabled = false;
@@ -816,12 +1094,12 @@ function initAuth() {
                 body: JSON.stringify({ username: usernameVal, password: passwordVal })
             });
 
-            showAlert('Registration completed successfully. You can now log in.');
+            showAlert(__('auth.register.success'));
             registerForm.reset();
             // Switch to login tab
             tabLoginBtn.click();
         } catch (err) {
-            showAlert('Registration failed: ' + err.message, 'danger');
+            showAlert(__('auth.register.failed') + err.message, 'danger');
         } finally {
             registerSpinner.classList.add('d-none');
             btnRegisterSubmit.disabled = false;
@@ -831,7 +1109,7 @@ function initAuth() {
     // Logout Click
     btnLogout.addEventListener('click', () => {
         logout();
-        showAlert('Logged out successfully.');
+        showAlert(__('auth.logout.success'));
     });
 }
 
@@ -859,9 +1137,9 @@ function logout() {
     document.getElementById('transaction-history-list').innerHTML = '';
     document.getElementById('report-results').classList.add('d-none');
     document.getElementById('sender-balance-indicator').textContent = '';
-    document.getElementById('sender-account-select').innerHTML = '<option value="" disabled selected>Select sender</option>';
-    document.getElementById('receiver-account-select').innerHTML = '<option value="" disabled selected>Select recipient</option>';
-    document.getElementById('report-account-select').innerHTML = '<option value="" disabled selected>Select account</option>';
+    document.getElementById('sender-account-select').innerHTML = `<option value="" disabled selected>${__('transfer.sender_placeholder')}</option>`;
+    document.getElementById('receiver-account-select').innerHTML = `<option value="" disabled selected>${__('transfer.recipient_placeholder')}</option>`;
+    document.getElementById('report-account-select').innerHTML = `<option value="" disabled selected>${__('report.account_placeholder')}</option>`;
 
     // Reset active tab variable
     activeTab = 'accounts-section';

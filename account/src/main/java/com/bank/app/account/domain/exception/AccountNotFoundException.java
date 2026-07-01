@@ -9,10 +9,10 @@ public class AccountNotFoundException extends BusinessException {
     public int getHttpStatusCode() { return 404; }
 
     public AccountNotFoundException(Long id) {
-        super("error.account_not_found", new Object[]{id}, "Account not found. ID: " + id);
+        super("error.account_not_found_id", new Object[]{id}, "Account not found. ID: " + id);
     }
 
     public AccountNotFoundException(String iban) {
-        super("error.account_not_found", new Object[]{iban}, "Account not found. IBAN: " + iban);
+        super("error.account_not_found_iban", new Object[]{iban}, "Account not found. IBAN: " + iban);
     }
 }

@@ -36,14 +36,20 @@
                         <span class="logo-sub">BANK</span>
                     </div>
                 </div>
-                <h2 class="auth-title">Welcome</h2>
-                <p class="auth-subtitle">Please log in to continue.</p>
+                <div class="auth-lang-switcher">
+                    <select id="language-switcher" class="lang-select" aria-label="Language">
+                        <option value="en">EN</option>
+                        <option value="tr">TR</option>
+                    </select>
+                </div>
+                <h2 class="auth-title" data-i18n="welcome">Welcome</h2>
+                <p class="auth-subtitle" data-i18n="welcome.subtitle">Please log in to continue.</p>
             </div>
 
             <!-- Auth Tabs -->
             <div class="auth-tabs">
-                <button class="auth-tab-btn active" id="tab-login-btn">Login</button>
-                <button class="auth-tab-btn" id="tab-register-btn">Register</button>
+                <button class="auth-tab-btn active" id="tab-login-btn" data-i18n="auth.login">Login</button>
+                <button class="auth-tab-btn" id="tab-register-btn" data-i18n="auth.register">Register</button>
             </div>
 
             <!-- Form Wrapper -->
@@ -51,17 +57,17 @@
                 <!-- Login Form -->
                 <form id="login-form">
                     <div class="form-group">
-                        <label class="form-label">Username</label>
+                        <label class="form-label" data-i18n="auth.username">Username</label>
                         <input type="text" class="form-control" id="login-username"
-                            placeholder="Enter your username" required>
+                            data-i18n="auth.username.placeholder" placeholder="Enter your username" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-control" id="login-password" placeholder="Enter your password"
+                        <label class="form-label" data-i18n="auth.password">Password</label>
+                        <input type="password" class="form-control" id="login-password" data-i18n="auth.password.placeholder" placeholder="Enter your password"
                             required>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-login-submit">
-                        <span>Login</span>
+                        <span data-i18n="auth.login.submit">Login</span>
                         <span class="spinner d-none" id="login-spinner"></span>
                     </button>
                 </form>
@@ -69,18 +75,18 @@
                 <!-- Register Form -->
                 <form id="register-form" class="d-none">
                     <div class="form-group">
-                        <label class="form-label">Username</label>
+                        <label class="form-label" data-i18n="auth.username">Username</label>
                         <input type="text" class="form-control" id="register-username"
-                            placeholder="Choose a new username" required>
+                            data-i18n="auth.register.username.placeholder" placeholder="Choose a new username" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Password</label>
+                        <label class="form-label" data-i18n="auth.password">Password</label>
                         <input type="password" class="form-control" id="register-password"
-                            placeholder="Set a strong password" required>
-                        <small class="form-help">Password must be at least 8 characters, contain at least one uppercase letter, one lowercase letter, and one digit.</small>
+                            data-i18n="auth.register.password.placeholder" placeholder="Set a strong password" required>
+                        <small class="form-help" data-i18n="auth.password.hint">Password must be at least 8 characters, contain at least one uppercase letter, one lowercase letter, and one digit.</small>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-register-submit">
-                        <span>Create Account & Register</span>
+                        <span data-i18n="auth.register.submit">Create Account & Register</span>
                         <span class="spinner d-none" id="register-spinner"></span>
                     </button>
                 </form>
@@ -109,14 +115,14 @@
                         <rect x="14" y="12" width="7" height="9" rx="1" />
                         <rect x="3" y="16" width="7" height="5" rx="1" />
                     </svg>
-                    My Accounts
+                    <span data-i18n="nav.accounts">My Accounts</span>
                 </button>
                 <button class="nav-item" data-target="transfer-section">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
                         <path d="M17 3L21 7L17 11M7 21L3 17L7 13" />
                         <path d="M3 17H21M21 7H3" />
                     </svg>
-                    Money Transfer
+                    <span data-i18n="nav.transfer">Money Transfer</span>
                 </button>
                 <button class="nav-item" data-target="reports-section">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon">
@@ -126,16 +132,16 @@
                         <line x1="16" y1="17" x2="8" y2="17" />
                         <polyline points="10 9 9 9 8 9" />
                     </svg>
-                    Analytics & Report
+                    <span data-i18n="nav.reports">Analytics & Report</span>
                 </button>
             </nav>
             <!-- User Profile Area -->
             <div class="user-profile" id="user-profile-badge">
                 <div class="user-info">
                     <span class="user-name" id="display-username">User</span>
-                    <span class="user-role">Customer</span>
+                    <span class="user-role" data-i18n="nav.user.role">Customer</span>
                 </div>
-                <button class="btn-logout" id="btn-logout">Logout</button>
+                <button class="btn-logout" id="btn-logout" data-i18n="auth.logout">Logout</button>
             </div>
         </header>
 
@@ -145,15 +151,15 @@
             <section id="accounts-section" class="tab-content active">
                 <div class="section-header">
                     <div>
-                        <h1 class="section-title">Account Management</h1>
-                        <p class="section-subtitle">View your active bank accounts and create new ones.</p>
+                        <h1 class="section-title" data-i18n="account.title">Account Management</h1>
+                        <p class="section-subtitle" data-i18n="account.subtitle">View your active bank accounts and create new ones.</p>
                     </div>
                     <button class="btn btn-primary btn-add-account" id="open-create-modal">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        Open New Account
+                        <span data-i18n="account.open_new">Open New Account</span>
                     </button>
                 </div>
 
@@ -169,8 +175,8 @@
             <section id="transfer-section" class="tab-content">
                 <div class="section-header">
                     <div>
-                        <h1 class="section-title">Money Transfer</h1>
-                        <p class="section-subtitle">Transfer securely and instantly between your accounts or to other IBANs.</p>
+                        <h1 class="section-title" data-i18n="transfer.title">Money Transfer</h1>
+                        <p class="section-subtitle" data-i18n="transfer.subtitle">Transfer securely and instantly between your accounts or to other IBANs.</p>
                     </div>
                 </div>
 
@@ -179,10 +185,10 @@
                         <form id="transfer-form">
                             <!-- Sender Selection -->
                             <div class="form-group">
-                                <label class="form-label">Sender Account</label>
+                                <label class="form-label" data-i18n="transfer.sender_label">Sender Account</label>
                                 <div class="custom-select-wrapper">
                                     <select class="form-control" id="sender-account-select" required>
-                                        <option value="" disabled selected>Select sender</option>
+                                        <option value="" disabled selected data-i18n="transfer.sender_placeholder">Select sender</option>
                                     </select>
                                 </div>
                                 <div id="sender-balance-indicator" class="balance-indicator"></div>
@@ -200,43 +206,43 @@
 
                             <!-- Receiver Selection -->
                             <div class="form-group">
-                                <label class="form-label">Recipient Account Type</label>
+                                <label class="form-label" data-i18n="transfer.recipient_type">Recipient Account Type</label>
                                 <div class="radio-group">
                                     <label class="radio-label">
                                         <input type="radio" name="receiver-type" value="registered" checked>
-                                        <span>Registered Account</span>
+                                        <span data-i18n="transfer.recipient_registered">Registered Account</span>
                                     </label>
                                     <label class="radio-label">
                                         <input type="radio" name="receiver-type" value="manual">
-                                        <span>Enter Manual IBAN</span>
+                                        <span data-i18n="transfer.recipient_manual">Enter Manual IBAN</span>
                                     </label>
                                 </div>
                             </div>
 
                             <div class="form-group" id="receiver-registered-group">
-                                <label class="form-label">Recipient Account</label>
+                                <label class="form-label" data-i18n="transfer.recipient_label">Recipient Account</label>
                                 <div class="custom-select-wrapper">
                                     <select class="form-control" id="receiver-account-select">
-                                        <option value="" disabled selected>Select recipient</option>
+                                        <option value="" disabled selected data-i18n="transfer.recipient_placeholder">Select recipient</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="form-group d-none" id="receiver-manual-group">
-                                <label class="form-label">Recipient IBAN</label>
+                                <label class="form-label" data-i18n="transfer.recipient_iban">Recipient IBAN</label>
                                 <input type="text" class="form-control" id="receiver-iban-input"
-                                    placeholder="TR000000000000000000000000" maxlength="26">
+                                    data-i18n="modal.iban_placeholder" placeholder="TR000000000000000000000000" maxlength="26">
                             </div>
 
                             <!-- Amount & Currency -->
                             <div class="form-row">
                                 <div class="form-group col-8">
-                                    <label class="form-label">Amount</label>
+                                    <label class="form-label" data-i18n="transfer.amount">Amount</label>
                                     <input type="number" step="0.01" min="0.01" class="form-control text-right"
                                         id="transfer-amount" placeholder="0.00" required>
                                 </div>
                                 <div class="form-group col-4">
-                                    <label class="form-label">Currency</label>
+                                    <label class="form-label" data-i18n="transfer.currency">Currency</label>
                                     <select class="form-control" id="transfer-currency" required>
                                         <option value="TRY">TRY</option>
                                         <option value="USD">USD</option>
@@ -248,7 +254,7 @@
                             <!-- Submit button -->
                             <button type="submit" class="btn btn-primary btn-block btn-large mt-4"
                                 id="btn-submit-transfer">
-                                <span id="btn-transfer-text">Complete Transfer</span>
+                                <span id="btn-transfer-text" data-i18n="transfer.submit">Complete Transfer</span>
                                 <span class="spinner d-none" id="btn-transfer-spinner"></span>
                             </button>
                         </form>
@@ -257,19 +263,19 @@
                     <!-- Transfer info card -->
                     <div class="transfer-info-panel">
                         <div class="glass-panel info-card">
-                            <h3 class="info-title">Transaction Information</h3>
+                            <h3 class="info-title" data-i18n="transfer.info_title">Transaction Information</h3>
                             <ul class="info-list">
                                 <li>
                                     <span class="info-icon">⚡</span>
-                                    <span>Your transfers are processed instantly 7/24 via <strong>FAST</strong> infrastructure.</span>
+                                    <span data-i18n="transfer.info_instant">Your transfers are processed instantly 7/24 via <strong>FAST</strong> infrastructure.</span>
                                 </li>
                                 <li>
                                     <span class="info-icon">🛡️</span>
-                                    <span>Per our security standards, transfers made within the last <strong>24 hours</strong> can be cancelled.</span>
+                                    <span data-i18n="transfer.info_cancel">Per our security standards, transfers made within the last <strong>24 hours</strong> can be cancelled.</span>
                                 </li>
                                 <li>
                                     <span class="info-icon">💱</span>
-                                    <span>Inter-account transfers require matching currencies.</span>
+                                    <span data-i18n="transfer.info_currency">Inter-account transfers require matching currencies.</span>
                                 </li>
                             </ul>
                         </div>
@@ -281,8 +287,8 @@
             <section id="reports-section" class="tab-content">
                 <div class="section-header">
                     <div>
-                        <h1 class="section-title">Analytics & Account Details</h1>
-                        <p class="section-subtitle">Review your account activity and generate detailed reports for specific date ranges.</p>
+                        <h1 class="section-title" data-i18n="report.title">Analytics & Account Details</h1>
+                        <p class="section-subtitle" data-i18n="report.subtitle">Review your account activity and generate detailed reports for specific date ranges.</p>
                     </div>
                 </div>
 
@@ -290,15 +296,15 @@
                     <!-- Sidebar Selector -->
                     <div class="reports-sidebar glass-panel">
                         <div class="form-group">
-                            <label class="form-label">Account to Review</label>
+                            <label class="form-label" data-i18n="report.account_label">Account to Review</label>
                             <select class="form-control" id="report-account-select" required>
-                                <option value="" disabled selected>Select account</option>
+                                <option value="" disabled selected data-i18n="report.account_placeholder">Select account</option>
                             </select>
                         </div>
 
                         <div class="report-tabs">
-                            <button class="report-tab-btn active" data-tab="history-tab">Account History</button>
-                            <button class="report-tab-btn" data-tab="generator-tab">Report Generator</button>
+                            <button class="report-tab-btn active" data-tab="history-tab" data-i18n="report.history_tab">Account History</button>
+                            <button class="report-tab-btn" data-tab="generator-tab" data-i18n="report.generator_tab">Report Generator</button>
                         </div>
                     </div>
 
@@ -307,12 +313,12 @@
                         <!-- TAB A: HISTORY -->
                         <div id="history-tab" class="report-tab-content active">
                             <div class="tab-header">
-                                <h3 class="tab-title">Recent Account History</h3>
+                                <h3 class="tab-title" data-i18n="report.history_title">Recent Account History</h3>
                             </div>
                             <div class="history-list" id="transaction-history-list">
                                 <div class="empty-state">
                                     <span class="empty-icon">📂</span>
-                                    <p>Select an account from the left to view transaction history.</p>
+                                    <p data-i18n="report.history_empty">Select an account from the left to view transaction history.</p>
                                 </div>
                             </div>
                         </div>
@@ -320,33 +326,33 @@
                         <!-- TAB B: GENERATOR -->
                         <div id="generator-tab" class="report-tab-content">
                             <div class="tab-header">
-                                <h3 class="tab-title">Date-Based Report Generation</h3>
+                                <h3 class="tab-title" data-i18n="report.generator_title">Date-Based Report Generation</h3>
                             </div>
 
                             <form id="report-filter-form" class="report-filter-form">
                                 <div class="form-row">
                                     <div class="form-group col-6">
-                                        <label class="form-label">Start Date</label>
+                                        <label class="form-label" data-i18n="report.start_date">Start Date</label>
                                         <input type="datetime-local" class="form-control" id="report-start-date"
                                             required>
                                     </div>
                                     <div class="form-group col-6">
-                                        <label class="form-label">End Date</label>
+                                        <label class="form-label" data-i18n="report.end_date">End Date</label>
                                         <input type="datetime-local" class="form-control" id="report-end-date" required>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-secondary mt-3">Generate Report</button>
+                                <button type="submit" class="btn btn-secondary mt-3" data-i18n="report.generate">Generate Report</button>
                             </form>
 
                             <!-- Report Results -->
                             <div id="report-results" class="report-results d-none">
                                 <div class="report-stats">
                                     <div class="stat-card">
-                                        <span class="stat-label">Total Transactions</span>
+                                        <span class="stat-label" data-i18n="report.stat_count">Total Transactions</span>
                                         <span class="stat-value" id="report-stat-count">0</span>
                                     </div>
                                     <div class="stat-card">
-                                        <span class="stat-label">Total Volume</span>
+                                        <span class="stat-label" data-i18n="report.stat_volume">Total Volume</span>
                                         <span class="stat-value" id="report-stat-volume">0.00 TRY</span>
                                     </div>
                                 </div>
@@ -355,10 +361,10 @@
                                     <table class="report-table">
                                         <thead>
                                             <tr>
-                                                <th>Date</th>
-                                                <th>Description</th>
-                                                <th>Status</th>
-                                                <th class="text-right">Amount</th>
+                                                <th data-i18n="report.table_date">Date</th>
+                                                <th data-i18n="report.table_description">Description</th>
+                                                <th data-i18n="report.table_status">Status</th>
+                                                <th class="text-right" data-i18n="report.table_amount">Amount</th>
                                             </tr>
                                         </thead>
                                         <tbody id="report-table-body">
@@ -378,30 +384,30 @@
     <div class="modal-overlay" id="create-account-modal">
         <div class="modal-container glass-panel">
             <div class="modal-header">
-                <h2 class="modal-title">Create New Account</h2>
+                <h2 class="modal-title" data-i18n="modal.create_title">Create New Account</h2>
                 <button class="modal-close" id="close-create-modal">&times;</button>
             </div>
             <form id="create-account-form">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label class="form-label">Account Holder Name</label>
-                        <input type="text" class="form-control" id="acc-owner-name" placeholder="e.g. John Doe"
+                        <label class="form-label" data-i18n="modal.owner_name">Account Holder Name</label>
+                        <input type="text" class="form-control" id="acc-owner-name" data-i18n="modal.owner_placeholder" placeholder="e.g. John Doe"
                             required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">IBAN Number</label>
-                        <input type="text" class="form-control" id="acc-iban" placeholder="TR000000000000000000000000"
+                        <label class="form-label" data-i18n="modal.iban">IBAN Number</label>
+                        <input type="text" class="form-control" id="acc-iban" data-i18n="modal.iban_placeholder" placeholder="TR000000000000000000000000"
                             maxlength="26" required>
-                        <small class="form-help">Enter a 26-character IBAN starting with "TR".</small>
+                        <small class="form-help" data-i18n="account.iban_hint">Enter a 26-character IBAN starting with "TR".</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group col-6">
-                            <label class="form-label">Initial Balance</label>
+                            <label class="form-label" data-i18n="modal.balance">Initial Balance</label>
                             <input type="number" step="0.01" min="0" class="form-control text-right" id="acc-balance"
                                 placeholder="0.00" required>
                         </div>
                         <div class="form-group col-6">
-                            <label class="form-label">Para Birimi</label>
+                            <label class="form-label" data-i18n="modal.currency">Currency</label>
                             <select class="form-control" id="acc-currency" required>
                                 <option value="TRY" selected>TRY</option>
                                 <option value="USD">USD</option>
@@ -411,9 +417,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-link" id="btn-cancel-create">Cancel</button>
+                    <button type="button" class="btn btn-link" id="btn-cancel-create" data-i18n="modal.cancel">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="btn-submit-account">
-                        <span>Create Account</span>
+                        <span data-i18n="modal.create">Create Account</span>
                         <span class="spinner d-none" id="btn-account-spinner"></span>
                     </button>
                 </div>

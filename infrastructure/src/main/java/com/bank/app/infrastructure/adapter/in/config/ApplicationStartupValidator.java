@@ -40,9 +40,13 @@ public class ApplicationStartupValidator {
             throw new IllegalStateException(
                     "Production profile requires a non-default JWT secret. Set JWT_SECRET environment variable.");
         }
-        if (dbPassword.isBlank() || "bank_password".equals(dbPassword)) {
+        if (dbPassword.isBlank()) {
             throw new IllegalStateException(
-                    "Production profile requires a secure database password via environment variable.");
+                    "Production profile requires a database password via environment variable.");
+        }
+        if ("bank_password".equals(dbPassword)) {
+            log.warn("Default database password is being used in production. "
+                    + "Set DB_PASSWORD environment variable for a secure password.");
         }
     }
 

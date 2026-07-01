@@ -1096,6 +1096,40 @@ body {
     animation: fadeIn 0.4s ease-out;
 }
 
+/* Language Switcher */
+.lang-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text);
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.lang-select:hover,
+.lang-select:focus {
+    border-color: var(--primary);
+}
+
+.lang-select option {
+    background: #1a1a2e;
+    color: #e0e0e0;
+}
+
+.auth-lang-switcher {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.auth-header {
+    position: relative;
+}
+
 /* User Profile Badge in Header */
 .user-profile {
     display: flex;
