@@ -75,7 +75,7 @@ jobs:
       run: mvn test -pl app -am -Dtest="ArchitectureTest" -Dsurefire.failIfNoSpecifiedTests=false -q
 
     - name: Mutation Tests (PIT)
-      run: mvn pitest:mutationCoverage -Dpitest.skip=false -DargLine= -q
+      run: mvn pitest:mutationCoverage -Dpitest.skip=false -q
       continue-on-error: true
       env:
         DB_HOST: localhost

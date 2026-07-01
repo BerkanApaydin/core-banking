@@ -16,14 +16,14 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class AccountReadAdapterTest {
 
-    @Mock private AccountJpaRepository springDataRepo;
+    @Mock
+    private AccountJpaRepository springDataRepo;
 
     private final AccountJpaMapper mapper = new AccountJpaMapper();
 
@@ -72,7 +72,8 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIdSuccessfully() {
-        AccountJpaEntity jpaEntity = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), 100L);
+        AccountJpaEntity jpaEntity = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
+                100L);
 
         when(springDataRepo.findById(1L)).thenReturn(Optional.of(jpaEntity));
 
@@ -100,7 +101,8 @@ class AccountReadAdapterTest {
     @Test
     void shouldFindByIbanWithLockSuccessfully() {
         Iban iban = new Iban("TR290006200000000000000111");
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"),
+                "TRY", "ACTIVE", null);
 
         when(springDataRepo.findByIbanWithLock(iban.value())).thenReturn(Optional.of(jpaEntity));
 
@@ -126,7 +128,8 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIdWithLockSuccessfully() {
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
 
         when(springDataRepo.findByIdWithLock(1L)).thenReturn(Optional.of(jpaEntity));
 
@@ -149,8 +152,10 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindAllSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet",
+                new BigDecimal("500.00"), "TRY", "ACTIVE", null);
 
         when(springDataRepo.findAll()).thenReturn(List.of(entity1, entity2));
 
@@ -174,8 +179,10 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByUserIdSuccessfully() {
-        AccountJpaEntity entity1 = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), 100L);
-        AccountJpaEntity entity2 = createEntity(2L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), 100L);
+        AccountJpaEntity entity1 = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
+                100L);
+        AccountJpaEntity entity2 = createEntity(2L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"),
+                100L);
 
         when(springDataRepo.findByUserIdOrderByCreatedAtDesc(100L, Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of(entity1, entity2)));
@@ -201,8 +208,10 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIdsSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet",
+                new BigDecimal("500.00"), "TRY", "ACTIVE", null);
 
         when(springDataRepo.findByIdIn(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));
 
@@ -232,7 +241,8 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldThrowWhenEntityHasInvalidCurrencyOnFindAll() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"), "INVALID", "ACTIVE", null);
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), "INVALID", "ACTIVE", null);
 
         when(springDataRepo.findAll()).thenReturn(List.of(entity1));
 
@@ -240,4 +250,3 @@ class AccountReadAdapterTest {
         verify(springDataRepo).findAll();
     }
 }
-

@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -140,6 +141,26 @@ class DataSeederTest {
         runner.run();
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldSetAuthenticationOnRunAsUser() throws Exception {
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+
+        when(loadUserPort.findByUsername("ahmet"))
+                .thenReturn(Optional.of(ahmet));
+
+        when(loadUserPort.findByUsername("ayse"))
+                .thenReturn(Optional.of(ayse));
+
+        doAnswer(invocation -> {
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            return mock(AccountResponse.class);
+        }).when(createAccountPort).execute(any(CreateAccountRequest.class));
+
+        CommandLineRunner runner = dataSeeder.seedData();
+        runner.run();
     }
 
     @Test

@@ -86,6 +86,25 @@ class BusinessExceptionTest {
     }
 
     @Nested
+    @DisplayName("HTTP status code")
+    class HttpStatusCode {
+
+        @Test
+        @DisplayName("should return 400 as default HTTP status code")
+        void shouldReturnDefaultHttpStatusCode() {
+            BusinessException ex = new BusinessException("Test message") {};
+            assertThat(ex.getHttpStatusCode()).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("ConcurrentRequestException should return 409")
+        void shouldReturn409ForConcurrentRequest() {
+            ConcurrentRequestException ex = new ConcurrentRequestException("test");
+            assertThat(ex.getHttpStatusCode()).isEqualTo(409);
+        }
+    }
+
+    @Nested
     @DisplayName("constructor with cause")
     class ConstructorWithCause {
 

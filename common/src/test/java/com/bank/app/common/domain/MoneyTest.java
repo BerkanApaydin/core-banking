@@ -205,6 +205,13 @@ class MoneyTest {
         }
     }
 
+    @Test
+    @DisplayName("should return string representation with amount and currency")
+    void toStringShouldReturnAmountAndCurrency() {
+        Money money = Money.of("100.50", Currency.TRY);
+        assertThat(money.toString()).isEqualTo("100.50 TRY");
+    }
+
     @Nested
     @DisplayName("isZero")
     class IsZero {

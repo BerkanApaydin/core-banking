@@ -83,6 +83,17 @@ class IbanTest {
     }
 
     @Test
+    void toStringShouldMaskWhenLengthIsEight() {
+        Iban.configurePattern("^[A-Z0-9]{8}$");
+        try {
+            Iban iban = new Iban("TR123456");
+            assertThat(iban.toString()).contains("*******");
+        } finally {
+            Iban.configurePattern("^TR[0-9]{24}$");
+        }
+    }
+
+    @Test
     void normalizeShouldReturnNullWhenNull() {
         assertThat(Iban.normalize(null)).isNull();
     }
