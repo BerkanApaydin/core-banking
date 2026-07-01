@@ -42,6 +42,7 @@
                 <groupId>org.pitest</groupId>
                 <artifactId>pitest-maven</artifactId>
                 <configuration>
+                    <argLine/>
                     <targetClasses>
                         <param>com.bank.app.user.*</param>
                     </targetClasses>
