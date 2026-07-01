@@ -191,7 +191,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                                         .header("Authorization", "Bearer " + jwtToken))
                                         .andExpect(status().isNotFound())
                                         .andExpect(jsonPath("$.status", is(404)))
-                                        .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND")));
+                                        .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND_ID")));
                 }
 
                 @Test
@@ -234,7 +234,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                         mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000099999")
                                         .header("Authorization", "Bearer " + jwtToken))
                                         .andExpect(status().isNotFound())
-                                        .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND")));
+                                        .andExpect(jsonPath("$.code", is("ACCOUNT_NOT_FOUND_IBAN")));
                 }
 
                 @Test
