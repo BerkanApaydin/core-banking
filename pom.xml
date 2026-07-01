@@ -218,6 +218,7 @@
                         </dependency>
                     </dependencies>
                     <configuration>
+                        <argLine/>
                         <timestampedReports>false</timestampedReports>
                         <mutationThreshold>80</mutationThreshold>
                         <coverageThreshold>90</coverageThreshold>
