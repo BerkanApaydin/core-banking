@@ -53,17 +53,8 @@ jobs:
         DB_USERNAME: bank_user
         DB_PASSWORD: bank_password
 
-    - name: Unit Tests (with coverage)
-      run: mvn test jacoco:report -q
-      env:
-        DB_HOST: localhost
-        DB_PORT: 5432
-        DB_USERNAME: bank_user
-        DB_PASSWORD: bank_password
-        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
-
-    - name: Integration Tests
-      run: mvn verify -q
+    - name: Unit & Integration Tests (with coverage)
+      run: mvn install jacoco:report -q
       env:
         DB_HOST: localhost
         DB_PORT: 5432
