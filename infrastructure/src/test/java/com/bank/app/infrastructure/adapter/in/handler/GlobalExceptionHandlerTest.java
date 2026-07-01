@@ -167,14 +167,14 @@ class GlobalExceptionHandlerTest {
         when(ex.getArgs()).thenReturn(new Object[]{});
         when(ex.getErrorCode()).thenReturn("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
-                .thenReturn("Çok fazla başarısız giriş denemesi");
+                .thenReturn("Too many failed login attempts");
 
         ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().getProperties().get("code"));
-        assertEquals("Çok fazla başarısız giriş denemesi", response.getBody().getProperties().get("message"));
+        assertEquals("Too many failed login attempts", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -213,14 +213,14 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldHandleAuthorizationException() {
-        AuthorizationException ex = new AuthorizationException("Yetki hatası");
+        AuthorizationException ex = new AuthorizationException("Authorization error");
 
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
-        assertEquals("Yetki hatası", response.getBody().getProperties().get("message"));
+        assertEquals("Authorization error", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -229,12 +229,12 @@ class GlobalExceptionHandlerTest {
         when(ex.getMessageKey()).thenReturn("error.authorization");
         when(ex.getArgs()).thenReturn(new Object[]{});
         when(messageSource.getMessage(eq("error.authorization"), any(), any(Locale.class)))
-                .thenReturn("Yetkilendirme başarısız");
+                .thenReturn("Authorization failed");
 
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("Yetkilendirme başarısız", response.getBody().getProperties().get("message"));
+        assertEquals("Authorization failed", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -242,14 +242,14 @@ class GlobalExceptionHandlerTest {
         AuthorizationException ex = mock(AuthorizationException.class);
         when(ex.getMessageKey()).thenReturn("error.authorization");
         when(ex.getArgs()).thenReturn(new Object[]{});
-        when(ex.getMessage()).thenReturn("İşlem reddedildi");
+        when(ex.getMessage()).thenReturn("Transaction rejected");
         when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
                 .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
 
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("İşlem reddedildi", response.getBody().getProperties().get("message"));
+        assertEquals("Transaction rejected", response.getBody().getProperties().get("message"));
     }
 
     @Test

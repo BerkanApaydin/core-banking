@@ -67,7 +67,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
         when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(false);
-        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Too many requests sent. Please try again later.");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);
@@ -77,7 +77,7 @@ class RateLimitingFilterEdgeCaseTest {
 
         verify(response).setStatus(429);
         verify(chain, never()).doFilter(request, response);
-        assertTrue(stringWriter.toString().contains("Çok fazla istek gönderildi"));
+        assertTrue(stringWriter.toString().contains("Too many requests sent"));
     }
 
     @Test

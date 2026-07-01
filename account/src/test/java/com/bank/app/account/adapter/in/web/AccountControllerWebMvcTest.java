@@ -116,7 +116,7 @@ class AccountControllerWebMvcTest {
                                         new BigDecimal("500.00"), Currency.TRY);
 
                         when(createAccountPort.execute(any(CreateAccountRequest.class)))
-                                        .thenThrow(new DuplicateIbanException("Bu IBAN zaten kullanılıyor"));
+                                        .thenThrow(new DuplicateIbanException("This IBAN is already in use"));
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .contentType(MediaType.APPLICATION_JSON)

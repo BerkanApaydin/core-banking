@@ -178,7 +178,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
                     .isExactlyInstanceOf(AuthenticationFailedException.class)
-                    .hasMessage("Kimlik do\u011frulama ba\u015far\u0131s\u0131z: Bad credentials");
+                    .hasMessage("Authentication failed: Bad credentials");
 
             verify(authenticationPort).authenticate(anyString(), anyString());
             verifyNoInteractions(loadUserPort);

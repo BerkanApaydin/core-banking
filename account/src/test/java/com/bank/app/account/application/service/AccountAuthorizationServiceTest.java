@@ -86,7 +86,7 @@ class AccountAuthorizationServiceTest {
 
             assertThatThrownBy(() -> authorizationService.getCurrentUserId())
                     .isExactlyInstanceOf(AuthorizationException.class)
-                    .hasMessage("Bu işlem için giriş yapmalısınız.");
+                    .hasMessage("You must be logged in to perform this action.");
         }
     }
 }

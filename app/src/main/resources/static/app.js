@@ -106,7 +106,7 @@ async function fetchApi(endpoint, options = {}) {
 
         if (response.status === 401) {
             logout();
-            throw new Error('Oturum süreniz doldu, lütfen tekrar giriş yapın.');
+            throw new Error('Your session has expired, please log in again.');
         }
 
         const text = await response.text();
@@ -121,12 +121,12 @@ async function fetchApi(endpoint, options = {}) {
 
         if (!response.ok) {
             // Handle error messages from GlobalExceptionHandler
-            throw new Error((data && data.message) ? data.message : 'Bir hata oluştu.');
+            throw new Error((data && data.message) ? data.message : 'An error occurred.');
         }
 
         return data;
     } catch (error) {
-        console.error('API Hatası:', error);
+        console.error('API Error:', error);
         throw error;
     }
 }
@@ -136,14 +136,15 @@ async function loadAccounts() {
     const listElement = document.getElementById('accounts-list');
 
     try {
-        accounts = await fetchApi('/accounts');
+        const response = await fetchApi('/accounts');
+        accounts = response.content || response;
         listElement.innerHTML = '';
 
         if (accounts.length === 0) {
             listElement.innerHTML = `
                 <div class="empty-state" style="grid-column: 1 / -1;">
                     <span class="empty-icon">💳</span>
-                    <p>Henüz hesap bulunmamaktadır. Yeni hesap açarak başlayabilirsiniz.</p>
+                    <p>No accounts found. You can start by opening a new account.</p>
                 </div>
             `;
             return;
@@ -162,7 +163,7 @@ async function loadAccounts() {
                     <div class="card-chip"></div>
                 </div>
                 <div class="card-body">
-                    <span class="card-balance-label">Kullanılabilir Bakiye</span>
+                    <span class="card-balance-label">Available Balance</span>
                     <div class="card-balance">
                         <span>${formatMoney(acc.balance)}</span>
                         <span class="card-currency">${escapeHtml(acc.currency)}</span>
@@ -171,7 +172,7 @@ async function loadAccounts() {
                 <div class="card-footer">
                     <span class="card-iban">${escapeHtml(formatIbanDisplay(acc.iban))}</span>
                     <span class="card-status-badge ${acc.active ? 'badge-active' : 'badge-inactive'}">
-                        ${acc.active ? 'Aktif' : 'Pasif'}
+                        ${acc.active ? 'Active' : 'Inactive'}
                     </span>
                 </div>
             `;
@@ -191,7 +192,7 @@ async function loadAccounts() {
         listElement.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1; color: var(--danger);">
                 <span class="empty-icon">⚠️</span>
-                <p>Hesap bilgileri yüklenemedi. Lütfen sayfayı yenileyin.</p>
+                <p>Account information could not be loaded. Please refresh the page.</p>
             </div>
         `;
     }
@@ -247,7 +248,7 @@ function initModal() {
         const currency = document.getElementById('acc-currency').value;
 
         if (iban.length !== 26) {
-            showAlert('IBAN numarası tam 26 karakter olmalıdır.', 'danger');
+            showAlert('IBAN number must be exactly 26 characters.', 'danger');
             return;
         }
 
@@ -260,7 +261,7 @@ function initModal() {
                 body: JSON.stringify({ userId: parseInt(userId), iban, ownerName, initialBalance: balance, currency })
             });
 
-            showAlert('Hesabınız başarıyla oluşturuldu.');
+            showAlert('Your account has been successfully created.');
             closeModal();
             loadAccounts();
         } catch (err) {
@@ -282,8 +283,8 @@ function populateTransferDropdowns() {
     const prevSender = senderSelect.value;
     const prevReceiver = receiverSelect.value;
 
-    senderSelect.innerHTML = '<option value="" disabled selected>Gönderici seçin</option>';
-    receiverSelect.innerHTML = '<option value="" disabled selected>Alıcı seçin</option>';
+    senderSelect.innerHTML = '<option value="" disabled selected>Select sender</option>';
+    receiverSelect.innerHTML = '<option value="" disabled selected>Select recipient</option>';
 
     const activeAccounts = accounts.filter(a => a.active);
 
@@ -380,7 +381,7 @@ function initTransferForm() {
             receiverSelect.value = temp;
             updateSenderBalance();
         } else {
-            showAlert('Sadece kayıtlı iki hesap seçili iken yer değiştirebilirsiniz.', 'warning');
+            showAlert('You can only swap when two registered accounts are selected.', 'warning');
         }
     });
 
@@ -395,12 +396,12 @@ function initTransferForm() {
 
         const senderAcc = accounts.find(a => a.id == senderId);
         if (!senderAcc) {
-            showAlert('Lütfen gönderici hesabı seçin.', 'danger');
+            showAlert('Please select a sender account.', 'danger');
             return;
         }
 
         if (amount > senderAcc.balance) {
-            showAlert('Gönderici hesap bakiyesi bu işlem için yetersizdir.', 'danger');
+            showAlert('Sender account balance is insufficient for this transaction.', 'danger');
             return;
         }
 
@@ -409,26 +410,26 @@ function initTransferForm() {
             const receiverId = receiverSelect.value;
             const receiverAcc = accounts.find(a => a.id == receiverId);
             if (!receiverAcc) {
-                showAlert('Lütfen alıcı hesabı seçin.', 'danger');
+                showAlert('Please select a recipient account.', 'danger');
                 return;
             }
             if (senderId === receiverId) {
-                showAlert('Aynı hesaba para transferi yapılamaz.', 'danger');
+                showAlert('Cannot transfer to the same account.', 'danger');
                 return;
             }
             if (senderAcc.currency !== receiverAcc.currency) {
-                showAlert('Para birimleri uyuşmayan hesaplar arası transfer yapılamaz.', 'danger');
+                showAlert('Cannot transfer between accounts with mismatched currencies.', 'danger');
                 return;
             }
             receiverIban = receiverAcc.iban;
         } else {
             receiverIban = manualIbanInput.value.trim();
             if (receiverIban.length !== 26) {
-                showAlert('Geçerli bir 26 haneli alıcı IBAN girin.', 'danger');
+                showAlert('Enter a valid 26-digit recipient IBAN.', 'danger');
                 return;
             }
             if (senderAcc.iban === receiverIban) {
-                showAlert('Gönderen hesaba para transferi yapılamaz.', 'danger');
+                showAlert('Cannot transfer to the sender account.', 'danger');
                 return;
             }
         }
@@ -450,7 +451,7 @@ function initTransferForm() {
                 })
             });
 
-            showAlert(`Transfer başarıyla gerçekleştirildi! (Tutar: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
+            showAlert(`Transfer completed successfully! (Amount: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
             form.reset();
             transferIdempotencyKey = crypto.randomUUID();
             document.getElementById('sender-balance-indicator').textContent = '';
@@ -471,7 +472,7 @@ function populateReportDropdown() {
     const reportSelect = document.getElementById('report-account-select');
     const prevVal = reportSelect.value;
 
-    reportSelect.innerHTML = '<option value="" disabled selected>Hesap seçin</option>';
+    reportSelect.innerHTML = '<option value="" disabled selected>Select account</option>';
 
     accounts.forEach(acc => {
         const option = document.createElement('option');
@@ -531,7 +532,7 @@ function initReportSection() {
         const endDate = document.getElementById('report-end-date').value;
 
         if (!accountId) {
-            showAlert('Lütfen önce bir hesap seçin.', 'warning');
+            showAlert('Please select an account first.', 'warning');
             return;
         }
 
@@ -546,7 +547,7 @@ function initReportSection() {
 
 async function loadAccountHistory(accountId) {
     const historyList = document.getElementById('transaction-history-list');
-    historyList.innerHTML = '<div class="empty-state"><span class="spinner"></span><p>İşlemler yükleniyor...</p></div>';
+    historyList.innerHTML = '<div class="empty-state"><span class="spinner"></span><p>Loading transactions...</p></div>';
 
     const selectedAcc = accounts.find(a => a.id == accountId);
     if (!selectedAcc) return;
@@ -560,7 +561,7 @@ async function loadAccountHistory(accountId) {
             historyList.innerHTML = `
                 <div class="empty-state">
                     <span class="empty-icon">🔍</span>
-                    <p>Bu hesaba ait herhangi bir işlem geçmişi bulunmamaktadır.</p>
+                    <p>No transaction history found for this account.</p>
                 </div>
             `;
             return;
@@ -604,15 +605,15 @@ async function loadAccountHistory(accountId) {
                     <div class="history-badge ${badgeClass}">${badgeIcon}</div>
                     <div class="history-meta">
                         <span class="history-title">
-                            ${isCancelled ? '[İPTAL] ' : ''}
-                            ${isOutgoing ? `Transfer: Alıcı IBAN (${escapeHtml(formatIbanDisplay(t.receiverIban))})` : `Gelen Transfer: Gönderici IBAN (${escapeHtml(formatIbanDisplay(t.senderIban))})`}
+                            ${isCancelled ? '[CANCELLED] ' : ''}
+                            ${isOutgoing ? `Transfer: Recipient IBAN (${escapeHtml(formatIbanDisplay(t.receiverIban))})` : `Incoming Transfer: Sender IBAN (${escapeHtml(formatIbanDisplay(t.senderIban))})`}
                         </span>
                         <span class="history-sub">${formatDate(t.createdAt)}</span>
                     </div>
                 </div>
                 <div class="history-right">
                     <span class="history-amount ${amountClass}">${prefix}${formatMoney(t.amount)} ${escapeHtml(t.currency)}</span>
-                    ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">İptal Et</button>` : ''}
+                    ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">Cancel</button>` : ''}
                 </div>
             `;
 
@@ -623,7 +624,7 @@ async function loadAccountHistory(accountId) {
         historyList.innerHTML = `
             <div class="empty-state" style="color: var(--danger);">
                 <span class="empty-icon">⚠️</span>
-                <p>Hesap hareketleri yüklenemedi.</p>
+                <p>Account history could not be loaded.</p>
             </div>
         `;
     }
@@ -631,13 +632,13 @@ async function loadAccountHistory(accountId) {
 
 // Exposed to global window scope so it can be called from dynamic HTML
 window.cancelTransfer = async function (transferId, accountId) {
-    if (!confirm('Bu transfer işlemini iptal etmek ve parayı iade etmek istediğinize emin misiniz?')) {
+    if (!confirm('Are you sure you want to cancel this transfer and refund the money?')) {
         return;
     }
 
     try {
         await fetchApi(`/transfers/${transferId}/cancel`, { method: 'POST' });
-        showAlert('Para transferi başarıyla iptal edildi ve bakiyeler güncellendi.');
+        showAlert('Transfer successfully cancelled and balances updated.');
 
         // Reload all data
         await loadAccounts();
@@ -661,7 +662,7 @@ function renderReportResults(report) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="4" class="text-muted" style="text-align: center; padding: 2rem;">
-                    Seçilen tarihler arasında herhangi bir işlem bulunmamaktadır.
+                    No transactions found in the selected date range.
                 </td>
             </tr>
         `;
@@ -671,12 +672,12 @@ function renderReportResults(report) {
 
             const isCancelled = t.status === 'CANCELLED';
             const statusBadge = `<span class="card-status-badge ${isCancelled ? 'badge-inactive' : 'badge-active'}">
-                ${isCancelled ? 'İPTAL' : 'TAMAMLANDI'}
+                ${isCancelled ? 'CANCELLED' : 'COMPLETED'}
             </span>`;
 
             tr.innerHTML = `
                 <td>${formatDate(t.createdAt)}</td>
-                <td>Gönderen ID: ${t.senderAccountId} &rarr; Alıcı ID: ${t.receiverAccountId}</td>
+                <td>Sender ID: ${t.senderAccountId} &rarr; Recipient ID: ${t.receiverAccountId}</td>
                 <td>${statusBadge}</td>
                 <td class="text-right ${isCancelled ? 'amount-cancelled' : 'amount-minus'}">
                     ${formatMoney(t.amount)} ${escapeHtml(t.currency)}
@@ -700,7 +701,7 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 function formatMoney(amount) {
-    return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 
 function formatIbanDisplay(iban) {
@@ -710,7 +711,7 @@ function formatIbanDisplay(iban) {
 
 function formatDate(dateString) {
     const d = new Date(dateString);
-    return d.toLocaleString('tr-TR', {
+    return d.toLocaleString('en-US', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -721,7 +722,7 @@ function formatDate(dateString) {
 
 function formatDateTimeLocal(date) {
     const pad = (n) => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 // --- Authentication Operations ---
@@ -790,10 +791,10 @@ function initAuth() {
             localStorage.setItem('userId', userId);
             localStorage.setItem('username', username);
 
-            showAlert('Başarıyla giriş yapıldı. Hoş geldiniz!');
+            showAlert('Login successful. Welcome!');
             checkAuthStatus();
         } catch (err) {
-            showAlert('Giriş başarısız: ' + err.message, 'danger');
+            showAlert('Login failed: ' + err.message, 'danger');
         } finally {
             loginSpinner.classList.add('d-none');
             btnLoginSubmit.disabled = false;
@@ -815,12 +816,12 @@ function initAuth() {
                 body: JSON.stringify({ username: usernameVal, password: passwordVal })
             });
 
-            showAlert('Kayıt başarıyla tamamlandı. Giriş yapabilirsiniz.');
+            showAlert('Registration completed successfully. You can now log in.');
             registerForm.reset();
             // Switch to login tab
             tabLoginBtn.click();
         } catch (err) {
-            showAlert('Kayıt başarısız: ' + err.message, 'danger');
+            showAlert('Registration failed: ' + err.message, 'danger');
         } finally {
             registerSpinner.classList.add('d-none');
             btnRegisterSubmit.disabled = false;
@@ -830,7 +831,7 @@ function initAuth() {
     // Logout Click
     btnLogout.addEventListener('click', () => {
         logout();
-        showAlert('Başarıyla çıkış yapıldı.');
+        showAlert('Logged out successfully.');
     });
 }
 
@@ -858,9 +859,9 @@ function logout() {
     document.getElementById('transaction-history-list').innerHTML = '';
     document.getElementById('report-results').classList.add('d-none');
     document.getElementById('sender-balance-indicator').textContent = '';
-    document.getElementById('sender-account-select').innerHTML = '<option value="" disabled selected>Gönderici seçin</option>';
-    document.getElementById('receiver-account-select').innerHTML = '<option value="" disabled selected>Alıcı seçin</option>';
-    document.getElementById('report-account-select').innerHTML = '<option value="" disabled selected>Hesap seçin</option>';
+    document.getElementById('sender-account-select').innerHTML = '<option value="" disabled selected>Select sender</option>';
+    document.getElementById('receiver-account-select').innerHTML = '<option value="" disabled selected>Select recipient</option>';
+    document.getElementById('report-account-select').innerHTML = '<option value="" disabled selected>Select account</option>';
 
     // Reset active tab variable
     activeTab = 'accounts-section';

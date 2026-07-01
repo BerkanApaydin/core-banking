@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
 /**
- * Rate limiting abstraction — Redis (production) veya Caffeine (dev/test) implementasyonları.
+ * Rate limiting abstraction — Redis (production) or Caffeine (dev/test) implementations.
  */
 public interface RateLimiter {
 

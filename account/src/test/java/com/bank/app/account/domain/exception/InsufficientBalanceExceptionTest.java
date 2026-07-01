@@ -19,10 +19,10 @@ class InsufficientBalanceExceptionTest {
         InsufficientBalanceException ex = new InsufficientBalanceException(
                 "error.insufficient_balance",
                 new Object[]{"100.00", "TRY", "200.00", "TRY"},
-                "Bakiye yetersiz. Mevcut: 100.00 TRY, İstenen: 200.00 TRY");
+                "Insufficient balance. Current: 100.00 TRY, Requested: 200.00 TRY");
         assertEquals("error.insufficient_balance", ex.getMessageKey());
         assertArrayEquals(new Object[]{"100.00", "TRY", "200.00", "TRY"}, ex.getArgs());
-        assertEquals("Bakiye yetersiz. Mevcut: 100.00 TRY, İstenen: 200.00 TRY", ex.getMessage());
+        assertEquals("Insufficient balance. Current: 100.00 TRY, Requested: 200.00 TRY", ex.getMessage());
     }
 
     @Test

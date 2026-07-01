@@ -11,7 +11,7 @@ class AccountClosedExceptionTest {
     @Test
     void shouldCreateWithIban() {
         AccountClosedException ex = new AccountClosedException("TR290006200000000000000111");
-        assertEquals("Hesap kapatılmış: TR290006200000000000000111", ex.getMessage());
+        assertEquals("Account closed: TR290006200000000000000111", ex.getMessage());
         assertEquals("error.account_closed", ex.getMessageKey());
         assertArrayEquals(new Object[]{"TR290006200000000000000111"}, ex.getArgs());
     }

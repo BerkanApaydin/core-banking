@@ -27,7 +27,7 @@ public class GetAccountByIbanQueryHandler implements GetAccountByIbanQuery {
         Iban iban = new Iban(ibanValue);
         Account account = loadAccountPort.findByIban(iban)
             .orElseThrow(() -> new AccountNotFoundException(ibanValue));
-        accountAuthorizationService.authorizeAccountOwner(account, "Bu hesaba erişim yetkiniz yok");
+        accountAuthorizationService.authorizeAccountOwner(account, "You do not have access to this account");
         return AccountResponse.from(account);
     }
 }

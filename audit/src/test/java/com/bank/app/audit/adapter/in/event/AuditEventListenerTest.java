@@ -83,10 +83,10 @@ class AuditEventListenerTest {
 
     @Test
     void shouldLogAccountClosed() {
-        AuditEvent event = new AuditEvent("ACCOUNT_CLOSED", "Hesap kapatıldı", LocalDateTime.now());
+        AuditEvent event = new AuditEvent("ACCOUNT_CLOSED", "Account closed", LocalDateTime.now());
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CLOSED), eq("Hesap kapatıldı"));
+        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CLOSED), eq("Account closed"));
     }
 }

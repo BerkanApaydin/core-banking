@@ -14,6 +14,10 @@
     <name>app</name>
     <description>Spring Boot application bootstrap and configuration</description>
 
+    <properties>
+        <spring-boot.skip>false</spring-boot.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.bank</groupId>

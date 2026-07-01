@@ -128,7 +128,7 @@ class TransferControllerWebMvcTest {
                 @Test
                 @DisplayName("should propagate business exception on cancel failure")
                 void shouldPropagateBusinessException() throws Exception {
-                        doThrow(new DuplicateIbanException("İptal edilemez"))
+                        doThrow(new DuplicateIbanException("Cannot be cancelled"))
                                         .when(cancelTransferPort).execute(10L);
 
                         mockMvc.perform(post("/api/v1/transfers/10/cancel"))

@@ -9,6 +9,6 @@ public class TooManyFailedLoginAttemptsException extends BusinessException {
     public int getHttpStatusCode() { return 429; }
 
     public TooManyFailedLoginAttemptsException(String message) {
-        super("error.too_many_failed_login_attempts", new Object[]{message}, "Çok fazla başarısız giriş denemesi: " + message);
+        super("error.too_many_failed_login_attempts", new Object[]{message}, "Too many failed login attempts: " + message);
     }
 }

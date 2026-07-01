@@ -13,12 +13,12 @@ class CreateAccountRequestTest {
     @Test
     void shouldCreateWithAllFields() {
         CreateAccountRequest request = new CreateAccountRequest(
-                1L, "TR290006200000000000000111", "Ahmet Yılmaz",
+                1L, "TR290006200000000000000111", "Ahmet Yilmaz",
                 new BigDecimal("1000.00"), Currency.TRY);
 
         assertThat(request.userId()).isEqualTo(1L);
         assertThat(request.iban()).isEqualTo("TR290006200000000000000111");
-        assertThat(request.ownerName()).isEqualTo("Ahmet Yılmaz");
+        assertThat(request.ownerName()).isEqualTo("Ahmet Yilmaz");
         assertThat(request.initialBalance()).isEqualByComparingTo("1000.00");
         assertThat(request.currency()).isEqualTo(Currency.TRY);
     }

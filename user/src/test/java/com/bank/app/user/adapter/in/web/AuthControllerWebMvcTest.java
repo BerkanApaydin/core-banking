@@ -136,7 +136,7 @@ class AuthControllerWebMvcTest {
             AuthRequest request = new AuthRequest("existing", "Password1");
 
             doThrow(new DuplicateUsernameException("error.username_exists", new Object[] {},
-                    "Kullanıcı adı zaten kullanımda"))
+                    "Username already in use"))
                     .when(registerUserPort).execute(any(AuthRequest.class));
 
             mockMvc.perform(post("/api/v1/auth/register")
@@ -173,7 +173,7 @@ class AuthControllerWebMvcTest {
             AuthRequest request = new AuthRequest("testuser", "password");
 
             when(loginUserPort.execute(any(AuthRequest.class), anyString()))
-                    .thenThrow(new TooManyFailedLoginAttemptsException("Çok fazla deneme"));
+                    .thenThrow(new TooManyFailedLoginAttemptsException("Too many attempts"));
 
             mockMvc.perform(post("/api/v1/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)

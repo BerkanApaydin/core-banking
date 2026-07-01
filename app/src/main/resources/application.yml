@@ -34,13 +34,14 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 50 # PostgreSQL optimumu; üstesi context-switch ve lock contention üretiyor
+      maximum-pool-size: 50
       minimum-idle: 10
-      connection-timeout: 5000 # 5sn: bağlanamayan istek hızlı hata versin, kuyrukta beklesin
-      idle-timeout: 300000 # 5 dk
-      max-lifetime: 1200000 # 20 dk
-      keepalive-time: 60000 # Bağlantı canlı tutma – idle connection drop'u önler
-      leak-detection-threshold: 10000 # 10sn aşan bağlantıları logla
+      connection-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      keepalive-time: 60000
+      leak-detection-threshold: 10000
+      read-only: false
   jpa:
     open-in-view: false
     hibernate:
@@ -79,7 +80,6 @@ app:
         - /api/v1/auth/register
         - /api/v1/accounts
         - /api/v1/transfers
-  security:
     token-blacklist:
       backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
   idempotency:

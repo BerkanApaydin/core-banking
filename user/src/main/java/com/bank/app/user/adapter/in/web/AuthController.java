@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.Operation;
 @RestController
 @ApiVersion("v1")
 @RequestMapping("/auth")
-@Tag(name = "Auth API", description = "Kullanıcı kayıt ve kimlik doğrulama API'si")
+@Tag(name = "Auth API", description = "User registration and authentication API")
 public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
@@ -42,7 +42,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Yeni kullanıcı kaydı oluşturur", description = "Kullanıcı adı ve şifre ile sisteme yeni üye olunmasını sağlar.")
+    @Operation(summary = "Creates a new user registration", description = "Registers a new user with username and password.")
     public ResponseEntity<Void> register(@Valid @RequestBody AuthWebRequest webRequest) {
         AuthRequest request = new AuthRequest(
                 webRequest.username(), webRequest.password(),
@@ -52,7 +52,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Kullanıcı girişi yapar", description = "Geçerli kullanıcı bilgileriyle giriş yaparak JWT token üretilmesini sağlar.")
+    @Operation(summary = "Authenticates a user", description = "Validates credentials and generates a JWT token.")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthWebRequest webRequest, HttpServletRequest httpRequest) {
         AuthRequest request = new AuthRequest(
                 webRequest.username(), webRequest.password(),
@@ -63,7 +63,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Kullanıcı oturumunu kapatır", description = "Mevcut JWT token'ı geçersiz kılar.")
+    @Operation(summary = "Logs out the user", description = "Invalidates the current JWT token.")
     public ResponseEntity<Void> logout(
             @RequestHeader("Authorization") String authHeader) {
         logoutUseCase.execute(authHeader);

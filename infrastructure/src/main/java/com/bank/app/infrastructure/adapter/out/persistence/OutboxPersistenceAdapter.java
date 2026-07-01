@@ -29,7 +29,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<EventEntry> findAndLockUnprocessed(int limit, int partition) {
         return repository.findAndLockUnprocessed(partition, PageRequest.of(0, limit))
                 .stream()
@@ -38,7 +38,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<EventEntry> findByIdForUpdateSkipLocked(String id) {
         return repository.findByIdForUpdate(id).map(this::toDomain);
     }

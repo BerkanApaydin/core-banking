@@ -22,6 +22,6 @@ public class AccountAuthorizationService {
 
     public Long getCurrentUserId() {
         return userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("Bu işlem için giriş yapmalısınız."));
+                .orElseThrow(() -> new AuthorizationException("You must be logged in to perform this action."));
     }
 }

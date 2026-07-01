@@ -43,6 +43,7 @@
         <jjwt.version>0.12.5</jjwt.version>
         <springdoc.version>2.8.3</springdoc.version>
         <logstash.logback.version>7.4</logstash.logback.version>
+        <spring-boot.skip>true</spring-boot.skip>
         <archunit.version>1.3.0</archunit.version>
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
         <pitest-junit5-plugin.version>1.2.2</pitest-junit5-plugin.version>
@@ -174,6 +175,7 @@
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <configuration>
                         <jvmArguments>--enable-native-access=ALL-UNNAMED</jvmArguments>
+                        <skip>${spring-boot.skip}</skip>
                     </configuration>
                 </plugin>
                 <plugin>

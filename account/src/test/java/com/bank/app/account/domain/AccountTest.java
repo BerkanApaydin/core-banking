@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AccountTest {
 
     private static final Iban IBAN = new Iban("TR290006200000000000000111");
-    private static final String OWNER = "Ahmet Yılmaz";
+    private static final String OWNER = "Ahmet Yilmaz";
 
     private Account activeAccount(long balance) {
         return new Account(1L, new UserId(1L), IBAN, OWNER, Money.of(String.valueOf(balance), Currency.TRY),

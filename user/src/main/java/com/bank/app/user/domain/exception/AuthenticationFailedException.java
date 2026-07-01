@@ -9,10 +9,10 @@ public class AuthenticationFailedException extends BusinessException {
     public int getHttpStatusCode() { return 401; }
 
     public AuthenticationFailedException(String message) {
-        super("error.authentication_failed", new Object[]{message}, "Kimlik doğrulama başarısız: " + message);
+        super("error.authentication_failed", new Object[]{message}, "Authentication failed: " + message);
     }
 
     public AuthenticationFailedException(String message, Throwable cause) {
-        super("error.authentication_failed", new Object[]{message}, "Kimlik doğrulama başarısız: " + message, cause);
+        super("error.authentication_failed", new Object[]{message}, "Authentication failed: " + message, cause);
     }
 }

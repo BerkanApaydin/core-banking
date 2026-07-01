@@ -31,7 +31,7 @@ class RateLimitingFilterTest {
         messageSource = mock(MessageSource.class);
         clientIpResolver = new ClientIpResolver();
         when(messageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper,
                 clientIpResolver);
@@ -93,7 +93,7 @@ class RateLimitingFilterTest {
         filter.doFilter(request, response, chain);
 
         assertEquals(429, response.getStatus());
-        assertTrue(response.getContentAsString().contains("Çok fazla istek"));
+        assertTrue(response.getContentAsString().contains("Too many requests"));
     }
 
     @Test
@@ -258,7 +258,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -285,7 +285,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -307,7 +307,7 @@ class RateLimitingFilterTest {
 
         assertEquals(429, resp.getStatus());
         String body = resp.getContentAsString();
-        assertTrue(body.contains("Çok fazla istek"), "429 yanıtı Türkçe hata mesajı içermeli, alınan: " + body);
+        assertTrue(body.contains("Too many requests"), "429 response should contain Turkish error message, received: " + body);
     }
 
     @Test
@@ -315,7 +315,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -341,7 +341,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -367,7 +367,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -393,7 +393,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);
@@ -419,7 +419,7 @@ class RateLimitingFilterTest {
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.");
+                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(), objectMapper, clientIpResolver);

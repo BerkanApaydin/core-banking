@@ -25,7 +25,7 @@ public class GetAccountByIdQueryHandler implements GetAccountByIdQuery {
         Objects.requireNonNull(id, "Account ID must not be null");
         Account account = loadAccountPort.findById(id)
             .orElseThrow(() -> new AccountNotFoundException(id));
-        accountAuthorizationService.authorizeAccountOwner(account, "Bu hesaba erişim yetkiniz yok");
+        accountAuthorizationService.authorizeAccountOwner(account, "You do not have access to this account");
         return AccountResponse.from(account);
     }
 }

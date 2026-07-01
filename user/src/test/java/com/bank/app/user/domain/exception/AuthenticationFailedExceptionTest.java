@@ -9,18 +9,18 @@ class AuthenticationFailedExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        AuthenticationFailedException ex = new AuthenticationFailedException("yanlış şifre");
+        AuthenticationFailedException ex = new AuthenticationFailedException("wrong password");
         assertEquals("error.authentication_failed", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"yanlış şifre"}, ex.getArgs());
-        assertTrue(ex.getMessage().contains("yanlış şifre"));
+        assertArrayEquals(new Object[]{"wrong password"}, ex.getArgs());
+        assertTrue(ex.getMessage().contains("wrong password"));
     }
 
     @Test
     void shouldCreateWithMessageAndCause() {
         Throwable cause = new RuntimeException("root cause");
-        AuthenticationFailedException ex = new AuthenticationFailedException("yanlış şifre", cause);
+        AuthenticationFailedException ex = new AuthenticationFailedException("wrong password", cause);
         assertEquals("error.authentication_failed", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"yanlış şifre"}, ex.getArgs());
+        assertArrayEquals(new Object[]{"wrong password"}, ex.getArgs());
         assertSame(cause, ex.getCause());
     }
 

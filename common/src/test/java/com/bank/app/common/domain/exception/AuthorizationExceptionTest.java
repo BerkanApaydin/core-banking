@@ -25,7 +25,7 @@ class AuthorizationExceptionTest {
 
     @Test
     void shouldReturnMessageKeyWhenPresent() {
-        AuthorizationException ex = new AuthorizationException("error.access_denied", new Object[]{}, "Erişim reddedildi");
+        AuthorizationException ex = new AuthorizationException("error.access_denied", new Object[]{}, "Access denied");
         assertEquals("error.access_denied", ex.getMessageKey());
     }
 

@@ -62,8 +62,8 @@ class BusinessExceptionTest {
         @Test
         @DisplayName("should return message when provided directly")
         void shouldReturnMessageWhenProvided() {
-            BusinessException ex = new BusinessException("Doğrudan mesaj") {};
-            assertThat(ex.getMessage()).isEqualTo("Doğrudan mesaj");
+            BusinessException ex = new BusinessException("Direct message") {};
+            assertThat(ex.getMessage()).isEqualTo("Direct message");
             assertThat(ex.getMessageKey()).isNull();
             assertThat(ex.getArgs()).isNull();
         }

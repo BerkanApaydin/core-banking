@@ -100,11 +100,11 @@ class GetAccountsByUserQueryHandlerTest {
         @DisplayName("should throw AuthorizationException when user is not logged in")
         void shouldThrowWhenNotLoggedIn() {
             when(accountAuthorizationService.getCurrentUserId())
-                    .thenThrow(new AuthorizationException("Bu işlem için giriş yapmalısınız."));
+                    .thenThrow(new AuthorizationException("You must be logged in to perform this action."));
 
             assertThatThrownBy(() -> query.execute(0, 20))
                     .isExactlyInstanceOf(AuthorizationException.class)
-                    .hasMessage("Bu işlem için giriş yapmalısınız.");
+                    .hasMessage("You must be logged in to perform this action.");
             verifyNoInteractions(loadAccountPort);
         }
     }

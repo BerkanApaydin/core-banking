@@ -22,8 +22,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Örnek verileri domain use case'leri üzerinden tohumlar — JPA entity bypass
- * kaldırıldı.
+ * Seeds sample data through domain use cases — JPA entity bypass removed.
  */
 @Component
 @Profile("!prod")
@@ -52,7 +51,7 @@ public class DataSeeder {
             var ahmet = loadUserPort.findByUsername("ahmet")
                     .orElseThrow(() -> new IllegalStateException("User Ahmet not found."));
             var ayse = loadUserPort.findByUsername("ayse")
-                    .orElseThrow(() -> new IllegalStateException("User Ayşe not found."));
+                    .orElseThrow(() -> new IllegalStateException("User Ayse not found."));
 
             runAsUser(ahmet.getId().value(), ahmet.getUsername(), () -> {
                 seedAccountIfAbsent(ahmet.getId().value(), "TR123456789012345678901234", "Ahmet Yılmaz",

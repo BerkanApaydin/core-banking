@@ -10,10 +10,10 @@ class TooManyFailedLoginAttemptsExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException("5 deneme");
-        assertEquals("Çok fazla başarısız giriş denemesi: 5 deneme", ex.getMessage());
+        TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException("5 attempts");
+        assertEquals("Too many failed login attempts: 5 attempts", ex.getMessage());
         assertEquals("error.too_many_failed_login_attempts", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"5 deneme"}, ex.getArgs());
+        assertArrayEquals(new Object[]{"5 attempts"}, ex.getArgs());
     }
 
     @Test
