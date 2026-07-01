@@ -2,7 +2,6 @@ package com.bank.app.infrastructure.adapter.in.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -21,13 +20,9 @@ class RedisRateLimitConfigurationTest {
     @Test
     void shouldCreateRedisBeansWhenBackendIsRedis() {
         contextRunner
-                .withBean(RedisProperties.class, () -> {
-                    RedisProperties props = new RedisProperties();
-                    props.setHost("localhost");
-                    props.setPort(6379);
-                    return props;
-                })
                 .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
                         "app.security.rate-limit.backend=redis")
                 .run(context -> {
 
@@ -42,8 +37,9 @@ class RedisRateLimitConfigurationTest {
     @Test
     void shouldNotLoadConfigurationWhenBackendIsNotRedis() {
         contextRunner
-                .withBean(RedisProperties.class, RedisProperties::new)
                 .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
                         "app.security.rate-limit.backend=inmemory")
                 .run(context -> {
 
@@ -56,15 +52,11 @@ class RedisRateLimitConfigurationTest {
     }
 
     @Test
-    void shouldUseHostAndPortFromRedisProperties() {
+    void shouldUseHostAndPortFromProperties() {
         contextRunner
-                .withBean(RedisProperties.class, () -> {
-                    RedisProperties props = new RedisProperties();
-                    props.setHost("redis-host");
-                    props.setPort(6380);
-                    return props;
-                })
                 .withPropertyValues(
+                        "spring.data.redis.host=redis-host",
+                        "spring.data.redis.port=6380",
                         "app.security.rate-limit.backend=redis")
                 .run(context -> {
 
@@ -86,13 +78,9 @@ class RedisRateLimitConfigurationTest {
     @Test
     void shouldCreateStringRedisTemplateWithConnectionFactory() {
         contextRunner
-                .withBean(RedisProperties.class, () -> {
-                    RedisProperties props = new RedisProperties();
-                    props.setHost("localhost");
-                    props.setPort(6379);
-                    return props;
-                })
                 .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
                         "app.security.rate-limit.backend=redis")
                 .run(context -> {
                     StringRedisTemplate template = context.getBean(StringRedisTemplate.class);
@@ -103,18 +91,24 @@ class RedisRateLimitConfigurationTest {
     }
 
     @Test
-    void shouldThrowWhenRedisHostIsNull() {
+    void shouldUseDefaultHostAndPortWhenNotSet() {
         contextRunner
-                .withBean(RedisProperties.class, () -> new RedisProperties() {
-                    @Override
-                    public String getHost() {
-                        return null;
-                    }
-                })
                 .withPropertyValues(
                         "app.security.rate-limit.backend=redis")
                 .run(context -> {
-                    assertThat(context).hasFailed();
+
+                    RedisConnectionFactory factory = context.getBean(RedisConnectionFactory.class);
+
+                    assertThat(factory)
+                            .isInstanceOf(LettuceConnectionFactory.class);
+
+                    LettuceConnectionFactory lettuce = (LettuceConnectionFactory) factory;
+
+                    assertThat(lettuce.getHostName())
+                            .isEqualTo("localhost");
+
+                    assertThat(lettuce.getPort())
+                            .isEqualTo(6379);
                 });
     }
 

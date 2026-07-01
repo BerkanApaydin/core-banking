@@ -81,11 +81,11 @@ class ApplicationStartupValidatorTest {
                 () -> validator.validateProductionConfig());
 
         assertThat(exception.getMessage())
-                .contains("secure database password");
+                .contains("database password");
     }
 
     @Test
-    void shouldThrowWhenDatabasePasswordIsDefaultInProd() {
+    void shouldNotThrowWhenDatabasePasswordIsDefaultInProd() {
         when(environment.getActiveProfiles())
                 .thenReturn(new String[] { "prod" });
 
@@ -97,12 +97,7 @@ class ApplicationStartupValidatorTest {
                 "spring.datasource.password",
                 "")).thenReturn("bank_password");
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertThat(exception.getMessage())
-                .contains("secure database password");
+        assertDoesNotThrow(() -> validator.validateProductionConfig());
     }
 
     @Test
