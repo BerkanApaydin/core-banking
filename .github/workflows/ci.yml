@@ -54,7 +54,7 @@ jobs:
         DB_PASSWORD: bank_password
 
     - name: Unit & Integration Tests (with coverage)
-      run: mvn install jacoco:report -q
+      run: mvn install jacoco:report -T 4 -q
       env:
         DB_HOST: localhost
         DB_PORT: 5432

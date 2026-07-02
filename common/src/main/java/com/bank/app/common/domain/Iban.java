@@ -5,16 +5,17 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 public record Iban(String value) {
-    private static volatile Pattern ibanPattern = Pattern.compile("^TR[0-9]{24}$");
+    private static final ThreadLocal<Pattern> ibanPattern = ThreadLocal.withInitial(
+            () -> Pattern.compile("^TR[0-9]{24}$"));
 
     public static void configurePattern(String regex) {
-        ibanPattern = Pattern.compile(regex);
+        ibanPattern.set(Pattern.compile(regex));
     }
 
     public Iban {
         Objects.requireNonNull(value, "IBAN must not be null");
         value = normalize(value);
-        if (!ibanPattern.matcher(value).matches()) {
+        if (!ibanPattern.get().matcher(value).matches()) {
             throw new InvalidIbanException("Invalid IBAN format: " + value);
         }
     }
