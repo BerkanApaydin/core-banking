@@ -65,8 +65,15 @@ jobs:
     - name: Architecture Tests
       run: mvn test -pl app -am -Dtest="ArchitectureTest" -Dsurefire.failIfNoSpecifiedTests=false -q
 
+    - name: Cache PIT History
+      uses: actions/cache@v4
+      with:
+        path: '**/target/pit-history.txt'
+        key: ${{ runner.os }}-pit-${{ hashFiles('**/*.java') }}
+        restore-keys: ${{ runner.os }}-pit-
+
     - name: Mutation Tests (PIT)
-      run: mvn pitest:mutationCoverage -Dpitest.skip=false -q
+      run: mvn pitest:mutationCoverage -Dpitest.skip=false -T 4 -q
       continue-on-error: true
       env:
         DB_HOST: localhost

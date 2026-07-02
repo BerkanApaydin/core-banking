@@ -238,6 +238,8 @@
                             <avoidCallsTo>java.util.logging</avoidCallsTo>
                         </avoidCallsTo>
                         <threads>4</threads>
+                        <historyInputFile>${project.build.directory}/pit-history.txt</historyInputFile>
+                        <historyOutputFile>${project.build.directory}/pit-history.txt</historyOutputFile>
                         <outputFormats>
                             <param>XML</param>
                             <param>HTML</param>
