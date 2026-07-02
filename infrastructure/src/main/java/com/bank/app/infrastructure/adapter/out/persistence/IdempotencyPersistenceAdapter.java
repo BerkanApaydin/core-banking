@@ -2,7 +2,6 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -27,13 +26,7 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
 
     @Override
     public boolean tryCreate(String key, LocalDateTime now) {
-        try {
-            IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity(key, "PENDING", null, null, now);
-            repository.saveAndFlush(entity);
-            return true;
-        } catch (DataIntegrityViolationException e) {
-            return false;
-        }
+        return repository.tryInsert(key, now) > 0;
     }
 
     @Override
