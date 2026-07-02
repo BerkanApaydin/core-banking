@@ -142,6 +142,8 @@
                     <configuration>
                         <forkCount>1</forkCount>
                         <reuseForks>true</reuseForks>
+                        <parallel>classes</parallel>
+                        <useUnlimitedThreads>true</useUnlimitedThreads>
                         <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding}</argLine>
                         <excludes>
                             <exclude>**/*IntegrationTest.java</exclude>
@@ -235,6 +237,7 @@
                             <avoidCallsTo>org.slf4j</avoidCallsTo>
                             <avoidCallsTo>java.util.logging</avoidCallsTo>
                         </avoidCallsTo>
+                        <threads>4</threads>
                         <outputFormats>
                             <param>XML</param>
                             <param>HTML</param>
