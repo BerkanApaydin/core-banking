@@ -1,9 +1,11 @@
 package com.bank.app.user.domain;
 
+import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.UserId;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
-public class User {
+public class User extends BaseAggregateRoot {
 
     private final UserId id;
     private final String username;
@@ -32,11 +34,14 @@ public class User {
     }
 
     public static User create(String username, String password) {
-        return new User(null, username, password, Role.ROLE_USER, null, null);
+        return create(username, password, null, null);
     }
 
     public static User create(String username, String password, EmailAddress email, PhoneNumber phone) {
-        return new User(null, username, password, Role.ROLE_USER, email, phone);
+        User user = new User(null, username, password, Role.ROLE_USER, email, phone);
+        user.registerEvent(new UserRegisteredEvent(
+                null, username, Role.ROLE_USER.name(), LocalDateTime.now()));
+        return user;
     }
 
     private static String validateUsername(String username) {

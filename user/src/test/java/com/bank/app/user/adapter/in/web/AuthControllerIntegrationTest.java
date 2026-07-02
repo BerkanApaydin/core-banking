@@ -1,7 +1,10 @@
 package com.bank.app.user.adapter.in.web;
 
-import com.bank.app.user.adapter.out.security.CaffeineLoginAttemptAdapter;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
+import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.user.adapter.out.security.CaffeineLoginAttemptAdapter;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import com.bank.app.user.ModuleIntegrationTestConfig;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
@@ -25,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = {com.bank.app.user.TestApplication.class, ModuleIntegrationTestConfig.class})
+@SpringBootTest(classes = {com.bank.app.user.TestApplication.class, ModuleIntegrationTestConfig.class, AuthControllerIntegrationTest.TestConfig.class})
 @SuppressWarnings("null")
 class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
@@ -246,6 +249,14 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code", is("AUTHENTICATION_FAILED")));
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        EventPublisherPort eventPublisherPort() {
+            return event -> {};
+        }
     }
 
     @Test

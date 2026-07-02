@@ -93,6 +93,7 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Auditing use cases utilize `PROPAGATION_REQUIRES_NEW` to guarantee logging persistence even on parent transaction rollbacks.
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table. Leverages virtual partitioning (16 partitions) and `SELECT ... FOR UPDATE SKIP LOCKED` for concurrent scaling and deadlock prevention.
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
+- **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
 - **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key (`username_idempotencyKey`) stored in the `idempotency_keys` table.
 - **Dynamic Security Backends:** Abstracts Rate Limiting (sliding window via Lua script), Token Blacklisting, and Brute-Force lockout, supporting both Redis (production) and Caffeine (local dev).
 

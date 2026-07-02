@@ -16,7 +16,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.bank.app.transfer.application.dto.*;
+import com.bank.app.common.application.dto.PageResponse;
+import com.bank.app.transfer.application.dto.ReportCriteria;
+import com.bank.app.transfer.application.dto.TransferRequest;
+import com.bank.app.transfer.application.dto.TransferResponse;
+import com.bank.app.transfer.application.dto.TransferDetailResponse;
+import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.in.*;
 
 import java.math.BigDecimal;
@@ -165,14 +170,14 @@ class TransferControllerWebMvcTest {
                 void shouldReturn200() throws Exception {
                         TransferResponse t = new TransferResponse(10L, "COMPLETED", new BigDecimal("200.00"),
                                         "TRY", LocalDateTime.now(), "TR1", "TR2", 1L, 2L);
-                        PagedResponse<TransferResponse> paged = new PagedResponse<>(List.of(t), 0, 20, 1);
+                        PageResponse<TransferResponse> paged = PageResponse.of(List.of(t), 0, 20, 1);
 
                         when(getTransferHistoryPort.execute(eq(1L), anyInt(), anyInt())).thenReturn(paged);
 
                         mockMvc.perform(get("/api/v1/transfers/history/1"))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.items[0].id").value(10L))
-                                        .andExpect(jsonPath("$.totalItems").value(1));
+                                        .andExpect(jsonPath("$.content[0].id").value(10L))
+                                        .andExpect(jsonPath("$.totalElements").value(1));
                 }
         }
 

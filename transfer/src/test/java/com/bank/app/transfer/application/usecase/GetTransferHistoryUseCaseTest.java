@@ -3,7 +3,7 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
-import com.bank.app.transfer.application.dto.PagedResponse;
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.common.domain.Money;
@@ -54,14 +54,14 @@ class GetTransferHistoryUseCaseTest {
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
         when(loadTransferPort.countHistory(1L)).thenReturn(1L);
 
-        PagedResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
+        PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
 
         assertNotNull(history);
-        assertEquals(1, history.items().size());
-        assertEquals(10L, history.items().get(0).id());
-        assertEquals("TR290006200000000000000111", history.items().get(0).senderIban());
-        assertEquals("TR290006200000000000000222", history.items().get(0).receiverIban());
-        assertEquals(1, history.totalItems());
+        assertEquals(1, history.content().size());
+        assertEquals(10L, history.content().get(0).id());
+        assertEquals("TR290006200000000000000111", history.content().get(0).senderIban());
+        assertEquals("TR290006200000000000000222", history.content().get(0).receiverIban());
+        assertEquals(1, history.totalElements());
         assertEquals(0, history.page());
         assertEquals(20, history.size());
         assertEquals(1, history.totalPages());

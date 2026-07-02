@@ -2,7 +2,7 @@ package com.bank.app.transfer.adapter.in.web;
 
 import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
-import com.bank.app.transfer.application.dto.PagedResponse;
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
@@ -82,7 +82,7 @@ public class TransferController {
 
     @GetMapping("/history/{accountId}")
     @Operation(summary = "Lists the transfer history of an account")
-    public ResponseEntity<PagedResponse<TransferResponse>> getHistory(
+    public ResponseEntity<PageResponse<TransferResponse>> getHistory(
             @PathVariable Long accountId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
-import com.bank.app.transfer.application.dto.PagedResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.common.application.port.out.AccountAclPort;
@@ -32,12 +32,12 @@ public class GetTransferHistoryUseCaseImpl implements GetTransferHistoryQuery {
     }
 
     @Override
-    public PagedResponse<TransferResponse> execute(Long accountId) {
+    public PageResponse<TransferResponse> execute(Long accountId) {
         return execute(accountId, 0, 20);
     }
 
     @Override
-    public PagedResponse<TransferResponse> execute(Long accountId, int page, int size) {
+    public PageResponse<TransferResponse> execute(Long accountId, int page, int size) {
         Objects.requireNonNull(accountId, "Account ID must not be null");
 
         int cappedPage = Math.max(page, 0);
@@ -63,6 +63,6 @@ public class GetTransferHistoryUseCaseImpl implements GetTransferHistoryQuery {
 
         long totalItems = loadTransferPort.countHistory(accountId);
 
-        return new PagedResponse<>(items, cappedPage, cappedSize, totalItems);
+        return PageResponse.of(items, cappedPage, cappedSize, totalItems);
     }
 }

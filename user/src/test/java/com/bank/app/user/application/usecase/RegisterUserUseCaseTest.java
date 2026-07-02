@@ -5,10 +5,12 @@ import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
-import com.bank.app.user.domain.PasswordPolicy;
-import com.bank.app.user.domain.User;
+import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.Role;
+import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.UserRegisteredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,12 +36,14 @@ class RegisterUserUseCaseTest {
     private SaveUserPort saveUserPort;
     @Mock
     private PasswordEncoderPort passwordEncoderPort;
+    @Mock
+    private EventPublisherPort eventPublisherPort;
 
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
     void setUp() {
-        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT);
+        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT, eventPublisherPort);
     }
 
     @Nested
@@ -62,6 +66,7 @@ class RegisterUserUseCaseTest {
                     "newuser".equals(user.getUsername()) &&
                     "hashedpassword".equals(user.getPassword()) &&
                     user.getRole() == Role.ROLE_USER));
+            verify(eventPublisherPort).publish(any(UserRegisteredEvent.class));
         }
 
         @Test

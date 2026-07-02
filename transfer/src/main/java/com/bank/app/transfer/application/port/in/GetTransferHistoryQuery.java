@@ -1,11 +1,11 @@
 package com.bank.app.transfer.application.port.in;
 
-import com.bank.app.transfer.application.dto.PagedResponse;
+import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.transfer.application.dto.TransferResponse;
 
 public interface GetTransferHistoryQuery {
-    default PagedResponse<TransferResponse> execute(Long accountId) {
+    default PageResponse<TransferResponse> execute(Long accountId) {
         return execute(accountId, 0, 20);
     }
-    PagedResponse<TransferResponse> execute(Long accountId, int page, int size);
+    PageResponse<TransferResponse> execute(Long accountId, int page, int size);
 }
