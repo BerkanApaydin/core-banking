@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -55,21 +54,18 @@ class IdempotencyPersistenceAdapterTest {
     @Test
     void shouldTryCreateSuccessfully() {
         var now = LocalDateTime.now();
-        when(repository.saveAndFlush(any())).thenReturn(null);
+        when(repository.tryInsert("key1", now)).thenReturn(1);
 
         boolean result = adapter.tryCreate("key1", now);
 
         assertThat(result).isTrue();
-        verify(repository).saveAndFlush(argThat(e ->
-                e.getKey().equals("key1")
-                        && e.getStatus().equals("PENDING")
-                        && e.getCreatedAt().equals(now)));
+        verify(repository).tryInsert("key1", now);
     }
 
     @Test
     void shouldReturnFalseWhenTryCreateFailsWithDuplicate() {
         var now = LocalDateTime.now();
-        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Duplicate key"));
+        when(repository.tryInsert("key1", now)).thenReturn(0);
 
         boolean result = adapter.tryCreate("key1", now);
 
