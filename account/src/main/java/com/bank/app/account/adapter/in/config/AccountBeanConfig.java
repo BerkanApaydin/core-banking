@@ -4,16 +4,12 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
-import com.bank.app.account.application.port.in.ExecuteTransferUseCase;
-import com.bank.app.account.application.port.in.ReverseTransferUseCase;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.application.usecase.CreateAccountUseCaseImpl;
 import com.bank.app.account.application.usecase.GetAccountByIdQueryHandler;
 import com.bank.app.account.application.usecase.GetAccountByIbanQueryHandler;
 import com.bank.app.account.application.usecase.GetAccountsByUserQueryHandler;
-import com.bank.app.account.application.usecase.ExecuteTransferUseCaseImpl;
-import com.bank.app.account.application.usecase.ReverseTransferUseCaseImpl;
 import com.bank.app.account.application.usecase.AccountQueryUseCaseImpl;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
@@ -37,25 +33,6 @@ public class AccountBeanConfig {
         return new AccountAuthorizationService(userContextService);
     }
 
-    @Bean
-    public ExecuteTransferUseCase executeTransferUseCase(LoadAccountPort loadAccountPort,
-            SaveAccountPort saveAccountPort,
-            AccountAuthorizationService accountAuthorizationService,
-            DomainEventPublisherService domainEventPublisherService,
-            AuditEventPort auditEventPort) {
-        return new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
-                domainEventPublisherService, auditEventPort);
-    }
-
-    @Bean
-    public ReverseTransferUseCase reverseTransferUseCase(LoadAccountPort loadAccountPort,
-            SaveAccountPort saveAccountPort,
-            AccountAuthorizationService accountAuthorizationService,
-            DomainEventPublisherService domainEventPublisherService,
-            AuditEventPort auditEventPort) {
-        return new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
-                domainEventPublisherService, auditEventPort);
-    }
 
     @Bean
     public GetAccountByIdQuery getAccountByIdQuery(LoadAccountPort loadAccountPort,

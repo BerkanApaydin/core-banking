@@ -36,21 +36,6 @@ class AccountBeanConfigTest {
         assertNotNull(config.createAccountUseCase(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, authService));
     }
 
-    @Test
-    void shouldCreateExecuteTransferUseCaseBean() {
-        AccountBeanConfig config = new AccountBeanConfig();
-        AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
-        assertNotNull(config.executeTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, domainEventPublisherService, auditEventPort));
-    }
-
-    @Test
-    void shouldCreateReverseTransferUseCaseBean() {
-        AccountBeanConfig config = new AccountBeanConfig();
-        AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
-        assertNotNull(config.reverseTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, domainEventPublisherService, auditEventPort));
-    }
 
     @Test
     void shouldCreateGetAccountByIdQueryBean() {

@@ -6,7 +6,7 @@ import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaRepository;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaRepository;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import jakarta.persistence.EntityManager;
@@ -44,7 +44,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     private UserJpaRepository userRepository;
 
     @Autowired
-    private OutboxEventJpaRepository outboxEventRepo;
+    private OutboxJpaRepository outboxEventRepo;
 
     @Autowired
     private PlatformTransactionManager transactionManager;

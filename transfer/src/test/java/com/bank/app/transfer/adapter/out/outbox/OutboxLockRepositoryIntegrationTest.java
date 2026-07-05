@@ -1,9 +1,10 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaEntity;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaRepository;
 import com.bank.app.infrastructure.adapter.out.outbox.OutboxLockRepository;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaEntity;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaRepository;
 import com.bank.app.transfer.AbstractIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.jupiter.api.AfterEach;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
@@ -31,7 +30,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     private OutboxLockRepository lockRepository;
 
     @Autowired
-    private OutboxEventJpaRepository outboxRepo;
+    private OutboxJpaRepository outboxRepo;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -49,18 +48,18 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Transactional
     void shouldReturnEmptyListWhenNoUnprocessedEvents() {
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertTrue(result.isEmpty());
     }
 
     @Test
     @Transactional
     void shouldFindAndLockUnprocessedEventsWithSkipLocked() {
-        outboxRepo.save(new OutboxEventJpaEntity(
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
-                "{}", LocalDateTime.now(), false, null));
+                "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-1", result.get(0).getId());
     }
@@ -68,14 +67,14 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Transactional
     void shouldExcludeProcessedEvents() {
-        outboxRepo.save(new OutboxEventJpaEntity(
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
-                "{}", LocalDateTime.now(), true, LocalDateTime.now()));
-        outboxRepo.save(new OutboxEventJpaEntity(
+                "{}", LocalDateTime.now(), true, LocalDateTime.now(), 0, false, null, 0));
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-2", "Transfer", "2", "TransferCompletedEvent",
-                "{}", LocalDateTime.now(), false, null));
+                "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-2", result.get(0).getId());
     }
@@ -83,15 +82,14 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Transactional
     void shouldExcludeDeadLetterEvents() {
-        outboxRepo.save(new OutboxEventJpaEntity(
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-1", "Transfer", "1", "TransferCompletedEvent",
-                "{}", LocalDateTime.now(), false, null,
-                5, true, "dead"));
-        outboxRepo.save(new OutboxEventJpaEntity(
+                "{}", LocalDateTime.now(), false, 5, true, "dead", 0));
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-2", "Transfer", "2", "TransferCompletedEvent",
-                "{}", LocalDateTime.now(), false, null));
+                "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertEquals(1, result.size());
         assertEquals("evt-2", result.get(0).getId());
     }
@@ -99,14 +97,14 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Transactional
     void shouldOrderByCreatedAtAscending() {
-        outboxRepo.save(new OutboxEventJpaEntity(
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-later", "Transfer", "1", "TransferCompletedEvent",
-                "{}", LocalDateTime.now().plusMinutes(5), false, null));
-        outboxRepo.save(new OutboxEventJpaEntity(
+                "{}", LocalDateTime.now().plusMinutes(5), false, 0, false, null, 0));
+        outboxRepo.save(new OutboxJpaEntity(
                 "evt-earlier", "Transfer", "2", "TransferCompletedEvent",
-                "{}", LocalDateTime.now().minusMinutes(5), false, null));
+                "{}", LocalDateTime.now().minusMinutes(5), false, 0, false, null, 0));
 
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(10, -1);
         assertEquals(2, result.size());
         assertEquals("evt-earlier", result.get(0).getId());
         assertEquals("evt-later", result.get(1).getId());
@@ -116,12 +114,12 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Transactional
     void shouldRespectLimit() {
         for (int i = 0; i < 5; i++) {
-            outboxRepo.save(new OutboxEventJpaEntity(
+            outboxRepo.save(new OutboxJpaEntity(
                     "evt-" + i, "Transfer", String.valueOf(i), "TransferCompletedEvent",
-                    "{}", LocalDateTime.now().plusSeconds(i), false, null));
+                    "{}", LocalDateTime.now().plusSeconds(i), false, 0, false, null, 0));
         }
 
-        List<OutboxEventJpaEntity> result = lockRepository.findAndLockUnprocessed(3, -1);
+        List<OutboxJpaEntity> result = lockRepository.findAndLockUnprocessed(3, -1);
         assertEquals(3, result.size());
     }
 
@@ -130,9 +128,9 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.executeWithoutResult(status -> {
             for (int i = 0; i < 10; i++) {
-                outboxRepo.save(new OutboxEventJpaEntity(
+                outboxRepo.save(new OutboxJpaEntity(
                         "evt-" + i, "Transfer", String.valueOf(i), "TransferCompletedEvent",
-                        "{}", LocalDateTime.now().plusSeconds(i), false, null));
+                        "{}", LocalDateTime.now().plusSeconds(i), false, 0, false, null, 0));
             }
         });
 
@@ -142,8 +140,8 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
 
         for (int t = 0; t < threadCount; t++) {
             new Thread(() -> {
-                List<OutboxEventJpaEntity> batch = tx.execute(status -> {
-                    List<OutboxEventJpaEntity> locked = lockRepository.findAndLockUnprocessed(5, -1);
+                List<OutboxJpaEntity> batch = tx.execute(status -> {
+                    List<OutboxJpaEntity> locked = lockRepository.findAndLockUnprocessed(5, -1);
                     locked.forEach(e -> {
                         e.setProcessed(true);
                         e.setProcessedAt(LocalDateTime.now());
@@ -165,13 +163,13 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.executeWithoutResult(status -> {
             for (int i = 0; i < 3; i++) {
-                outboxRepo.save(new OutboxEventJpaEntity(
+                outboxRepo.save(new OutboxJpaEntity(
                         "evt-" + i, "Transfer", String.valueOf(i), "TransferCompletedEvent",
-                        "{}", LocalDateTime.now().plusSeconds(i), false, null));
+                        "{}", LocalDateTime.now().plusSeconds(i), false, 0, false, null, 0));
             }
         });
 
-        List<OutboxEventJpaEntity> firstBatch = tx.execute(status ->
+        List<OutboxJpaEntity> firstBatch = tx.execute(status ->
                 lockRepository.findAndLockUnprocessed(10, -1));
         assertEquals(3, firstBatch.size());
 
@@ -181,7 +179,7 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
             outboxRepo.save(e);
         });
 
-        List<OutboxEventJpaEntity> secondBatch = tx.execute(status ->
+        List<OutboxJpaEntity> secondBatch = tx.execute(status ->
                 lockRepository.findAndLockUnprocessed(10, -1));
         assertTrue(secondBatch.isEmpty(), "Same unprocessed events should not be returned again without processing");
     }
@@ -190,18 +188,18 @@ class OutboxLockRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Transactional
     void shouldReturnRemainingEventsAfterProcessingSome() {
         for (int i = 0; i < 5; i++) {
-            outboxRepo.save(new OutboxEventJpaEntity(
+            outboxRepo.save(new OutboxJpaEntity(
                     "evt-" + i, "Transfer", String.valueOf(i), "TransferCompletedEvent",
-                    "{}", LocalDateTime.now().plusSeconds(i), false, null));
+                    "{}", LocalDateTime.now().plusSeconds(i), false, 0, false, null, 0));
         }
 
-        List<OutboxEventJpaEntity> allEvents = outboxRepo.findAll();
-        OutboxEventJpaEntity toProcess = allEvents.get(0);
+        List<OutboxJpaEntity> allEvents = outboxRepo.findAll();
+        OutboxJpaEntity toProcess = allEvents.get(0);
         toProcess.setProcessed(true);
         toProcess.setProcessedAt(LocalDateTime.now());
         outboxRepo.save(toProcess);
 
-        List<OutboxEventJpaEntity> remaining = lockRepository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> remaining = lockRepository.findAndLockUnprocessed(10, -1);
         assertEquals(4, remaining.size());
         assertTrue(remaining.stream().noneMatch(e -> e.getId().equals(toProcess.getId())));
     }

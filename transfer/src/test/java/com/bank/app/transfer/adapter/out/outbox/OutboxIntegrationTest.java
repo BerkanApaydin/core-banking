@@ -7,8 +7,8 @@ import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaEntity;
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaRepository;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaEntity;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaRepository;
 import com.bank.app.infrastructure.adapter.out.security.SecurityContextAdapter;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
 import com.bank.app.transfer.application.dto.TransferRequest;
@@ -46,7 +46,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     private PlaceTransferUseCase placeTransferPort;
 
     @Autowired
-    private OutboxEventJpaRepository outboxRepo;
+    private OutboxJpaRepository outboxRepo;
 
     @Autowired
     private AccountJpaRepository accountRepo;
@@ -76,16 +76,16 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         @Bean
         @Primary
         EventPublisherPort domainEventOutboxAdapter(ObjectMapper objectMapper,
-                OutboxEventJpaRepository outboxEventRepo) {
+                OutboxJpaRepository outboxRepo) {
             return event -> {
                 try {
                     String payload = objectMapper.writeValueAsString(event);
                     String eventType = event.getClass().getSimpleName();
-                    OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+                    OutboxJpaEntity entity = new OutboxJpaEntity(
                             UUID.randomUUID().toString(),
                             "Transfer", "unknown", eventType,
-                            payload, LocalDateTime.now(), false, null);
-                    outboxEventRepo.save(entity);
+                            payload, LocalDateTime.now(), false, 0, false, null, 0);
+                    outboxRepo.save(entity);
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException("Failed to serialize event", e);
                 }
@@ -93,7 +93,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         }
     }
 
-    private static EventEntry toEventEntry(OutboxEventJpaEntity e) {
+    private static EventEntry toEventEntry(OutboxJpaEntity e) {
         return new EventEntry(e.getId(), e.getAggregateType(), e.getAggregateId(),
                 e.getEventType(), e.getPayload(), e.getRetryCount(),
                 e.isProcessed(), e.isDeadLetter(), e.getLastError(),
@@ -116,7 +116,6 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     @AfterEach
     void cleanUp() {
         new TransactionTemplate(txManager).execute(status -> {
-            entityManager.createQuery("delete from OutboxEventJpaEntity").executeUpdate();
             entityManager.createQuery("delete from OutboxJpaEntity").executeUpdate();
             entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
             entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
@@ -138,10 +137,10 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
             return null;
         });
 
-        List<OutboxEventJpaEntity> allOutboxEvents = outboxRepo.findAll();
+        List<OutboxJpaEntity> allOutboxEvents = outboxRepo.findAll();
         assertEquals(3, allOutboxEvents.size());
 
-        OutboxEventJpaEntity event = allOutboxEvents.stream()
+        OutboxJpaEntity event = allOutboxEvents.stream()
                 .filter(e -> "TransferCompletedEvent".equals(e.getEventType()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("TransferCompletedEvent not found"));
@@ -150,24 +149,23 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         outboxProcessor.processEvent(toEventEntry(event));
 
-        OutboxEventJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
+        OutboxJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
         assertTrue(processedEvent.isProcessed());
         assertNotNull(processedEvent.getProcessedAt());
     }
 
     @Test
     void shouldIncrementRetryCountOnFailedProcessing() {
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+        OutboxJpaEntity entity = new OutboxJpaEntity(
                 UUID.randomUUID().toString(),
                 "Transfer", "123", "TransferCompletedEvent",
-                "invalid json", LocalDateTime.now(), false, null,
-                0, false, null);
+                "invalid json", LocalDateTime.now(), false, 0, false, null, 0);
         outboxRepo.save(entity);
 
         assertThrows(RuntimeException.class, () -> outboxProcessor.processEvent(toEventEntry(entity)));
         outboxProcessor.recordFailure(toEventEntry(entity), new RuntimeException("processing failed"), 5);
 
-        OutboxEventJpaEntity failedEvent = outboxRepo.findById(entity.getId()).orElseThrow();
+        OutboxJpaEntity failedEvent = outboxRepo.findById(entity.getId()).orElseThrow();
         assertEquals(1, failedEvent.getRetryCount());
         assertFalse(failedEvent.isProcessed());
         assertFalse(failedEvent.isDeadLetter());
@@ -176,17 +174,16 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Test
     void shouldMoveToDeadLetterAfterMaxRetries() {
-        OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+        OutboxJpaEntity entity = new OutboxJpaEntity(
                 UUID.randomUUID().toString(),
                 "Transfer", "123", "TransferCompletedEvent",
-                "invalid json", LocalDateTime.now(), false, null,
-                4, false, "previous error");
+                "invalid json", LocalDateTime.now(), false, 4, false, "previous error", 0);
         outboxRepo.save(entity);
 
         assertThrows(RuntimeException.class, () -> outboxProcessor.processEvent(toEventEntry(entity)));
         outboxProcessor.recordFailure(toEventEntry(entity), new RuntimeException("processing failed"), 5);
 
-        OutboxEventJpaEntity deadEvent = outboxRepo.findById(entity.getId()).orElseThrow();
+        OutboxJpaEntity deadEvent = outboxRepo.findById(entity.getId()).orElseThrow();
         assertEquals(5, deadEvent.getRetryCount());
         assertTrue(deadEvent.isDeadLetter());
         assertFalse(deadEvent.isProcessed());
@@ -204,26 +201,26 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
                                     com.bank.app.common.domain.Currency.TRY),
                             com.bank.app.transfer.domain.TransferStatus.COMPLETED,
                             LocalDateTime.now());
-            OutboxEventJpaEntity entity = new OutboxEventJpaEntity(
+            OutboxJpaEntity entity = new OutboxJpaEntity(
                     UUID.randomUUID().toString(),
                     "Transfer", String.valueOf(100L + i), "TransferCompletedEvent",
                     objectMapper.writeValueAsString(payload),
-                    LocalDateTime.now(), false, null);
+                    LocalDateTime.now(), false, 0, false, null, 0);
             outboxRepo.save(entity);
         }
 
         assertEquals(3, outboxRepo.findAll().stream().filter(e -> !e.isProcessed()).count());
 
-        List<OutboxEventJpaEntity> events = outboxRepo.findAll();
-        for (OutboxEventJpaEntity event : events) {
+        List<OutboxJpaEntity> events = outboxRepo.findAll();
+        for (OutboxJpaEntity event : events) {
             outboxProcessor.processEvent(toEventEntry(event));
         }
 
-        List<OutboxEventJpaEntity> processed = outboxRepo.findAll().stream()
-                .filter(OutboxEventJpaEntity::isProcessed)
+        List<OutboxJpaEntity> processed = outboxRepo.findAll().stream()
+                .filter(OutboxJpaEntity::isProcessed)
                 .toList();
         assertEquals(3, processed.size());
-        for (OutboxEventJpaEntity event : processed) {
+        for (OutboxJpaEntity event : processed) {
             assertNull(event.getLastError());
             assertFalse(event.isDeadLetter());
             assertNotNull(event.getProcessedAt());

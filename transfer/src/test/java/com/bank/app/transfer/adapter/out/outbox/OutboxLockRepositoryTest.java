@@ -1,7 +1,7 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
-import com.bank.app.infrastructure.adapter.out.outbox.OutboxEventJpaEntity;
 import com.bank.app.infrastructure.adapter.out.outbox.OutboxLockRepository;
+import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.Query;
@@ -38,15 +38,15 @@ class OutboxLockRepositoryTest {
         ReflectionTestUtils.setField(repository, "useSkipLocked", true);
 
         Query nativeQuery = mock(Query.class);
-        when(entityManager.createNativeQuery(anyString(), eq(OutboxEventJpaEntity.class)))
+        when(entityManager.createNativeQuery(anyString(), eq(OutboxJpaEntity.class)))
                 .thenReturn(nativeQuery);
         when(nativeQuery.setParameter("limit", 10)).thenReturn(nativeQuery);
         when(nativeQuery.getResultList()).thenReturn(List.of());
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
 
         assertTrue(result.isEmpty());
-        verify(entityManager).createNativeQuery(contains("FOR UPDATE SKIP LOCKED"), eq(OutboxEventJpaEntity.class));
+        verify(entityManager).createNativeQuery(contains("FOR UPDATE SKIP LOCKED"), eq(OutboxJpaEntity.class));
         verify(nativeQuery).setParameter("limit", 10);
         verify(nativeQuery, never()).setParameter(eq("partition"), anyInt());
     }
@@ -56,16 +56,16 @@ class OutboxLockRepositoryTest {
         ReflectionTestUtils.setField(repository, "useSkipLocked", true);
 
         Query nativeQuery = mock(Query.class);
-        when(entityManager.createNativeQuery(anyString(), eq(OutboxEventJpaEntity.class)))
+        when(entityManager.createNativeQuery(anyString(), eq(OutboxJpaEntity.class)))
                 .thenReturn(nativeQuery);
         when(nativeQuery.setParameter("limit", 5)).thenReturn(nativeQuery);
         when(nativeQuery.setParameter("partition", 2)).thenReturn(nativeQuery);
         when(nativeQuery.getResultList()).thenReturn(List.of());
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(5, 2);
+        List<OutboxJpaEntity> result = repository.findAndLockUnprocessed(5, 2);
 
         assertTrue(result.isEmpty());
-        verify(entityManager).createNativeQuery(contains("AND partition = :partition"), eq(OutboxEventJpaEntity.class));
+        verify(entityManager).createNativeQuery(contains("AND partition = :partition"), eq(OutboxJpaEntity.class));
         verify(nativeQuery).setParameter("limit", 5);
         verify(nativeQuery).setParameter("partition", 2);
     }
@@ -74,18 +74,18 @@ class OutboxLockRepositoryTest {
     void shouldUsePessimisticWriteQueryWithoutPartition() {
         ReflectionTestUtils.setField(repository, "useSkipLocked", false);
 
-        TypedQuery<OutboxEventJpaEntity> typedQuery = mock(TypedQuery.class);
-        when(entityManager.createQuery(anyString(), eq(OutboxEventJpaEntity.class)))
+        TypedQuery<OutboxJpaEntity> typedQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(OutboxJpaEntity.class)))
                 .thenReturn(typedQuery);
         when(typedQuery.setMaxResults(10)).thenReturn(typedQuery);
         when(typedQuery.setLockMode(LockModeType.PESSIMISTIC_WRITE)).thenReturn(typedQuery);
         when(typedQuery.getResultList()).thenReturn(List.of());
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
+        List<OutboxJpaEntity> result = repository.findAndLockUnprocessed(10, -1);
 
         assertTrue(result.isEmpty());
         verify(entityManager).createQuery(argThat((String q) -> !q.contains("partition")),
-                eq(OutboxEventJpaEntity.class));
+                eq(OutboxJpaEntity.class));
         verify(typedQuery).setMaxResults(10);
         verify(typedQuery).setLockMode(LockModeType.PESSIMISTIC_WRITE);
     }
@@ -94,21 +94,20 @@ class OutboxLockRepositoryTest {
     void shouldUsePessimisticWriteQueryWithPartition() {
         ReflectionTestUtils.setField(repository, "useSkipLocked", false);
 
-        TypedQuery<OutboxEventJpaEntity> typedQuery = mock(TypedQuery.class);
-        when(entityManager.createQuery(anyString(), eq(OutboxEventJpaEntity.class)))
+        TypedQuery<OutboxJpaEntity> typedQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(OutboxJpaEntity.class)))
                 .thenReturn(typedQuery);
         when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
         when(typedQuery.setLockMode(LockModeType.PESSIMISTIC_WRITE)).thenReturn(typedQuery);
         when(typedQuery.setParameter("partition", 1)).thenReturn(typedQuery);
         when(typedQuery.getResultList()).thenReturn(List.of());
 
-        List<OutboxEventJpaEntity> result = repository.findAndLockUnprocessed(3, 1);
+        List<OutboxJpaEntity> result = repository.findAndLockUnprocessed(3, 1);
 
         assertTrue(result.isEmpty());
-        verify(entityManager).createQuery(contains("AND e.partition = :partition"), eq(OutboxEventJpaEntity.class));
+        verify(entityManager).createQuery(contains("AND e.partition = :partition"), eq(OutboxJpaEntity.class));
         verify(typedQuery).setParameter("partition", 1);
         verify(typedQuery).setMaxResults(3);
         verify(typedQuery).setLockMode(LockModeType.PESSIMISTIC_WRITE);
     }
-
 }
