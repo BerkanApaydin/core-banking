@@ -15,4 +15,14 @@ public record AccountClosedEvent(
         Objects.requireNonNull(finalBalance);
         Objects.requireNonNull(occurredAt);
     }
+
+    @Override
+    public String aggregateType() {
+        return "Account";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(accountId);
+    }
 }

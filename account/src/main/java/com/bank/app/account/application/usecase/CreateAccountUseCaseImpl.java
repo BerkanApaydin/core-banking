@@ -13,7 +13,7 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
@@ -30,16 +30,16 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final EventPublisherPort eventPublisherPort;
+    private final DomainEventPublisherService domainEventPublisherService;
     private final AuditEventPort auditEventPort;
     private final AccountAuthorizationService accountAuthorizationService;
 
     public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-                                    EventPublisherPort eventPublisherPort, AuditEventPort auditEventPort,
+                                    DomainEventPublisherService domainEventPublisherService, AuditEventPort auditEventPort,
                                     AccountAuthorizationService accountAuthorizationService) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.eventPublisherPort = eventPublisherPort;
+        this.domainEventPublisherService = domainEventPublisherService;
         this.auditEventPort = auditEventPort;
         this.accountAuthorizationService = accountAuthorizationService;
     }
@@ -63,7 +63,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
         Account savedAccount = saveAccountPort.save(account);
 
-        eventPublisherPort.publish(new AccountCreatedEvent(
+        domainEventPublisherService.publish(new AccountCreatedEvent(
             savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban(),
             savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now()
         ));

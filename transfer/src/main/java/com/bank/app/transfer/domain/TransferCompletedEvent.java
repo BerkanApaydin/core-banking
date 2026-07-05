@@ -21,4 +21,14 @@ public record TransferCompletedEvent(
         Objects.requireNonNull(status);
         Objects.requireNonNull(occurredAt);
     }
+
+    @Override
+    public String aggregateType() {
+        return "Transfer";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(transferId);
+    }
 }

@@ -5,12 +5,13 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.UserId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,16 @@ class TransferAccountHelperTest {
     private SaveAccountPort saveAccountPort;
 
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> {
+            com.bank.app.common.domain.event.DomainEventProvider p = invocation.getArgument(0);
+            p.clearDomainEvents();
+            return null;
+        }).when(domainEventPublisherService).publishEvents(any());
+    }
 
     private Account createAccount(Long id, Long userId, Iban iban, Money balance) {
         return new Account(id, new UserId(userId), iban, "Owner", balance, AccountStatus.ACTIVE);
@@ -187,11 +197,11 @@ class TransferAccountHelperTest {
             Account sender = triggerEvent(createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY)));
             Account receiver = createAccount(2L, 20L, RECEIVER_IBAN, Money.of("500", Currency.TRY));
 
-            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
+            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
 
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
-            verify(eventPublisherPort, times(1)).publish(any());
+            verify(domainEventPublisherService, times(2)).publishEvents(any());
         }
 
         @Test
@@ -200,7 +210,7 @@ class TransferAccountHelperTest {
             Account sender = triggerEvent(createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY)));
             Account receiver = triggerEvent(createAccount(2L, 20L, RECEIVER_IBAN, Money.of("500", Currency.TRY)));
 
-            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
+            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
 
             assertThat(sender.getDomainEvents()).isEmpty();
             assertThat(receiver.getDomainEvents()).isEmpty();

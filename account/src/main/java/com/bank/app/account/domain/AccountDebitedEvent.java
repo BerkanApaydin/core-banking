@@ -17,4 +17,14 @@ public record AccountDebitedEvent(
         Objects.requireNonNull(newBalance);
         Objects.requireNonNull(occurredAt);
     }
+
+    @Override
+    public String aggregateType() {
+        return "Account";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(accountId);
+    }
 }

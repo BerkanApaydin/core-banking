@@ -4,7 +4,7 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +18,7 @@ class AccountBeanConfigTest {
 
     @Mock private LoadAccountPort loadAccountPort;
     @Mock private SaveAccountPort saveAccountPort;
-    @Mock private EventPublisherPort eventPublisherPort;
+    @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private AuditEventPort auditEventPort;
     @Mock private UserContextService userContextService;
     @Mock private AccountAuthorizationService accountAuthorizationService;
@@ -33,7 +33,7 @@ class AccountBeanConfigTest {
     void shouldCreateCreateAccountUseCaseBean() {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
-        assertNotNull(config.createAccountUseCase(loadAccountPort, saveAccountPort, eventPublisherPort, auditEventPort, authService));
+        assertNotNull(config.createAccountUseCase(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, authService));
     }
 
     @Test
@@ -41,7 +41,7 @@ class AccountBeanConfigTest {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
         assertNotNull(config.executeTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, eventPublisherPort, auditEventPort));
+                authService, domainEventPublisherService, auditEventPort));
     }
 
     @Test
@@ -49,7 +49,7 @@ class AccountBeanConfigTest {
         AccountBeanConfig config = new AccountBeanConfig();
         AccountAuthorizationService authService = config.accountAuthorizationService(userContextService);
         assertNotNull(config.reverseTransferUseCase(loadAccountPort, saveAccountPort,
-                authService, eventPublisherPort, auditEventPort));
+                authService, domainEventPublisherService, auditEventPort));
     }
 
     @Test

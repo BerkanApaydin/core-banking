@@ -5,7 +5,7 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -37,7 +37,7 @@ class AccountAclAdapterTest {
     private SaveAccountPort saveAccountPort;
 
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
 
     @Captor
     private ArgumentCaptor<Account> accountCaptor;
@@ -51,7 +51,7 @@ class AccountAclAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort, eventPublisherPort);
+        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort, domainEventPublisherService);
         senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
                 "Sender", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         receiverAccount = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),

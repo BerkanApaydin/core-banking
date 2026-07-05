@@ -12,4 +12,14 @@ public record AccountSuspendedEvent(
         Objects.requireNonNull(accountId);
         Objects.requireNonNull(occurredAt);
     }
+
+    @Override
+    public String aggregateType() {
+        return "Account";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(accountId);
+    }
 }

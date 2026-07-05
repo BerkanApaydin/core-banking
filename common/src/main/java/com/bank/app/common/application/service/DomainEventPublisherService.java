@@ -19,7 +19,11 @@ public class DomainEventPublisherService {
         List<DomainEvent> events = List.copyOf(provider.getDomainEvents());
         provider.clearDomainEvents();
         for (DomainEvent event : events) {
-            eventPublisherPort.publish(Objects.requireNonNull(event, "Domain event must not be null"));
+            publish(Objects.requireNonNull(event, "Domain event must not be null"));
         }
+    }
+
+    public void publish(DomainEvent event) {
+        eventPublisherPort.publish(event);
     }
 }

@@ -32,4 +32,14 @@ public record AsyncTransferCompletedEvent(
             transfer.getCreatedAt()
         );
     }
+
+    @Override
+    public String aggregateType() {
+        return "Transfer";
+    }
+
+    @Override
+    public String aggregateId() {
+        return String.valueOf(transferId);
+    }
 }

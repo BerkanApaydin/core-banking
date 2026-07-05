@@ -18,7 +18,7 @@ import com.bank.app.account.application.usecase.AccountQueryUseCaseImpl;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,8 +28,8 @@ public class AccountBeanConfig {
 
     @Bean
     public CreateAccountUseCase createAccountUseCase(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-            EventPublisherPort eventPublisherPort, AuditEventPort auditEventPort, AccountAuthorizationService accountAuthorizationService) {
-        return new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, eventPublisherPort, auditEventPort, accountAuthorizationService);
+            DomainEventPublisherService domainEventPublisherService, AuditEventPort auditEventPort, AccountAuthorizationService accountAuthorizationService) {
+        return new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, accountAuthorizationService);
     }
 
     @Bean
@@ -41,20 +41,20 @@ public class AccountBeanConfig {
     public ExecuteTransferUseCase executeTransferUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
             AccountAuthorizationService accountAuthorizationService,
-            EventPublisherPort eventPublisherPort,
+            DomainEventPublisherService domainEventPublisherService,
             AuditEventPort auditEventPort) {
         return new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
-                eventPublisherPort, auditEventPort);
+                domainEventPublisherService, auditEventPort);
     }
 
     @Bean
     public ReverseTransferUseCase reverseTransferUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
             AccountAuthorizationService accountAuthorizationService,
-            EventPublisherPort eventPublisherPort,
+            DomainEventPublisherService domainEventPublisherService,
             AuditEventPort auditEventPort) {
         return new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort, accountAuthorizationService,
-                eventPublisherPort, auditEventPort);
+                domainEventPublisherService, auditEventPort);
     }
 
     @Bean

@@ -1,6 +1,6 @@
 package com.bank.app.user.adapter.in.config;
 
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.port.out.JwtPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -26,12 +26,12 @@ class UserBeanConfigTest {
     @Mock private AuthenticationPort authenticationPort;
     @Mock private JwtPort jwtPort;
     @Mock private LoginAttemptPort loginAttemptPort;
-    @Mock private EventPublisherPort eventPublisherPort;
+    @Mock private DomainEventPublisherService domainEventPublisherService;
 
     @Test
     void shouldCreateRegisterUserUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
-        RegisterUserUseCase useCase = config.registerUserUseCase(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT, eventPublisherPort);
+        RegisterUserUseCase useCase = config.registerUserUseCase(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT, domainEventPublisherService);
         assertNotNull(useCase);
     }
 

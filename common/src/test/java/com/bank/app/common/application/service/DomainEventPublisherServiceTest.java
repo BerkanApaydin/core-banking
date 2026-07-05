@@ -62,6 +62,16 @@ class DomainEventPublisherServiceTest {
         TestEvent(String data) {
             this(data, LocalDateTime.now());
         }
+
+        @Override
+        public String aggregateType() {
+            return "Test";
+        }
+
+        @Override
+        public String aggregateId() {
+            return data;
+        }
     }
 
     private static class StubDomainEventProvider implements DomainEventProvider {

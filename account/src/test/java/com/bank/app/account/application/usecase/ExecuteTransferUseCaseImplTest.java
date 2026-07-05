@@ -9,7 +9,7 @@ import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -47,7 +47,7 @@ class ExecuteTransferUseCaseImplTest {
     private UserContextService userContextService;
 
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
 
     @Mock
     private AuditEventPort auditEventPort;
@@ -67,7 +67,13 @@ class ExecuteTransferUseCaseImplTest {
     void setUp() {
         AccountAuthorizationService accountAuthorizationService = new AccountAuthorizationService(userContextService);
         useCase = new ExecuteTransferUseCaseImpl(loadAccountPort, saveAccountPort,
-                accountAuthorizationService, eventPublisherPort, auditEventPort);
+                accountAuthorizationService, domainEventPublisherService, auditEventPort);
+
+        lenient().doAnswer(invocation -> {
+            com.bank.app.common.domain.event.DomainEventProvider p = invocation.getArgument(0);
+            p.clearDomainEvents();
+            return null;
+        }).when(domainEventPublisherService).publishEvents(any());
 
         sender = Account.builder()
                 .id(1L).userId(new UserId(10L))
@@ -106,7 +112,7 @@ class ExecuteTransferUseCaseImplTest {
             assertThat(receiver.getBalance()).isEqualTo(Money.of("700.00", Currency.TRY));
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
-            verify(eventPublisherPort, times(2)).publish(any());
+            verify(domainEventPublisherService, times(2)).publishEvents(any());
             verify(auditEventPort).publish(any());
         }
 

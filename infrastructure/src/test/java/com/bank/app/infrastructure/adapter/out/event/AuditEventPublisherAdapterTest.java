@@ -12,20 +12,20 @@ import org.springframework.context.ApplicationEventPublisher;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SpringEventPublisherAdapterTest {
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @InjectMocks
-    private SpringEventPublisherAdapter adapter;
-
-    @Test
-    void shouldPublishAuditEvent() {
-        AuditEvent event = new AuditEvent("TEST_EVENT", "test detail", LocalDateTime.now());
-
-        adapter.publish(event);
-
-        verify(eventPublisher).publishEvent(event);
-    }
-}
+class AuditEventPublisherAdapterTest {
+ 
+     @Mock
+     private ApplicationEventPublisher eventPublisher;
+ 
+     @InjectMocks
+     private AuditEventPublisherAdapter adapter;
+ 
+     @Test
+     void shouldPublishAuditEvent() {
+         AuditEvent event = new AuditEvent("TEST_EVENT", "test detail", LocalDateTime.now());
+ 
+         adapter.publish(event);
+ 
+         verify(eventPublisher).publishEvent(event);
+     }
+ }

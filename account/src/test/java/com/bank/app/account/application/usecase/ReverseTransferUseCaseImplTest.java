@@ -7,7 +7,7 @@ import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -43,7 +43,7 @@ class ReverseTransferUseCaseImplTest {
     private UserContextService userContextService;
 
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
 
     @Mock
     private AuditEventPort auditEventPort;
@@ -57,7 +57,13 @@ class ReverseTransferUseCaseImplTest {
     void setUp() {
         AccountAuthorizationService accountAuthorizationService = new AccountAuthorizationService(userContextService);
         useCase = new ReverseTransferUseCaseImpl(loadAccountPort, saveAccountPort,
-                accountAuthorizationService, eventPublisherPort, auditEventPort);
+                accountAuthorizationService, domainEventPublisherService, auditEventPort);
+
+        lenient().doAnswer(invocation -> {
+            com.bank.app.common.domain.event.DomainEventProvider p = invocation.getArgument(0);
+            p.clearDomainEvents();
+            return null;
+        }).when(domainEventPublisherService).publishEvents(any());
 
         sender = Account.builder()
                 .id(1L).userId(new UserId(10L))
@@ -96,7 +102,7 @@ class ReverseTransferUseCaseImplTest {
             assertThat(receiver.getBalance()).isEqualTo(Money.of("500.00", Currency.TRY));
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
-            verify(eventPublisherPort, times(2)).publish(any());
+            verify(domainEventPublisherService, times(2)).publishEvents(any());
             verify(auditEventPort).publish(any());
         }
 

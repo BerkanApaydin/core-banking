@@ -1,8 +1,7 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.in.TransactionalUseCase;
-import com.bank.app.common.application.port.out.EventPublisherPort;
-import com.bank.app.common.application.service.DomainEventPublisher;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
@@ -25,16 +24,16 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     private final SaveUserPort saveUserPort;
     private final PasswordEncoderPort passwordEncoderPort;
     private final PasswordPolicy passwordPolicy;
-    private final EventPublisherPort eventPublisherPort;
+    private final DomainEventPublisherService domainEventPublisherService;
 
     public RegisterUserUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
                                     PasswordEncoderPort passwordEncoderPort, PasswordPolicy passwordPolicy,
-                                    EventPublisherPort eventPublisherPort) {
+                                    DomainEventPublisherService domainEventPublisherService) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
         this.passwordEncoderPort = passwordEncoderPort;
         this.passwordPolicy = passwordPolicy;
-        this.eventPublisherPort = eventPublisherPort;
+        this.domainEventPublisherService = domainEventPublisherService;
     }
 
     @Override
@@ -53,7 +52,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         PhoneNumber phone = request.phone() != null ? new PhoneNumber(request.phone()) : null;
         User user = User.create(request.username(), encodedPassword, email, phone);
         saveUserPort.save(user);
-        DomainEventPublisher.publishEvents(user, eventPublisherPort);
+        domainEventPublisherService.publishEvents(user);
 
         log.info("User registered: username={}", request.username());
     }

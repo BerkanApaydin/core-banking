@@ -20,7 +20,17 @@ class BaseAggregateRootTest {
         }
     }
 
-    private record TestEvent(String data, LocalDateTime occurredAt) implements DomainEvent {}
+    private record TestEvent(String data, LocalDateTime occurredAt) implements DomainEvent {
+        @Override
+        public String aggregateType() {
+            return "Test";
+        }
+
+        @Override
+        public String aggregateId() {
+            return data;
+        }
+    }
 
     private final TestAggregate aggregate = new TestAggregate();
 

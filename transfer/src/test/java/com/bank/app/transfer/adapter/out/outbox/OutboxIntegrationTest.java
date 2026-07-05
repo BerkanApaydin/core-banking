@@ -75,7 +75,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     static class TestConfig {
         @Bean
         @Primary
-        EventPublisherPort realEventPublisherPort(ObjectMapper objectMapper,
+        EventPublisherPort domainEventOutboxAdapter(ObjectMapper objectMapper,
                 OutboxEventJpaRepository outboxEventRepo) {
             return event -> {
                 try {

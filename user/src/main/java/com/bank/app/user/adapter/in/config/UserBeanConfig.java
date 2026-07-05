@@ -10,7 +10,7 @@ import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.usecase.LoginUserUseCaseImpl;
 import com.bank.app.user.application.usecase.RegisterUserUseCaseImpl;
 import com.bank.app.user.domain.PasswordPolicy;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.port.out.JwtPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.usecase.LogoutUseCaseImpl;
@@ -32,8 +32,8 @@ public class UserBeanConfig {
     public RegisterUserUseCase registerUserUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
                                                     PasswordEncoderPort passwordEncoderPort,
                                                     PasswordPolicy passwordPolicy,
-                                                    EventPublisherPort eventPublisherPort) {
-        return new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, passwordPolicy, eventPublisherPort);
+                                                    DomainEventPublisherService domainEventPublisherService) {
+        return new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, passwordPolicy, domainEventPublisherService);
     }
 
     @Bean

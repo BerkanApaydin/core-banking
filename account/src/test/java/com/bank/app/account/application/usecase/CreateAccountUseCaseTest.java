@@ -12,7 +12,7 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
@@ -46,7 +46,7 @@ class CreateAccountUseCaseTest {
     @Mock
     private SaveAccountPort saveAccountPort;
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
     @Mock
     private AuditEventPort auditEventPort;
     @Mock
@@ -64,7 +64,7 @@ class CreateAccountUseCaseTest {
     @BeforeEach
     void setUp() {
         createAccountUseCase = new CreateAccountUseCaseImpl(
-                loadAccountPort, saveAccountPort, eventPublisherPort, auditEventPort, accountAuthorizationService);
+                loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, accountAuthorizationService);
     }
 
     private CreateAccountRequest validRequest() {
@@ -101,8 +101,8 @@ class CreateAccountUseCaseTest {
             verify(saveAccountPort).save(accountCaptor.capture());
             assertThat(accountCaptor.getValue().getIban().value()).isEqualTo(VALID_IBAN);
 
-            verify(eventPublisherPort).publish(any());
-            verify(eventPublisherPort).publish(eventCaptor.capture());
+            verify(domainEventPublisherService).publish(any());
+            verify(domainEventPublisherService).publish(eventCaptor.capture());
             verify(auditEventPort).publish(any());
             AccountCreatedEvent publishedEvent = eventCaptor.getValue();
             assertThat(publishedEvent.accountId()).isEqualTo(1L);

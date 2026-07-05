@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.outbox;
 
+import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.account.domain.AccountClosedEvent;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountCreditedEvent;
@@ -151,7 +152,20 @@ class DomainEventOutboxAdapterTest {
     void publishShouldHandleUnknownEventType() throws Exception {
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
-        adapter.publish(() -> LocalDateTime.now());
+        adapter.publish(new DomainEvent() {
+            @Override
+            public LocalDateTime occurredAt() {
+                return LocalDateTime.now();
+            }
+            @Override
+            public String aggregateType() {
+                return "Unknown";
+            }
+            @Override
+            public String aggregateId() {
+                return "unknown";
+            }
+        });
 
         ArgumentCaptor<OutboxPort.EventEntry> captor = ArgumentCaptor.captor();
         verify(outboxPort).save(captor.capture());

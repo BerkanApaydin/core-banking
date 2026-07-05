@@ -59,8 +59,8 @@ graph TD
     common[common module]:::commonClass
 
     app --> transfer & account & audit & user & infra & common
-    transfer --> account & user & infra & common
-    account --> user & infra & common
+    transfer --> infra & common
+    account --> infra & common
     user --> infra & common
     audit --> infra & common
     infra --> common
@@ -94,6 +94,7 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table. Leverages virtual partitioning (16 partitions) and `SELECT ... FOR UPDATE SKIP LOCKED` for concurrent scaling and deadlock prevention.
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
 - **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
+- **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules are strictly decoupled at compile-time. Inter-context communication is mediated by the `AccountAclPort` contract (placed in `common`) and implemented via `AccountAclAdapter` (in `account`), protecting the transfer domain from database or structure changes inside the account module.
 - **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key (`username_idempotencyKey`) stored in the `idempotency_keys` table.
 - **Dynamic Security Backends:** Abstracts Rate Limiting (sliding window via Lua script), Token Blacklisting, and Brute-Force lockout, supporting both Redis (production) and Caffeine (local dev).
 
@@ -134,6 +135,10 @@ docker-compose up --build
 
 ## 🧪 Testing & Quality Gates
 
-- **Verify Architecture Boundaries (ArchUnit):** Verified automatically via `ArchitectureTest.java`.
+- **Verify Architecture Boundaries (ArchUnit):** Verified automatically via `ArchitectureTest.java`. This enforces:
+  - **Hexagonal Architecture Guard:** Checks that domain layer does not import Spring or framework classes.
+  - **Dependency Flow Validation:** Enforces that dependency always flows from adapters to ports, never the reverse.
+  - **Cycle Prevention:** Guarantees no cyclic dependencies exist between Maven modules (e.g., compile-time decoupling of `transfer` and `account`).
+- **Integration Testing with Testcontainers & Flyway:** Integration tests spin up real database instances (`PostgreSQL` via `testcontainers`) and programmatically apply Flyway schema migrations inside `AbstractIntegrationTest` static initializer block to guarantee correct database structure validation before JPA context boots.
 - **Generate Coverage Report (JaCoCo):** `./mvnw jacoco:report` (or `.\mvnw.cmd jacoco:report`)
 - **Run Mutation Testing (Pitest):** `./mvnw pitest:mutationCoverage` (or `.\mvnw.cmd pitest:mutationCoverage`)

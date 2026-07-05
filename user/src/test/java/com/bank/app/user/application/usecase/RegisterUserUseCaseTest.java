@@ -5,12 +5,11 @@ import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
-import com.bank.app.user.domain.UserRegisteredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,13 +36,14 @@ class RegisterUserUseCaseTest {
     @Mock
     private PasswordEncoderPort passwordEncoderPort;
     @Mock
-    private EventPublisherPort eventPublisherPort;
+    private DomainEventPublisherService domainEventPublisherService;
 
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
     void setUp() {
-        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort, PasswordPolicy.DEFAULT, eventPublisherPort);
+        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort,
+                PasswordPolicy.DEFAULT, domainEventPublisherService);
     }
 
     @Nested
@@ -62,11 +62,10 @@ class RegisterUserUseCaseTest {
 
             verify(loadUserPort).findByUsername("newuser");
             verify(passwordEncoderPort).encode("Rawpassword1");
-            verify(saveUserPort).save(argThat(user ->
-                    "newuser".equals(user.getUsername()) &&
+            verify(saveUserPort).save(argThat(user -> "newuser".equals(user.getUsername()) &&
                     "hashedpassword".equals(user.getPassword()) &&
                     user.getRole() == Role.ROLE_USER));
-            verify(eventPublisherPort).publish(any(UserRegisteredEvent.class));
+            verify(domainEventPublisherService).publishEvents(any(User.class));
         }
 
         @Test
@@ -79,12 +78,10 @@ class RegisterUserUseCaseTest {
 
             registerUserUseCase.execute(request);
 
-            verify(saveUserPort).save(argThat(user ->
-                    "newuser".equals(user.getUsername()) &&
+            verify(saveUserPort).save(argThat(user -> "newuser".equals(user.getUsername()) &&
                     "hashedpassword".equals(user.getPassword()) &&
                     user.getEmail() != null && "test@example.com".equals(user.getEmail().value()) &&
-                    user.getPhone() != null && "5551234567".equals(user.getPhone().value())
-            ));
+                    user.getPhone() != null && "5551234567".equals(user.getPhone().value())));
         }
 
         @Test
@@ -97,9 +94,7 @@ class RegisterUserUseCaseTest {
 
             registerUserUseCase.execute(request);
 
-            verify(saveUserPort).save(argThat(user ->
-                    user.getEmail() == null && user.getPhone() == null
-            ));
+            verify(saveUserPort).save(argThat(user -> user.getEmail() == null && user.getPhone() == null));
         }
 
         @Test
@@ -112,9 +107,7 @@ class RegisterUserUseCaseTest {
             registerUserUseCase.execute(request);
 
             verify(passwordEncoderPort).encode("rawPassword123");
-            verify(saveUserPort).save(argThat(user ->
-                    "$2a$10$encryptedhash".equals(user.getPassword())
-            ));
+            verify(saveUserPort).save(argThat(user -> "$2a$10$encryptedhash".equals(user.getPassword())));
         }
     }
 

@@ -8,4 +8,14 @@ public record UserRegisteredEvent(
         String username,
         String role,
         LocalDateTime occurredAt) implements DomainEvent {
+
+    @Override
+    public String aggregateType() {
+        return "User";
+    }
+
+    @Override
+    public String aggregateId() {
+        return userId != null ? userId : "unknown";
+    }
 }

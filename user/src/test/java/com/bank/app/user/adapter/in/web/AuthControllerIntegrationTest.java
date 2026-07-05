@@ -2,6 +2,7 @@ package com.bank.app.user.adapter.in.web;
 
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.user.adapter.out.security.CaffeineLoginAttemptAdapter;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -256,6 +257,11 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         @Bean
         EventPublisherPort eventPublisherPort() {
             return event -> {};
+        }
+
+        @Bean
+        DomainEventPublisherService domainEventPublisherService(EventPublisherPort port) {
+            return new DomainEventPublisherService(port);
         }
     }
 

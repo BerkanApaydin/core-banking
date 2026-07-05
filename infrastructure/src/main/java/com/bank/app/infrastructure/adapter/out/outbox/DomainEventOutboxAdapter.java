@@ -1,16 +1,8 @@
 package com.bank.app.infrastructure.adapter.out.outbox;
 
-import com.bank.app.account.domain.AccountClosedEvent;
-import com.bank.app.account.domain.AccountCreatedEvent;
-import com.bank.app.account.domain.AccountCreditedEvent;
-import com.bank.app.account.domain.AccountDebitedEvent;
-import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
-import com.bank.app.transfer.domain.TransferCancelledEvent;
-import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -49,8 +41,8 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
         LocalDateTime now = LocalDateTime.now();
         String id = UUID.randomUUID().toString();
 
-        String aggregateType = resolveAggregateType(event);
-        String aggregateId = resolveAggregateId(event);
+        String aggregateType = event.aggregateType();
+        String aggregateId = event.aggregateId();
         int partition = resolvePartition(aggregateId);
 
         return new OutboxPort.EventEntry(
@@ -68,35 +60,10 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
         }
     }
 
-    private static String resolveAggregateType(DomainEvent event) {
-        return switch (event) {
-            case AccountCreatedEvent ignored -> "Account";
-            case AccountDebitedEvent ignored -> "Account";
-            case AccountCreditedEvent ignored -> "Account";
-            case AccountClosedEvent ignored -> "Account";
-            case AccountSuspendedEvent ignored -> "Account";
-            case TransferCompletedEvent ignored -> "Transfer";
-            case TransferCancelledEvent ignored -> "Transfer";
-            case AsyncTransferCompletedEvent ignored -> "Transfer";
-            default -> event.getClass().getSimpleName();
-        };
-    }
-
-    private static String resolveAggregateId(DomainEvent event) {
-        return switch (event) {
-            case AccountCreatedEvent e -> String.valueOf(e.accountId());
-            case AccountDebitedEvent e -> String.valueOf(e.accountId());
-            case AccountCreditedEvent e -> String.valueOf(e.accountId());
-            case AccountClosedEvent e -> String.valueOf(e.accountId());
-            case AccountSuspendedEvent e -> String.valueOf(e.accountId());
-            case TransferCompletedEvent e -> String.valueOf(e.transferId());
-            case TransferCancelledEvent e -> String.valueOf(e.transferId());
-            case AsyncTransferCompletedEvent e -> String.valueOf(e.transferId());
-            default -> "unknown";
-        };
-    }
-
     private static int resolvePartition(String aggregateId) {
+        if (aggregateId == null) {
+            return 0;
+        }
         return Math.abs(aggregateId.hashCode() % 16);
     }
 }

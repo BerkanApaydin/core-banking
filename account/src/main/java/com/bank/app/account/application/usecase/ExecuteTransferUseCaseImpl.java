@@ -7,7 +7,7 @@ import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
@@ -22,16 +22,16 @@ public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
     private final AccountAuthorizationService accountAuthorizationService;
-    private final EventPublisherPort eventPublisherPort;
+    private final DomainEventPublisherService domainEventPublisherService;
     private final AuditEventPort auditEventPort;
 
     public ExecuteTransferUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
-            AccountAuthorizationService accountAuthorizationService, EventPublisherPort eventPublisherPort,
+            AccountAuthorizationService accountAuthorizationService, DomainEventPublisherService domainEventPublisherService,
             AuditEventPort auditEventPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.accountAuthorizationService = accountAuthorizationService;
-        this.eventPublisherPort = eventPublisherPort;
+        this.domainEventPublisherService = domainEventPublisherService;
         this.auditEventPort = auditEventPort;
     }
 
@@ -46,7 +46,7 @@ public class ExecuteTransferUseCaseImpl implements ExecuteTransferUseCase {
         sender.debit(amount);
         receiver.credit(amount);
 
-        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, eventPublisherPort);
+        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
         auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
             String.format("Transfer completed. Sender: %d, Receiver: %d",
                 senderId, receiverId),
