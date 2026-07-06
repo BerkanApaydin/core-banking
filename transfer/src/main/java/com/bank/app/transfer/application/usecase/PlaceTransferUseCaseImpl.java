@@ -5,6 +5,7 @@ import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
@@ -17,6 +18,7 @@ import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferParticipants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -59,20 +61,13 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
         Transfer savedTransfer = saveTransferPort.save(transfer);
 
-        try {
-            accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        List<DomainEvent> accountEvents = accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-            savedTransfer.complete();
-            saveTransferPort.save(savedTransfer);
-            domainEventPublisherService.publishEvents(savedTransfer);
-        } catch (Exception e) {
-            try {
-                accountAclPort.reverseBalancesForCancellation(senderInfo.id(), receiverInfo.id(), amount);
-            } catch (Exception compensationError) {
-                log.error("Compensation reversal failed for transfer: id={}", savedTransfer.getId(), compensationError);
-            }
-            throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
-        }
+        savedTransfer.complete();
+        saveTransferPort.save(savedTransfer);
+
+        accountEvents.forEach(domainEventPublisherService::publish);
+        domainEventPublisherService.publishEvents(savedTransfer);
 
         log.info("Transfer completed: id={}, senderId={}, receiverId={}",
             savedTransfer.getId(), savedTransfer.getSenderAccountId(),

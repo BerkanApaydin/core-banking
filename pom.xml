@@ -37,6 +37,7 @@
         <jacoco.line.coverage>0.85</jacoco.line.coverage>
         <jacoco.branch.coverage>0.80</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
+        <postgresql.image.tag>15-alpine</postgresql.image.tag>
         <testcontainers.version>1.20.6</testcontainers.version>
         <pitest.version>1.19.1</pitest.version>
         <jacoco.skip>false</jacoco.skip>

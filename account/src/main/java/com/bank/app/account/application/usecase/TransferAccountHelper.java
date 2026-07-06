@@ -4,7 +4,6 @@ import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.OrderedPair;
 
 import java.util.Objects;
@@ -29,11 +28,8 @@ public class TransferAccountHelper {
         return senderId < receiverId ? pair.higherIdItem() : pair.lowerIdItem();
     }
 
-    public static void saveAndPublishEvents(Account sender, Account receiver,
-                                     SaveAccountPort savePort, DomainEventPublisherService eventPublisherService) {
+    public static void saveAccounts(Account sender, Account receiver, SaveAccountPort savePort) {
         savePort.save(sender);
         savePort.save(receiver);
-        eventPublisherService.publishEvents(sender);
-        eventPublisherService.publishEvents(receiver);
     }
 }

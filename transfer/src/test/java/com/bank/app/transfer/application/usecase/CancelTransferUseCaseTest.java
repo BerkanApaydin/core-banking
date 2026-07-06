@@ -1,11 +1,11 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,8 +42,6 @@ class CancelTransferUseCaseTest {
     @Mock
     private AccountAclPort accountAclPort;
     @Mock
-    private EventPublisherPort eventPublisherPort;
-    @Mock
     private AuditEventPort auditEventPort;
     @Mock
     private UserContextService userContextService;
@@ -56,7 +55,7 @@ class CancelTransferUseCaseTest {
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
-                accountAclPort, eventPublisherPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, 72);
+                accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, 72);
     }
 
     @Test
@@ -71,12 +70,15 @@ class CancelTransferUseCaseTest {
         when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId))
                 .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
+        when(accountAclPort.reverseBalancesForCancellation(any(), any(), any()))
+                .thenReturn(List.of(mock(DomainEvent.class), mock(DomainEvent.class)));
 
         cancelTransferUseCase.execute(transferId);
 
         verify(userContextService).checkUserAuthorization(eq(100L), anyString());
         verify(accountAclPort).reverseBalancesForCancellation(senderAccountId, receiverAccountId, amount);
         verify(saveTransferPort).save(transfer);
+        verify(domainEventPublisherService, times(2)).publish(any());
         verify(domainEventPublisherService).publishEvents(transfer);
         verify(auditEventPort).publish(any());
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());

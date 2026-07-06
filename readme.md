@@ -74,9 +74,9 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 
 | Module | Endpoint | Method | Description | Special Headers / Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Auth** | `/auth/register` | `POST` | Register a new user | |
-| **Auth** | `/auth/login` | `POST` | Log in and obtain JWT | Brute-force & Rate-limited |
-| **Auth** | `/auth/logout` | `POST` | Log out and blacklist token | `Authorization: Bearer <token>` |
+| **User** | `/auth/register` | `POST` | Register a new user | |
+| **User** | `/auth/login` | `POST` | Log in and obtain JWT | Brute-force & Rate-limited |
+| **User** | `/auth/logout` | `POST` | Log out and blacklist token | `Authorization: Bearer <token>` |
 | **Account** | `/accounts` | `POST` | Create a new bank account | `Authorization: Bearer <token>` |
 | **Account** | `/accounts` | `GET` | List all accounts (Paged) | `Authorization: Bearer <token>` |
 | **Account** | `/accounts/{id}` | `GET` | Query account details by ID | `Authorization: Bearer <token>` |

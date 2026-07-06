@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import com.bank.app.common.domain.event.DomainEventProvider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -38,18 +39,6 @@ class TransferAccountHelperTest {
 
     @Mock
     private SaveAccountPort saveAccountPort;
-
-    @Mock
-    private DomainEventPublisherService domainEventPublisherService;
-
-    @BeforeEach
-    void setUp() {
-        lenient().doAnswer(invocation -> {
-            com.bank.app.common.domain.event.DomainEventProvider p = invocation.getArgument(0);
-            p.clearDomainEvents();
-            return null;
-        }).when(domainEventPublisherService).publishEvents(any());
-    }
 
     private Account createAccount(Long id, Long userId, Iban iban, Money balance) {
         return new Account(id, new UserId(userId), iban, "Owner", balance, AccountStatus.ACTIVE);
@@ -183,36 +172,31 @@ class TransferAccountHelperTest {
     }
 
     @Nested
-    @DisplayName("saveAndPublishEvents")
-    class SaveAndPublishEvents {
-
-        private Account triggerEvent(Account account) {
-            account.debit(Money.of("100", Currency.TRY));
-            return account;
-        }
+    @DisplayName("saveAccounts")
+    class SaveAccounts {
 
         @Test
-        @DisplayName("should save both accounts and publish events")
-        void shouldSaveBothAndPublish() {
-            Account sender = triggerEvent(createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY)));
+        @DisplayName("should save both accounts")
+        void shouldSaveBoth() {
+            Account sender = createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY));
             Account receiver = createAccount(2L, 20L, RECEIVER_IBAN, Money.of("500", Currency.TRY));
 
-            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
+            TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
 
             verify(saveAccountPort).save(sender);
             verify(saveAccountPort).save(receiver);
-            verify(domainEventPublisherService, times(2)).publishEvents(any());
         }
 
         @Test
-        @DisplayName("should clear domain events after publishing")
-        void shouldClearDomainEvents() {
-            Account sender = triggerEvent(createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY)));
-            Account receiver = triggerEvent(createAccount(2L, 20L, RECEIVER_IBAN, Money.of("500", Currency.TRY)));
+        @DisplayName("should not clear domain events after saving")
+        void shouldNotClearDomainEvents() {
+            Account sender = createAccount(1L, 10L, SENDER_IBAN, Money.of("1000", Currency.TRY));
+            Account receiver = createAccount(2L, 20L, RECEIVER_IBAN, Money.of("500", Currency.TRY));
+            sender.debit(Money.of("100", Currency.TRY));
 
-            TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
+            TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
 
-            assertThat(sender.getDomainEvents()).isEmpty();
+            assertThat(sender.getDomainEvents()).isNotEmpty();
             assertThat(receiver.getDomainEvents()).isEmpty();
         }
     }

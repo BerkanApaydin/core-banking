@@ -5,11 +5,11 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.event.DomainEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +20,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -36,9 +37,6 @@ class AccountAclAdapterTest {
     @Mock
     private SaveAccountPort saveAccountPort;
 
-    @Mock
-    private DomainEventPublisherService domainEventPublisherService;
-
     @Captor
     private ArgumentCaptor<Account> accountCaptor;
 
@@ -51,7 +49,7 @@ class AccountAclAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort, domainEventPublisherService);
+        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort);
         senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
                 "Sender", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         receiverAccount = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),
@@ -125,7 +123,7 @@ class AccountAclAdapterTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(senderAccount));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiverAccount));
 
-            adapter.debitAndCredit(1L, 2L, amount);
+            List<DomainEvent> events = adapter.debitAndCredit(1L, 2L, amount);
 
             verify(saveAccountPort, times(2)).save(accountCaptor.capture());
             var savedAccounts = accountCaptor.getAllValues();
@@ -133,6 +131,7 @@ class AccountAclAdapterTest {
             var savedReceiver = savedAccounts.stream().filter(a -> a.getId().equals(2L)).findFirst().orElseThrow();
             assertEquals(Money.of("800.00", Currency.TRY), savedSender.getBalance());
             assertEquals(Money.of("700.00", Currency.TRY), savedReceiver.getBalance());
+            assertEquals(2, events.size());
         }
     }
 
@@ -145,7 +144,7 @@ class AccountAclAdapterTest {
             when(loadAccountPort.findByIdWithLock(1L)).thenReturn(Optional.of(senderAccount));
             when(loadAccountPort.findByIdWithLock(2L)).thenReturn(Optional.of(receiverAccount));
 
-            adapter.reverseBalancesForCancellation(1L, 2L, amount);
+            List<DomainEvent> events = adapter.reverseBalancesForCancellation(1L, 2L, amount);
 
             verify(saveAccountPort, times(2)).save(accountCaptor.capture());
             var savedAccounts = accountCaptor.getAllValues();
@@ -153,6 +152,7 @@ class AccountAclAdapterTest {
             var savedReceiver = savedAccounts.stream().filter(a -> a.getId().equals(2L)).findFirst().orElseThrow();
             assertEquals(Money.of("1200.00", Currency.TRY), savedSender.getBalance());
             assertEquals(Money.of("300.00", Currency.TRY), savedReceiver.getBalance());
+            assertEquals(2, events.size());
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.in.event;
 
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
+import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,17 @@ public class TransferEventListener {
                 port.notifyTransferCompleted(event);
             } catch (Exception e) {
                 log.error("Failed to send notification via {}", port.getClass().getSimpleName(), e);
+            }
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleTransferCancelled(AsyncTransferCancelledEvent event) {
+        for (SendNotificationPort port : notificationPorts) {
+            try {
+                port.notifyTransferCancelled(event);
+            } catch (Exception e) {
+                log.error("Failed to send cancellation notification via {}", port.getClass().getSimpleName(), e);
             }
         }
     }

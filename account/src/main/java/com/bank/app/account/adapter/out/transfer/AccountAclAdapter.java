@@ -6,12 +6,14 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.application.usecase.TransferAccountHelper;
 import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -21,14 +23,11 @@ public class AccountAclAdapter implements AccountAclPort {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
-    private final DomainEventPublisherService domainEventPublisherService;
 
     public AccountAclAdapter(LoadAccountPort loadAccountPort,
-                             SaveAccountPort saveAccountPort,
-                             DomainEventPublisherService domainEventPublisherService) {
+                             SaveAccountPort saveAccountPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
-        this.domainEventPublisherService = domainEventPublisherService;
     }
 
     @Override
@@ -55,25 +54,36 @@ public class AccountAclAdapter implements AccountAclPort {
     }
 
     @Override
-    public void debitAndCredit(Long senderId, Long receiverId, Money amount) {
+    public List<DomainEvent> debitAndCredit(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
         Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
         Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
         sender.debit(amount);
         receiver.credit(amount);
-        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
+        TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
+        return collectEvents(sender, receiver);
     }
 
     @Override
-    public void reverseBalancesForCancellation(Long senderId, Long receiverId, Money amount) {
+    public List<DomainEvent> reverseBalancesForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
         Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
         Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
         sender.credit(amount);
         receiver.debit(amount);
-        TransferAccountHelper.saveAndPublishEvents(sender, receiver, saveAccountPort, domainEventPublisherService);
+        TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
+        return collectEvents(sender, receiver);
+    }
+
+    private static List<DomainEvent> collectEvents(Account sender, Account receiver) {
+        List<DomainEvent> events = new ArrayList<>();
+        events.addAll(sender.getDomainEvents());
+        events.addAll(receiver.getDomainEvents());
+        sender.clearDomainEvents();
+        receiver.clearDomainEvents();
+        return events;
     }
 
     private static AccountInfo toAccountInfo(Account account) {
