@@ -329,7 +329,7 @@ class TransferTest {
         @DisplayName("should cancel using default 24-hour window")
         void shouldCancelWithDefaultWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
-            transfer.cancel();
+            transfer.cancel(Clock.systemDefaultZone(), 24);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
     }

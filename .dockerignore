@@ -1,0 +1,59 @@
+# Build artifacts
+target/
+*.jar
+build/
+
+# Version control
+.git/
+.gitattributes
+.gitignore
+.gitmodules
+
+# IDE & config
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings
+.factorypath
+.springBeans
+
+# Environment & secrets
+.env
+.env.example
+secrets.yml
+
+# Project metadata
+.clauderules
+.cursorrules
+
+# Code analysis
+.codegraph/
+
+# Logs
+*.log
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+/.gradle/
+.gradle/
+
+# Load tests
+load_tests/
+__pycache__/
+*.pyc
+
+# Docker
+docker-init/
+README.md
+readme.md
+
+# OS files
+.DS_Store
+Thumbs.db

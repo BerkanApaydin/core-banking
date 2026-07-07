@@ -205,7 +205,6 @@ class ArchitectureTest {
     void useCaseImplementationsShouldFollowNamingConvention() {
         ArchRule rule = classes()
                 .that().resideInAnyPackage("..application.usecase..")
-                .and().doNotHaveSimpleName("TransferAccountHelper")
                 .should().haveSimpleNameEndingWith("Impl")
                 .orShould().haveSimpleNameEndingWith("Handler")
                 .allowEmptyShould(true);

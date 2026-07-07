@@ -90,7 +90,6 @@ app:
   outbox:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
     max-retries: ${OUTBOX_MAX_RETRIES:5}
-    use-skip-locked: ${OUTBOX_USE_SKIP_LOCKED:true}
   cache:
     caffeine:
       account-info:

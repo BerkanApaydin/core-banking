@@ -3,19 +3,13 @@ package com.bank.app.infrastructure.adapter.out.security;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class JwtTokenProviderTest {
-
-    @Mock
-    private Environment environment;
 
     private JwtTokenProvider jwtTokenProvider;
 
@@ -23,7 +17,7 @@ class JwtTokenProviderTest {
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider(environment, SECRET, 86400000L, true);
+        jwtTokenProvider = new JwtTokenProvider(SECRET, 86400000L);
     }
 
     @Test
@@ -88,43 +82,28 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void shouldNotThrowExceptionWhenDefaultSecretAllowed() {
-        assertDoesNotThrow(() -> {
-            new JwtTokenProvider(environment, SECRET, 86400000L, true);
-        });
-    }
-
-    @Test
-    void shouldThrowWhenDefaultSecretIsUsedAndNotAllowed() {
-        when(environment.getActiveProfiles()).thenReturn(new String[]{"test"});
-        JwtTokenProvider provider = new JwtTokenProvider(environment, SECRET, 86400000L, false);
-        assertThrows(IllegalStateException.class, () -> provider.validateSecret());
-    }
-
-    @Test
-    void shouldNotThrowWithCustomSecretAndNotAllowed() {
-        when(environment.getActiveProfiles()).thenReturn(new String[]{"test"});
-        JwtTokenProvider provider = new JwtTokenProvider(environment, "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L, false);
-        assertDoesNotThrow(() -> provider.validateSecret());
+    void shouldNotThrowWithCustomSecret() {
+        JwtTokenProvider provider = new JwtTokenProvider(
+                "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L);
+        assertDoesNotThrow(provider::validateSecret);
     }
 
     @Test
     void shouldReturnFalseForExpiredToken() {
-        JwtTokenProvider shortLived = new JwtTokenProvider(null, SECRET, 0L, true);
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, 0L);
         String token = shortLived.generateToken(1L, "testUser");
         assertFalse(shortLived.isTokenValid(token));
     }
 
     @Test
     void shouldThrowWhenSecretIsTooShort() {
-        when(environment.getActiveProfiles()).thenReturn(new String[]{"test"});
-        JwtTokenProvider provider = new JwtTokenProvider(environment, "c2hvcnQ=", 86400000L, false);
-        assertThrows(IllegalStateException.class, () -> provider.validateSecret());
+        JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L);
+        assertThrows(IllegalStateException.class, provider::validateSecret);
     }
 
     @Test
     void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
-        JwtTokenProvider provider = new JwtTokenProvider(environment, SECRET, 86400000L, true);
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L);
         javax.crypto.SecretKey key = io.jsonwebtoken.security.Keys.hmacShaKeyFor(
                 io.jsonwebtoken.io.Decoders.BASE64.decode(SECRET));
         String token = io.jsonwebtoken.Jwts.builder()

@@ -40,7 +40,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     @Override
     @Transactional
     public Optional<EventEntry> findByIdForUpdateSkipLocked(String id) {
-        return repository.findByIdForUpdate(id).map(this::toDomain);
+        return repository.findByIdForUpdateSkipLocked(id).map(this::toDomain);
     }
 
     @Override

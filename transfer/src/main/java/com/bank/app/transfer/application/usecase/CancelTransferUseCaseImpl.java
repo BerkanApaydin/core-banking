@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.event.DomainEvent;
@@ -14,7 +15,6 @@ import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -30,6 +30,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     private final AuditEventPort auditEventPort;
     private final TransferAuthorizationService transferAuthorizationService;
     private final DomainEventPublisherService domainEventPublisherService;
+    private final ClockProviderPort clockProvider;
     private final int cancellationWindowHours;
 
     public CancelTransferUseCaseImpl(LoadTransferPort loadTransferPort,
@@ -38,6 +39,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
                                  AuditEventPort auditEventPort,
                                  TransferAuthorizationService transferAuthorizationService,
                                  DomainEventPublisherService domainEventPublisherService,
+                                 ClockProviderPort clockProvider,
                                  int cancellationWindowHours) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
@@ -45,6 +47,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         this.auditEventPort = auditEventPort;
         this.transferAuthorizationService = transferAuthorizationService;
         this.domainEventPublisherService = domainEventPublisherService;
+        this.clockProvider = clockProvider;
         this.cancellationWindowHours = cancellationWindowHours;
     }
 
@@ -59,7 +62,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         transferAuthorizationService.authorizeByAccountId(senderAccountId);
 
-        transfer.cancel(Clock.systemDefaultZone(), cancellationWindowHours);
+        transfer.cancel(clockProvider.clock(), cancellationWindowHours);
 
         List<DomainEvent> accountEvents = accountAclPort.reverseBalancesForCancellation(
                 senderAccountId, receiverAccountId, transfer.getAmount());

@@ -4,7 +4,6 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
-import com.bank.app.account.application.usecase.TransferAccountHelper;
 import com.bank.app.common.application.port.out.AccountAclPort;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.Money;
@@ -25,7 +24,7 @@ public class AccountAclAdapter implements AccountAclPort {
     private final SaveAccountPort saveAccountPort;
 
     public AccountAclAdapter(LoadAccountPort loadAccountPort,
-                             SaveAccountPort saveAccountPort) {
+            SaveAccountPort saveAccountPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
     }
@@ -56,24 +55,24 @@ public class AccountAclAdapter implements AccountAclPort {
     @Override
     public List<DomainEvent> debitAndCredit(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
-        Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
-        Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
+        OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId, loadAccountPort);
+        Account sender = resolveSender(pair, senderId, receiverId);
+        Account receiver = resolveReceiver(pair, senderId, receiverId);
         sender.debit(amount);
         receiver.credit(amount);
-        TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
+        saveAccounts(sender, receiver, saveAccountPort);
         return collectEvents(sender, receiver);
     }
 
     @Override
     public List<DomainEvent> reverseBalancesForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        OrderedPair<Account> pair = TransferAccountHelper.loadOrderedPair(senderId, receiverId, loadAccountPort);
-        Account sender = TransferAccountHelper.resolveSender(pair, senderId, receiverId);
-        Account receiver = TransferAccountHelper.resolveReceiver(pair, senderId, receiverId);
+        OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId, loadAccountPort);
+        Account sender = resolveSender(pair, senderId, receiverId);
+        Account receiver = resolveReceiver(pair, senderId, receiverId);
         sender.credit(amount);
         receiver.debit(amount);
-        TransferAccountHelper.saveAccounts(sender, receiver, saveAccountPort);
+        saveAccounts(sender, receiver, saveAccountPort);
         return collectEvents(sender, receiver);
     }
 
@@ -91,7 +90,29 @@ public class AccountAclAdapter implements AccountAclPort {
                 account.getId(),
                 account.getUserId().value(),
                 account.getBalance().currency().name(),
-                account.getStatus().name()
-        );
+                account.getStatus().name());
+    }
+
+    private static OrderedPair<Account> loadOrderedPair(Long id1, Long id2, LoadAccountPort port) {
+        Objects.requireNonNull(id1, "id1 must not be null");
+        Objects.requireNonNull(id2, "id2 must not be null");
+        return OrderedPair.from(
+                id1, () -> port.findByIdWithLock(id1)
+                        .orElseThrow(() -> new AccountNotFoundException(id1)),
+                id2, () -> port.findByIdWithLock(id2)
+                        .orElseThrow(() -> new AccountNotFoundException(id2)));
+    }
+
+    private static Account resolveSender(OrderedPair<Account> pair, Long senderId, Long receiverId) {
+        return senderId < receiverId ? pair.lowerIdItem() : pair.higherIdItem();
+    }
+
+    private static Account resolveReceiver(OrderedPair<Account> pair, Long senderId, Long receiverId) {
+        return senderId < receiverId ? pair.higherIdItem() : pair.lowerIdItem();
+    }
+
+    private static void saveAccounts(Account sender, Account receiver, SaveAccountPort savePort) {
+        savePort.save(sender);
+        savePort.save(receiver);
     }
 }

@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
@@ -25,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -47,15 +49,18 @@ class CancelTransferUseCaseTest {
     private UserContextService userContextService;
     @Mock
     private DomainEventPublisherService domainEventPublisherService;
+    @Mock
+    private ClockProviderPort clockProvider;
 
     private CancelTransferUseCase cancelTransferUseCase;
 
     @BeforeEach
     void setUp() {
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
-                accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, 72);
+                accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, 72);
     }
 
     @Test
@@ -115,7 +120,7 @@ class CancelTransferUseCaseTest {
         Long transferId = 1L;
         Transfer transfer = createCompletedTransfer(transferId, 10L, 20L,
                 new Money(new BigDecimal("100.00"), Currency.TRY));
-        transfer.cancel();
+        transfer.cancel(Clock.systemDefaultZone(), 24);
 
         when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))

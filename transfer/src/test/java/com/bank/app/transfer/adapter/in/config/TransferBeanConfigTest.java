@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.in.config;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.application.port.out.AccountAclPort;
@@ -23,6 +24,7 @@ class TransferBeanConfigTest {
     @Mock private UserContextService userContextService;
     @Mock private LoadTransferPort loadTransferPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
+    @Mock private ClockProviderPort clockProvider;
 
     private final TransferProperties transferProperties = new TransferProperties(24, 3, 500L, 2000L);
 
@@ -51,7 +53,7 @@ class TransferBeanConfigTest {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         assertNotNull(config.cancelTransferUseCase(loadTransferPort, saveTransferPort,
-                accountAclPort, auditEventPort, authService, domainEventPublisherService));
+                accountAclPort, auditEventPort, authService, domainEventPublisherService, clockProvider));
     }
 
     @Test

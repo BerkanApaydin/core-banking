@@ -85,7 +85,7 @@ class OutboxPersistenceAdapterTest {
     void shouldFindByIdForUpdateSkipLocked() {
         OutboxJpaEntity entity = new OutboxJpaEntity("id-1", "transfer", "agg-1", "TransferCompletedEvent",
                 "{}", now, false, 0, false, null, 0);
-        when(repository.findByIdForUpdate("id-1")).thenReturn(Optional.of(entity));
+        when(repository.findByIdForUpdateSkipLocked("id-1")).thenReturn(Optional.of(entity));
 
         Optional<EventEntry> result = adapter.findByIdForUpdateSkipLocked("id-1");
 
@@ -95,7 +95,7 @@ class OutboxPersistenceAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenNotFoundById() {
-        when(repository.findByIdForUpdate("id-missing")).thenReturn(Optional.empty());
+        when(repository.findByIdForUpdateSkipLocked("id-missing")).thenReturn(Optional.empty());
 
         Optional<EventEntry> result = adapter.findByIdForUpdateSkipLocked("id-missing");
 

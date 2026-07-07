@@ -12,7 +12,6 @@ import java.util.Objects;
 public class Transfer extends BaseAggregateRoot {
 
     private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
-    static final int DEFAULT_CANCELLATION_WINDOW_HOURS = 24;
     private final Long id;
     private final Long senderAccountId;
     private final Long receiverAccountId;
@@ -104,10 +103,6 @@ public class Transfer extends BaseAggregateRoot {
     public String toString() {
         return "Transfer{id=" + id + ", sender=" + senderAccountId + ", receiver=" + receiverAccountId
                 + ", amount=" + amount + ", status=" + status + "}";
-    }
-
-    public void cancel() {
-        cancel(DEFAULT_CLOCK, DEFAULT_CANCELLATION_WINDOW_HOURS);
     }
 
     public void markFailed() {

@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.in.config;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -52,12 +53,13 @@ public class TransferBeanConfig {
 
     @Bean
     public CancelTransferUseCase cancelTransferUseCase(LoadTransferPort loadTransferPort,
-                                                          SaveTransferPort saveTransferPort,
-                                                          AccountAclPort accountAclPort,
-                                                          AuditEventPort auditEventPort,
-                                                          TransferAuthorizationService transferAuthorizationService,
-                                                          DomainEventPublisherService domainEventPublisherService) {
-        return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, transferProperties.cancellationWindowHours());
+                                                           SaveTransferPort saveTransferPort,
+                                                           AccountAclPort accountAclPort,
+                                                           AuditEventPort auditEventPort,
+                                                           TransferAuthorizationService transferAuthorizationService,
+                                                           DomainEventPublisherService domainEventPublisherService,
+                                                           ClockProviderPort clockProvider) {
+        return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, transferProperties.cancellationWindowHours());
     }
 
     @Bean

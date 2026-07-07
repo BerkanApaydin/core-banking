@@ -10,8 +10,6 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.io.Decoders;
-import org.springframework.core.env.Environment;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,33 +20,15 @@ public class JwtTokenProvider implements JwtPort {
 
     private String secretKey;
     private long jwtExpiration;
-    private boolean allowDefaultSecret;
-    private final Environment environment;
 
-    public JwtTokenProvider(Environment environment,
-                      @Value("${jwt.secret}") String secretKey,
-                      @Value("${jwt.expiration:86400000}") long jwtExpiration,
-                      @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {
-        this.environment = environment;
+    public JwtTokenProvider(@Value("${jwt.secret}") String secretKey,
+                            @Value("${jwt.expiration:86400000}") long jwtExpiration) {
         this.secretKey = secretKey;
         this.jwtExpiration = jwtExpiration;
-        this.allowDefaultSecret = allowDefaultSecret;
     }
 
     @PostConstruct
     public void validateSecret() {
-        String devDefault = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
-        boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
-
-        if (devDefault.equals(secretKey)) {
-            if (isProd || !allowDefaultSecret) {
-                throw new IllegalStateException(
-                    "Default JWT secret is not allowed in production or when allow-default-secret is disabled. " +
-                    "Please configure a secure JWT secret key via the JWT_SECRET environment variable.");
-            }
-            return;
-        }
-
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         if (keyBytes.length < 32) {
             throw new IllegalStateException(

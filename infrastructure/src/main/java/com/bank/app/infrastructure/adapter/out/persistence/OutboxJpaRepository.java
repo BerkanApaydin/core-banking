@@ -1,10 +1,12 @@
 package com.bank.app.infrastructure.adapter.out.persistence;
 
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -15,6 +17,7 @@ import java.util.Optional;
 public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, String> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
     @Query("SELECT e FROM OutboxJpaEntity e WHERE e.processed = false AND e.deadLetter = false "
            + "AND (:partition < 0 OR e.partition = :partition) "
            + "ORDER BY e.createdAt ASC")
@@ -22,8 +25,9 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
                                                   org.springframework.data.domain.Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
     @Query("SELECT e FROM OutboxJpaEntity e WHERE e.id = :id")
-    Optional<OutboxJpaEntity> findByIdForUpdate(@Param("id") String id);
+    Optional<OutboxJpaEntity> findByIdForUpdateSkipLocked(@Param("id") String id);
 
     @Modifying
     @Query("UPDATE OutboxJpaEntity e SET e.processed = true, e.processedAt = CURRENT_TIMESTAMP WHERE e.id = :id")
