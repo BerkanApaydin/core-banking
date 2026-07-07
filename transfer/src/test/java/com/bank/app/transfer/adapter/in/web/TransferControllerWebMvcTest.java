@@ -1,9 +1,13 @@
 package com.bank.app.transfer.adapter.in.web;
 
+import com.bank.app.account.domain.exception.AccountNotActiveException;
+import com.bank.app.account.domain.exception.InsufficientBalanceException;
+import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
-import com.bank.app.account.domain.exception.DuplicateIbanException;
+import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -99,19 +103,74 @@ class TransferControllerWebMvcTest {
                 }
 
                 @Test
-                @DisplayName("should propagate business exception from use case")
-                void shouldPropagateBusinessException() throws Exception {
+                @DisplayName("should return 400 when balance is insufficient")
+                void shouldReturn400WhenBalanceInsufficient() throws Exception {
                         TransferRequest request = new TransferRequest(
                                         "TR290006200000000000000111", "TR290006200000000000000222",
-                                        new BigDecimal("200.00"), Currency.TRY);
+                                        new BigDecimal("2000.00"), Currency.TRY);
 
                         when(placeTransferPort.execute(any(TransferRequest.class)))
-                                        .thenThrow(new DuplicateIbanException("Yetersiz bakiye"));
+                                        .thenThrow(new InsufficientBalanceException("Yetersiz bakiye"));
 
                         mockMvc.perform(post("/api/v1/transfers")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
-                                        .andExpect(status().isConflict());
+                                        .andExpect(status().isBadRequest())
+                                        .andExpect(jsonPath("$.code").value("INSUFFICIENT_BALANCE"));
+                }
+
+                @Test
+                @DisplayName("should return 400 when account is not active")
+                void shouldReturn400WhenAccountNotActive() throws Exception {
+                        TransferRequest request = new TransferRequest(
+                                        "TR290006200000000000000333", "TR290006200000000000000222",
+                                        new BigDecimal("100.00"), Currency.TRY);
+
+                        when(placeTransferPort.execute(any(TransferRequest.class)))
+                                        .thenThrow(new AccountNotActiveException("TR290006200000000000000333"));
+
+                        mockMvc.perform(post("/api/v1/transfers")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isBadRequest())
+                                        .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+                }
+
+                @Test
+                @DisplayName("should return 409 when idempotency key is pending")
+                void shouldReturn409WhenIdempotencyKeyPending() throws Exception {
+                        TransferRequest request = new TransferRequest(
+                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        new BigDecimal("100.00"), Currency.TRY);
+
+                        when(placeTransferPort.execute(any(TransferRequest.class)))
+                                        .thenThrow(new ConcurrentRequestException("Concurrent request"));
+
+                        mockMvc.perform(post("/api/v1/transfers")
+                                        .header("Idempotency-Key", "pending-key")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isConflict())
+                                        .andExpect(jsonPath("$.code").value("CONCURRENT_REQUEST"));
+                }
+
+                @Test
+                @DisplayName("should return 201 when idempotency key is blank")
+                void shouldReturn201WhenIdempotencyKeyBlank() throws Exception {
+                        TransferRequest request = new TransferRequest(
+                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        new BigDecimal("200.00"), Currency.TRY);
+                        TransferResponse response = new TransferResponse(1L, "COMPLETED", new BigDecimal("200.00"),
+                                        "TRY", LocalDateTime.now(), "TR290006200000000000000111",
+                                        "TR290006200000000000000222", 1L, 2L);
+
+                        when(placeTransferPort.execute(any(TransferRequest.class))).thenReturn(response);
+
+                        mockMvc.perform(post("/api/v1/transfers")
+                                        .header("Idempotency-Key", "   ")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isCreated());
                 }
         }
 
@@ -133,11 +192,23 @@ class TransferControllerWebMvcTest {
                 @Test
                 @DisplayName("should propagate business exception on cancel failure")
                 void shouldPropagateBusinessException() throws Exception {
-                        doThrow(new DuplicateIbanException("Cannot be cancelled"))
+                        doThrow(new TransferAlreadyCancelledException(10L))
                                         .when(cancelTransferPort).execute(10L);
 
                         mockMvc.perform(post("/api/v1/transfers/10/cancel"))
-                                        .andExpect(status().isConflict());
+                                        .andExpect(status().isBadRequest())
+                                        .andExpect(jsonPath("$.code").value("TRANSFER_ALREADY_CANCELLED"));
+                }
+
+                @Test
+                @DisplayName("should return 404 when transfer not found for cancel")
+                void shouldReturn404WhenTransferNotFound() throws Exception {
+                        doThrow(new TransferNotFoundException(99999L))
+                                        .when(cancelTransferPort).execute(99999L);
+
+                        mockMvc.perform(post("/api/v1/transfers/99999/cancel"))
+                                        .andExpect(status().isNotFound())
+                                        .andExpect(jsonPath("$.code").value("TRANSFER_NOT_FOUND"));
                 }
         }
 
@@ -158,6 +229,17 @@ class TransferControllerWebMvcTest {
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.id").value(1L))
                                         .andExpect(jsonPath("$.amount").value(150.00));
+                }
+
+                @Test
+                @DisplayName("should return 404 when transfer not found for detail")
+                void shouldReturn404WhenTransferNotFound() throws Exception {
+                        when(getTransferDetailPort.execute(99999L))
+                                        .thenThrow(new TransferNotFoundException(99999L));
+
+                        mockMvc.perform(get("/api/v1/transfers/99999"))
+                                        .andExpect(status().isNotFound())
+                                        .andExpect(jsonPath("$.code").value("TRANSFER_NOT_FOUND"));
                 }
         }
 
@@ -200,6 +282,23 @@ class TransferControllerWebMvcTest {
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.accountId").value(1L))
                                         .andExpect(jsonPath("$.totalVolume").value(350.00));
+                }
+
+                @Test
+                @DisplayName("should return 200 with empty report when no transfers")
+                void shouldReturn200WithEmptyReport() throws Exception {
+                        TransferReportResponse emptyReport = new TransferReportResponse(1L, 0,
+                                        BigDecimal.ZERO, "TRY", List.of());
+
+                        when(generateTransferReportPort.execute(any(ReportCriteria.class))).thenReturn(emptyReport);
+
+                        mockMvc.perform(get("/api/v1/transfers/report")
+                                        .param("accountId", "1")
+                                        .param("startDate", "2025-01-01T00:00:00")
+                                        .param("endDate", "2025-01-10T00:00:00"))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.totalTransfersCount").value(0))
+                                        .andExpect(jsonPath("$.totalVolume").value(0));
                 }
         }
 }

@@ -39,7 +39,7 @@ public class AccountEventOutboxHandler implements OutboxEventPort {
 
     @Override
     public boolean supports(String eventType) {
-        return SUPPORTED_EVENTS.containsKey(eventType);
+        return eventType != null && SUPPORTED_EVENTS.containsKey(eventType);
     }
 
     @Override

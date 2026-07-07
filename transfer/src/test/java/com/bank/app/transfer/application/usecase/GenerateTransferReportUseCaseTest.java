@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -51,7 +52,7 @@ class GenerateTransferReportUseCaseTest {
 
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
-        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L, 3L)))).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222",
                 3L, "TR290006200000000000000333"));
@@ -75,6 +76,7 @@ class GenerateTransferReportUseCaseTest {
         assertEquals(2, response.transfers().size());
         assertEquals(10L, response.transfers().get(0).id());
         assertEquals(11L, response.transfers().get(1).id());
+        verify(accountOperationPort).getIbansForAccounts(Set.of(1L, 2L, 3L));
     }
 
     @Test

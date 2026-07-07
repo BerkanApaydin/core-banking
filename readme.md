@@ -21,7 +21,7 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 - **Testcontainers:** Integration testing with real PostgreSQL containers.
 - **ArchUnit:** Architecture verification to enforce Hexagonal boundary rules.
 - **JaCoCo:** Quality gates enforcing $\ge 85\%$ Line and $\ge 80\%$ Branch coverage.
-- **Pitest:** Mutation testing to verify test assertion strength.
+- **Pitest:** Mutation testing quality gate enforcing $\ge 80\%$ mutation coverage to verify test assertion strength.
 
 ### 🐳 DevOps & Prerequisites
 - **Docker & Docker Compose:** Multi-container orchestration.

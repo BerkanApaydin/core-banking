@@ -144,6 +144,28 @@ class AuthControllerWebMvcTest {
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict());
         }
+
+        @Test
+        @DisplayName("should return 400 when email is invalid")
+        void shouldReturn400WhenEmailInvalid() throws Exception {
+            AuthRequest request = new AuthRequest("validuser", "ValidPass1", "not-an-email", "5551234567");
+
+            mockMvc.perform(post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors").exists());
+        }
+
+        @Test
+        @DisplayName("should return 400 when request body is malformed")
+        void shouldReturn400OnMalformedBody() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{invalid json}"))
+                    .andExpect(status().isBadRequest());
+        }
+
     }
 
     @Nested
@@ -187,6 +209,17 @@ class AuthControllerWebMvcTest {
             mockMvc.perform(post("/api/v1/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(""))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("should return 400 when login with blank username")
+        void shouldReturn400WhenLoginWithBlankUsername() throws Exception {
+            AuthRequest request = new AuthRequest("", "password");
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
         }
 

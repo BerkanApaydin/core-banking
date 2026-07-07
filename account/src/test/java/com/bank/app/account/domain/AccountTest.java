@@ -99,6 +99,15 @@ class AccountTest {
         }
 
         @Test
+        @DisplayName("should allow owner name exactly 255 characters")
+        void shouldAllow255CharOwnerName() {
+            String name = "a".repeat(255);
+            Account account = new Account(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
+                    AccountStatus.ACTIVE);
+            assertThat(account.getOwnerName()).isEqualTo(name);
+        }
+
+        @Test
         @DisplayName("should create account with version constructor and reject null userId")
         void shouldRejectNullUserIdInVersionConstructor() {
             assertThatThrownBy(() -> new Account(1L, (UserId) null, IBAN, OWNER, Money.of("1000", Currency.TRY),

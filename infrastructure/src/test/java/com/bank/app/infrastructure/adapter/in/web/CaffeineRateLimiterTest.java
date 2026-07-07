@@ -125,6 +125,26 @@ class CaffeineRateLimiterTest {
     }
 
     @Test
+    void shouldRetainCacheEntryBeyondTimeWindow() throws Exception {
+        // Verifies expireAfterWrite uses timeWindowMs * 2 (not / 2)
+        // Caffeine's expireAfterWrite uses system ticker, so we need real time to pass
+        // timeWindowMs=500, expireAfterWrite = 1000ms (original) vs 250ms (mutant)
+        SettableClock testClock = new SettableClock(0);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(10, 500, 10000, testClock);
+
+        limiter.tryAcquire("client"); // miss at t=0, cache entry created at real-time T0
+
+        Thread.sleep(300); // real time passes — at T0+300ms
+
+        testClock.advance(600);
+        // mutant: entry expired (300ms > 250ms) → evicted → miss
+        // original: entry alive (300ms < 1000ms) → hit
+        limiter.tryAcquire("client");
+
+        assertEquals(1, limiter.getMissCount());
+    }
+
+    @Test
     void shouldNotAddRejectedRequestsToWindow() {
         SettableClock testClock = new SettableClock(1000);
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 500, 10000, testClock);

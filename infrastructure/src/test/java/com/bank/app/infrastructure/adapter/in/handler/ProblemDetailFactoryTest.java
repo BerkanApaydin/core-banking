@@ -30,9 +30,11 @@ class ProblemDetailFactoryTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
             assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().getTitle()).isEqualTo("Not Found");
             assertThat(response.getBody().getProperties())
                     .containsEntry("code", "RESOURCE_NOT_FOUND")
-                    .containsEntry("message", "Resource not found");
+                    .containsEntry("message", "Resource not found")
+                    .containsKey("timestamp");
         }
 
         @SuppressWarnings("unchecked")
@@ -98,14 +100,28 @@ class ProblemDetailFactoryTest {
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.createValidationError(errors, null);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody().getTitle()).isEqualTo("Validation Failed");
             assertThat(response.getBody().getProperties())
                     .containsEntry("code", "VALIDATION_FAILED")
-                    .containsEntry("message", "Validation failed");
+                    .containsEntry("message", "Validation failed")
+                    .containsKey("timestamp");
             assertThat(response.getBody().getProperties().get("errors"))
                     .isInstanceOf(Map.class);
             @SuppressWarnings("unchecked")
             var resultErrors = (Map<String, String>) response.getBody().getProperties().get("errors");
             assertThat(resultErrors).containsEntry("field1", "must not be null");
+        }
+
+        @Test
+        @DisplayName("should set instance URI when WebRequest is provided")
+        void shouldSetInstanceFromWebRequest() {
+            WebRequest request = mock(WebRequest.class);
+            when(request.getDescription(false)).thenReturn("uri=/api/test/validation");
+
+            Map<String, String> errors = Map.of("name", "required");
+            ResponseEntity<ProblemDetail> response = ProblemDetailFactory.createValidationError(errors, request);
+
+            assertThat(response.getBody().getInstance()).isEqualTo(URI.create("/api/test/validation"));
         }
     }
 }

@@ -76,9 +76,9 @@ class JwtTokenProviderTest {
     void shouldGenerateUniqueTokensOnEachCall() {
         String token1 = jwtTokenProvider.generateToken(1L, "testUser");
         String token2 = jwtTokenProvider.generateToken(1L, "testUser");
-
         assertNotNull(token1);
         assertNotNull(token2);
+        assertNotEquals(token1, token2);
     }
 
     @Test
@@ -86,11 +86,13 @@ class JwtTokenProviderTest {
         JwtTokenProvider provider = new JwtTokenProvider(
                 "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L);
         assertDoesNotThrow(provider::validateSecret);
+        assertNotNull(provider.generateToken(1L, "admin"));
     }
 
     @Test
     void shouldReturnFalseForExpiredToken() {
-        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, 0L);
+        // Negative expiration ensures the token is always expired
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L);
         String token = shortLived.generateToken(1L, "testUser");
         assertFalse(shortLived.isTokenValid(token));
     }
@@ -98,7 +100,9 @@ class JwtTokenProviderTest {
     @Test
     void shouldThrowWhenSecretIsTooShort() {
         JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L);
-        assertThrows(IllegalStateException.class, provider::validateSecret);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, provider::validateSecret);
+        // Verify the bit-length calculation to kill MathMutator on keyBytes.length * 8
+        assertTrue(ex.getMessage().contains("40 bits"));
     }
 
     @Test

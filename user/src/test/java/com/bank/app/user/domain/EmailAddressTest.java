@@ -75,16 +75,13 @@ class EmailAddressTest {
         @Test
         void shouldMaskLocalPart() {
             EmailAddress email = new EmailAddress("ahmet.yilmaz@example.com");
-            String masked = email.toString();
-            assertThat(masked).contains("***");
-            assertThat(masked).endsWith("@example.com");
-            assertThat(masked.chars().filter(c -> c == '@').count()).isEqualTo(1);
+            assertThat(email.toString()).isEqualTo("a***z@example.com");
         }
 
         @Test
         void shouldHandleShortLocalPart() {
             EmailAddress email = new EmailAddress("ab@test.com");
-            assertThat(email.toString()).startsWith("a***");
+            assertThat(email.toString()).isEqualTo("a***b@test.com");
         }
 
         @Test

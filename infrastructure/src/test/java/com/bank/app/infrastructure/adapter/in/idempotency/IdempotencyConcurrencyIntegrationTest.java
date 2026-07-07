@@ -68,7 +68,7 @@ class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegratio
         }
 
         latch.countDown();
-        assertTrue(finishLatch.await(30, TimeUnit.SECONDS), "All threads should finish");
+        assertTrue(finishLatch.await(5, TimeUnit.SECONDS), "All threads should finish");
         executor.shutdown();
 
         assertEquals(1, newCount.get(), "Exactly one thread should get NEW status");
@@ -112,7 +112,7 @@ class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegratio
         }
 
         latch.countDown();
-        assertTrue(finishLatch.await(30, TimeUnit.SECONDS), "All threads should finish");
+        assertTrue(finishLatch.await(5, TimeUnit.SECONDS), "All threads should finish");
         executor.shutdown();
 
         assertEquals(1, newCount.get(), "Only one thread should start the request");

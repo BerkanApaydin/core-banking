@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -48,7 +49,7 @@ class GetTransferHistoryUseCaseTest {
                 LocalDateTime.now());
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
+        when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR290006200000000000000111",
                 2L, "TR290006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
@@ -65,6 +66,7 @@ class GetTransferHistoryUseCaseTest {
         assertEquals(0, history.page());
         assertEquals(20, history.size());
         assertEquals(1, history.totalPages());
+        verify(accountOperationPort).getIbansForAccounts(Set.of(1L, 2L));
     }
 
     @Test

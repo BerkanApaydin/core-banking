@@ -40,13 +40,16 @@ class UserTest {
         }
 
         @Test
-        @DisplayName("should create via static factory")
+        @DisplayName("should create via static factory with registration event")
         void shouldCreateViaStaticFactory() {
             User user = User.create("testuser", "raw_password");
             assertThat(user.getId()).isNull();
             assertThat(user.getUsername()).isEqualTo("testuser");
             assertThat(user.getPassword()).isEqualTo("raw_password");
             assertThat(user.getRole()).isEqualTo(Role.ROLE_USER);
+            assertThat(user.getDomainEvents())
+                    .hasSize(1)
+                    .allMatch(e -> e instanceof UserRegisteredEvent);
         }
 
         @Test
@@ -106,6 +109,14 @@ class UserTest {
             assertThatThrownBy(() -> new User(new UserId(1L), longUsername, "password", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Username can be at most 255 characters");
+        }
+
+        @Test
+        @DisplayName("should allow username exactly 255 characters")
+        void shouldAllow255CharUsername() {
+            String username = "a".repeat(255);
+            User user = new User(new UserId(1L), username, "password", Role.ROLE_USER);
+            assertThat(user.getUsername()).isEqualTo(username);
         }
 
         @Test

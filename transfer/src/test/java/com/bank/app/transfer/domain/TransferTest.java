@@ -18,6 +18,7 @@ import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @SuppressWarnings("null")
 @DisplayName("Transfer domain entity")
@@ -167,11 +168,16 @@ class TransferTest {
     class Cancel {
 
         @Test
-        @DisplayName("should cancel within 24-hour window")
+        @DisplayName("should cancel within 24-hour window and register event")
         void shouldCancelWithinWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
             transfer.cancel(Clock.systemDefaultZone(), 24);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
+            assertThat(transfer.getDomainEvents())
+                    .hasSize(1)
+                    .allMatch(e -> e instanceof TransferCancelledEvent);
+            TransferCancelledEvent event = (TransferCancelledEvent) transfer.getDomainEvents().getFirst();
+            assertThat(event.transferId()).isEqualTo(1L);
         }
 
         @Test

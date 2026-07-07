@@ -4,18 +4,19 @@ import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.infrastructure.adapter.in.outbox.OutboxPoller;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
+import com.bank.app.infrastructure.adapter.out.outbox.DomainEventOutboxAdapter;
 import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaEntity;
 import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaRepository;
 import com.bank.app.infrastructure.adapter.out.security.SecurityContextAdapter;
-import com.bank.app.transfer.ModuleIntegrationTestConfig;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -37,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class, ModuleIntegrationTestConfig.class,
+@SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class,
         OutboxIntegrationTest.TestConfig.class })
 @SuppressWarnings("null")
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
@@ -69,27 +70,17 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     @MockitoBean
     private SecurityContextAdapter securityUtils;
 
+    @MockitoBean
+    private OutboxPoller outboxPoller;
+
     private UserJpaEntity user;
 
     @TestConfiguration
     static class TestConfig {
         @Bean
         @Primary
-        EventPublisherPort domainEventOutboxAdapter(ObjectMapper objectMapper,
-                OutboxJpaRepository outboxRepo) {
-            return event -> {
-                try {
-                    String payload = objectMapper.writeValueAsString(event);
-                    String eventType = event.getClass().getSimpleName();
-                    OutboxJpaEntity entity = new OutboxJpaEntity(
-                            UUID.randomUUID().toString(),
-                            "Transfer", "unknown", eventType,
-                            payload, LocalDateTime.now(), false, 0, false, null, 0);
-                    outboxRepo.save(entity);
-                } catch (JsonProcessingException e) {
-                    throw new RuntimeException("Failed to serialize event", e);
-                }
-            };
+        EventPublisherPort domainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper) {
+            return new DomainEventOutboxAdapter(outboxPort, objectMapper);
         }
     }
 
@@ -127,7 +118,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
-    void shouldCreateOutboxEventAndProcessItSuccessfully() {
+    void shouldCreateOutboxEventAndProcessThroughRealPipeline() {
         TransferRequest request = new TransferRequest(
                 "TR290006200000000000000111",
                 "TR290006200000000000000222",
@@ -140,20 +131,24 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         });
 
         List<OutboxJpaEntity> allOutboxEvents = outboxRepo.findAll();
-        assertEquals(3, allOutboxEvents.size());
+        assertFalse(allOutboxEvents.isEmpty(), "Real EventPublisherPort should have saved outbox events");
 
         OutboxJpaEntity event = allOutboxEvents.stream()
                 .filter(e -> "TransferCompletedEvent".equals(e.getEventType()))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("TransferCompletedEvent not found"));
+                .orElseThrow(() -> new AssertionError("TransferCompletedEvent not found in outbox"));
+        assertNotNull(event.getAggregateType());
+        assertNotNull(event.getAggregateId());
+        assertNotNull(event.getPayload());
         assertFalse(event.isProcessed());
         assertNull(event.getProcessedAt());
 
         outboxProcessor.processEvent(toEventEntry(event));
 
         OutboxJpaEntity processedEvent = outboxRepo.findById(event.getId()).orElseThrow();
-        assertTrue(processedEvent.isProcessed());
+        assertTrue(processedEvent.isProcessed(), "Real handler should have been invoked and marked as processed");
         assertNotNull(processedEvent.getProcessedAt());
+        assertNull(processedEvent.getLastError(), "No error should be recorded on success");
     }
 
     @Test

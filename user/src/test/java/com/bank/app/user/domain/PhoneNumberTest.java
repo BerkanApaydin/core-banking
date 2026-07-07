@@ -73,9 +73,7 @@ class PhoneNumberTest {
         @Test
         void shouldMaskMiddleDigits() {
             PhoneNumber phone = new PhoneNumber("+905551234567");
-            String masked = phone.toString();
-            assertThat(masked).doesNotContain("1234");
-            assertThat(masked).endsWith("567");
+            assertThat(phone.toString()).isEqualTo("**********567");
         }
 
         @Test

@@ -13,6 +13,7 @@ import io.jsonwebtoken.io.Decoders;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -64,6 +65,7 @@ public class JwtTokenProvider implements JwtPort {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(username)
+                .id(UUID.randomUUID().toString())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .signWith(getSignInKey())

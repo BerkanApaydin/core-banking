@@ -278,6 +278,7 @@ class RateLimitingFilterTest {
 
         assertEquals(429, resp.getStatus());
         assertTrue(resp.getContentType() != null && resp.getContentType().startsWith("application/json"));
+        assertEquals("UTF-8", resp.getCharacterEncoding());
     }
 
     @Test

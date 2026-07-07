@@ -16,7 +16,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import org.mockito.ArgumentCaptor;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -169,7 +172,8 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldUpdateExistingTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
+        // domain transfer has updated version=2L vs existing entity version=1L
+        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 2L);
         TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
                 "COMPLETED", 1L, now);
         TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
@@ -186,7 +190,12 @@ class TransferPersistenceAdapterTest {
         assertEquals(2L, result.getReceiverAccountId());
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
         verify(springDataRepo).findById(10L);
-        verify(springDataRepo).save(any(TransferJpaEntity.class));
+
+        ArgumentCaptor<TransferJpaEntity> captor = ArgumentCaptor.forClass(TransferJpaEntity.class);
+        verify(springDataRepo).save(captor.capture());
+        TransferJpaEntity capturedEntity = captor.getValue();
+        // If updateJpaEntity was not called, version would still be 1L (from existingEntity)
+        assertEquals(2L, capturedEntity.getVersion());
     }
 
     @Test
