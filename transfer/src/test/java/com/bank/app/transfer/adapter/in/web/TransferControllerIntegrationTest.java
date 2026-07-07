@@ -9,6 +9,7 @@ import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaEnti
 import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaRepository;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.transfer.ModuleIntegrationTestConfig;
+import com.bank.app.transfer.adapter.out.persistence.TransferJpaRepository;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
@@ -71,6 +72,9 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Autowired
         private EntityManager entityManager;
 
+        @Autowired
+        private TransferJpaRepository transferRepo;
+
         private String jwtToken;
         private Long u3Id;
 
@@ -117,6 +121,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 var template = new TransactionTemplate(transactionManager);
                 template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
                 template.execute(status -> {
+                        entityManager.createQuery("delete from OutboxJpaEntity").executeUpdate();
+                        entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
                         idempotencyKeyRepo.deleteAll();
                         accountRepo.deleteAll();
                         userRepository.deleteAll();

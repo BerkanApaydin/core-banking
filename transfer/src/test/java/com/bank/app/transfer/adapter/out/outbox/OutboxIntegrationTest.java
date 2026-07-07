@@ -120,6 +120,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
             entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
             entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
             entityManager.createQuery("delete from UserJpaEntity").executeUpdate();
+            entityManager.flush();
+            entityManager.clear();
             return null;
         });
     }
