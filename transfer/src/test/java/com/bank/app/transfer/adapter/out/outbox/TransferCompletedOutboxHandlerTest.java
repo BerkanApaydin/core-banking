@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -34,6 +35,9 @@ class TransferCompletedOutboxHandlerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private IdempotencyPort idempotencyPort;
+
     private ObjectMapper objectMapper;
     private TransferCompletedOutboxHandler handler;
 
@@ -46,7 +50,7 @@ class TransferCompletedOutboxHandlerTest {
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         objectMapper.findAndRegisterModules();
-        handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher);
+        handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher, idempotencyPort);
     }
 
     @Nested
@@ -72,6 +76,13 @@ class TransferCompletedOutboxHandlerTest {
     @DisplayName("handle")
     class Handle {
 
+        private void mockDedupSuccess(String eventId) {
+            when(idempotencyPort.tryCreate(
+                    eq("outbox_handler_TransferCompletedOutboxHandler_" + eventId),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+        }
+
         @Test
         @DisplayName("should publish AsyncTransferCompletedEvent on success")
         void shouldPublishEventSuccessfully() throws Exception {
@@ -82,6 +93,7 @@ class TransferCompletedOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "Transfer",
                     "42", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-1");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -99,6 +111,7 @@ class TransferCompletedOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-2", "Transfer",
                     "42", "TransferCompletedEvent", "{invalid json}", 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-2");
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("TransferCompletedOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
@@ -110,7 +123,9 @@ class TransferCompletedOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-3", "Transfer",
                     "42", "TransferCompletedEvent", null, 0, false, false, null, 0, LocalDateTime.now());
 
-            assertThrows(RuntimeException.class, () -> handler.handle(event));
+            mockDedupSuccess("evt-3");
+            RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
+            assertTrue(ex.getMessage().contains("TransferCompletedOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
         }
 
@@ -124,10 +139,48 @@ class TransferCompletedOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-4", "Transfer",
                     "99", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-4");
             doThrow(new RuntimeException("publisher error")).when(eventPublisher).publishEvent(any());
 
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("TransferCompletedOutboxHandler failed"));
+        }
+
+        @Test
+        @DisplayName("should skip duplicate event when idempotency key already exists")
+        void shouldSkipDuplicateEvent() throws Exception {
+            String json = objectMapper.writeValueAsString(new TransferCompletedEvent(
+                    42L, 1L, 2L,
+                    new Money(new BigDecimal("250.00"), Currency.TRY),
+                    TransferStatus.COMPLETED, LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-5", "Transfer",
+                    "42", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCompletedOutboxHandler_evt-5"), any(LocalDateTime.class)))
+                    .thenReturn(false);
+
+            handler.handle(event);
+
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("should process event when idempotency key is created successfully")
+        void shouldProcessWhenIdempotencyKeyCreated() throws Exception {
+            String json = objectMapper.writeValueAsString(new TransferCompletedEvent(
+                    42L, 1L, 2L,
+                    new Money(new BigDecimal("250.00"), Currency.TRY),
+                    TransferStatus.COMPLETED, LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-6", "Transfer",
+                    "42", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCompletedOutboxHandler_evt-6"), any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            handler.handle(event);
+
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertEquals(42L, eventCaptor.getValue().transferId());
         }
     }
 }

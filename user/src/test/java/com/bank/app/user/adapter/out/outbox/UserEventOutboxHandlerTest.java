@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.out.outbox;
 
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.user.domain.UserRegisteredEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +29,9 @@ class UserEventOutboxHandlerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private IdempotencyPort idempotencyPort;
+
     private ObjectMapper objectMapper;
     private UserEventOutboxHandler handler;
 
@@ -39,7 +43,7 @@ class UserEventOutboxHandlerTest {
         objectMapper = new ObjectMapper();
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.findAndRegisterModules();
-        handler = new UserEventOutboxHandler(objectMapper, eventPublisher);
+        handler = new UserEventOutboxHandler(objectMapper, eventPublisher, idempotencyPort);
     }
 
     @Nested
@@ -65,6 +69,13 @@ class UserEventOutboxHandlerTest {
     @DisplayName("handle")
     class Handle {
 
+        private void mockDedupSuccess(String eventId) {
+            when(idempotencyPort.tryCreate(
+                    eq("outbox_handler_UserEventOutboxHandler_" + eventId),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+        }
+
         @Test
         @DisplayName("should publish UserRegisteredEvent on success")
         void shouldPublishEventSuccessfully() throws Exception {
@@ -73,6 +84,7 @@ class UserEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "User",
                     "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-1");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -88,6 +100,7 @@ class UserEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-2", "User",
                     "1", "UserRegisteredEvent", "{invalid json}", 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-2");
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("UserEventOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
@@ -99,7 +112,9 @@ class UserEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-3", "User",
                     "1", "UserRegisteredEvent", null, 0, false, false, null, 0, LocalDateTime.now());
 
-            assertThrows(RuntimeException.class, () -> handler.handle(event));
+            mockDedupSuccess("evt-3");
+            RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
+            assertTrue(ex.getMessage().contains("UserEventOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
         }
 
@@ -111,10 +126,45 @@ class UserEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-4", "User",
                     "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-4");
             doThrow(new RuntimeException("publisher error")).when(eventPublisher).publishEvent(any());
 
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("UserEventOutboxHandler failed"));
+        }
+
+        @Test
+        @DisplayName("should skip duplicate event when idempotency key already exists")
+        void shouldSkipDuplicateEvent() throws Exception {
+            String json = objectMapper.writeValueAsString(new UserRegisteredEvent(
+                    "1", "testuser", "ROLE_USER", LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "User",
+                    "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_UserEventOutboxHandler_evt-1"), any(LocalDateTime.class)))
+                    .thenReturn(false);
+
+            handler.handle(event);
+
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("should process event when idempotency key is created successfully")
+        void shouldProcessWhenIdempotencyKeyCreated() throws Exception {
+            String json = objectMapper.writeValueAsString(new UserRegisteredEvent(
+                    "1", "testuser", "ROLE_USER", LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "User",
+                    "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_UserEventOutboxHandler_evt-1"), any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            handler.handle(event);
+
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            UserRegisteredEvent captured = eventCaptor.getValue();
+            assertEquals("1", captured.userId());
         }
     }
 }

@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
 
 @Aspect
 @Component
@@ -25,13 +26,16 @@ public class IdempotencyAspect {
     private final IdempotencyGuard idempotencyGuard;
     private final UserContextService userContextService;
     private final ObjectMapper objectMapper;
+    private final ClientIpResolver clientIpResolver;
 
     public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
             UserContextService userContextService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ClientIpResolver clientIpResolver) {
         this.idempotencyGuard = idempotencyGuard;
         this.userContextService = userContextService;
         this.objectMapper = objectMapper;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Around("@annotation(idempotent)")
@@ -48,9 +52,15 @@ public class IdempotencyAspect {
             return joinPoint.proceed();
         }
 
-        String username = userContextService.getCurrentUsername()
-                .orElseThrow(() -> new AuthorizationException("You must be logged in."));
-        String key = username + "_" + idempotencyKeyHeader;
+        String key;
+        if (idempotent.publicEndpoint()) {
+            String clientIp = clientIpResolver.resolveClientIp(request);
+            key = clientIp + "_" + idempotencyKeyHeader;
+        } else {
+            String username = userContextService.getCurrentUsername()
+                    .orElseThrow(() -> new AuthorizationException("You must be logged in."));
+            key = username + "_" + idempotencyKeyHeader;
+        }
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
 

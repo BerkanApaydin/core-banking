@@ -53,7 +53,8 @@ class IdempotencyCleanupSchedulerEdgeCaseTest {
         when(idempotencyPort.deleteExpired(any(LocalDateTime.class)))
                 .thenThrow(new RuntimeException("DB error"));
 
-        assertThrows(RuntimeException.class, () -> scheduler.cleanupExpiredKeys());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> scheduler.cleanupExpiredKeys());
+        assertEquals("DB error", ex.getMessage());
     }
 
     @Test

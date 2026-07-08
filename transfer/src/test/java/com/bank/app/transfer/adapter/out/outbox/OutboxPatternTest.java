@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxPoller;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
@@ -36,6 +37,7 @@ class OutboxPatternTest {
     private OutboxPort outboxPort;
     private ObjectMapper objectMapper;
     private ApplicationEventPublisher eventPublisher;
+    private IdempotencyPort idempotencyPort;
 
     private OutboxPoller outboxPoller;
     private TransferCompletedOutboxHandler handler;
@@ -91,13 +93,16 @@ class OutboxPatternTest {
         outboxPort = mock(OutboxPort.class);
         objectMapper = createMapper();
         eventPublisher = mock(ApplicationEventPublisher.class);
+        idempotencyPort = mock(IdempotencyPort.class);
 
         when(outboxPort.findByIdForUpdateSkipLocked(anyString())).thenAnswer(invocation -> {
             String id = invocation.getArgument(0);
             return Optional.ofNullable(entityMap.get(id));
         });
 
-        handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher);
+        when(idempotencyPort.tryCreate(anyString(), any())).thenReturn(true);
+
+        handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher, idempotencyPort);
         OutboxProcessor processor = new OutboxProcessor(outboxPort, List.of(handler));
         outboxPoller = new OutboxPoller(outboxPort, processor, defaultOutboxProperties);
     }

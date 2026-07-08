@@ -11,4 +11,5 @@ import java.lang.annotation.Target;
 @Documented
 public @interface Idempotent {
     String headerName() default "Idempotency-Key";
+    boolean publicEndpoint() default false;
 }

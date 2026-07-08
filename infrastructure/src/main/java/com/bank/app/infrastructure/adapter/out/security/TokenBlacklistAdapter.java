@@ -1,39 +1,41 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "caffeine", matchIfMissing = true)
 public class TokenBlacklistAdapter implements TokenBlacklistPort {
 
-    private final ConcurrentHashMap<String, Long> blacklist = new ConcurrentHashMap<>();
+    private final Cache<String, Boolean> blacklist;
+
+    public TokenBlacklistAdapter() {
+        this.blacklist = Caffeine.newBuilder()
+                .expireAfterWrite(1, TimeUnit.DAYS)
+                .maximumSize(1_000_000)
+                .build();
+    }
 
     @Override
     public void blacklist(String token, long expirationMs) {
-        long expiry = System.currentTimeMillis() + expirationMs;
-        blacklist.put(token, expiry);
+        if (expirationMs <= 0) {
+            return;
+        }
+        blacklist.put(token, Boolean.TRUE);
     }
 
     @Override
     public boolean isBlacklisted(String token) {
-        Long expiry = blacklist.get(token);
-        if (expiry == null) {
-            return false;
-        }
-        if (System.currentTimeMillis() > expiry) {
-            blacklist.remove(token);
-            return false;
-        }
-        return true;
+        return blacklist.getIfPresent(token) != null;
     }
 
     @Override
     public void cleanExpired() {
-        long now = System.currentTimeMillis();
-        blacklist.values().removeIf(expiry -> now > expiry);
+        blacklist.cleanUp();
     }
 }

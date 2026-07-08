@@ -5,6 +5,7 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountCreditedEvent;
 import com.bank.app.account.domain.AccountDebitedEvent;
 import com.bank.app.account.domain.AccountSuspendedEvent;
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.event.DomainEvent;
@@ -14,12 +15,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Component
 public class AccountEventOutboxHandler implements OutboxEventPort {
 
     private static final Logger log = LoggerFactory.getLogger(AccountEventOutboxHandler.class);
+    private static final String DEDUP_KEY_PREFIX = "outbox_handler_AccountEventOutboxHandler_";
 
     private static final Map<String, Class<? extends DomainEvent>> SUPPORTED_EVENTS = Map.of(
             "AccountCreatedEvent", AccountCreatedEvent.class,
@@ -31,10 +34,14 @@ public class AccountEventOutboxHandler implements OutboxEventPort {
 
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final IdempotencyPort idempotencyPort;
 
-    public AccountEventOutboxHandler(ObjectMapper objectMapper, ApplicationEventPublisher eventPublisher) {
+    public AccountEventOutboxHandler(ObjectMapper objectMapper,
+                                      ApplicationEventPublisher eventPublisher,
+                                      IdempotencyPort idempotencyPort) {
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.idempotencyPort = idempotencyPort;
     }
 
     @Override
@@ -44,6 +51,12 @@ public class AccountEventOutboxHandler implements OutboxEventPort {
 
     @Override
     public void handle(EventEntry event) {
+        String dedupKey = DEDUP_KEY_PREFIX + event.id();
+        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now())) {
+            log.info("Duplicate outbox event detected, skipping. handler=AccountEventOutboxHandler, eventId={}", event.id());
+            return;
+        }
+
         Class<? extends DomainEvent> eventClass = SUPPORTED_EVENTS.get(event.eventType());
         if (eventClass == null) {
             log.warn("Unsupported account event type: {}", event.eventType());

@@ -4,6 +4,7 @@ import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.Currency;
@@ -36,6 +37,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = { com.bank.app.transfer.TestApplication.class,
@@ -81,6 +84,14 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         @Primary
         EventPublisherPort domainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper) {
             return new DomainEventOutboxAdapter(outboxPort, objectMapper);
+        }
+
+        @Bean
+        @Primary
+        IdempotencyPort idempotencyPort() {
+            IdempotencyPort mock = mock(IdempotencyPort.class);
+            when(mock.tryCreate(any(), any())).thenReturn(true);
+            return mock;
         }
     }
 

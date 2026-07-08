@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +37,9 @@ class IdempotencyAspectTest {
     private UserContextService userContextService;
 
     @Mock
+    private ClientIpResolver clientIpResolver;
+
+    @Mock
     private ObjectMapper objectMapper;
 
     @Mock
@@ -54,7 +58,8 @@ class IdempotencyAspectTest {
         aspect = new IdempotencyAspect(
                 idempotencyGuard,
                 userContextService,
-                objectMapper);
+                objectMapper,
+                clientIpResolver);
     }
 
     @AfterEach
@@ -75,6 +80,30 @@ class IdempotencyAspectTest {
             @Override
             public String headerName() {
                 return "Idempotency-Key";
+            }
+
+            @Override
+            public boolean publicEndpoint() {
+                return false;
+            }
+
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return Idempotent.class;
+            }
+        };
+    }
+
+    private Idempotent publicAnnotation() {
+        return new Idempotent() {
+            @Override
+            public String headerName() {
+                return "Idempotency-Key";
+            }
+
+            @Override
+            public boolean publicEndpoint() {
+                return true;
             }
 
             @Override
@@ -393,5 +422,85 @@ class IdempotencyAspectTest {
 
         assertEquals(200, result.getStatusCode().value());
         assertNull(result.getBody());
+    }
+
+    @Test
+    void shouldUseClientIpForPublicEndpoint() throws Throwable {
+
+        mockRequest("abc");
+
+        when(clientIpResolver.resolveClientIp(request))
+                .thenReturn("10.0.0.1");
+
+        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.newRequest());
+
+        when(joinPoint.proceed())
+                .thenReturn(ResponseEntity.ok().build());
+
+        Object result = aspect.handleIdempotency(joinPoint, publicAnnotation());
+
+        verify(idempotencyGuard)
+                .completeRequest("10.0.0.1_abc", "", 200);
+        assertNotNull(result);
+        assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
+    }
+
+    @Test
+    void shouldReturnCompletedForPublicEndpoint() throws Throwable {
+
+        mockRequest("abc");
+
+        when(clientIpResolver.resolveClientIp(request))
+                .thenReturn("10.0.0.1");
+
+        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.completed(
+                                "{\"message\":\"cached\"}",
+                                201));
+
+        when(objectMapper.readValue(
+                anyString(),
+                eq(JsonNode.class)))
+                .thenReturn(jsonNode);
+
+        ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
+                joinPoint,
+                publicAnnotation());
+
+        assertEquals(201, result.getStatusCode().value());
+        assertSame(jsonNode, result.getBody());
+    }
+
+    @Test
+    void shouldThrowConcurrentRequestForPublicEndpoint() throws Exception {
+
+        mockRequest("abc");
+
+        when(clientIpResolver.resolveClientIp(request))
+                .thenReturn("10.0.0.1");
+
+        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+                .thenReturn(
+                        IdempotencyGuard.IdempotencyResult.pending());
+
+        assertThrows(
+                ConcurrentRequestException.class,
+                () -> aspect.handleIdempotency(joinPoint, publicAnnotation()));
+    }
+
+    @Test
+    void shouldProceedWhenPublicEndpointHeaderNull() throws Throwable {
+
+        mockRequest(null);
+
+        when(joinPoint.proceed()).thenReturn("OK");
+
+        Object result = aspect.handleIdempotency(joinPoint, publicAnnotation());
+
+        assertEquals("OK", result);
+        verify(clientIpResolver, never()).resolveClientIp(any());
     }
 }

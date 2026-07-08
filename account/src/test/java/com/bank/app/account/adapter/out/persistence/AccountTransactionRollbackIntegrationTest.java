@@ -21,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.bank.app.account.domain.exception.DuplicateIbanException;
+import com.bank.app.common.domain.exception.InvalidIbanException;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = { com.bank.app.account.TestApplication.class, ModuleIntegrationTestConfig.class })
@@ -79,7 +82,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
                                 new BigDecimal("1000.00"),
                                 Currency.TRY);
 
-                assertThrows(Exception.class, () -> createAccountUseCase.execute(duplicateRequest));
+                assertThrows(DuplicateIbanException.class, () -> createAccountUseCase.execute(duplicateRequest));
 
                 long countAfter = accountJpaRepository.count();
                 assertEquals(countBefore, countAfter,
@@ -97,7 +100,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
                                 new BigDecimal("500.00"),
                                 Currency.TRY);
 
-                assertThrows(Exception.class, () -> createAccountUseCase.execute(request));
+                assertThrows(InvalidIbanException.class, () -> createAccountUseCase.execute(request));
 
                 long countAfter = accountJpaRepository.count();
                 assertEquals(countBefore, countAfter,

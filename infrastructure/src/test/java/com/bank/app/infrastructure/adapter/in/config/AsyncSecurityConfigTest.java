@@ -37,13 +37,14 @@ class AsyncSecurityConfigTest {
     }
 
     @Test
-    void shouldReuseExistingDelegateOnSecondCall() {
+    void shouldReuseExistingDelegateOnSecondCall() throws Exception {
         AsyncSecurityConfig config = new AsyncSecurityConfig();
         Executor first = config.asyncTaskExecutor();
         Executor second = config.asyncTaskExecutor();
 
         assertNotNull(first);
         assertNotNull(second);
+        assertSame(extractThreadPoolTaskExecutor(first), extractThreadPoolTaskExecutor(second));
     }
 
     @Test
@@ -84,27 +85,17 @@ class AsyncSecurityConfigTest {
     }
 
     @Test
-    void shouldShutdownDelegate() {
-        AsyncSecurityConfig config = new AsyncSecurityConfig();
-        config.asyncTaskExecutor();
-        config.shutdown();
-    }
-
-    @Test
-    void shouldShutdownAndStopThreadPool() throws Exception {
+    void shouldShutdownDelegate() throws Exception {
         AsyncSecurityConfig config = new AsyncSecurityConfig();
         Executor executor = config.asyncTaskExecutor();
-
         ThreadPoolTaskExecutor delegate = extractThreadPoolTaskExecutor(executor);
-
         config.shutdown();
-
         assertTrue(delegate.getThreadPoolExecutor().isShutdown());
     }
 
     @Test
     void shouldHandleShutdownWithoutDelegate() {
         AsyncSecurityConfig config = new AsyncSecurityConfig();
-        config.shutdown();
+        assertDoesNotThrow(config::shutdown);
     }
 }

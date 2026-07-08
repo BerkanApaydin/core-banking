@@ -259,13 +259,32 @@ function getLanguage() {
     return currentLang;
 }
 
+// --- Idempotency Key Helpers ---
+function getIdempotencyKey(keyName) {
+    let key = localStorage.getItem(keyName);
+    if (!key) {
+        key = crypto.randomUUID();
+        localStorage.setItem(keyName, key);
+    }
+    return key;
+}
+
+function renewIdempotencyKey(keyName) {
+    const key = crypto.randomUUID();
+    localStorage.setItem(keyName, key);
+    return key;
+}
+
+function clearIdempotencyKey(keyName) {
+    localStorage.removeItem(keyName);
+}
+
 // --- State Management ---
 let accounts = [];
 let activeTab = 'accounts-section';
 let token = localStorage.getItem('token') || null;
 let userId = localStorage.getItem('userId') || null;
 let username = localStorage.getItem('username') || null;
-let transferIdempotencyKey = crypto.randomUUID();
 
 // --- DOM Elements ---
 const navItems = document.querySelectorAll('.nav-item');
@@ -532,12 +551,17 @@ function initModal() {
         submitBtn.disabled = true;
 
         try {
+            const idempotencyKey = getIdempotencyKey('accountKey');
             await fetchApi('/accounts', {
                 method: 'POST',
+                headers: {
+                    'Idempotency-Key': idempotencyKey
+                },
                 body: JSON.stringify({ userId: parseInt(userId), iban, ownerName, initialBalance: balance, currency })
             });
 
             showAlert(__('account.created'));
+            renewIdempotencyKey('accountKey');
             closeModal();
             loadAccounts();
         } catch (err) {
@@ -710,35 +734,53 @@ function initTransferForm() {
             }
         }
 
-        spinner.classList.remove('d-none');
-        submitBtn.disabled = true;
+        const idempotencyKey = getIdempotencyKey('transferKey');
+        let lastError = null;
 
-        try {
-            const result = await fetchApi('/transfers', {
-                method: 'POST',
-                headers: {
-                    'Idempotency-Key': transferIdempotencyKey
-                },
-                body: JSON.stringify({
-                    senderIban: senderAcc.iban,
-                    receiverIban: receiverIban,
-                    amount: amount,
-                    currency: currency
-                })
-            });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) {
+                showAlert(`Retrying... (${attempt + 1}/3)`, 'warning');
+                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+            }
 
-            showAlert(`${__('transfer.success')} (${__('transfer.amount')}: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
-            form.reset();
-            transferIdempotencyKey = crypto.randomUUID();
-            document.getElementById('sender-balance-indicator').textContent = '';
+            spinner.classList.remove('d-none');
+            submitBtn.disabled = true;
 
-            // Reload accounts in background
-            await loadAccounts();
-        } catch (err) {
-            showAlert(err.message, 'danger');
-        } finally {
-            spinner.classList.add('d-none');
-            submitBtn.disabled = false;
+            try {
+                const result = await fetchApi('/transfers', {
+                    method: 'POST',
+                    headers: {
+                        'Idempotency-Key': idempotencyKey
+                    },
+                    body: JSON.stringify({
+                        senderIban: senderAcc.iban,
+                        receiverIban: receiverIban,
+                        amount: amount,
+                        currency: currency
+                    })
+                });
+
+                showAlert(`${__('transfer.success')} (${__('transfer.amount')}: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
+                form.reset();
+                renewIdempotencyKey('transferKey');
+                document.getElementById('sender-balance-indicator').textContent = '';
+
+                await loadAccounts();
+                lastError = null;
+                break;
+            } catch (err) {
+                lastError = err;
+                if (attempt < 2) {
+                    continue;
+                }
+            } finally {
+                spinner.classList.add('d-none');
+                submitBtn.disabled = false;
+            }
+        }
+
+        if (lastError) {
+            showAlert(lastError.message, 'danger');
         }
     });
 }
@@ -912,15 +954,35 @@ window.cancelTransfer = async function (transferId, accountId) {
         return;
     }
 
-    try {
-        await fetchApi(`/transfers/${transferId}/cancel`, { method: 'POST' });
-        showAlert(__('transfer.cancelled'));
+    const idempotencyKey = getIdempotencyKey('cancelKey_' + transferId);
+    let lastError = null;
 
-        // Reload all data
-        await loadAccounts();
-        loadAccountHistory(accountId);
-    } catch (err) {
-        showAlert(err.message, 'danger');
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+        }
+
+        try {
+            await fetchApi(`/transfers/${transferId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Idempotency-Key': idempotencyKey
+                }
+            });
+            showAlert(__('transfer.cancelled'));
+            clearIdempotencyKey('cancelKey_' + transferId);
+
+            await loadAccounts();
+            loadAccountHistory(accountId);
+            lastError = null;
+            break;
+        } catch (err) {
+            lastError = err;
+        }
+    }
+
+    if (lastError) {
+        showAlert(lastError.message, 'danger');
     }
 };
 
@@ -1089,10 +1151,15 @@ function initAuth() {
         btnRegisterSubmit.disabled = true;
 
         try {
+            const registerKey = getIdempotencyKey('registerKey');
             await fetchApi('/auth/register', {
                 method: 'POST',
+                headers: {
+                    'Idempotency-Key': registerKey
+                },
                 body: JSON.stringify({ username: usernameVal, password: passwordVal })
             });
+            renewIdempotencyKey('registerKey');
 
             showAlert(__('auth.register.success'));
             registerForm.reset();
@@ -1121,6 +1188,9 @@ function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('username');
+    localStorage.removeItem('transferKey');
+    localStorage.removeItem('accountKey');
+    localStorage.removeItem('registerKey');
 
     // Reset all forms
     document.getElementById('login-form').reset();

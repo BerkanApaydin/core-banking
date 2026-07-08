@@ -34,5 +34,4 @@ app:
   transfer:
     cancellation-window-hours: 24
   outbox:
-    use-skip-locked: false
     max-retries: 5

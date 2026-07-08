@@ -41,7 +41,7 @@ The project follows Hexagonal Architecture rules where the domain core remains i
 - **`user`**: User registration, authentication, token blacklisting, and brute-force lockout.
 - **`account`**: Bank account lifecycle, balance mutations, and details.
 - **`transfer`**: Fund transfers, cancellations (24-hour window), and reporting.
-- **`audit`**: Asynchronous transaction logging listening to commit-phase domain events.
+- **`audit`**: Transactional audit logging triggered by commit-phase domain events via `@TransactionalEventListener(AFTER_COMMIT)`.
 
 ```mermaid
 graph TD
@@ -91,12 +91,12 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 
 ## 🔑 Key Features & Design Decisions
 
-- **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Auditing use cases utilize `PROPAGATION_REQUIRES_NEW` to guarantee logging persistence even on parent transaction rollbacks.
-- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table. Each partition is polled independently on its own thread (`ScheduledExecutorService`, configurable `partitionCount`, default: 0). Uses `SELECT ... FOR UPDATE SKIP LOCKED` (via Hibernate `@QueryHint`) to prevent duplicate processing under concurrent polling.
+- **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Audit events are published via `ApplicationEventPublisher` within the transaction boundary and consumed by `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`, ensuring audit logging is only persisted on successful commit.
+- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table. Each partition is polled independently on its own thread (`ScheduledExecutorService`, configurable `partitionCount`, default: 0). Uses `SELECT ... FOR UPDATE SKIP LOCKED` (via Hibernate `@QueryHint`) to prevent duplicate processing under concurrent polling. Outbox event handlers use idempotency-based deduplication (`IdempotencyPort.tryCreate`) to guarantee at-most-once processing of each outbox event across restarts and retries.
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
 - **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
 - **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules are strictly decoupled at compile-time. Inter-context communication is mediated by the `AccountAclPort` contract (placed in `common`) and implemented via `AccountAclAdapter` (in `account`), protecting the transfer domain from database or structure changes inside the account module.
-- **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key (`username_idempotencyKey`) stored in the `idempotency_keys` table.
+- **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key stored in the `idempotency_keys` table. Authenticated endpoints use a `username_idempotencyKey` key; public endpoints (e.g., `/auth/register`) use a `clientIp_idempotencyKey` key via `ClientIpResolver`, configured with `@Idempotent(publicEndpoint = true)`.
 - **Dynamic Security Backends:** Abstracts Rate Limiting (sliding window via Lua script), Token Blacklisting, and Brute-Force lockout, supporting both Redis (production) and Caffeine (local dev).
 
 ---

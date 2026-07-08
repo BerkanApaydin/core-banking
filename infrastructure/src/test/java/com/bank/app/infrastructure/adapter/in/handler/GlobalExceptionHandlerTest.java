@@ -150,11 +150,13 @@ class GlobalExceptionHandlerTest {
         assertEquals("Bad credentials", response.getBody().getProperties().get("message"));
     }
 
+    @SuppressWarnings("serial")
     private static final class TestRateLimitException extends BusinessException {
         TestRateLimitException() { super("error.rate_limit", new Object[]{}, "Rate limit"); }
         @Override public int getHttpStatusCode() { return 429; }
     }
 
+    @SuppressWarnings("serial")
     private static final class TestDuplicateException extends BusinessException {
         TestDuplicateException() { super("error.duplicate", new Object[]{}, "Duplicate"); }
         @Override public int getHttpStatusCode() { return 409; }

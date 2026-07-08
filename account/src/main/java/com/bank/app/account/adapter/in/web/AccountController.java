@@ -9,6 +9,7 @@ import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +45,8 @@ public class AccountController {
     }
 
     @PostMapping
-    @Operation(summary = "Creates a new account", description = "Opens a new account with the given information and verified IBAN.")
+    @Idempotent
+    @Operation(summary = "Creates a new account", description = "Opens a new account with the given information and verified IBAN. Duplicate requests can be prevented with the Idempotency-Key header.")
     public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountWebRequest webRequest) {
         CreateAccountRequest request = new CreateAccountRequest(
                 webRequest.userId(), webRequest.iban(), webRequest.ownerName(),

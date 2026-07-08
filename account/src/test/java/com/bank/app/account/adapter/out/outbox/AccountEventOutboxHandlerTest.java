@@ -5,6 +5,7 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountCreditedEvent;
 import com.bank.app.account.domain.AccountDebitedEvent;
 import com.bank.app.account.domain.AccountSuspendedEvent;
+import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -38,6 +39,9 @@ class AccountEventOutboxHandlerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private IdempotencyPort idempotencyPort;
+
     private ObjectMapper objectMapper;
     private AccountEventOutboxHandler handler;
 
@@ -50,7 +54,7 @@ class AccountEventOutboxHandlerTest {
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         objectMapper.findAndRegisterModules();
-        handler = new AccountEventOutboxHandler(objectMapper, eventPublisher);
+        handler = new AccountEventOutboxHandler(objectMapper, eventPublisher, idempotencyPort);
     }
 
     @Nested
@@ -80,6 +84,13 @@ class AccountEventOutboxHandlerTest {
     @DisplayName("handle")
     class Handle {
 
+        private void mockDedupSuccess(String eventId) {
+            when(idempotencyPort.tryCreate(
+                    eq("outbox_handler_AccountEventOutboxHandler_" + eventId),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+        }
+
         @Test
         @DisplayName("should publish AccountCreatedEvent on success")
         void shouldPublishAccountCreatedEvent() throws Exception {
@@ -89,6 +100,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "Account",
                     "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-1");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -106,6 +118,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-2", "Account",
                     "1", "AccountDebitedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-2");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -123,6 +136,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-3", "Account",
                     "2", "AccountCreditedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-3");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -140,6 +154,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-4", "Account",
                     "3", "AccountSuspendedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-4");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -157,6 +172,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-5", "Account",
                     "4", "AccountClosedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-5");
             handler.handle(event);
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -182,6 +198,7 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-7", "Account",
                     "1", "AccountCreatedEvent", "{invalid json}", 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-7");
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("AccountEventOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
@@ -193,8 +210,47 @@ class AccountEventOutboxHandlerTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-8", "Account",
                     "1", "AccountCreatedEvent", null, 0, false, false, null, 0, LocalDateTime.now());
 
-            assertThrows(RuntimeException.class, () -> handler.handle(event));
+            mockDedupSuccess("evt-8");
+            RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
+            assertTrue(ex.getMessage().contains("AccountEventOutboxHandler failed"));
             verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("should skip duplicate event when idempotency key already exists")
+        void shouldSkipDuplicateEvent() throws Exception {
+            AccountCreatedEvent domainEvent = new AccountCreatedEvent(
+                    1L, new UserId(100L), new Iban("TR290006200000000000000111"), "TEST",
+                    Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
+            String json = objectMapper.writeValueAsString(domainEvent);
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-9", "Account",
+                    "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_AccountEventOutboxHandler_evt-9"), any(LocalDateTime.class)))
+                    .thenReturn(false);
+
+            handler.handle(event);
+
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("should process event when idempotency key is created successfully")
+        void shouldProcessWhenIdempotencyKeyCreated() throws Exception {
+            AccountCreatedEvent domainEvent = new AccountCreatedEvent(
+                    1L, new UserId(100L), new Iban("TR290006200000000000000111"), "TEST",
+                    Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
+            String json = objectMapper.writeValueAsString(domainEvent);
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-10", "Account",
+                    "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_AccountEventOutboxHandler_evt-10"), any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            handler.handle(event);
+
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertInstanceOf(AccountCreatedEvent.class, eventCaptor.getValue());
         }
     }
 }
