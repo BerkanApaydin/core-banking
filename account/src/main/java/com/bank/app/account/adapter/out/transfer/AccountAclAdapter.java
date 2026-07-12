@@ -4,10 +4,11 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
-import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -22,11 +23,14 @@ public class AccountAclAdapter implements AccountAclPort {
 
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
+    private final ClockProviderPort clockProvider;
 
     public AccountAclAdapter(LoadAccountPort loadAccountPort,
-            SaveAccountPort saveAccountPort) {
+            SaveAccountPort saveAccountPort,
+            ClockProviderPort clockProvider) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
+        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -58,8 +62,8 @@ public class AccountAclAdapter implements AccountAclPort {
         OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId, loadAccountPort);
         Account sender = resolveSender(pair, senderId, receiverId);
         Account receiver = resolveReceiver(pair, senderId, receiverId);
-        sender.debit(amount);
-        receiver.credit(amount);
+        sender.debit(amount, clockProvider.clock());
+        receiver.credit(amount, clockProvider.clock());
         saveAccounts(sender, receiver, saveAccountPort);
         return collectEvents(sender, receiver);
     }
@@ -70,8 +74,8 @@ public class AccountAclAdapter implements AccountAclPort {
         OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId, loadAccountPort);
         Account sender = resolveSender(pair, senderId, receiverId);
         Account receiver = resolveReceiver(pair, senderId, receiverId);
-        sender.credit(amount);
-        receiver.debit(amount);
+        sender.credit(amount, clockProvider.clock());
+        receiver.debit(amount, clockProvider.clock());
         saveAccounts(sender, receiver, saveAccountPort);
         return collectEvents(sender, receiver);
     }

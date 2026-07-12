@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.persistence;
 
+import com.bank.app.common.adapter.out.persistence.AuditableJpaEntity;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;

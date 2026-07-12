@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
-import com.bank.app.infrastructure.adapter.out.security.CustomUserDetails;
+import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import com.bank.app.common.application.port.out.JwtPort;
 import com.bank.app.common.application.port.out.TokenBlacklistPort;
 import jakarta.servlet.FilterChain;

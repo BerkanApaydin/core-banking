@@ -7,6 +7,7 @@ import com.bank.app.common.application.port.out.SecurityContextPort;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.stereotype.Component;
 
+import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import java.util.Optional;
 
 @Component

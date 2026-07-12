@@ -37,7 +37,7 @@ class TransferTest {
         @Test
         @DisplayName("should create transfer with PENDING status")
         void shouldCreateWithPendingStatus() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.PENDING);
             assertThat(transfer.getCreatedAt()).isNotNull();
             assertThat(transfer.getId()).isNull();
@@ -66,7 +66,7 @@ class TransferTest {
         @Test
         @DisplayName("should create transfer with null version by default")
         void shouldCreateWithNullVersion() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             assertThat(transfer.getVersion()).isNull();
         }
 
@@ -105,7 +105,7 @@ class TransferTest {
         @DisplayName("should complete a PENDING transfer")
         void shouldCompletePending() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
-            transfer.complete();
+            transfer.complete(Clock.systemDefaultZone());
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
         }
 
@@ -130,7 +130,7 @@ class TransferTest {
         @DisplayName("should throw when completing already COMPLETED transfer")
         void shouldThrowOnAlreadyCompleted() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
-            assertThatThrownBy(transfer::complete)
+            assertThatThrownBy(() -> transfer.complete(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
         }
@@ -139,7 +139,7 @@ class TransferTest {
         @DisplayName("should throw when completing FAILED transfer")
         void shouldThrowOnFailedStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
-            assertThatThrownBy(transfer::complete)
+            assertThatThrownBy(() -> transfer.complete(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
         }
@@ -148,7 +148,7 @@ class TransferTest {
         @DisplayName("should throw when completing CANCELLED transfer")
         void shouldThrowOnCancelledStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
-            assertThatThrownBy(transfer::complete)
+            assertThatThrownBy(() -> transfer.complete(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
         }
@@ -157,8 +157,8 @@ class TransferTest {
         @DisplayName("should complete only once")
         void shouldCompleteOnlyOnce() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
-            transfer.complete();
-            assertThatThrownBy(transfer::complete)
+            transfer.complete(Clock.systemDefaultZone());
+            assertThatThrownBy(() -> transfer.complete(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class);
         }
     }
@@ -247,7 +247,7 @@ class TransferTest {
         @Test
         @DisplayName("should throw when status is PENDING")
         void shouldThrowOnPendingStatus() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("still pending");
@@ -287,7 +287,7 @@ class TransferTest {
         @DisplayName("should mark PENDING transfer as FAILED")
         void shouldMarkFailedFromPending() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
-            transfer.markFailed();
+            transfer.markFailed(Clock.systemDefaultZone());
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
         }
 
@@ -303,7 +303,7 @@ class TransferTest {
         @DisplayName("should throw when marking already COMPLETED transfer as failed")
         void shouldThrowOnAlreadyCompleted() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
-            assertThatThrownBy(transfer::markFailed)
+            assertThatThrownBy(() -> transfer.markFailed(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
         }
@@ -312,7 +312,7 @@ class TransferTest {
         @DisplayName("should throw when marking already CANCELLED transfer as failed")
         void shouldThrowOnCancelledStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
-            assertThatThrownBy(transfer::markFailed)
+            assertThatThrownBy(() -> transfer.markFailed(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
         }
@@ -321,7 +321,7 @@ class TransferTest {
         @DisplayName("should throw when marking already FAILED transfer as failed")
         void shouldThrowOnAlreadyFailed() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
-            assertThatThrownBy(transfer::markFailed)
+            assertThatThrownBy(() -> transfer.markFailed(Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
         }
@@ -363,8 +363,8 @@ class TransferTest {
         @Test
         @DisplayName("equals should return false when both IDs are null")
         void notEqualsWhenBothNullIds() {
-            Transfer t1 = Transfer.create(1L, 2L, AMOUNT);
-            Transfer t2 = Transfer.create(1L, 2L, AMOUNT);
+            Transfer t1 = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
+            Transfer t2 = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             assertThat(t1).isNotEqualTo(t2);
         }
 
@@ -386,7 +386,7 @@ class TransferTest {
         @Test
         @DisplayName("equals should return false when this.id is null and other.id is not null")
         void notEqualsWhenThisIdIsNull() {
-            Transfer t1 = Transfer.create(1L, 2L, AMOUNT);
+            Transfer t1 = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             Transfer t2 = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
             assertThat(t1).isNotEqualTo(t2);
         }
@@ -394,7 +394,7 @@ class TransferTest {
         @Test
         @DisplayName("hashCode should return 0 when id is null")
         void hashCodeWithNullId() {
-            Transfer transfer = Transfer.create(1L, 2L, AMOUNT);
+            Transfer transfer = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
             assertThat(transfer.hashCode()).isZero();
         }
     }

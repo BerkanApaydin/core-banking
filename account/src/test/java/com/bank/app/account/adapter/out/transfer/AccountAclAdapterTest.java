@@ -4,11 +4,12 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.event.DomainEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -40,6 +42,9 @@ class AccountAclAdapterTest {
     @Captor
     private ArgumentCaptor<Account> accountCaptor;
 
+    @Mock
+    private ClockProviderPort clockProvider;
+
     private AccountAclAdapter adapter;
     private Account senderAccount;
     private Account receiverAccount;
@@ -49,7 +54,8 @@ class AccountAclAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort);
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
+        adapter = new AccountAclAdapter(loadAccountPort, saveAccountPort, clockProvider);
         senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
                 "Sender", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         receiverAccount = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),
@@ -99,7 +105,7 @@ class AccountAclAdapterTest {
         @Test
         void shouldReturnMapOfIdsToIbans() {
             when(loadAccountPort.findByIds(Set.of(1L, 2L)))
-                    .thenReturn(java.util.List.of(senderAccount, receiverAccount));
+                    .thenReturn(List.of(senderAccount, receiverAccount));
 
             var result = adapter.getIbansForAccounts(Set.of(1L, 2L));
 

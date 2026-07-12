@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.service;
 
-import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
 

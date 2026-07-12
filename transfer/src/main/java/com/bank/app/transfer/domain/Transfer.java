@@ -11,7 +11,6 @@ import java.util.Objects;
 
 public class Transfer extends BaseAggregateRoot {
 
-    private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
     private final Long id;
     private final Long senderAccountId;
     private final Long receiverAccountId;
@@ -34,20 +33,12 @@ public class Transfer extends BaseAggregateRoot {
         this.version = version;
     }
 
-    public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount) {
-        return create(senderAccountId, receiverAccountId, amount, DEFAULT_CLOCK);
-    }
-
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Transfer amount must not be null");
         if (amount.isZero()) {
             throw new IllegalArgumentException("Transfer amount must not be zero");
         }
         return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
-    }
-
-    public void complete() {
-        complete(DEFAULT_CLOCK);
     }
 
     public void complete(Clock clock) {
@@ -103,10 +94,6 @@ public class Transfer extends BaseAggregateRoot {
     public String toString() {
         return "Transfer{id=" + id + ", sender=" + senderAccountId + ", receiver=" + receiverAccountId
                 + ", amount=" + amount + ", status=" + status + "}";
-    }
-
-    public void markFailed() {
-        markFailed(DEFAULT_CLOCK);
     }
 
     public void markFailed(Clock clock) {

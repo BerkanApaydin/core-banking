@@ -19,7 +19,7 @@ public class Account extends BaseAggregateRoot {
     private Money balance;
     private AccountStatus status;
     private final Long version;
-    private static final Clock DEFAULT_CLOCK = Clock.systemDefaultZone();
+
 
     public Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status) {
         this(id, userId, iban, ownerName, balance, status, null);
@@ -95,10 +95,6 @@ public class Account extends BaseAggregateRoot {
         return status == AccountStatus.ACTIVE;
     }
 
-    public void debit(Money amount) {
-        debit(amount, DEFAULT_CLOCK);
-    }
-
     public void debit(Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Debit amount must not be null");
         if (amount.isZero()) {
@@ -119,10 +115,6 @@ public class Account extends BaseAggregateRoot {
         registerEvent(new AccountDebitedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
     }
 
-    public void credit(Money amount) {
-        credit(amount, DEFAULT_CLOCK);
-    }
-
     public void credit(Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Credit amount must not be null");
         if (amount.isZero()) {
@@ -135,10 +127,6 @@ public class Account extends BaseAggregateRoot {
         registerEvent(new AccountCreditedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
     }
 
-    public void suspend() {
-        suspend(DEFAULT_CLOCK);
-    }
-
     public void suspend(Clock clock) {
         if (this.status == AccountStatus.CLOSED) {
             throw new AccountClosedException(this.iban.value());
@@ -148,10 +136,6 @@ public class Account extends BaseAggregateRoot {
         }
         this.status = AccountStatus.SUSPENDED;
         registerEvent(new AccountSuspendedEvent(this.id, LocalDateTime.now(clock)));
-    }
-
-    public void close() {
-        close(DEFAULT_CLOCK);
     }
 
     public void close(Clock clock) {

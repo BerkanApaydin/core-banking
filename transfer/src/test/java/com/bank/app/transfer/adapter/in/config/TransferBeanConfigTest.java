@@ -4,7 +4,7 @@ import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
-import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
@@ -45,7 +45,7 @@ class TransferBeanConfigTest {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         assertNotNull(config.placeTransferUseCase(accountAclPort, saveTransferPort,
-                config.transferDomainService(), authService, domainEventPublisherService));
+                config.transferDomainService(), authService, domainEventPublisherService, clockProvider));
     }
 
     @Test

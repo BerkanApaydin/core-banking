@@ -63,7 +63,7 @@ public class IdempotencyGuard {
 
     public record IdempotencyResult(Status status, String responseBody, Integer responseStatus) {
         public IdempotencyResult {
-            java.util.Objects.requireNonNull(status);
+            Objects.requireNonNull(status);
         }
 
         public enum Status { NEW, PENDING, COMPLETED }

@@ -4,13 +4,14 @@ import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
-import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
@@ -29,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +56,9 @@ class PlaceTransferUseCaseImplTest {
     @Mock
     private DomainEventPublisherService domainEventPublisherService;
 
+    @Mock
+    private ClockProviderPort clockProvider;
+
     private TransferDomainService transferDomainService;
 
     private PlaceTransferUseCase placeTransferUseCase;
@@ -71,12 +76,13 @@ class PlaceTransferUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
         transferDomainService = new TransferDomainService();
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
                 accountAclPort, saveTransferPort,
-                transferDomainService, transferAuthorizationService, domainEventPublisherService);
+                transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider);
     }
 
     private AccountInfo senderInfo() {

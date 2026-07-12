@@ -7,6 +7,8 @@ import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import java.time.Clock;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,8 +28,7 @@ class TransferDomainServiceTest {
             TransferParticipants participants = new TransferParticipants(
                 1L, "TR290006200000000000000111", Currency.TRY,
                 2L, "TR290006200000000000000222", Currency.TRY);
-            Transfer transfer = transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("300.00", Currency.TRY));
+            Transfer transfer = transferDomainService.validateAndCreateTransfer(participants, Money.of("300.00", Currency.TRY), Clock.systemDefaultZone());
 
             assertThat(transfer).isNotNull();
             assertThat(transfer.getSenderAccountId()).isEqualTo(1L);
@@ -47,8 +48,7 @@ class TransferDomainServiceTest {
                 1L, "TR1", Currency.TRY,
                 1L, "TR2", Currency.TRY);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("100.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
                     .hasMessage("Cannot transfer to the same account: TR1");
         }
@@ -60,8 +60,7 @@ class TransferDomainServiceTest {
                 1L, "tr123", Currency.TRY,
                 2L, "TR123", Currency.TRY);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("100.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
                     .hasMessage("Cannot transfer to the same account: tr123");
         }
@@ -73,7 +72,7 @@ class TransferDomainServiceTest {
                 1L, "TR1", Currency.TRY,
                 2L, "TR2", Currency.TRY);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, null))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, null, Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Transfer amount must not be null");
         }
@@ -81,7 +80,7 @@ class TransferDomainServiceTest {
         @Test
         @DisplayName("should throw NullPointerException when participants is null")
         void shouldThrowNullPointerExceptionWhenParticipantsIsNull() {
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(null, Money.of("100.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(null, Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Transfer participants must not be null");
         }
@@ -93,8 +92,7 @@ class TransferDomainServiceTest {
                 1L, "TR1", Currency.USD,
                 2L, "TR2", Currency.TRY);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("100.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isInstanceOf(CurrencyMismatchException.class)
                     .hasMessage("Sender account currency (USD) does not match transfer amount currency (TRY).");
         }
@@ -106,8 +104,7 @@ class TransferDomainServiceTest {
                 1L, "TR1", Currency.TRY,
                 2L, "TR2", Currency.USD);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("100.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isInstanceOf(CurrencyMismatchException.class)
                     .hasMessage("Receiver account currency (USD) does not match transfer amount currency (TRY).");
         }
@@ -159,8 +156,7 @@ class TransferDomainServiceTest {
                 1L, "TR1", Currency.TRY,
                 2L, "TR2", Currency.TRY);
 
-            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(
-                    participants, Money.of("0.00", Currency.TRY)))
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("0.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Transfer amount must not be zero");
         }

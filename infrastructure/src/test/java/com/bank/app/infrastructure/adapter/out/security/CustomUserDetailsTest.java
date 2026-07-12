@@ -1,4 +1,5 @@
 package com.bank.app.infrastructure.adapter.out.security;
+import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 

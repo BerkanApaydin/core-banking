@@ -13,7 +13,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import com.bank.app.infrastructure.adapter.out.security.CustomUserDetails;
+import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import java.util.Collections;
 import java.util.Optional;
 

@@ -9,7 +9,7 @@ import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
-import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
@@ -47,8 +47,9 @@ public class TransferBeanConfig {
                                                        SaveTransferPort saveTransferPort,
                                                        TransferDomainService transferDomainService,
                                                        TransferAuthorizationService transferAuthorizationService,
-                                                       DomainEventPublisherService domainEventPublisherService) {
-        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, transferDomainService, transferAuthorizationService, domainEventPublisherService);
+                                                       DomainEventPublisherService domainEventPublisherService,
+                                                       ClockProviderPort clockProvider) {
+        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider);
     }
 
     @Bean

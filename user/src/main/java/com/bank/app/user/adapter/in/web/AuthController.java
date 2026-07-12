@@ -2,7 +2,7 @@ package com.bank.app.user.adapter.in.web;
 
 import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
@@ -29,12 +29,12 @@ public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUserUseCase loginUserUseCase;
-    private final ClientIpResolver clientIpResolver;
+    private final ClientIpResolverPort clientIpResolver;
     private final LogoutUseCase logoutUseCase;
 
     public AuthController(RegisterUserUseCase registerUserUseCase,
                           LoginUserUseCase loginUserUseCase,
-                          ClientIpResolver clientIpResolver,
+                          ClientIpResolverPort clientIpResolver,
                           LogoutUseCase logoutUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;

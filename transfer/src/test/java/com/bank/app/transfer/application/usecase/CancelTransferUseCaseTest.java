@@ -10,8 +10,8 @@ import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
-import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
@@ -134,7 +134,7 @@ class CancelTransferUseCaseTest {
     void shouldThrowWhenTransferNotCompleted() {
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
-        Transfer transfer = Transfer.create(10L, 20L, amount);
+        Transfer transfer = Transfer.create(10L, 20L, amount, Clock.systemDefaultZone());
 
         when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))

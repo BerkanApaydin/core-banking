@@ -5,6 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
@@ -108,12 +115,12 @@ class JwtTokenProviderTest {
     @Test
     void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
         JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L);
-        javax.crypto.SecretKey key = io.jsonwebtoken.security.Keys.hmacShaKeyFor(
-                io.jsonwebtoken.io.Decoders.BASE64.decode(SECRET));
-        String token = io.jsonwebtoken.Jwts.builder()
+        SecretKey key = Keys.hmacShaKeyFor(
+                Decoders.BASE64.decode(SECRET));
+        String token = Jwts.builder()
                 .subject("testUser")
-                .issuedAt(new java.util.Date())
-                .expiration(new java.util.Date(System.currentTimeMillis() + 86400000L))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 86400000L))
                 .signWith(key)
                 .compact();
         assertNull(provider.extractUserId(token));

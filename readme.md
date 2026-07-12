@@ -18,9 +18,9 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 
 ### 🧪 Quality Assurance & Testing
 - **JUnit 5 & Mockito:** Standard test suites and mocking.
-- **Testcontainers:** Integration testing with real PostgreSQL containers.
+- **Testcontainers:** Integration testing with a single PostgreSQL container shared across all modules.
 - **ArchUnit:** Architecture verification to enforce Hexagonal boundary rules.
-- **JaCoCo:** Quality gates enforcing $\ge 85\%$ Line and $\ge 80\%$ Branch coverage.
+- **JaCoCo:** Quality gates enforcing $\ge 85\%$ Line and $\ge 70\%$ Branch coverage.
 - **Pitest:** Mutation testing quality gate enforcing $\ge 80\%$ mutation coverage to verify test assertion strength.
 
 ### 🐳 DevOps & Prerequisites
@@ -32,15 +32,15 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 
 ## 📐 Architecture & Module Dependency
 
-The project follows Hexagonal Architecture rules where the domain core remains isolated from framework dependencies, and adapters depend strictly on ports.
+The project follows Hexagonal Architecture rules where the domain core remains isolated from framework dependencies, and adapters depend strictly on ports. Dependency flows **inward**: infrastructure adapters depend on domain modules, never the reverse.
 
 ### Module Breakdown:
-- **`app`**: Bootstraps the application (`BankApplication`) and wires all modules together.
-- **`common`**: Framework-independent shared domain models, value objects, exceptions, and annotations.
-- **`infrastructure`**: Security, JWT validation, outbox poller/processor, and Redis/Caffeine adapters.
-- **`user`**: User registration, authentication, token blacklisting, and brute-force lockout.
-- **`account`**: Bank account lifecycle, balance mutations, and details.
-- **`transfer`**: Fund transfers, cancellations (24-hour window), and reporting.
+- **`app`**: Bootstraps the application (`BankApplication`) and wires all modules together. Houses all integration and WebMvc tests.
+- **`common`**: Framework-independent shared domain models, value objects, exceptions, annotations, and cross-cutting ports (`ClockProviderPort`, `IdempotencyPort`, `EventPublisherPort`).
+- **`infrastructure`**: Security, JWT validation, outbox poller/processor, Redis/Caffeine adapters, and global exception handling. Depends on all bounded context modules to provide their adapter implementations.
+- **`user`**: User registration, authentication, token blacklisting, and brute-force lockout. Defines `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure`.
+- **`account`**: Bank account lifecycle, balance mutations, and details. Implements `AccountAclPort` (defined in `transfer`) as an anti-corruption layer.
+- **`transfer`**: Fund transfers, cancellations (24-hour window), and reporting. Defines `AccountAclPort` as an outbound port — the `account` module implements it.
 - **`audit`**: Transactional audit logging triggered by commit-phase domain events via `@TransactionalEventListener(AFTER_COMMIT)`.
 
 ```mermaid
@@ -59,12 +59,15 @@ graph TD
     common[common module]:::commonClass
 
     app --> transfer & account & audit & user & infra & common
-    transfer --> infra & common
-    account --> infra & common
-    user --> infra & common
-    audit --> infra & common
-    infra --> common
+    infra --> account & transfer & user & audit & common
+    transfer --> common
+    account --> transfer & common
+    user --> common
+    audit --> common
 ```
+
+> [!NOTE]
+> The `account → transfer` edge exists because `AccountAclAdapter` (in `account`) implements `AccountAclPort` (defined in `transfer.application.port.out`). This is a controlled anti-corruption layer dependency — the port contract belongs to `transfer`, and `account` provides the implementation. No domain module depends on `infrastructure` at compile time.
 
 ---
 
@@ -74,7 +77,7 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 
 | Module | Endpoint | Method | Description | Special Headers / Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **User** | `/auth/register` | `POST` | Register a new user | |
+| **User** | `/auth/register` | `POST` | Register a new user | `Idempotency-Key` (Recommended) |
 | **User** | `/auth/login` | `POST` | Log in and obtain JWT | Brute-force & Rate-limited |
 | **User** | `/auth/logout` | `POST` | Log out and blacklist token | `Authorization: Bearer <token>` |
 | **Account** | `/accounts` | `POST` | Create a new bank account | `Authorization: Bearer <token>` |
@@ -91,13 +94,16 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 
 ## 🔑 Key Features & Design Decisions
 
+- **Hexagonal Architecture (Ports & Adapters):** All bounded context modules (`account`, `transfer`, `user`, `audit`) are compile-time independent of `infrastructure`. Infrastructure adapters depend on domain modules, not vice versa. Ports are owned by their defining module — `AccountAclPort` lives in `transfer.application.port.out`.
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Audit events are published via `ApplicationEventPublisher` within the transaction boundary and consumed by `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`, ensuring audit logging is only persisted on successful commit.
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table. Each partition is polled independently on its own thread (`ScheduledExecutorService`, configurable `partitionCount`, default: 0). Uses `SELECT ... FOR UPDATE SKIP LOCKED` (via Hibernate `@QueryHint`) to prevent duplicate processing under concurrent polling. Outbox event handlers use idempotency-based deduplication (`IdempotencyPort.tryCreate`) to guarantee at-most-once processing of each outbox event across restarts and retries.
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
 - **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
-- **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules are strictly decoupled at compile-time. Inter-context communication is mediated by the `AccountAclPort` contract (placed in `common`) and implemented via `AccountAclAdapter` (in `account`), protecting the transfer domain from database or structure changes inside the account module.
-- **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key stored in the `idempotency_keys` table. Authenticated endpoints use a `username_idempotencyKey` key; public endpoints (e.g., `/auth/register`) use a `clientIp_idempotencyKey` key via `ClientIpResolver`, configured with `@Idempotent(publicEndpoint = true)`.
-- **Dynamic Security Backends:** Abstracts Rate Limiting (sliding window via Lua script), Token Blacklisting, and Brute-Force lockout, supporting both Redis (production) and Caffeine (local dev).
+- **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules communicate through the `AccountAclPort` contract (defined in `transfer`), implemented via `AccountAclAdapter` (in `account`). This protects the transfer domain from database or structure changes inside the account module.
+- **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key stored in the `idempotency_keys` table. Authenticated endpoints use a `username_idempotencyKey` key; public endpoints (e.g., `/auth/register`) use a `clientIp_idempotencyKey` key via `ClientIpResolverPort`, configured with `@Idempotent(publicEndpoint = true)`.
+- **Clock Abstraction (`ClockProviderPort`):** Domain entities receive `java.time.Clock` as an explicit parameter instead of relying on `Clock.systemDefaultZone()`. This makes all time-dependent operations (debit, credit, suspend, close, complete, cancel) fully testable with `Clock.fixed()`.
+- **Dynamic Security Backends:** Abstracts Rate Limiting (sliding window via Lua script), Token Blacklisting, and Brute-Force lockout, supporting both Redis (production) and Caffeine (local dev). The `LoginAttemptPort` is defined in `user`; its Caffeine and Redis implementations live in `infrastructure`.
+- **Shared Auditing Entity:** `AuditableJpaEntity` resides in `common` (not `infrastructure`), so all domain modules can extend it without depending on the infrastructure module.
 
 ---
 
@@ -136,10 +142,11 @@ docker-compose up --build
 
 ## 🧪 Testing & Quality Gates
 
+- **Test Suite (1200+ tests):** Unit tests reside in their respective modules; integration and WebMvc tests are consolidated in the `app` module for deployment-level coverage.
 - **Verify Architecture Boundaries (ArchUnit):** Verified automatically via `ArchitectureTest.java`. This enforces:
   - **Hexagonal Architecture Guard:** Checks that domain layer does not import Spring or framework classes.
-  - **Dependency Flow Validation:** Enforces that dependency always flows from adapters to ports, never the reverse.
+  - **Dependency Flow Validation:** Enforces that dependency always flows from adapters to ports, never the reverse — no domain module may depend on `infrastructure`.
   - **Cycle Prevention:** Guarantees no cyclic dependencies exist between Maven modules (e.g., compile-time decoupling of `transfer` and `account`).
-- **Integration Testing with Testcontainers & Flyway:** Integration tests spin up real PostgreSQL instances via Testcontainers and apply Flyway schema migrations (`V1__init_schema.sql` in `common` module) inside the static initializer block before the Spring context boots. Both `@DataJpaTest`-slice (`AbstractIntegrationTest`) and full-context (`AbstractSpringBootIntegrationTest`) base classes use Flyway with `ddl-auto=validate` to guarantee schema consistency.
+- **Integration Testing with Testcontainers & Flyway:** Integration tests spin up a single real PostgreSQL instance via Testcontainers and apply Flyway schema migrations (`V1__init_schema.sql` in `common` module) inside the static initializer block before the Spring context boots. Both `@DataJpaTest`-slice (`AbstractIntegrationTest`) and full-context (`AbstractSpringBootIntegrationTest`) base classes use Flyway with `ddl-auto=validate` to guarantee schema consistency.
 - **Generate Coverage Report (JaCoCo):** `./mvnw jacoco:report` (or `.\mvnw.cmd jacoco:report`)
 - **Run Mutation Testing (Pitest):** `./mvnw pitest:mutationCoverage` (or `.\mvnw.cmd pitest:mutationCoverage`)

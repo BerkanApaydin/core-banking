@@ -11,6 +11,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import java.util.concurrent.TimeUnit;
+
 import static org.mockito.Mockito.*;
 
 @DisplayName("RedisTokenBlacklistAdapter")
@@ -41,7 +43,7 @@ class RedisTokenBlacklistAdapterTest {
 
             adapter.blacklist("token-1", 60000L);
 
-            verify(valueOperations).set("token_blacklist:token-1", "blacklisted", 60000L, java.util.concurrent.TimeUnit.MILLISECONDS);
+            verify(valueOperations).set("token_blacklist:token-1", "blacklisted", 60000L, TimeUnit.MILLISECONDS);
         }
     }
 

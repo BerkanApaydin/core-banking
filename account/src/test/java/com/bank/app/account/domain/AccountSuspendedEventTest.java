@@ -8,25 +8,26 @@ import static org.junit.jupiter.api.Assertions.*;
 @SuppressWarnings("null")
 class AccountSuspendedEventTest {
 
+    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2026, 6, 15, 10, 30);
+
     @Test
     void shouldCreateEventWithAllFields() {
-        LocalDateTime now = LocalDateTime.now();
-        AccountSuspendedEvent event = new AccountSuspendedEvent(1L, now);
+        AccountSuspendedEvent event = new AccountSuspendedEvent(1L, FIXED_TIME);
 
         assertEquals(1L, event.accountId());
-        assertEquals(now, event.occurredAt());
+        assertEquals(FIXED_TIME, event.occurredAt());
     }
 
     @Test
     void shouldImplementDomainEvent() {
-        AccountSuspendedEvent event = new AccountSuspendedEvent(1L, LocalDateTime.now());
+        AccountSuspendedEvent event = new AccountSuspendedEvent(1L, FIXED_TIME);
         assertInstanceOf(DomainEvent.class, event);
     }
 
     @Test
     void shouldRejectNullAccountId() {
         assertThrows(NullPointerException.class,
-                () -> new AccountSuspendedEvent(null, LocalDateTime.now()));
+                () -> new AccountSuspendedEvent(null, FIXED_TIME));
     }
 
     @Test

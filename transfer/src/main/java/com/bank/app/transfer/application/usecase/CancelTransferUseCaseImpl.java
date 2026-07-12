@@ -8,7 +8,7 @@ import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
-import com.bank.app.common.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;

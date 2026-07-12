@@ -4,7 +4,7 @@ import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.infrastructure.adapter.out.security.CustomUserDetails;
+import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;

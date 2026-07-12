@@ -3,11 +3,12 @@ package com.bank.app.transfer.domain;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferCurrencyMismatchException;
+import java.time.Clock;
 import java.util.Objects;
 
 public final class TransferDomainService {
 
-    public Transfer validateAndCreateTransfer(TransferParticipants participants, Money amount) {
+    public Transfer validateAndCreateTransfer(TransferParticipants participants, Money amount, Clock clock) {
         Objects.requireNonNull(participants, "Transfer participants must not be null");
         Objects.requireNonNull(amount, "Transfer amount must not be null");
 
@@ -28,6 +29,6 @@ public final class TransferDomainService {
                             ") does not match transfer amount currency (" + amount.currency() + ").");
         }
 
-        return Transfer.create(participants.senderId(), participants.receiverId(), amount);
+        return Transfer.create(participants.senderId(), participants.receiverId(), amount, clock);
     }
 }

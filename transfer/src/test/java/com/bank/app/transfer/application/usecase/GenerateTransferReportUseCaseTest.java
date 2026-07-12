@@ -1,8 +1,8 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
-import com.bank.app.common.application.port.out.AccountAclPort;
-import com.bank.app.common.application.port.out.AccountAclPort.AccountInfo;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
