@@ -90,7 +90,7 @@ graph TB
 | :--- | :--- |
 | `transfer` → `account` **forbidden** | Transfer must never touch the account module at compile time — `account-api` only |
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes |
-| No-FK (V19) | `accounts.user_id`, `transfers.*_account_id` are not FKs; integrity lives in the application layer + `OrphanIntegrityReporter` |
+| No-FK (V19/V22) | `accounts.user_id`, `transfers.*_account_id` are not FKs (V3 leftovers dropped in V22); integrity lives in the application layer + `OrphanIntegrityReporter` |
 
 > The full dependency matrix is enforced at build time by `ArchitectureTest.java`; the above are the only three rules you need to know.
 

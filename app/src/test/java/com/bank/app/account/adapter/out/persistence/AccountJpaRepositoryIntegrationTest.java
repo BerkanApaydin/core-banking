@@ -28,6 +28,10 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Delete child-first: transfers reference accounts (and the FK graph
+        // may exist on databases migrated before V22 dropped the constraints),
+        // so cleanup order must never depend on test execution order.
+        entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
 
