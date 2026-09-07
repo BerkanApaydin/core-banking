@@ -80,6 +80,20 @@ public class GlobalExceptionHandler {
         return ProblemDetailFactory.createValidationError(errors, request);
     }
 
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ProblemDetail> handleConstraintViolationException(
+            jakarta.validation.ConstraintViolationException ex, WebRequest request) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations()
+                .forEach(violation -> {
+                    String path = violation.getPropertyPath() != null
+                            ? violation.getPropertyPath().toString() : "parameter";
+                    String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+                    errors.put(field, violation.getMessage());
+                });
+        return ProblemDetailFactory.createValidationError(errors, request);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
         return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, ex.getMessage(), request);

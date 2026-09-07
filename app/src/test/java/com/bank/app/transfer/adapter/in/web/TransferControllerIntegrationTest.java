@@ -29,6 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.UUID;
 import org.springframework.context.i18n.LocaleContextHolder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -81,6 +83,10 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         private String jwtToken;
         private Long u3Id;
 
+        private static String newIdempotencyKey() {
+                return "it-" + UUID.randomUUID();
+        }
+
         void saveIdempotencyKeyInNewTransaction(IdempotencyKeyJpaEntity entity) {
                 var template = new TransactionTemplate(transactionManager);
                 template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -93,7 +99,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @BeforeEach
         void setUp() {
                 SecurityContextHolder.clearContext();
-                LocaleContextHolder.setLocale(java.util.Locale.of("tr", "TR"), true);
+                LocaleContextHolder.setLocale(Locale.of("tr", "TR"), true);
 
                 var template = new TransactionTemplate(transactionManager);
                 template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -144,12 +150,14 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 var result = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andReturn();
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
@@ -173,6 +181,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
@@ -191,6 +200,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 String u3Token = jwtTokenProvider.generateToken(u3Id, "u3");
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + u3Token)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
@@ -208,6 +218,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
@@ -221,7 +232,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 assertEquals(new BigDecimal("700.00"), balanceReceiver);
 
                 mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
-                                .header("Authorization", "Bearer " + jwtToken))
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey()))
                                 .andExpect(status().isNoContent());
 
                 balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
@@ -233,7 +245,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldReturnBadRequestWhenCancellingNonExistentTransfer() throws Exception {
                 mockMvc.perform(post("/api/v1/transfers/99999/cancel")
-                                .header("Authorization", "Bearer " + jwtToken))
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey()))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status", is(404)))
                                 .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
@@ -249,6 +262,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest())
@@ -265,6 +279,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req1)))
                                 .andExpect(status().isCreated());
@@ -276,6 +291,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req2)))
                                 .andExpect(status().isCreated());
@@ -328,18 +344,24 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         }
 
         @Test
-        void shouldCapHistorySizeTo100() throws Exception {
+        void shouldRejectHistorySizeOver100() throws Exception {
                 Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
 
                 mockMvc.perform(get("/api/v1/transfers/history/" + accountId)
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .param("page", "0")
                                 .param("size", "200"))
+                                .andExpect(status().isBadRequest());
+
+                mockMvc.perform(get("/api/v1/transfers/history/" + accountId)
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .param("page", "0")
+                                .param("size", "100"))
                                 .andExpect(status().isOk());
         }
 
         @Test
-        void shouldPerformTransferSuccessfullyWhenIdempotencyKeyIsBlank() throws Exception {
+        void shouldRequireIdempotencyKeyWhenKeyIsBlank() throws Exception {
                 TransferRequest request = new TransferRequest(
                                 "TR290006200000000000000111",
                                 "TR290006200000000000000222",
@@ -351,8 +373,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .header("Idempotency-Key", "   ")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.id", notNullValue()));
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.code", is("IDEMPOTENCY_KEY_REQUIRED")));
         }
 
         @Test
@@ -408,6 +430,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
@@ -445,6 +468,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 String responseJson = mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
@@ -453,11 +477,13 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
 
                 mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
-                                .header("Authorization", "Bearer " + jwtToken))
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey()))
                                 .andExpect(status().isNoContent());
 
                 mockMvc.perform(post("/api/v1/transfers/" + transferId + "/cancel")
-                                .header("Authorization", "Bearer " + jwtToken))
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", newIdempotencyKey()))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code", is("TRANSFER_ALREADY_CANCELLED")));
         }

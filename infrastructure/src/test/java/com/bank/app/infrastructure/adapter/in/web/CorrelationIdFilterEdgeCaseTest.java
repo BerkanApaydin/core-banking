@@ -94,4 +94,37 @@ class CorrelationIdFilterEdgeCaseTest {
 
         verify(chain).doFilter(request, response);
     }
+
+    @Test
+    void shouldRejectCrlfInjectionInCorrelationId() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("abc\r\nINJECTED: true");
+
+        filter.doFilter(request, response, chain);
+
+        verify(response, never()).setHeader(eq("X-Correlation-ID"), eq("abc\r\nINJECTED: true"));
+        verify(response).setHeader(eq("X-Correlation-ID"), argThat(id ->
+                id instanceof String s && !s.contains("\r") && !s.contains("\n")));
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void shouldRejectOversizedCorrelationId() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("a".repeat(65));
+
+        filter.doFilter(request, response, chain);
+
+        verify(response, never()).setHeader(eq("X-Correlation-ID"), argThat("a".repeat(65)::equals));
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void shouldRejectMaliciousTraceIdAndFallBackToCorrelationId() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("corr-1");
+        when(request.getHeader("X-Trace-ID")).thenReturn("<script>alert(1)</script>");
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setHeader("X-Trace-ID", "corr-1");
+        verify(chain).doFilter(request, response);
+    }
 }

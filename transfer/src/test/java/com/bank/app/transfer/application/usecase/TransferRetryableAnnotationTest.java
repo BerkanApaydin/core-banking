@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.adapter.in.config.TransferUseCaseRetryAspect;
+import com.bank.app.transfer.config.TransferProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.retry.annotation.Retryable;
 
@@ -28,7 +29,7 @@ class TransferRetryableAnnotationTest {
         @Test
         void aspectShouldRetryOnOptimisticLockingFailure() {
                 TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                        new com.bank.app.transfer.adapter.in.config.TransferProperties(24, 3, 500, 2000));
+                        new TransferProperties(24, 3, 500, 2000, 100));
                 assertNotNull(aspect);
         }
 }

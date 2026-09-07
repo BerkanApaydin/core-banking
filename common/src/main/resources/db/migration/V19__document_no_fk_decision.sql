@@ -1,0 +1,24 @@
+-- V19__document_no_fk_decision.sql
+-- Intentional NO-FOREIGN-KEY decision for bounded-context autonomy.
+--
+-- accounts.user_id -> users.id and transfers.sender/receiver_account_id -> accounts.id
+-- are deliberately NOT enforced as database foreign keys:
+--   1. Each aggregate (User, Account, Transfer) is owned by a different bounded
+--      context and referenced by ID only (see Account.userId:UserId,
+--      Transfer.senderAccountId:Long). ID references keep BCs independently
+--      understandable and deployable.
+--   2. Cross-context integrity is enforced at the application layer
+--      (use-case checks + ACL via account-api) and observed via domain events /
+--      outbox, not via cascading DB constraints.
+--   3. Adding FKs now would couple future storage splits (separate schemas/DBs
+--      per BC) and reintroduce the modular-monolith distributed-monolith trap.
+--
+-- Guardrails instead of FKs:
+--   - ArchitectureTest.jpaEntitiesShouldNotReferenceOtherModuleEntities bans JPA
+--     associations across BC persistence packages.
+--   - transferModuleShouldNotDependOnAccountModule bans compile-time coupling.
+--   - Orphan cleanup (if ever needed) must be an explicit compensating job,
+--     never ON DELETE CASCADE.
+--
+-- This migration is a no-op by design; it records the decision in Flyway history.
+SELECT 1;

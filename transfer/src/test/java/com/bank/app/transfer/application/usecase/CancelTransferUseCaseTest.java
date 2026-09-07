@@ -6,7 +6,6 @@ import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -28,7 +27,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,18 +70,21 @@ class CancelTransferUseCaseTest {
 
         Transfer transfer = createCompletedTransfer(transferId, senderAccountId, receiverAccountId, amount);
 
-        when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId))
                 .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
         when(accountAclPort.reverseBalancesForCancellation(any(), any(), any()))
-                .thenReturn(List.of(mock(DomainEvent.class), mock(DomainEvent.class)));
+                .thenReturn(new AccountAclPort.MutationResult(senderAccountId, receiverAccountId,
+                        new Money(new BigDecimal("1100.00"), Currency.TRY),
+                        new Money(new BigDecimal("900.00"), Currency.TRY)));
 
         cancelTransferUseCase.execute(transferId);
 
         verify(userContextService).checkUserAuthorization(eq(100L), anyString());
         verify(accountAclPort).reverseBalancesForCancellation(senderAccountId, receiverAccountId, amount);
         verify(saveTransferPort).save(transfer);
-        verify(domainEventPublisherService, times(2)).publish(any());
+        // Account publishes its own events; transfer publishes only its own.
+        verify(domainEventPublisherService, never()).publish(any());
         verify(domainEventPublisherService).publishEvents(transfer);
         verify(auditEventPort).publish(any());
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
@@ -92,7 +93,7 @@ class CancelTransferUseCaseTest {
     @Test
     void shouldThrowTransferNotFoundExceptionWhenTransferDoesNotExist() {
         Long transferId = 1L;
-        when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.empty());
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.empty());
 
         assertThrows(TransferNotFoundException.class, () -> cancelTransferUseCase.execute(transferId));
         verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
@@ -105,7 +106,7 @@ class CancelTransferUseCaseTest {
         Transfer transfer = createCompletedTransfer(transferId, senderAccountId, 20L,
                 new Money(new BigDecimal("100.00"), Currency.TRY));
 
-        when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId))
                 .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
         doThrow(new AuthorizationException("yetki yok")).when(userContextService)
@@ -122,7 +123,7 @@ class CancelTransferUseCaseTest {
                 new Money(new BigDecimal("100.00"), Currency.TRY));
         transfer.cancel(Clock.systemDefaultZone(), 24);
 
-        when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))
                 .thenReturn(new AccountInfo(10L, 100L, "TRY", "ACTIVE"));
 
@@ -136,7 +137,7 @@ class CancelTransferUseCaseTest {
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
         Transfer transfer = Transfer.create(10L, 20L, amount, Clock.systemDefaultZone());
 
-        when(loadTransferPort.findByIdWithLock(transferId)).thenReturn(Optional.of(transfer));
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))
                 .thenReturn(new AccountInfo(10L, 100L, "TRY", "ACTIVE"));
 

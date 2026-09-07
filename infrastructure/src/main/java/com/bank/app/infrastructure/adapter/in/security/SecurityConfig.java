@@ -7,7 +7,6 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,23 +17,23 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-import jakarta.servlet.http.HttpServletResponse;
-
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final SecurityProperties securityProperties;
+    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                           UserDetailsService userDetailsService,
-                          SecurityProperties securityProperties) {
+                          SecurityProperties securityProperties,
+                          ProblemDetailAuthenticationEntryPoint authenticationEntryPoint) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.securityProperties = securityProperties;
+        this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
     @Bean
@@ -52,8 +51,7 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, authException) ->
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")))
+                .authenticationEntryPoint(authenticationEntryPoint))
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
                 .httpStrictTransportSecurity(hsts -> hsts
@@ -65,6 +63,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());

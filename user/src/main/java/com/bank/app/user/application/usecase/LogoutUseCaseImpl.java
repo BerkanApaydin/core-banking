@@ -2,8 +2,8 @@ package com.bank.app.user.application.usecase;
 
 
 import com.bank.app.user.application.port.in.LogoutUseCase;
-import com.bank.app.common.application.port.out.TokenBlacklistPort;
-import com.bank.app.common.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.port.out.JwtPort;
 
 public class LogoutUseCaseImpl implements LogoutUseCase {
 
@@ -19,8 +19,10 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     public void execute(String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            long expirationMs = jwtPort.getExpirationMs();
-            tokenBlacklistPort.blacklist(token, expirationMs);
+            long remainingMs = jwtPort.getRemainingMs(token);
+            if (remainingMs > 0) {
+                tokenBlacklistPort.blacklist(token, remainingMs);
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.out.outbox;
 
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.event.DomainEvent;
+import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,7 +45,8 @@ class DomainEventOutboxAdapterTest {
 
         @BeforeEach
         void setUp() throws Exception {
-            adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper);
+            adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
+                    new OutboxProperties(5, 50, 0, 2000));
             lenient().when(objectMapper.writeValueAsString(any())).thenReturn(TEST_PAYLOAD);
         }
 
@@ -138,7 +141,8 @@ class DomainEventOutboxAdapterTest {
         @Test
         void shouldSerializeWithObjectMapper() throws Exception {
             ObjectMapper realMapper = new ObjectMapper();
-            adapter = new DomainEventOutboxAdapter(outboxPort, realMapper);
+            adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> Clock.systemUTC(),
+                    new OutboxProperties(5, 50, 0, 2000));
             DomainEvent event = new DomainEvent() {
                 @Override public LocalDateTime occurredAt() { return LocalDateTime.of(2024, 1, 15, 10, 30); }
                 @Override public String aggregateType() { return "TestAggregate"; }

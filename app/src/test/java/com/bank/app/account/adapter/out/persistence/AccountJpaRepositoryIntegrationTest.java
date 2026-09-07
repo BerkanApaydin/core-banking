@@ -67,27 +67,27 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldFindByIbanWithPessimisticLock() {
-        Optional<AccountJpaEntity> locked = repo.findByIbanWithLock("TR290006200000000000000111");
+        Optional<AccountJpaEntity> locked = repo.findByIbanForUpdate("TR290006200000000000000111");
         assertTrue(locked.isPresent());
         assertEquals(savedEntityId, locked.get().getId());
     }
 
     @Test
-    void shouldReturnEmptyWhenIbanWithLockNotFound() {
-        Optional<AccountJpaEntity> locked = repo.findByIbanWithLock("TR290006200000000000000999");
+    void shouldReturnEmptyWhenIbanForUpdateNotFound() {
+        Optional<AccountJpaEntity> locked = repo.findByIbanForUpdate("TR290006200000000000000999");
         assertFalse(locked.isPresent());
     }
 
     @Test
     void shouldFindByIdWithPessimisticLock() {
-        Optional<AccountJpaEntity> locked = repo.findByIdWithLock(savedEntityId);
+        Optional<AccountJpaEntity> locked = repo.findByIdForUpdate(savedEntityId);
         assertTrue(locked.isPresent());
         assertEquals(savedEntityId, locked.get().getId());
     }
 
     @Test
-    void shouldReturnEmptyWhenFindByIdWithLockNotFound() {
-        Optional<AccountJpaEntity> locked = repo.findByIdWithLock(999L);
+    void shouldReturnEmptyWhenFindByIdForUpdateNotFound() {
+        Optional<AccountJpaEntity> locked = repo.findByIdForUpdate(999L);
         assertFalse(locked.isPresent());
     }
 

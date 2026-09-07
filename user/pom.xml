@@ -12,12 +12,17 @@
 
     <artifactId>user</artifactId>
     <name>user</name>
-    <description>User bounded context</description>
+    <description>[BC] User bounded context: identity, authentication, token lifecycle ports (JwtPort, TokenBlacklistPort).</description>
 
     <dependencies>
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

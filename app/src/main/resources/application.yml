@@ -64,6 +64,11 @@ jwt:
   allow-default-secret: ${JWT_ALLOW_DEFAULT_SECRET:false}
 
 app:
+  proxy:
+    # Honor X-Forwarded-For ONLY behind a trusted reverse proxy that overwrites
+    # it (e.g. ingress). Default false: the header is attacker-controlled and
+    # feeds IP rate limiting, brute-force lockout and public idempotency keys.
+    trust-forwarded-headers: ${PROXY_TRUST_HEADERS:false}
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
@@ -85,11 +90,17 @@ app:
   idempotency:
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
+  integrity:
+    enabled: ${ORPHAN_CHECK_ENABLED:true}
+    orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
   transfer:
     cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
   outbox:
+    enabled: ${OUTBOX_POLL_ENABLED:true}
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
     max-retries: ${OUTBOX_MAX_RETRIES:5}
+    partition-count: ${OUTBOX_PARTITION_COUNT:2}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
   cache:
     caffeine:
       account-info:

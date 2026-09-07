@@ -12,6 +12,7 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -26,9 +27,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import com.bank.app.common.domain.exception.AuthorizationException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +53,8 @@ class CreateAccountUseCaseTest {
     private AuditEventPort auditEventPort;
     @Mock
     private AccountAuthorizationService accountAuthorizationService;
+    @Mock
+    private ClockProviderPort clockProvider;
 
     @Captor
     private ArgumentCaptor<AccountCreatedEvent> eventCaptor;
@@ -64,7 +68,8 @@ class CreateAccountUseCaseTest {
     @BeforeEach
     void setUp() {
         createAccountUseCase = new CreateAccountUseCaseImpl(
-                loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, accountAuthorizationService);
+                loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider);
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     private CreateAccountRequest validRequest() {
@@ -120,11 +125,11 @@ class CreateAccountUseCaseTest {
             CreateAccountRequest request = new CreateAccountRequest(
                     200L, VALID_IBAN, OWNER, new BigDecimal("500.00"), Currency.TRY);
 
-            doThrow(new AccessDeniedException("You cannot create an account on behalf of another user."))
+            doThrow(new AuthorizationException("You cannot create an account on behalf of another user."))
                     .when(accountAuthorizationService).authorizeUserAction(eq(200L), anyString());
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
-                    .isExactlyInstanceOf(AccessDeniedException.class)
+                    .isExactlyInstanceOf(AuthorizationException.class)
                     .hasMessage("You cannot create an account on behalf of another user.");
             verify(saveAccountPort, never()).save(any(Account.class));
         }
@@ -134,11 +139,11 @@ class CreateAccountUseCaseTest {
         void shouldThrowWhenNotLoggedIn() {
             CreateAccountRequest request = validRequest();
 
-            doThrow(new AccessDeniedException("Session not found."))
+            doThrow(new AuthorizationException("Session not found."))
                     .when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
-                    .isExactlyInstanceOf(AccessDeniedException.class)
+                    .isExactlyInstanceOf(AuthorizationException.class)
                     .hasMessage("Session not found.");
             verify(saveAccountPort, never()).save(any(Account.class));
         }

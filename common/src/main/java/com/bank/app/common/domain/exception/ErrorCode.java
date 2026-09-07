@@ -14,6 +14,7 @@ public enum ErrorCode {
     UNIQUE_CONSTRAINT_VIOLATION(409),
     DB_INTEGRITY_VIOLATION(409),
     CONCURRENT_REQUEST(409),
+    RATE_LIMIT_EXCEEDED(429),
     UNSUPPORTED_MEDIA_TYPE(415);
 
     private final int httpStatus;

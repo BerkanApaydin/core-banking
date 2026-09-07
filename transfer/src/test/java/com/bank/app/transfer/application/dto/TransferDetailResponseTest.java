@@ -14,19 +14,19 @@ class TransferDetailResponseTest {
     @Test
     void shouldCreateWithAllFields() {
         LocalDateTime now = LocalDateTime.now();
-        TransferDetailResponse resp = new TransferDetailResponse(1L, 10L, 20L, Money.of("100", Currency.TRY).amount(), "TRY", "COMPLETED", now);
+        TransferDetailResponse resp = new TransferDetailResponse(1L, 10L, 20L, Money.of("100", Currency.TRY).amount(), "TRY", TransferStatus.COMPLETED, now);
         assertEquals(1L, resp.id());
         assertEquals(10L, resp.senderAccountId());
         assertEquals(20L, resp.receiverAccountId());
         assertEquals("TRY", resp.currency());
-        assertEquals("COMPLETED", resp.status());
+        assertEquals(TransferStatus.COMPLETED, resp.status());
         assertEquals(now, resp.createdAt());
     }
 
     @Test
     void shouldRejectNullId() {
         assertThrows(NullPointerException.class,
-                () -> new TransferDetailResponse(null, 10L, 20L, Money.of("100", Currency.TRY).amount(), "TRY", "OK", LocalDateTime.now()));
+                () -> new TransferDetailResponse(null, 10L, 20L, Money.of("100", Currency.TRY).amount(), "TRY", TransferStatus.COMPLETED, LocalDateTime.now()));
     }
 
     @Test
@@ -34,6 +34,6 @@ class TransferDetailResponseTest {
         Transfer transfer = new Transfer(1L, 10L, 20L, Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferDetailResponse resp = TransferDetailResponse.from(transfer);
         assertEquals(1L, resp.id());
-        assertEquals("COMPLETED", resp.status());
+        assertEquals(TransferStatus.COMPLETED, resp.status());
     }
 }

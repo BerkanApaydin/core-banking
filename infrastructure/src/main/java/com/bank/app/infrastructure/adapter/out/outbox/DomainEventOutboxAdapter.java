@@ -2,7 +2,9 @@ package com.bank.app.infrastructure.adapter.out.outbox;
 
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.OutboxPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.event.DomainEvent;
+import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -18,13 +20,19 @@ import java.util.UUID;
 public class DomainEventOutboxAdapter implements EventPublisherPort {
 
     private static final Logger log = LoggerFactory.getLogger(DomainEventOutboxAdapter.class);
+    private static final int DEFAULT_PARTITION_MODULO = 16;
 
     private final OutboxPort outboxPort;
     private final ObjectMapper objectMapper;
+    private final ClockProviderPort clockProvider;
+    private final OutboxProperties outboxProperties;
 
-    public DomainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper) {
+    public DomainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper,
+            ClockProviderPort clockProvider, OutboxProperties outboxProperties) {
         this.outboxPort = outboxPort;
         this.objectMapper = objectMapper;
+        this.clockProvider = clockProvider;
+        this.outboxProperties = outboxProperties;
     }
 
     @Override
@@ -38,7 +46,7 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
     private OutboxPort.EventEntry toOutboxEntry(DomainEvent event) {
         String payload = serialize(event);
         String eventType = event.getClass().getSimpleName();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clockProvider.clock());
         String id = UUID.randomUUID().toString();
 
         String aggregateType = event.aggregateType();
@@ -60,10 +68,13 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
         }
     }
 
-    private static int resolvePartition(String aggregateId) {
+    private int resolvePartition(String aggregateId) {
         if (aggregateId == null) {
             return 0;
         }
-        return Math.abs(aggregateId.hashCode() % 16);
+        int modulo = outboxProperties.partitionCount() > 0
+                ? outboxProperties.partitionCount()
+                : DEFAULT_PARTITION_MODULO;
+        return Math.abs(aggregateId.hashCode() % modulo);
     }
 }

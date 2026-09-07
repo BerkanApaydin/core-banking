@@ -14,17 +14,10 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM TransferJpaEntity t WHERE t.id = :id")
-    Optional<TransferJpaEntity> findByIdWithLock(@Param("id") Long id);
+    Optional<TransferJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
     List<TransferJpaEntity> findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(
             Long senderId, Long receiverId, Pageable pageable);
-
-    List<TransferJpaEntity> findBySenderAccountIdOrderByCreatedAtDesc(Long accountId, Pageable pageable);
-
-    List<TransferJpaEntity> findByReceiverAccountIdOrderByCreatedAtDesc(Long accountId, Pageable pageable);
-
-    List<TransferJpaEntity> findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-            Long accountId, LocalDateTime start, LocalDateTime end);
 
     @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
            + "AND t.createdAt BETWEEN :start AND :end ORDER BY t.createdAt DESC")

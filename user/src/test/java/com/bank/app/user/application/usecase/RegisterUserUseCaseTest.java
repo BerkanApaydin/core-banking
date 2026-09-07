@@ -6,6 +6,7 @@ import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.Role;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -37,13 +39,16 @@ class RegisterUserUseCaseTest {
     private PasswordEncoderPort passwordEncoderPort;
     @Mock
     private DomainEventPublisherService domainEventPublisherService;
+    @Mock
+    private ClockProviderPort clockProvider;
 
     private RegisterUserUseCase registerUserUseCase;
 
     @BeforeEach
     void setUp() {
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort,
-                PasswordPolicy.DEFAULT, domainEventPublisherService);
+                PasswordPolicy.DEFAULT, domainEventPublisherService, clockProvider);
     }
 
     @Nested

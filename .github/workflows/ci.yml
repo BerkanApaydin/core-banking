@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:15-alpine
         env:
           POSTGRES_DB: bank_db
           POSTGRES_USER: bank_user
@@ -24,6 +24,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -60,6 +69,8 @@ jobs:
         DB_PORT: 5432
         DB_USERNAME: bank_user
         DB_PASSWORD: bank_password
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
         JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
 
     - name: Architecture Tests
@@ -74,12 +85,13 @@ jobs:
 
     - name: Mutation Tests (PIT)
       run: mvn pitest:mutationCoverage -Dpitest.skip=false -T 4 -q
-      continue-on-error: true
       env:
         DB_HOST: localhost
         DB_PORT: 5432
         DB_USERNAME: bank_user
         DB_PASSWORD: bank_password
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
 
     - name: Upload JaCoCo Coverage Report
       if: always()

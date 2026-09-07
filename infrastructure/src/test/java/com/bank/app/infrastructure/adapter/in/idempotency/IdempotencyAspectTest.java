@@ -3,8 +3,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -37,7 +37,7 @@ class IdempotencyAspectTest {
     private UserContextService userContextService;
 
     @Mock
-    private ClientIpResolver clientIpResolver;
+    private ClientIpResolverPort clientIpResolver;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -47,9 +47,6 @@ class IdempotencyAspectTest {
 
     @Mock
     private HttpServletRequest request;
-
-    @Mock
-    private JsonNode jsonNode;
 
     private IdempotencyAspect aspect;
 
@@ -88,6 +85,11 @@ class IdempotencyAspectTest {
             }
 
             @Override
+            public boolean required() {
+                return false;
+            }
+
+            @Override
             public Class<? extends Annotation> annotationType() {
                 return Idempotent.class;
             }
@@ -104,6 +106,11 @@ class IdempotencyAspectTest {
             @Override
             public boolean publicEndpoint() {
                 return true;
+            }
+
+            @Override
+            public boolean required() {
+                return false;
             }
 
             @Override
@@ -149,6 +156,38 @@ class IdempotencyAspectTest {
     }
 
     @Test
+    void shouldRejectMissingHeaderWhenRequired() {
+        mockRequest(null);
+
+        Idempotent required = new Idempotent() {
+            @Override
+            public String headerName() {
+                return "Idempotency-Key";
+            }
+
+            @Override
+            public boolean publicEndpoint() {
+                return false;
+            }
+
+            @Override
+            public boolean required() {
+                return true;
+            }
+
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return Idempotent.class;
+            }
+        };
+
+        ConcurrentRequestException ex = assertThrows(
+                ConcurrentRequestException.class,
+                () -> aspect.handleIdempotency(joinPoint, required));
+        assertEquals("error.idempotency_key_required", ex.getMessageKey());
+    }
+
+    @Test
     void shouldThrowAccessDeniedException() {
 
         mockRequest("abc");
@@ -175,17 +214,13 @@ class IdempotencyAspectTest {
                                 "{\"message\":\"cached\"}",
                                 201));
 
-        when(objectMapper.readValue(
-                anyString(),
-                eq(JsonNode.class)))
-                .thenReturn(jsonNode);
-
         ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
                 joinPoint,
                 annotation());
 
         assertEquals(201, result.getStatusCode().value());
-        assertSame(jsonNode, result.getBody());
+        assertEquals("{\"message\":\"cached\"}", result.getBody());
+        assertEquals(MediaType.APPLICATION_JSON, result.getHeaders().getContentType());
     }
 
     @Test
@@ -202,17 +237,13 @@ class IdempotencyAspectTest {
                                 "{}",
                                 null));
 
-        when(objectMapper.readValue(
-                anyString(),
-                eq(JsonNode.class)))
-                .thenReturn(jsonNode);
-
         ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
                 joinPoint,
                 annotation());
 
         assertEquals(200, result.getStatusCode().value());
-        assertSame(jsonNode, result.getBody());
+        assertEquals("{}", result.getBody());
+        assertEquals(MediaType.APPLICATION_JSON, result.getHeaders().getContentType());
     }
 
     @Test
@@ -429,7 +460,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(clientIpResolver.resolveClientIp(request))
+        when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
         when(idempotencyGuard.startRequest("10.0.0.1_abc"))
@@ -452,7 +483,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(clientIpResolver.resolveClientIp(request))
+        when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
         when(idempotencyGuard.startRequest("10.0.0.1_abc"))
@@ -461,17 +492,13 @@ class IdempotencyAspectTest {
                                 "{\"message\":\"cached\"}",
                                 201));
 
-        when(objectMapper.readValue(
-                anyString(),
-                eq(JsonNode.class)))
-                .thenReturn(jsonNode);
-
         ResponseEntity<?> result = (ResponseEntity<?>) aspect.handleIdempotency(
                 joinPoint,
                 publicAnnotation());
 
         assertEquals(201, result.getStatusCode().value());
-        assertSame(jsonNode, result.getBody());
+        assertEquals("{\"message\":\"cached\"}", result.getBody());
+        assertEquals(MediaType.APPLICATION_JSON, result.getHeaders().getContentType());
     }
 
     @Test
@@ -479,7 +506,7 @@ class IdempotencyAspectTest {
 
         mockRequest("abc");
 
-        when(clientIpResolver.resolveClientIp(request))
+        when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
         when(idempotencyGuard.startRequest("10.0.0.1_abc"))
@@ -501,6 +528,6 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, publicAnnotation());
 
         assertEquals("OK", result);
-        verify(clientIpResolver, never()).resolveClientIp(any());
+        verify(clientIpResolver, never()).resolveClientIp(any(), any());
     }
 }

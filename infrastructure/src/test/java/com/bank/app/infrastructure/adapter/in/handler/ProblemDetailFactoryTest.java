@@ -1,12 +1,14 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.WebRequest;
 
 import java.net.URI;
@@ -122,6 +124,39 @@ class ProblemDetailFactoryTest {
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.createValidationError(errors, request);
 
             assertThat(response.getBody().getInstance()).isEqualTo(URI.create("/api/test/validation"));
+        }
+    }
+
+    @Nested
+    @DisplayName("writeProblem")
+    class WriteProblem {
+
+        @Test
+        @DisplayName("should write RFC 7807 body with problem+json content type")
+        void shouldWriteProblemBody() throws Exception {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            ProblemDetailFactory.writeProblem(response, new ObjectMapper(), HttpStatus.UNAUTHORIZED,
+                    ErrorCode.AUTHENTICATION_FAILED.code(), "Unauthorized", "/api/v1/accounts");
+
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(response.getContentType()).startsWith("application/problem+json");
+            assertThat(response.getContentAsString())
+                    .contains("\"code\":\"AUTHENTICATION_FAILED\"")
+                    .contains("Unauthorized")
+                    .contains("/api/v1/accounts");
+        }
+
+        @Test
+        @DisplayName("should omit instance when path is null")
+        void shouldOmitInstanceWhenPathNull() throws Exception {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            ProblemDetailFactory.writeProblem(response, new ObjectMapper(), HttpStatus.TOO_MANY_REQUESTS,
+                    ErrorCode.RATE_LIMIT_EXCEEDED.code(), "Too many requests", null);
+
+            assertThat(response.getStatus()).isEqualTo(429);
+            assertThat(response.getContentAsString()).contains("RATE_LIMIT_EXCEEDED");
         }
     }
 }

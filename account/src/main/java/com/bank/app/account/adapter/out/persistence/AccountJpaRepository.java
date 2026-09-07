@@ -17,13 +17,15 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM AccountJpaEntity a WHERE a.iban = :iban")
-    Optional<AccountJpaEntity> findByIbanWithLock(@Param("iban") String iban);
+    Optional<AccountJpaEntity> findByIbanForUpdate(@Param("iban") String iban);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM AccountJpaEntity a WHERE a.id = :id")
-    Optional<AccountJpaEntity> findByIdWithLock(@Param("id") Long id);
+    Optional<AccountJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
     Page<AccountJpaEntity> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+    long countByUserId(Long userId);
 
     List<AccountJpaEntity> findByIdIn(Collection<Long> ids);
 }

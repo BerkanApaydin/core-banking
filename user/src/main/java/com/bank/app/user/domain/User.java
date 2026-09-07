@@ -2,6 +2,7 @@ package com.bank.app.user.domain;
 
 import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.UserId;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -34,13 +35,18 @@ public class User extends BaseAggregateRoot {
     }
 
     public static User create(String username, String password) {
-        return create(username, password, null, null);
+        return create(username, password, null, null, Clock.systemUTC());
     }
 
     public static User create(String username, String password, EmailAddress email, PhoneNumber phone) {
+        return create(username, password, email, phone, Clock.systemUTC());
+    }
+
+    public static User create(String username, String password, EmailAddress email, PhoneNumber phone, Clock clock) {
+        Objects.requireNonNull(clock, "Clock must not be null");
         User user = new User(null, username, password, Role.ROLE_USER, email, phone);
         user.registerEvent(new UserRegisteredEvent(
-                null, username, Role.ROLE_USER.name(), LocalDateTime.now()));
+                null, username, Role.ROLE_USER.name(), LocalDateTime.now(clock)));
         return user;
     }
 

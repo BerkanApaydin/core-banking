@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -22,7 +23,7 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
            + "AND (:partition < 0 OR e.partition = :partition) "
            + "ORDER BY e.createdAt ASC")
     List<OutboxJpaEntity> findAndLockUnprocessed(@Param("partition") int partition,
-                                                  org.springframework.data.domain.Pageable pageable);
+                                                  Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))

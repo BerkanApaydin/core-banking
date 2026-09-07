@@ -3,6 +3,7 @@ package com.bank.app.user.adapter.in.web;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
 import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.infrastructure.adapter.in.web.ProxyProperties;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -13,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,6 +31,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({GlobalExceptionHandler.class, ApiVersionConfig.class, ClientIpResolver.class})
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerIpResolverTest {
+
+    // These tests verify X-Forwarded-For parsing, which is only honored behind
+    // a trusted proxy — so the slice wires the resolver in trusted mode.
+    @TestConfiguration
+    static class TrustedProxyConfig {
+        @Bean
+        ProxyProperties proxyProperties() {
+            return new ProxyProperties(true);
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;

@@ -7,9 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -99,82 +98,55 @@ class AccountReadAdapterTest {
     }
 
     @Test
-    void shouldFindByIbanWithLockSuccessfully() {
+    void shouldFindByIbanForUpdateSuccessfully() {
         Iban iban = new Iban("TR290006200000000000000111");
         AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"),
                 "TRY", "ACTIVE", null);
 
-        when(springDataRepo.findByIbanWithLock(iban.value())).thenReturn(Optional.of(jpaEntity));
+        when(springDataRepo.findByIbanForUpdate(iban.value())).thenReturn(Optional.of(jpaEntity));
 
-        var result = adapter.findByIbanWithLock(iban);
+        var result = adapter.findByIbanForUpdate(iban);
 
         assertTrue(result.isPresent());
         assertEquals("Ahmet", result.get().getOwnerName());
         assertEquals(new BigDecimal("1000.00"), result.get().getBalance().amount());
-        verify(springDataRepo).findByIbanWithLock(iban.value());
+        verify(springDataRepo).findByIbanForUpdate(iban.value());
     }
 
     @Test
-    void shouldReturnEmptyWhenFindByIbanWithLockNotFound() {
+    void shouldReturnEmptyWhenFindByIbanForUpdateNotFound() {
         Iban iban = new Iban("TR290006200000000000000999");
 
-        when(springDataRepo.findByIbanWithLock(iban.value())).thenReturn(Optional.empty());
+        when(springDataRepo.findByIbanForUpdate(iban.value())).thenReturn(Optional.empty());
 
-        var result = adapter.findByIbanWithLock(iban);
+        var result = adapter.findByIbanForUpdate(iban);
 
         assertFalse(result.isPresent());
-        verify(springDataRepo).findByIbanWithLock(iban.value());
+        verify(springDataRepo).findByIbanForUpdate(iban.value());
     }
 
     @Test
-    void shouldFindByIdWithLockSuccessfully() {
+    void shouldFindByIdForUpdateSuccessfully() {
         AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
                 new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
 
-        when(springDataRepo.findByIdWithLock(1L)).thenReturn(Optional.of(jpaEntity));
+        when(springDataRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(jpaEntity));
 
-        var result = adapter.findByIdWithLock(1L);
+        var result = adapter.findByIdForUpdate(1L);
 
         assertTrue(result.isPresent());
         assertEquals("Ahmet", result.get().getOwnerName());
-        verify(springDataRepo).findByIdWithLock(1L);
+        verify(springDataRepo).findByIdForUpdate(1L);
     }
 
     @Test
-    void shouldReturnEmptyWhenFindByIdWithLockNotFound() {
-        when(springDataRepo.findByIdWithLock(999L)).thenReturn(Optional.empty());
+    void shouldReturnEmptyWhenFindByIdForUpdateNotFound() {
+        when(springDataRepo.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
-        var result = adapter.findByIdWithLock(999L);
+        var result = adapter.findByIdForUpdate(999L);
 
         assertFalse(result.isPresent());
-        verify(springDataRepo).findByIdWithLock(999L);
-    }
-
-    @Test
-    void shouldFindAllSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
-                new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet",
-                new BigDecimal("500.00"), "TRY", "ACTIVE", null);
-
-        when(springDataRepo.findAll()).thenReturn(List.of(entity1, entity2));
-
-        var result = adapter.findAll();
-
-        assertEquals(2, result.size());
-        assertEquals("Ahmet", result.get(0).getOwnerName());
-        assertEquals("Mehmet", result.get(1).getOwnerName());
-        verify(springDataRepo).findAll();
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenFindAllReturnsEmpty() {
-        when(springDataRepo.findAll()).thenReturn(List.of());
-
-        var result = adapter.findAll();
-
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findAll();
+        verify(springDataRepo).findByIdForUpdate(999L);
     }
 
     @Test
@@ -184,26 +156,34 @@ class AccountReadAdapterTest {
         AccountJpaEntity entity2 = createEntity(2L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"),
                 100L);
 
-        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(100L, Pageable.unpaged()))
+        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(100L, PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(entity1, entity2)));
 
-        var result = adapter.findByUserId(100L, Pageable.unpaged());
+        var result = adapter.findByUserId(100L, 0, 20);
 
-        assertEquals(2, result.getNumberOfElements());
-        assertEquals("Ahmet", result.getContent().get(0).getOwnerName());
-        assertEquals("Mehmet", result.getContent().get(1).getOwnerName());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(100L, Pageable.unpaged());
+        assertEquals(2, result.size());
+        assertEquals("Ahmet", result.get(0).getOwnerName());
+        assertEquals("Mehmet", result.get(1).getOwnerName());
+        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(100L, PageRequest.of(0, 20));
     }
 
     @Test
     void shouldReturnEmptyPageWhenFindByUserIdReturnsEmpty() {
-        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(999L, Pageable.unpaged()))
-                .thenReturn(Page.empty());
+        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(999L, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of()));
 
-        var result = adapter.findByUserId(999L, Pageable.unpaged());
+        var result = adapter.findByUserId(999L, 0, 20);
 
-        assertTrue(result.getContent().isEmpty());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(999L, Pageable.unpaged());
+        assertTrue(result.isEmpty());
+        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(999L, PageRequest.of(0, 20));
+    }
+
+    @Test
+    void shouldCountByUserId() {
+        when(springDataRepo.countByUserId(100L)).thenReturn(2L);
+
+        assertEquals(2L, adapter.countByUserId(100L));
+        verify(springDataRepo).countByUserId(100L);
     }
 
     @Test
@@ -237,16 +217,5 @@ class AccountReadAdapterTest {
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(springDataRepo);
-    }
-
-    @Test
-    void shouldThrowWhenEntityHasInvalidCurrencyOnFindAll() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
-                new BigDecimal("1000.00"), "INVALID", "ACTIVE", null);
-
-        when(springDataRepo.findAll()).thenReturn(List.of(entity1));
-
-        assertThrows(IllegalArgumentException.class, () -> adapter.findAll());
-        verify(springDataRepo).findAll();
     }
 }

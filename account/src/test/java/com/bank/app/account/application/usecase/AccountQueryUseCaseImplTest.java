@@ -1,6 +1,7 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
@@ -88,7 +89,7 @@ class AccountQueryUseCaseImplTest {
 
     @Test
     void shouldThrowAccountNotFoundExceptionForTransferWhenIbanInvalid() {
-        assertThrows(com.bank.app.common.domain.exception.InvalidIbanException.class,
+        assertThrows(InvalidIbanException.class,
                 () -> accountQueryUseCase.getAccountInfoForTransfer("INVALID_IBAN"));
     }
 

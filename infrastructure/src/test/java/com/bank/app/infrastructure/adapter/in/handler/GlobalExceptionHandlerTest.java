@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
@@ -83,7 +84,7 @@ class GlobalExceptionHandlerTest {
         when(ex.getMessage()).thenReturn("Account not found. IBAN: TR1");
         when(ex.getErrorCode()).thenReturn("ACCOUNT_NOT_FOUND");
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
-                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+                .thenThrow(new NoSuchMessageException("No key"));
 
         ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
@@ -246,7 +247,7 @@ class GlobalExceptionHandlerTest {
         when(ex.getArgs()).thenReturn(new Object[]{});
         when(ex.getMessage()).thenReturn("Transaction rejected");
         when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
-                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+                .thenThrow(new NoSuchMessageException("No key"));
 
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
@@ -418,7 +419,7 @@ class GlobalExceptionHandlerTest {
     void shouldHandleConcurrentRequestExceptionWhenMessageSourceThrows() {
         ConcurrentRequestException ex = new ConcurrentRequestException("error.concurrent", new Object[] {}, "fallback message");
         when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
-                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+                .thenThrow(new NoSuchMessageException("No key"));
 
         ResponseEntity<ProblemDetail> response = handler.handleConcurrentRequestException(ex, null);
 
@@ -432,7 +433,7 @@ class GlobalExceptionHandlerTest {
     void shouldHandleConcurrentRequestExceptionWithNullDefaultMessage() {
         ConcurrentRequestException ex = new ConcurrentRequestException("error.concurrent", new Object[] {}, null);
         when(messageSource.getMessage(anyString(), any(), any(Locale.class)))
-                .thenThrow(new org.springframework.context.NoSuchMessageException("No key"));
+                .thenThrow(new NoSuchMessageException("No key"));
 
         ResponseEntity<ProblemDetail> response = handler.handleConcurrentRequestException(ex, null);
 
@@ -536,5 +537,24 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertNull(response.getBody().getInstance());
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void shouldHandleJakartaConstraintViolationAsBadRequest() {
+        jakarta.validation.ConstraintViolation violation = mock(jakarta.validation.ConstraintViolation.class);
+        jakarta.validation.Path path = mock(jakarta.validation.Path.class);
+        when(path.toString()).thenReturn("getHistory.size");
+        when(violation.getPropertyPath()).thenReturn(path);
+        when(violation.getMessage()).thenReturn("must be less than or equal to 100");
+        java.util.Set violations = new java.util.HashSet(java.util.List.of(violation));
+        jakarta.validation.ConstraintViolationException ex =
+                new jakarta.validation.ConstraintViolationException("validation failed", violations);
+
+        ResponseEntity<ProblemDetail> response = handler.handleConstraintViolationException(ex, null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("VALIDATION_FAILED", response.getBody().getProperties().get("code"));
     }
 }

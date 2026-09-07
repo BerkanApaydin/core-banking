@@ -59,7 +59,8 @@ public class AuthController {
         AuthRequest request = new AuthRequest(
                 webRequest.username(), webRequest.password(),
                 webRequest.email(), webRequest.phone());
-        String ip = clientIpResolver.resolveClientIp(httpRequest);
+        String ip = clientIpResolver.resolveClientIp(
+                httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
         AuthResponse response = loginUserUseCase.execute(request, ip);
         return ResponseEntity.ok(response);
     }

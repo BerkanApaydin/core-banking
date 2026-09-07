@@ -26,6 +26,7 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
+import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.application.port.in.*;
 
 import java.math.BigDecimal;
@@ -75,7 +76,7 @@ class TransferControllerWebMvcTest {
                         TransferRequest request = new TransferRequest(
                                         "TR290006200000000000000111", "TR290006200000000000000222",
                                         new BigDecimal("200.00"), Currency.TRY);
-                        TransferResponse response = new TransferResponse(10L, "COMPLETED", new BigDecimal("200.00"),
+                        TransferResponse response = new TransferResponse(10L, TransferStatus.COMPLETED, new BigDecimal("200.00"),
                                         "TRY", LocalDateTime.now(), "TR290006200000000000000111",
                                         "TR290006200000000000000222", 1L, 2L);
 
@@ -160,7 +161,7 @@ class TransferControllerWebMvcTest {
                         TransferRequest request = new TransferRequest(
                                         "TR290006200000000000000111", "TR290006200000000000000222",
                                         new BigDecimal("200.00"), Currency.TRY);
-                        TransferResponse response = new TransferResponse(1L, "COMPLETED", new BigDecimal("200.00"),
+                        TransferResponse response = new TransferResponse(1L, TransferStatus.COMPLETED, new BigDecimal("200.00"),
                                         "TRY", LocalDateTime.now(), "TR290006200000000000000111",
                                         "TR290006200000000000000222", 1L, 2L);
 
@@ -221,7 +222,7 @@ class TransferControllerWebMvcTest {
                 void shouldReturn200() throws Exception {
                         TransferDetailResponse response = new TransferDetailResponse(
                                         1L, 10L, 20L, new BigDecimal("150.00"),
-                                        "TRY", "COMPLETED", LocalDateTime.now());
+                                        "TRY", TransferStatus.COMPLETED, LocalDateTime.now());
 
                         when(getTransferDetailPort.execute(1L)).thenReturn(response);
 
@@ -250,7 +251,7 @@ class TransferControllerWebMvcTest {
                 @Test
                 @DisplayName("should return 200 with paged history")
                 void shouldReturn200() throws Exception {
-                        TransferResponse t = new TransferResponse(10L, "COMPLETED", new BigDecimal("200.00"),
+                        TransferResponse t = new TransferResponse(10L, TransferStatus.COMPLETED, new BigDecimal("200.00"),
                                         "TRY", LocalDateTime.now(), "TR1", "TR2", 1L, 2L);
                         PageResponse<TransferResponse> paged = PageResponse.of(List.of(t), 0, 20, 1);
 

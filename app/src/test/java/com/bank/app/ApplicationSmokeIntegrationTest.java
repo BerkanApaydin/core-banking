@@ -3,6 +3,7 @@ package com.bank.app;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.transfer.application.dto.TransferResponse;
+import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -135,17 +138,21 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String senderIban = accountA.getBody().iban();
         String receiverIban = accountB.getBody().iban();
 
+        HttpHeaders transferHeaders = new HttpHeaders();
+        transferHeaders.setBearerAuth(loginA.getBody().token());
+        transferHeaders.set("Idempotency-Key", "smoke-" + UUID.randomUUID());
+
         ResponseEntity<TransferResponse> transferResponse = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
                         "senderIban", senderIban,
                         "receiverIban", receiverIban,
                         "amount", new BigDecimal("500.00"),
                         "currency", "TRY"
-                ), headersA), TransferResponse.class);
+                ), transferHeaders), TransferResponse.class);
         assertThat(transferResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(transferResponse.getBody()).isNotNull();
         assertThat(transferResponse.getBody().id()).isPositive();
-        assertThat(transferResponse.getBody().status()).isEqualTo("COMPLETED");
+        assertThat(transferResponse.getBody().status()).isEqualTo(TransferStatus.COMPLETED);
         assertThat(transferResponse.getBody().amount()).isEqualByComparingTo("500.00");
         assertThat(transferResponse.getBody().senderIban()).isEqualTo(senderIban);
         assertThat(transferResponse.getBody().receiverIban()).isEqualTo(receiverIban);
@@ -215,7 +222,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "receiverIban", "TR330006200000000000000006",
                         "amount", new BigDecimal("99999.00"),
                         "currency", "TRY"
-                ), headersSender), ProblemDetail.class);
+                ), transferHeaders(headersSender)), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -248,8 +255,99 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "receiverIban", "TR990006200000000000000999",
                         "amount", new BigDecimal("100.00"),
                         "currency", "TRY"
-                ), headers), ProblemDetail.class);
+                ), transferHeaders(headers)), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldCompleteFullJourneyFromRegisterToLogout() {
+        String user = "journey_" + System.currentTimeMillis();
+        restTemplate.postForEntity("/api/v1/auth/register",
+                new AuthRequest(user, "Test1234"), Void.class);
+
+        ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
+                new AuthRequest(user, "Test1234"), AuthResponse.class);
+        assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Long userId = login.getBody().userId();
+
+        HttpHeaders auth = new HttpHeaders();
+        auth.setBearerAuth(login.getBody().token());
+
+        ResponseEntity<AccountResponse> sender = restTemplate.exchange("/api/v1/accounts",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "userId", userId,
+                        "iban", "TR330006200000000000000008",
+                        "ownerName", "Journey Sender",
+                        "initialBalance", new BigDecimal("5000.00"),
+                        "currency", "TRY"
+                ), auth), AccountResponse.class);
+        assertThat(sender.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<AccountResponse> receiver = restTemplate.exchange("/api/v1/accounts",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "userId", userId,
+                        "iban", "TR330006200000000000000009",
+                        "ownerName", "Journey Receiver",
+                        "initialBalance", new BigDecimal("0"),
+                        "currency", "TRY"
+                ), auth), AccountResponse.class);
+        assertThat(receiver.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Long senderId = sender.getBody().id();
+
+        ResponseEntity<TransferResponse> transfer = restTemplate.exchange("/api/v1/transfers",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "senderIban", "TR330006200000000000000008",
+                        "receiverIban", "TR330006200000000000000009",
+                        "amount", new BigDecimal("500.00"),
+                        "currency", "TRY"
+                ), transferHeaders(auth)), TransferResponse.class);
+        assertThat(transfer.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Long transferId = transfer.getBody().id();
+
+        ResponseEntity<Map> detail = restTemplate.exchange("/api/v1/transfers/" + transferId,
+                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+        assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(detail.getBody().get("status")).isEqualTo("COMPLETED");
+
+        ResponseEntity<Map> history = restTemplate.exchange(
+                "/api/v1/transfers/history/" + senderId + "?page=0&size=20",
+                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+        assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> report = restTemplate.exchange(
+                "/api/v1/transfers/report?accountId=" + senderId
+                        + "&startDate=" + LocalDateTime.now().minusHours(1)
+                        + "&endDate=" + LocalDateTime.now().plusHours(1),
+                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+        assertThat(report.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Void> cancel = restTemplate.exchange("/api/v1/transfers/" + transferId + "/cancel",
+                HttpMethod.POST, new HttpEntity<>(transferHeaders(auth)), Void.class);
+        assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<Void> logout = restTemplate.exchange("/api/v1/auth/logout",
+                HttpMethod.POST, new HttpEntity<>(auth), Void.class);
+        assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<ProblemDetail> afterLogout = restTemplate.exchange(
+                "/api/v1/accounts/" + senderId,
+                HttpMethod.GET, new HttpEntity<>(auth), ProblemDetail.class);
+        assertThat(afterLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
+     * Builds transfer-call headers with a fresh idempotency key. The key must
+     * differ from any key used on account creation: reusing an account-create
+     * key would replay the cached account response instead of executing the
+     * transfer.
+     */    private static HttpHeaders transferHeaders(HttpHeaders authHeaders) {
+        HttpHeaders transferHeaders = new HttpHeaders();
+        String bearer = authHeaders.getFirst(HttpHeaders.AUTHORIZATION);
+        if (bearer != null) {
+            transferHeaders.set(HttpHeaders.AUTHORIZATION, bearer);
+        }
+        transferHeaders.set("Idempotency-Key", "smoke-" + UUID.randomUUID());
+        return transferHeaders;
     }
 }

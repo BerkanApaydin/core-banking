@@ -13,6 +13,7 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -33,15 +34,17 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
     private final DomainEventPublisherService domainEventPublisherService;
     private final AuditEventPort auditEventPort;
     private final AccountAuthorizationService accountAuthorizationService;
+    private final ClockProviderPort clockProvider;
 
     public CreateAccountUseCaseImpl(LoadAccountPort loadAccountPort, SaveAccountPort saveAccountPort,
                                     DomainEventPublisherService domainEventPublisherService, AuditEventPort auditEventPort,
-                                    AccountAuthorizationService accountAuthorizationService) {
+                                    AccountAuthorizationService accountAuthorizationService, ClockProviderPort clockProvider) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.domainEventPublisherService = domainEventPublisherService;
         this.auditEventPort = auditEventPort;
         this.accountAuthorizationService = accountAuthorizationService;
+        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -65,12 +68,12 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
         domainEventPublisherService.publish(new AccountCreatedEvent(
             savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban(),
-            savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now()
+            savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now(clockProvider.clock())
         ));
         auditEventPort.publish(new AuditEvent("ACCOUNT_CREATED",
             String.format("New account created. ID: %d",
                 savedAccount.getId()),
-            LocalDateTime.now()));
+            LocalDateTime.now(clockProvider.clock())));
 
         log.info("Account created: id={}", savedAccount.getId());
 

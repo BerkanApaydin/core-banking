@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.aspect;
 
 import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.Signature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +26,7 @@ class UseCaseTransactionAspectTest {
     private ProceedingJoinPoint joinPoint;
 
     @Mock
-    private org.aspectj.lang.Signature signature;
+    private Signature signature;
 
     @Mock
     private PlatformTransactionManager transactionManager;

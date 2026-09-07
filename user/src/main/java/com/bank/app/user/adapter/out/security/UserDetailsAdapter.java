@@ -5,11 +5,11 @@ import com.bank.app.user.domain.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 
-@Service
+@Component
 public class UserDetailsAdapter implements UserDetailsService {
 
     private final LoadUserPort loadUserPort;

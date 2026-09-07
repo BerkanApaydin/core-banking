@@ -1,7 +1,7 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.port.in.ReadOnlyUseCase;
-import com.bank.app.common.application.port.out.JwtPort;
+import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -14,7 +14,7 @@ import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-@ReadOnlyUseCase
+@TransactionalUseCase
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(LoginUserUseCaseImpl.class);

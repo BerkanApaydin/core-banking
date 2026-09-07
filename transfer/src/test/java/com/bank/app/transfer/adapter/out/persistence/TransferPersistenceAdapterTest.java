@@ -99,71 +99,6 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindBySenderAccountIdSuccessfully() {
-        LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY",
-                "COMPLETED", null, now);
-        TransferJpaEntity entity2 = createEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
-
-        when(springDataRepo.findBySenderAccountIdOrderByCreatedAtDesc(eq(100L), any()))
-                .thenReturn(List.of(entity1, entity2));
-
-        var result = repository.findBySenderAccountId(100L);
-
-        assertEquals(2, result.size());
-        assertEquals(100L, result.get(0).getSenderAccountId());
-        assertEquals(100L, result.get(1).getSenderAccountId());
-        verify(springDataRepo).findBySenderAccountIdOrderByCreatedAtDesc(eq(100L), any());
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenFindBySenderAccountIdNotFound() {
-        when(springDataRepo.findBySenderAccountIdOrderByCreatedAtDesc(eq(999L), any())).thenReturn(List.of());
-
-        var result = repository.findBySenderAccountId(999L);
-
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findBySenderAccountIdOrderByCreatedAtDesc(eq(999L), any());
-    }
-
-    @Test
-    void shouldFindBySenderAccountIdAndCreatedAtBetweenSuccessfully() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY",
-                "COMPLETED", null, now);
-        TransferJpaEntity entity2 = createEntity(2L, 100L, 300L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
-
-        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(100L, start, end))
-                .thenReturn(List.of(entity1, entity2));
-
-        var result = repository.findBySenderAccountIdAndCreatedAtBetween(100L, start, end);
-
-        assertEquals(2, result.size());
-        assertEquals(100L, result.get(0).getSenderAccountId());
-        assertEquals(100L, result.get(1).getSenderAccountId());
-        verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(100L, start, end);
-    }
-
-    @Test
-    void shouldReturnEmptyListWhenFindBySenderAccountIdAndCreatedAtBetweenNotFound() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-
-        when(springDataRepo.findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(999L, start, end))
-                .thenReturn(List.of());
-
-        var result = repository.findBySenderAccountIdAndCreatedAtBetween(999L, start, end);
-
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(999L, start, end);
-    }
-
-    @Test
     @SuppressWarnings("null")
     void shouldThrowExceptionWhenSavingNullTransfer() {
         assertThrows(IllegalArgumentException.class, () -> repository.save(null));
@@ -213,28 +148,28 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindByIdWithLockSuccessfully() {
+    void shouldFindByIdForUpdateSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
                 "COMPLETED", null, now);
 
-        when(springDataRepo.findByIdWithLock(10L)).thenReturn(Optional.of(jpaEntity));
+        when(springDataRepo.findByIdForUpdate(10L)).thenReturn(Optional.of(jpaEntity));
 
-        Optional<Transfer> result = repository.findByIdWithLock(10L);
+        Optional<Transfer> result = repository.findByIdForUpdate(10L);
 
         assertTrue(result.isPresent());
         assertEquals(10L, result.get().getId());
-        verify(springDataRepo).findByIdWithLock(10L);
+        verify(springDataRepo).findByIdForUpdate(10L);
     }
 
     @Test
-    void shouldReturnEmptyWhenFindByIdWithLockNotFound() {
-        when(springDataRepo.findByIdWithLock(999L)).thenReturn(Optional.empty());
+    void shouldReturnEmptyWhenFindByIdForUpdateNotFound() {
+        when(springDataRepo.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
-        Optional<Transfer> result = repository.findByIdWithLock(999L);
+        Optional<Transfer> result = repository.findByIdForUpdate(999L);
 
         assertTrue(result.isEmpty());
-        verify(springDataRepo).findByIdWithLock(999L);
+        verify(springDataRepo).findByIdForUpdate(999L);
     }
 
     @Test

@@ -97,10 +97,13 @@ public class Transfer extends BaseAggregateRoot {
     }
 
     public void markFailed(Clock clock) {
+        Objects.requireNonNull(clock, "Clock must not be null");
         if (this.status != TransferStatus.PENDING) {
             throw new TransferNotPendingException(this.status);
         }
         this.status = TransferStatus.FAILED;
+        registerEvent(new TransferFailedEvent(
+                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
     }
 
     public void cancel(Clock clock, int cancellationWindowHours) {

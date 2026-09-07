@@ -15,9 +15,9 @@ class TransferResponseTest {
     @Test
     void shouldCreateWithAllFields() {
         LocalDateTime now = LocalDateTime.now();
-        TransferResponse resp = new TransferResponse(1L, "COMPLETED", BigDecimal.TEN, "TRY", now, "TR111", "TR222", 10L, 20L);
+        TransferResponse resp = new TransferResponse(1L, TransferStatus.COMPLETED, BigDecimal.TEN, "TRY", now, "TR111", "TR222", 10L, 20L);
         assertEquals(1L, resp.id());
-        assertEquals("COMPLETED", resp.status());
+        assertEquals(TransferStatus.COMPLETED, resp.status());
         assertEquals(BigDecimal.TEN, resp.amount());
         assertEquals("TRY", resp.currency());
         assertEquals(now, resp.createdAt());
@@ -30,7 +30,7 @@ class TransferResponseTest {
     @Test
     void shouldRejectNullId() {
         assertThrows(NullPointerException.class,
-                () -> new TransferResponse(null, "OK", BigDecimal.TEN, "TRY", LocalDateTime.now(), "TR111", "TR222", 10L, 20L));
+                () -> new TransferResponse(null, TransferStatus.COMPLETED, BigDecimal.TEN, "TRY", LocalDateTime.now(), "TR111", "TR222", 10L, 20L));
     }
 
     @Test
@@ -38,7 +38,7 @@ class TransferResponseTest {
         Transfer transfer = new Transfer(1L, 10L, 20L, Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferResponse resp = TransferResponse.from(transfer, "TR111", "TR222");
         assertEquals(1L, resp.id());
-        assertEquals("COMPLETED", resp.status());
+        assertEquals(TransferStatus.COMPLETED, resp.status());
         assertEquals("100.00", resp.amount().toString());
         assertEquals("TRY", resp.currency());
     }

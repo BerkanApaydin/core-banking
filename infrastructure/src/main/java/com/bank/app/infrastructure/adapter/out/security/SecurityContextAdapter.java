@@ -3,13 +3,18 @@ package com.bank.app.infrastructure.adapter.out.security;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import com.bank.app.common.application.port.out.SecurityContextPort;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.stereotype.Component;
 
-import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import java.util.Optional;
 
+/**
+ * Reads the current user through the framework-free {@link AuthenticatedPrincipalPort}
+ * abstraction, so this adapter never depends on a bounded context's concrete
+ * adapter classes — only on ports and the shared kernel (DIP).
+ */
 @Component
 public class SecurityContextAdapter implements SecurityContextPort {
 
@@ -20,8 +25,8 @@ public class SecurityContextAdapter implements SecurityContextPort {
                 && !(auth instanceof AnonymousAuthenticationToken)
                 && !auth.getName().equals("anonymousUser")) {
             Object principal = auth.getPrincipal();
-            if (principal instanceof CustomUserDetails customUserDetails) {
-                return Optional.of(customUserDetails.getId());
+            if (principal instanceof AuthenticatedPrincipalPort authenticatedPrincipal) {
+                return Optional.of(authenticatedPrincipal.getAuthenticatedUserId());
             }
         }
         return Optional.empty();
@@ -33,6 +38,10 @@ public class SecurityContextAdapter implements SecurityContextPort {
         if (auth != null && auth.isAuthenticated()
                 && !(auth instanceof AnonymousAuthenticationToken)
                 && !auth.getName().equals("anonymousUser")) {
+            Object principal = auth.getPrincipal();
+            if (principal instanceof AuthenticatedPrincipalPort authenticatedPrincipal) {
+                return Optional.of(authenticatedPrincipal.getAuthenticatedUsername());
+            }
             return Optional.of(auth.getName());
         }
         return Optional.empty();

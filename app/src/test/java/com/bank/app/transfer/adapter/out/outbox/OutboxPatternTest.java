@@ -23,7 +23,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,9 +42,9 @@ class OutboxPatternTest {
     private IdempotencyPort idempotencyPort;
 
     private OutboxPoller outboxPoller;
-    private TransferCompletedOutboxHandler handler;
+    private TransferCompletedOutboxRelay handler;
 
-    private final java.util.Map<String, EventEntry> entityMap = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, EventEntry> entityMap = new ConcurrentHashMap<>();
 
     private EventEntry register(EventEntry entry) {
         entityMap.put(entry.id(), entry);
@@ -102,7 +104,7 @@ class OutboxPatternTest {
 
         when(idempotencyPort.tryCreate(anyString(), any())).thenReturn(true);
 
-        handler = new TransferCompletedOutboxHandler(objectMapper, eventPublisher, idempotencyPort);
+        handler = new TransferCompletedOutboxRelay(objectMapper, eventPublisher, idempotencyPort);
         OutboxProcessor processor = new OutboxProcessor(outboxPort, List.of(handler));
         outboxPoller = new OutboxPoller(outboxPort, processor, defaultOutboxProperties);
     }

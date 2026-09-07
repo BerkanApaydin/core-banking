@@ -23,7 +23,11 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager("accountInfo");
+        // Single region: "accountAclInfo" serves the transfer-facing ACL adapter
+        // through AccountInfoCachePort (infrastructure owns the backend).
+        // Nothing uses @Cacheable in this codebase — manual port-based caching
+        // only — so no other region is pre-created.
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager("accountAclInfo");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(cacheProperties.getAccountInfo().getMaximumSize())
                 .expireAfterWrite(cacheProperties.getAccountInfo().getExpireAfterWrite(), TimeUnit.SECONDS)

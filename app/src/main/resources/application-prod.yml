@@ -17,9 +17,10 @@ management:
   endpoint:
     health:
       show-details: when_authorized
-  tracing:
-    sampling:
-      probability: 1.0
+  # NOTE: no micrometer-tracing/OTel SDK on the classpath yet, so there is
+  # intentionally no management.tracing block here. Correlation/trace IDs in
+  # logs are generated locally by CorrelationIdFilter until real distributed
+  # tracing is added (then reintroduce sampling config + OTLP endpoint).
 
 app:
   security:

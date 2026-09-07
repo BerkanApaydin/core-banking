@@ -284,11 +284,21 @@ class TransferTest {
     class MarkFailed {
 
         @Test
-        @DisplayName("should mark PENDING transfer as FAILED")
+        @DisplayName("should mark PENDING transfer as FAILED and publish event")
         void shouldMarkFailedFromPending() {
+            Instant failedAt = Instant.parse("2026-06-24T12:00:00Z");
+            Clock clock = Clock.fixed(failedAt, ZoneId.systemDefault());
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.PENDING, now());
-            transfer.markFailed(Clock.systemDefaultZone());
+            transfer.markFailed(clock);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
+            assertThat(transfer.getDomainEvents()).hasSize(1);
+            TransferFailedEvent event = (TransferFailedEvent) transfer.getDomainEvents().get(0);
+            assertThat(event.transferId()).isEqualTo(1L);
+            assertThat(event.status()).isEqualTo(TransferStatus.FAILED);
+            assertThat(event.occurredAt())
+                    .isEqualTo(LocalDateTime.ofInstant(failedAt, ZoneId.systemDefault()));
+            assertThat(event.aggregateType()).isEqualTo("Transfer");
+            assertThat(event.aggregateId()).isEqualTo("1");
         }
 
         @Test

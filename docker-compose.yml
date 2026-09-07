@@ -38,15 +38,18 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      # Local-dev defaults below. PROD: set SPRING_PROFILES_ACTIVE=prod and provide
+      # JWT_SECRET + DB_PASSWORD from a secret manager. Never deploy prod with the
+      # default dev secret (ApplicationStartupValidator fails fast on prod+default).
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: bank_user
-      DB_PASSWORD: bank_password
+      DB_USERNAME: ${DB_USERNAME:-bank_user}
+      DB_PASSWORD: ${DB_PASSWORD:-bank_password}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-      JWT_ALLOW_DEFAULT_SECRET: "true"
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      JWT_ALLOW_DEFAULT_SECRET: ${JWT_ALLOW_DEFAULT_SECRET:-true}
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       TOKEN_BLACKLIST_BACKEND: redis

@@ -35,7 +35,7 @@ class RateLimitingFilterEdgeCaseTest {
     void setUp() {
         when(request.getMethod()).thenReturn("POST");
         objectMapper = new ObjectMapper();
-        clientIpResolver = new ClientIpResolver();
+        clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
         filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper, clientIpResolver);
     }
 

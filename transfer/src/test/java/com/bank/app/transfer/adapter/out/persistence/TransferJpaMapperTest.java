@@ -53,6 +53,7 @@ class TransferJpaMapperTest {
             assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
             assertThat(entity.getCurrency()).isEqualTo(CURRENCY.name());
             assertThat(entity.getStatus()).isEqualTo(STATUS.name());
+            assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);
             assertThat(entity.getVersion()).isEqualTo(VERSION);
         }
 
@@ -74,7 +75,8 @@ class TransferJpaMapperTest {
         void shouldMapToDomain() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
                     AMOUNT_VALUE, CURRENCY.name(), STATUS.name(), VERSION);
-            entity.setCreatedAt(CREATED_AT);
+            entity.setBusinessCreatedAt(CREATED_AT);
+            entity.setCreatedAt(CREATED_AT.plusHours(1));
 
             Transfer transfer = mapper.toDomain(entity);
 
@@ -86,6 +88,18 @@ class TransferJpaMapperTest {
             assertThat(transfer.getStatus()).isEqualTo(STATUS);
             assertThat(transfer.getCreatedAt()).isEqualTo(CREATED_AT);
             assertThat(transfer.getVersion()).isEqualTo(VERSION);
+        }
+
+        @Test
+        @DisplayName("should fall back to auditing timestamp for pre-V20 rows")
+        void shouldFallBackToAuditingTimestamp() {
+            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+                    AMOUNT_VALUE, CURRENCY.name(), STATUS.name(), VERSION);
+            entity.setCreatedAt(CREATED_AT);
+
+            Transfer transfer = mapper.toDomain(entity);
+
+            assertThat(transfer.getCreatedAt()).isEqualTo(CREATED_AT);
         }
 
         @Test

@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
-import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

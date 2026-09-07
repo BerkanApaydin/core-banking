@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.dto;
 
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.TransferStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -11,7 +12,7 @@ public record TransferDetailResponse(
     Long receiverAccountId,
     BigDecimal amount,
     String currency,
-    String status,
+    TransferStatus status,
     LocalDateTime createdAt
 ) {
     public TransferDetailResponse {
@@ -31,7 +32,7 @@ public record TransferDetailResponse(
             transfer.getReceiverAccountId(),
             transfer.getAmount().amount(),
             transfer.getAmount().currency().name(),
-            transfer.getStatus().name(),
+            transfer.getStatus(),
             transfer.getCreatedAt()
         );
     }

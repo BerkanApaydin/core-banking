@@ -26,5 +26,6 @@ class TransferNotFoundExceptionTest {
     void shouldReturnCorrectErrorCode() {
         TransferNotFoundException ex = new TransferNotFoundException(1L);
         assertEquals("TRANSFER_NOT_FOUND", ex.getErrorCode());
+        assertEquals(404, ex.getHttpStatusCode());
     }
 }

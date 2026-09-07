@@ -7,6 +7,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record OutboxProperties(
         @DefaultValue("5") int maxRetries,
         @DefaultValue("50") int batchSize,
-        @DefaultValue("0") int partitionCount,
+        @DefaultValue("2") int partitionCount,
         @DefaultValue("2000") long pollDelayMs
 ) {}

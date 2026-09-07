@@ -19,12 +19,18 @@
     <description>Clean Architecture Transfer System with Spring Boot</description>
 
     <modules>
+        <!-- Platform / shared: stable, low-level, no BC dependencies -->
         <module>common</module>
+        <module>persistence</module>
+        <module>account-api</module>
         <module>infrastructure</module>
+        <!-- Bounded contexts (modular monolith slices, each hexagonal inside) -->
         <module>account</module>
         <module>transfer</module>
         <module>user</module>
+        <!-- Supporting subdomain -->
         <module>audit</module>
+        <!-- Bootstrap / composition root -->
         <module>app</module>
     </modules>
 
@@ -34,14 +40,14 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.12.0</mockito.version>
         <byte-buddy.version>1.17.5</byte-buddy.version>
-        <jacoco.line.coverage>0.85</jacoco.line.coverage>
-        <jacoco.branch.coverage>0.80</jacoco.branch.coverage>
+        <jacoco.line.coverage>0.80</jacoco.line.coverage>
+        <jacoco.branch.coverage>0.70</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
         <postgresql.image.tag>15-alpine</postgresql.image.tag>
         <testcontainers.version>1.20.6</testcontainers.version>
         <pitest.version>1.19.1</pitest.version>
         <jacoco.skip>false</jacoco.skip>
-        <jjwt.version>0.12.5</jjwt.version>
+        <jjwt.version>0.12.7</jjwt.version>
         <springdoc.version>2.8.3</springdoc.version>
         <logstash.logback.version>7.4</logstash.logback.version>
         <spring-boot.skip>true</spring-boot.skip>

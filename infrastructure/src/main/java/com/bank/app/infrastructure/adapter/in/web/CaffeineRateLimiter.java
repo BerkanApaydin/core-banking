@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.web;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -11,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.security.rate-limit.backend", havingValue = "caffeine", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.security.rate-limit.backend", havingValue = "caffeine", matchIfMissing = true)
 public class CaffeineRateLimiter implements RateLimiter {
 
     private final int maxRequests;

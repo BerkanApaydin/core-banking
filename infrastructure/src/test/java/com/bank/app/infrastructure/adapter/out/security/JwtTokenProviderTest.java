@@ -24,7 +24,7 @@ class JwtTokenProviderTest {
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider(SECRET, 86400000L);
+        jwtTokenProvider = new JwtTokenProvider(SECRET, 86400000L, true);
     }
 
     @Test
@@ -91,7 +91,7 @@ class JwtTokenProviderTest {
     @Test
     void shouldNotThrowWithCustomSecret() {
         JwtTokenProvider provider = new JwtTokenProvider(
-                "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L);
+                "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L, false);
         assertDoesNotThrow(provider::validateSecret);
         assertNotNull(provider.generateToken(1L, "admin"));
     }
@@ -99,22 +99,35 @@ class JwtTokenProviderTest {
     @Test
     void shouldReturnFalseForExpiredToken() {
         // Negative expiration ensures the token is always expired
-        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L);
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, true);
         String token = shortLived.generateToken(1L, "testUser");
         assertFalse(shortLived.isTokenValid(token));
     }
 
     @Test
     void shouldThrowWhenSecretIsTooShort() {
-        JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L);
+        JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L, true);
         IllegalStateException ex = assertThrows(IllegalStateException.class, provider::validateSecret);
         // Verify the bit-length calculation to kill MathMutator on keyBytes.length * 8
         assertTrue(ex.getMessage().contains("40 bits"));
     }
 
     @Test
+    void shouldThrowWhenSecretIsBlank() {
+        JwtTokenProvider blankProvider = new JwtTokenProvider("   ", 86400000L, true);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, blankProvider::validateSecret);
+        assertTrue(ex.getMessage().contains("must not be blank"));
+    }
+
+    @Test
+    void shouldThrowWhenDefaultSecretWithoutExplicitConsent() {
+        JwtTokenProvider defaultProvider = new JwtTokenProvider(SECRET, 86400000L, false);
+        assertThrows(IllegalStateException.class, defaultProvider::validateSecret);
+    }
+
+    @Test
     void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
-        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L);
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, true);
         SecretKey key = Keys.hmacShaKeyFor(
                 Decoders.BASE64.decode(SECRET));
         String token = Jwts.builder()
@@ -129,5 +142,27 @@ class JwtTokenProviderTest {
     @Test
     void shouldReturnExpirationMs() {
         assertEquals(86400000L, jwtTokenProvider.getExpirationMs());
+    }
+
+    @Test
+    void shouldReturnPositiveRemainingMsForFreshToken() {
+        String token = jwtTokenProvider.generateToken(1L, "testUser");
+
+        long remaining = jwtTokenProvider.getRemainingMs(token);
+
+        assertTrue(remaining > 0 && remaining <= 86400000L);
+    }
+
+    @Test
+    void shouldReturnZeroRemainingMsForExpiredToken() {
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, true);
+        String token = shortLived.generateToken(1L, "testUser");
+
+        assertEquals(0L, shortLived.getRemainingMs(token));
+    }
+
+    @Test
+    void shouldReturnZeroRemainingMsForMalformedToken() {
+        assertEquals(0L, jwtTokenProvider.getRemainingMs("not-a-token"));
     }
 }

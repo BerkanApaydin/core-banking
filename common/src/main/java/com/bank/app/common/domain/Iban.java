@@ -2,20 +2,20 @@ package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 public record Iban(String value) {
-    private static final ThreadLocal<Pattern> ibanPattern = ThreadLocal.withInitial(
-            () -> Pattern.compile("^TR[0-9]{24}$"));
+    private static volatile java.util.regex.Pattern ibanPattern =
+            java.util.regex.Pattern.compile("^TR[0-9]{24}$");
 
-    public static void configurePattern(String regex) {
-        ibanPattern.set(Pattern.compile(regex));
+    public static synchronized void configurePattern(String regex) {
+        Objects.requireNonNull(regex, "IBAN pattern must not be null");
+        ibanPattern = java.util.regex.Pattern.compile(regex);
     }
 
     public Iban {
         Objects.requireNonNull(value, "IBAN must not be null");
         value = normalize(value);
-        if (!ibanPattern.get().matcher(value).matches()) {
+        if (!ibanPattern.matcher(value).matches()) {
             throw new InvalidIbanException("Invalid IBAN format: " + value);
         }
     }

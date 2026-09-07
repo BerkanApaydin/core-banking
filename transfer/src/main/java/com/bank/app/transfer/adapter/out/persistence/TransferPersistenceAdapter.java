@@ -7,10 +7,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 
-@Repository
+@Component
 public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransferPort {
 
     private final TransferJpaRepository repository;
@@ -48,24 +47,8 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     }
 
     @Override
-    public Optional<Transfer> findByIdWithLock(Long id) {
-        return repository.findByIdWithLock(id).map(mapper::toDomain);
-    }
-
-    @Override
-    public List<Transfer> findBySenderAccountId(Long accountId) {
-        return repository.findBySenderAccountIdOrderByCreatedAtDesc(accountId, Pageable.unpaged())
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public List<Transfer> findBySenderAccountIdAndCreatedAtBetween(Long accountId, LocalDateTime start, LocalDateTime end) {
-        return repository.findBySenderAccountIdAndCreatedAtBetweenOrderByCreatedAtDesc(accountId, start, end)
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
+    public Optional<Transfer> findByIdForUpdate(Long id) {
+        return repository.findByIdForUpdate(id).map(mapper::toDomain);
     }
 
     @Override

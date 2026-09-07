@@ -14,9 +14,12 @@ import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +36,7 @@ import io.swagger.v3.oas.annotations.Operation;
 
 @RestController
 @ApiVersion("v1")
+@Validated
 @RequestMapping("/transfers")
 @Tag(name = "Transfer API", description = "API for managing money transfers")
 public class TransferController {
@@ -56,8 +60,8 @@ public class TransferController {
     }
 
     @PostMapping
-    @Idempotent
-    @Operation(summary = "Executes a money transfer", description = "Initiates and records a money transfer with sender and receiver IBAN information. Duplicate requests can be prevented with the Idempotency-Key header.")
+    @Idempotent(required = true)
+    @Operation(summary = "Executes a money transfer", description = "Initiates and records a money transfer with sender and receiver IBAN information. Idempotency-Key header is required.")
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferWebRequest webRequest) {
         TransferRequest request = new TransferRequest(
                 webRequest.senderIban(), webRequest.receiverIban(),
@@ -67,8 +71,8 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/cancel")
-    @Idempotent
-    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within 24 hours by transfer ID and refunds balances.")
+    @Idempotent(required = true)
+    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within 24 hours by transfer ID and refunds balances. Idempotency-Key header is required.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
         cancelTransferUseCase.execute(id);
         return ResponseEntity.noContent().build();
@@ -84,8 +88,8 @@ public class TransferController {
     @Operation(summary = "Lists the transfer history of an account")
     public ResponseEntity<PageResponse<TransferResponse>> getHistory(
             @PathVariable Long accountId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ResponseEntity.ok(getTransferHistoryQuery.execute(accountId, page, size));
     }
 
@@ -95,8 +99,8 @@ public class TransferController {
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "100") @Min(1) @Max(100) int size) {
         return ResponseEntity
                 .ok(generateTransferReportQuery.execute(new ReportCriteria(accountId, startDate, endDate, page, size)));
     }

@@ -1,6 +1,14 @@
 jwt:
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971
 
+app:
+  outbox:
+    # No background polling in tests: every context would otherwise spawn
+    # poller threads against the shared Testcontainers database and race
+    # tests that assert on outbox rows. Tests trigger processing explicitly
+    # (pollAndProcessEvents / processEvent) or mock the poller.
+    enabled: false
+
 spring:
   jpa:
     hibernate:

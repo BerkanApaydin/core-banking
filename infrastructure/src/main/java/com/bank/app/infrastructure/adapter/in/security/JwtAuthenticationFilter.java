@@ -1,20 +1,23 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
-import com.bank.app.user.adapter.out.security.CustomUserDetails;
-import com.bank.app.common.application.port.out.JwtPort;
-import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
+import com.bank.app.user.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -32,14 +35,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
 
     private final JwtPort jwtPort;
-    private final UserDetailsService userDetailsService;
     private final TokenBlacklistPort tokenBlacklistPort;
+    private final ObjectMapper objectMapper;
 
-    public JwtAuthenticationFilter(JwtPort jwtPort, UserDetailsService userDetailsService,
-            TokenBlacklistPort tokenBlacklistPort) {
+    public JwtAuthenticationFilter(JwtPort jwtPort,
+            TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper) {
         this.jwtPort = jwtPort;
-        this.userDetailsService = userDetailsService;
         this.tokenBlacklistPort = tokenBlacklistPort;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -60,7 +63,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         jwt = authHeader.substring(BEARER_PREFIX.length());
 
         if (tokenBlacklistPort.isBlacklisted(jwt)) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, MSG_TOKEN_REVOKED);
+            ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_REVOKED, request.getRequestURI());
             return;
         }
 
@@ -69,18 +73,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 Long userId = jwtPort.extractUserId(jwt);
                 String role = jwtPort.extractRole(jwt);
-                UserDetails userDetails;
-
-                if (userId != null && role != null) {
-                    userDetails = new CustomUserDetails(
-                            userId,
-                            username,
-                            "",
-                            Collections.singletonList(
-                                    new SimpleGrantedAuthority(role)));
-                } else {
-                    userDetails = this.userDetailsService.loadUserByUsername(username);
+                if (userId == null || role == null) {
+                    // Stateless JWT requires userId+role claims; legacy tokens without
+                    // claims are rejected instead of falling back to a DB lookup.
+                    // Clients must re-login to obtain a current token.
+                    ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                            ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                    return;
                 }
+                UserDetails userDetails = new SimpleAuthenticatedPrincipal(
+                        userId,
+                        username,
+                        Collections.singletonList(
+                                new SimpleGrantedAuthority(role)));
 
                 if (jwtPort.isTokenValid(jwt)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -95,7 +100,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             log.warn("JWT authentication failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, MSG_TOKEN_INVALID);
+            ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
             return;
         }
         filterChain.doFilter(request, response);

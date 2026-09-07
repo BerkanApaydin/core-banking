@@ -36,17 +36,18 @@ public class ApplicationStartupValidator {
             return;
         }
 
-        if (DEFAULT_JWT_SECRET.equals(jwtSecret)) {
+        if (jwtSecret == null || jwtSecret.isBlank() || DEFAULT_JWT_SECRET.equals(jwtSecret)) {
             throw new IllegalStateException(
                     "Production profile requires a non-default JWT secret. Set JWT_SECRET environment variable.");
         }
-        if (dbPassword.isBlank()) {
+        if (dbPassword == null || dbPassword.isBlank()) {
             throw new IllegalStateException(
                     "Production profile requires a database password via environment variable.");
         }
         if ("bank_password".equals(dbPassword)) {
-            log.warn("Default database password is being used in production. "
-                    + "Set DB_PASSWORD environment variable for a secure password.");
+            throw new IllegalStateException(
+                    "Production profile must not use the default database password. "
+                    + "Set DB_PASSWORD environment variable to a secure password.");
         }
     }
 

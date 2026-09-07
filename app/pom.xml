@@ -12,7 +12,7 @@
 
     <artifactId>app</artifactId>
     <name>app</name>
-    <description>Spring Boot application bootstrap and configuration</description>
+    <description>[Bootstrap] Composition root: Spring Boot application wiring, integration/WebMvc tests, quality gates.</description>
 
     <properties>
         <spring-boot.skip>false</spring-boot.skip>
@@ -32,6 +32,11 @@
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>account</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>account-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -163,12 +168,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
+                                            <minimum>${jacoco.line.coverage}</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
+                                            <minimum>${jacoco.branch.coverage}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

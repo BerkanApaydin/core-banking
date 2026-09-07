@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
-import com.bank.app.common.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.JwtPort;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -19,17 +19,33 @@ import java.util.function.Function;
 @Service
 public class JwtTokenProvider implements JwtPort {
 
+    private static final String DEFAULT_JWT_SECRET =
+            "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+
     private String secretKey;
     private long jwtExpiration;
+    private final boolean allowDefaultSecret;
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey,
-                            @Value("${jwt.expiration:86400000}") long jwtExpiration) {
+                            @Value("${jwt.expiration:86400000}") long jwtExpiration,
+                            @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {
         this.secretKey = secretKey;
         this.jwtExpiration = jwtExpiration;
+        this.allowDefaultSecret = allowDefaultSecret;
     }
 
     @PostConstruct
     public void validateSecret() {
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                "JWT secret must not be blank. Set JWT_SECRET environment variable. "
+                + "Generate a secure key with: openssl rand -base64 32");
+        }
+        if (DEFAULT_JWT_SECRET.equals(secretKey) && !allowDefaultSecret) {
+            throw new IllegalStateException(
+                "Default JWT secret is not allowed (jwt.allow-default-secret=false). "
+                + "Set JWT_SECRET environment variable.");
+        }
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
@@ -86,6 +102,16 @@ public class JwtTokenProvider implements JwtPort {
     @Override
     public long getExpirationMs() {
         return jwtExpiration;
+    }
+
+    @Override
+    public long getRemainingMs(String token) {
+        try {
+            long remaining = extractExpiration(token).getTime() - System.currentTimeMillis();
+            return Math.max(remaining, 0);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     @Override

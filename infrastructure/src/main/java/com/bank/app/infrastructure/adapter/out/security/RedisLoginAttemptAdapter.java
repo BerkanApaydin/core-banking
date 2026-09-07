@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.LoginAttemptPort;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -20,8 +21,8 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     public RedisLoginAttemptAdapter(
             StringRedisTemplate redisTemplate,
-            @org.springframework.beans.factory.annotation.Value("${app.security.failed-login.max-attempts:5}") int maxAttempts,
-            @org.springframework.beans.factory.annotation.Value("${app.security.failed-login.window-minutes:15}") long windowMinutes) {
+            @Value("${app.security.failed-login.max-attempts:5}") int maxAttempts,
+            @Value("${app.security.failed-login.window-minutes:15}") long windowMinutes) {
         this.redisTemplate = redisTemplate;
         this.maxAttempts = maxAttempts;
         this.windowMinutes = windowMinutes;

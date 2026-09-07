@@ -12,4 +12,9 @@ import java.lang.annotation.Target;
 public @interface Idempotent {
     String headerName() default "Idempotency-Key";
     boolean publicEndpoint() default false;
+    /**
+     * When true, requests without the idempotency header are rejected instead
+     * of silently bypassing the guard. Use for money-movement endpoints.
+     */
+    boolean required() default false;
 }

@@ -11,6 +11,7 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -22,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,7 +44,8 @@ class DomainEventOutboxAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper);
+        adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
+                new OutboxProperties(5, 50, 0, 2000));
     }
 
     @Test

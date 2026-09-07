@@ -12,12 +12,22 @@
 
     <artifactId>transfer</artifactId>
     <name>transfer</name>
-    <description>Transfer bounded context</description>
+    <description>[BC] Transfer bounded context (hexagonal slice). Consumes account-api only; never the account module.</description>
 
     <dependencies>
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>persistence</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>account-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -40,13 +50,11 @@
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
         </dependency>
+        <!-- spring-cache removed: transfer no longer uses @Cacheable/@CacheEvict directly.
+             Caching goes through AccountInfoCachePort; infrastructure owns the backend. -->
         <!-- Test dependencies -->
-        <dependency>
-            <groupId>com.bank</groupId>
-            <artifactId>user</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- user test-dep removed: BCs must stay compile- and test-independent.
+             Shared fixtures come from common test-jar only. -->
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>common</artifactId>

@@ -6,6 +6,8 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 public class TransferJpaMapper {
 
@@ -13,7 +15,7 @@ public class TransferJpaMapper {
         if (transfer == null) {
             throw new IllegalArgumentException("Transfer must not be null");
         }
-        return new TransferJpaEntity(
+        TransferJpaEntity entity = new TransferJpaEntity(
                 transfer.getId(),
                 transfer.getSenderAccountId(),
                 transfer.getReceiverAccountId(),
@@ -22,19 +24,24 @@ public class TransferJpaMapper {
                 transfer.getStatus().name(),
                 transfer.getVersion()
         );
+        entity.setBusinessCreatedAt(transfer.getCreatedAt());
+        return entity;
     }
 
     public Transfer toDomain(TransferJpaEntity entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
+        LocalDateTime createdAt = entity.getBusinessCreatedAt() != null
+                ? entity.getBusinessCreatedAt()
+                : entity.getCreatedAt();
         return new Transfer(
                 entity.getId(),
                 entity.getSenderAccountId(),
                 entity.getReceiverAccountId(),
                 Money.of(entity.getAmount(), Currency.valueOf(entity.getCurrency())),
                 TransferStatus.valueOf(entity.getStatus()),
-                entity.getCreatedAt(),
+                createdAt,
                 entity.getVersion()
         );
     }

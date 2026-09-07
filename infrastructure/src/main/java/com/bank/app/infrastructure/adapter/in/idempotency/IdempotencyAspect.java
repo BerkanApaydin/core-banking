@@ -4,7 +4,6 @@ import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -12,11 +11,12 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.user.application.port.out.ClientIpResolverPort;
 
 @Aspect
 @Component
@@ -26,12 +26,12 @@ public class IdempotencyAspect {
     private final IdempotencyGuard idempotencyGuard;
     private final UserContextService userContextService;
     private final ObjectMapper objectMapper;
-    private final ClientIpResolver clientIpResolver;
+    private final ClientIpResolverPort clientIpResolver;
 
     public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
             UserContextService userContextService,
             ObjectMapper objectMapper,
-            ClientIpResolver clientIpResolver) {
+            ClientIpResolverPort clientIpResolver) {
         this.idempotencyGuard = idempotencyGuard;
         this.userContextService = userContextService;
         this.objectMapper = objectMapper;
@@ -49,12 +49,17 @@ public class IdempotencyAspect {
         String idempotencyKeyHeader = request.getHeader(idempotent.headerName());
 
         if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
+            if (idempotent.required()) {
+                throw new ConcurrentRequestException("error.idempotency_key_required", null,
+                        "Idempotency-Key header is required for this operation.");
+            }
             return joinPoint.proceed();
         }
 
         String key;
         if (idempotent.publicEndpoint()) {
-            String clientIp = clientIpResolver.resolveClientIp(request);
+            String clientIp = clientIpResolver.resolveClientIp(
+                    request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
             key = clientIp + "_" + idempotencyKeyHeader;
         } else {
             String username = userContextService.getCurrentUsername()
@@ -96,20 +101,20 @@ public class IdempotencyAspect {
     }
 
     private Object buildCachedResponse(IdempotencyGuard.IdempotencyResult result) {
-        try {
-            HttpStatusCode status = result.responseStatus() != null
-                    ? HttpStatusCode.valueOf(result.responseStatus())
-                    : HttpStatusCode.valueOf(200);
+        HttpStatusCode status = result.responseStatus() != null
+                ? HttpStatusCode.valueOf(result.responseStatus())
+                : HttpStatusCode.valueOf(200);
 
-            String body = result.responseBody();
-            if (body == null || body.isBlank() || "null".equals(body)) {
-                return ResponseEntity.status(status).build();
-            }
-
-            JsonNode cachedBody = objectMapper.readValue(body, JsonNode.class);
-            return ResponseEntity.status(status).body(cachedBody);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to resolve idempotent cache response", e);
+        String body = result.responseBody();
+        if (body == null || body.isBlank() || "null".equals(body)) {
+            return ResponseEntity.status(status).build();
         }
+
+        // Return the stored payload byte-identical to the original response instead of
+        // re-deserializing it into a generic tree model, so replayed responses keep the
+        // exact JSON shape and content type of the first response.
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body);
     }
 }

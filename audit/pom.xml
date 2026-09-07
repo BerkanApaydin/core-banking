@@ -12,7 +12,7 @@
 
     <artifactId>audit</artifactId>
     <name>audit</name>
-    <description>Audit bounded context</description>
+    <description>[Supporting] Audit supporting subdomain: transactional audit log consumed via AFTER_COMMIT domain events.</description>
 
     <dependencies>
         <dependency>

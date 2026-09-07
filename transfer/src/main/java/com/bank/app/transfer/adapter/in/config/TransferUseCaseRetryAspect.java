@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.in.config;
 
+import com.bank.app.transfer.config.TransferProperties;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

@@ -29,7 +29,7 @@ class RateLimitingFilterTest {
         props.setTimeWindowMs(10_000);
         rateLimiter = new CaffeineRateLimiter(props);
         messageSource = mock(MessageSource.class);
-        clientIpResolver = new ClientIpResolver();
+        clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
         when(messageSource.getMessage(anyString(), any(), anyString(), any()))
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
@@ -277,8 +277,10 @@ class RateLimitingFilterTest {
         strictFilter.doFilter(req2, resp, mock(FilterChain.class));
 
         assertEquals(429, resp.getStatus());
-        assertTrue(resp.getContentType() != null && resp.getContentType().startsWith("application/json"));
+        assertTrue(resp.getContentType() != null && resp.getContentType().startsWith("application/problem+json"));
         assertEquals("UTF-8", resp.getCharacterEncoding());
+        assertTrue(resp.getContentAsString().contains("RATE_LIMIT_EXCEEDED"));
+        assertTrue(resp.getContentAsString().contains("Too many requests"));
     }
 
     @Test

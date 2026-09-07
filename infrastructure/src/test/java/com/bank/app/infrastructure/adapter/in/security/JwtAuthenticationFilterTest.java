@@ -1,7 +1,8 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
-import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,11 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,9 +30,6 @@ class JwtAuthenticationFilterTest {
     private JwtTokenProvider JwtTokenProvider;
 
     @Mock
-    private UserDetailsService userDetailsService;
-
-    @Mock
     private TokenBlacklistPort tokenBlacklistPort;
 
     @Mock
@@ -44,15 +41,12 @@ class JwtAuthenticationFilterTest {
     @Mock
     private FilterChain filterChain;
 
-    @Mock
-    private UserDetails userDetails;
-
     private JwtAuthenticationFilter filter;
     private SecurityContext originalContext;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(JwtTokenProvider, userDetailsService, tokenBlacklistPort);
+        filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, new ObjectMapper());
         originalContext = SecurityContextHolder.getContext();
         SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());
     }
@@ -70,7 +64,7 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(JwtTokenProvider, userDetailsService, tokenBlacklistPort);
+        verifyNoInteractions(JwtTokenProvider, tokenBlacklistPort);
     }
 
     @Test
@@ -81,7 +75,7 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(JwtTokenProvider, userDetailsService, tokenBlacklistPort);
+        verifyNoInteractions(JwtTokenProvider, tokenBlacklistPort);
     }
 
     @Test
@@ -89,12 +83,12 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer invalidjwt");
         when(JwtTokenProvider.extractUsername("invalidjwt")).thenThrow(new RuntimeException("invalid token"));
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(userDetailsService);
     }
 
     @Test
@@ -106,7 +100,6 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(userDetailsService);
     }
 
     @Test
@@ -121,14 +114,14 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain).doFilter(request, response);
         assertEquals(existingAuth, SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(userDetailsService);
     }
 
     @Test
     void shouldSkipAuthenticationWhenTokenIsInvalid() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
-        when(userDetailsService.loadUserByUsername("user")).thenReturn(userDetails);
+        when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
+        when(JwtTokenProvider.extractRole("token")).thenReturn("ROLE_USER");
         when(JwtTokenProvider.isTokenValid("token")).thenReturn(false);
 
         filter.doFilterInternal(request, response, filterChain);
@@ -141,9 +134,9 @@ class JwtAuthenticationFilterTest {
     void shouldSetAuthenticationWhenTokenIsValid() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
-        when(userDetailsService.loadUserByUsername("user")).thenReturn(userDetails);
+        when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
+        when(JwtTokenProvider.extractRole("token")).thenReturn("ROLE_USER");
         when(JwtTokenProvider.isTokenValid("token")).thenReturn(true);
-        when(userDetails.getAuthorities()).thenReturn(null);
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -159,9 +152,10 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer ");
         when(JwtTokenProvider.extractUsername("")).thenThrow(new RuntimeException("JWT string is empty"));
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
@@ -172,12 +166,13 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer blacklisted-token");
         when(tokenBlacklistPort.isBlacklisted("blacklisted-token")).thenReturn(true);
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Token has been revoked");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(JwtTokenProvider, userDetailsService);
+        verifyNoInteractions(JwtTokenProvider);
     }
 
     @Test
@@ -198,24 +193,30 @@ class JwtAuthenticationFilterTest {
         assertEquals("user", auth.getName());
         assertEquals(1, auth.getAuthorities().size());
         assertEquals("ROLE_USER", auth.getAuthorities().iterator().next().getAuthority());
-        verifyNoInteractions(userDetailsService);
     }
 
     @Test
-    @DisplayName("should fallback to UserDetailsService when JWT has no role claim")
-    void shouldFallbackToUserDetailsServiceWhenNoRoleClaim() throws Exception {
+    @DisplayName("should reject legacy token without role claim instead of DB fallback")
+    void shouldRejectLegacyTokenWithoutRoleClaim() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
         when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
         when(JwtTokenProvider.extractRole("token")).thenReturn(null);
-        when(userDetailsService.loadUserByUsername("user")).thenReturn(userDetails);
-        when(JwtTokenProvider.isTokenValid("token")).thenReturn(true);
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(filterChain).doFilter(request, response);
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        assertNotNull(auth);
-        verify(userDetailsService).loadUserByUsername("user");
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoMoreInteractions(filterChain);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    private static void assertProblemResponse(MockHttpServletResponse errorResponse, int status,
+            String code, String message) throws Exception {
+        assertEquals(status, errorResponse.getStatus());
+        assertTrue(errorResponse.getContentType().contains("application/problem+json"));
+        String body = errorResponse.getContentAsString();
+        assertTrue(body.contains("\"code\":\"" + code + "\""), "expected code " + code + " in: " + body);
+        assertTrue(body.contains(message), "expected message in: " + body);
     }
 }

@@ -1,0 +1,110 @@
+package com.bank.app.transfer.config;
+
+import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
+import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
+import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
+import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
+import com.bank.app.accountapi.AccountApi;
+import com.bank.app.transfer.adapter.out.account.AccountAclAdapter;
+import com.bank.app.transfer.adapter.out.account.InMemoryAccountInfoCacheAdapter;
+import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.transfer.application.port.out.AccountInfoCachePort;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
+import com.bank.app.transfer.application.port.out.SaveTransferPort;
+import com.bank.app.transfer.application.service.TransferAuthorizationService;
+import com.bank.app.transfer.application.service.TransferViewEnricher;
+import com.bank.app.transfer.application.usecase.CancelTransferUseCaseImpl;
+import com.bank.app.transfer.application.usecase.GenerateTransferReportQueryImpl;
+import com.bank.app.transfer.application.usecase.GetTransferDetailQueryImpl;
+import com.bank.app.transfer.application.usecase.GetTransferHistoryQueryImpl;
+import com.bank.app.transfer.application.usecase.PlaceTransferUseCaseImpl;
+import com.bank.app.transfer.domain.TransferDomainService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.annotation.EnableRetry;
+
+@Configuration
+@EnableRetry
+public class TransferBeanConfig {
+
+    private final TransferProperties transferProperties;
+
+    public TransferBeanConfig(TransferProperties transferProperties) {
+        this.transferProperties = transferProperties;
+    }
+
+    @Bean
+    public TransferDomainService transferDomainService() {
+        return new TransferDomainService();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AccountInfoCachePort.class)
+    public AccountInfoCachePort accountInfoCachePort() {
+        return new InMemoryAccountInfoCacheAdapter();
+    }
+
+    @Bean
+    public AccountAclPort accountAclPort(AccountApi accountApi, AccountInfoCachePort cache) {
+        return new AccountAclAdapter(accountApi, cache);
+    }
+
+    @Bean
+    public TransferAuthorizationService transferAuthorizationService(AccountAclPort accountAclPort,
+                                                                       UserContextService userContextService) {
+        return new TransferAuthorizationService(accountAclPort, userContextService);
+    }
+
+    @Bean
+    public TransferViewEnricher transferViewEnricher(AccountAclPort accountAclPort) {
+        return new TransferViewEnricher(accountAclPort);
+    }
+
+    @Bean
+    public PlaceTransferUseCase placeTransferUseCase(AccountAclPort accountAclPort,
+                                                       SaveTransferPort saveTransferPort,
+                                                       TransferDomainService transferDomainService,
+                                                       TransferAuthorizationService transferAuthorizationService,
+                                                       DomainEventPublisherService domainEventPublisherService,
+                                                       ClockProviderPort clockProvider) {
+        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider);
+    }
+
+    @Bean
+    public CancelTransferUseCase cancelTransferUseCase(LoadTransferPort loadTransferPort,
+                                                           SaveTransferPort saveTransferPort,
+                                                           AccountAclPort accountAclPort,
+                                                           AuditEventPort auditEventPort,
+                                                           TransferAuthorizationService transferAuthorizationService,
+                                                           DomainEventPublisherService domainEventPublisherService,
+                                                           ClockProviderPort clockProvider) {
+        return new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort, accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, transferProperties.cancellationWindowHours());
+    }
+
+    @Bean
+    public GenerateTransferReportQuery generateTransferReportQuery(LoadTransferPort loadTransferPort,
+                                                                      TransferViewEnricher viewEnricher,
+                                                                      TransferAuthorizationService transferAuthorizationService) {
+        return new GenerateTransferReportQueryImpl(loadTransferPort, viewEnricher, transferAuthorizationService, transferProperties.maxPageSize());
+    }
+
+    @Bean
+    public GetTransferDetailQuery getTransferDetailQuery(LoadTransferPort loadTransferPort,
+                                                            AccountAclPort accountAclPort,
+                                                            TransferAuthorizationService transferAuthorizationService) {
+        return new GetTransferDetailQueryImpl(loadTransferPort, accountAclPort, transferAuthorizationService);
+    }
+
+    @Bean
+    public GetTransferHistoryQuery getTransferHistoryQuery(LoadTransferPort loadTransferPort,
+                                                              TransferViewEnricher viewEnricher,
+                                                              TransferAuthorizationService transferAuthorizationService) {
+        return new GetTransferHistoryQueryImpl(loadTransferPort, viewEnricher, transferAuthorizationService, transferProperties.maxPageSize());
+    }
+}

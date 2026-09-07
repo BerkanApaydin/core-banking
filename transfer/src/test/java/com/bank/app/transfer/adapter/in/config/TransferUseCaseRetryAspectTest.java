@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.in.config;
 
+import com.bank.app.transfer.config.TransferProperties;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,7 +21,7 @@ import static org.mockito.Mockito.when;
 class TransferUseCaseRetryAspectTest {
 
     private final TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-            new TransferProperties(24, 3, 50, 500));
+            new TransferProperties(24, 3, 50, 500, 100));
 
     @Mock
     private ProceedingJoinPoint joinPoint;
@@ -78,7 +79,7 @@ class TransferUseCaseRetryAspectTest {
             // L35 mutant (attempt <= maxAttempts → attempt < maxAttempts) skips the loop entirely,
             // leaving lastException=null and throwing IllegalStateException instead.
             TransferUseCaseRetryAspect aspect1 = new TransferUseCaseRetryAspect(
-                    new TransferProperties(24, 1, 100, 1000));
+                    new TransferProperties(24, 1, 100, 1000, 100));
             OptimisticLockingFailureException original = new OptimisticLockingFailureException("conflict");
             when(joinPoint.proceed()).thenThrow(original);
 
@@ -96,7 +97,7 @@ class TransferUseCaseRetryAspectTest {
             // L42 delay/2: sleep(1000) + sleep(500) = ~1500ms (< 2000 assertion fails)
             // L41 removed sleep: ~0ms (< 2000 assertion fails)
             TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                    new TransferProperties(24, 3, 1000, 10000));
+                    new TransferProperties(24, 3, 1000, 10000, 100));
             when(joinPoint.proceed())
                     .thenThrow(new OptimisticLockingFailureException("1"))
                     .thenThrow(new OptimisticLockingFailureException("2"))

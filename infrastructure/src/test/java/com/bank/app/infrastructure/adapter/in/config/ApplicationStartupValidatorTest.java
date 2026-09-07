@@ -85,7 +85,7 @@ class ApplicationStartupValidatorTest {
     }
 
     @Test
-    void shouldNotThrowWhenDatabasePasswordIsDefaultInProd() {
+    void shouldThrowWhenDatabasePasswordIsDefaultInProd() {
         when(environment.getActiveProfiles())
                 .thenReturn(new String[] { "prod" });
 
@@ -97,7 +97,12 @@ class ApplicationStartupValidatorTest {
                 "spring.datasource.password",
                 "")).thenReturn("bank_password");
 
-        assertDoesNotThrow(() -> validator.validateProductionConfig());
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> validator.validateProductionConfig());
+
+        assertThat(exception.getMessage())
+                .contains("default database password");
     }
 
     @Test

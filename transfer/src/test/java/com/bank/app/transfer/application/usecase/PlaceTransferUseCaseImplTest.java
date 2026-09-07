@@ -5,7 +5,6 @@ import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.application.port.out.ClockProviderPort;
-import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -18,6 +17,7 @@ import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferDomainService;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
+import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +101,12 @@ class PlaceTransferUseCaseImplTest {
         when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN)).thenReturn(receiverInfo());
     }
 
+    private void stubBalanceAdjustment() {
+        when(accountAclPort.debitAndCredit(any(), any(), any()))
+                .thenReturn(new AccountAclPort.MutationResult(SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+                        new Money(AMOUNT, Currency.TRY), new Money(AMOUNT, Currency.TRY)));
+    }
+
     @Nested
     @DisplayName("happy path")
     class HappyPath {
@@ -118,8 +123,7 @@ class PlaceTransferUseCaseImplTest {
                         return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
-            when(accountAclPort.debitAndCredit(any(), any(), any()))
-                    .thenReturn(List.of(mock(DomainEvent.class), mock(DomainEvent.class)));
+            stubBalanceAdjustment();
 
             TransferResponse response = placeTransferUseCase.execute(validRequest());
 
@@ -129,7 +133,7 @@ class PlaceTransferUseCaseImplTest {
             assertThat(response.currency()).isEqualTo("TRY");
             assertThat(response.senderIban()).isEqualTo(SENDER_IBAN);
             assertThat(response.receiverIban()).isEqualTo(RECEIVER_IBAN);
-            assertThat(response.status()).isEqualTo("COMPLETED");
+            assertThat(response.status()).isEqualTo(TransferStatus.COMPLETED);
 
             verify(accountAclPort).getAccountInfoForTransfer(SENDER_IBAN);
             verify(accountAclPort).getAccountInfoForTransfer(RECEIVER_IBAN);
@@ -138,7 +142,8 @@ class PlaceTransferUseCaseImplTest {
             verify(accountAclPort).debitAndCredit(SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
                     new Money(AMOUNT, Currency.TRY));
             verify(saveTransferPort, times(2)).save(any(Transfer.class));
-            verify(domainEventPublisherService, times(2)).publish(any());
+            // Account publishes its own events; transfer publishes only its own.
+            verify(domainEventPublisherService, never()).publish(any());
             verify(domainEventPublisherService).publishEvents(any());
         }
 
@@ -154,8 +159,7 @@ class PlaceTransferUseCaseImplTest {
                         return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
-            when(accountAclPort.debitAndCredit(any(), any(), any()))
-                    .thenReturn(List.of(mock(DomainEvent.class), mock(DomainEvent.class)));
+            stubBalanceAdjustment();
 
             placeTransferUseCase.execute(validRequest());
 
@@ -223,11 +227,11 @@ class PlaceTransferUseCaseImplTest {
         @DisplayName("should throw when sender is not authorized")
         void shouldThrowWhenNotAuthorized() {
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(senderInfo());
-            doThrow(new org.springframework.security.access.AccessDeniedException("yetki yok"))
+            doThrow(new AuthorizationException("yetki yok"))
                     .when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
-                    .isExactlyInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                    .isExactlyInstanceOf(AuthorizationException.class);
             verify(saveTransferPort, never()).save(any());
             verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
         }
@@ -310,8 +314,7 @@ class PlaceTransferUseCaseImplTest {
                         return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
-            when(accountAclPort.debitAndCredit(any(), any(), any()))
-                    .thenReturn(List.of(mock(DomainEvent.class), mock(DomainEvent.class)));
+            stubBalanceAdjustment();
             doThrow(new RuntimeException("Event bus unavailable"))
                     .when(domainEventPublisherService).publishEvents(any());
 
@@ -323,7 +326,7 @@ class PlaceTransferUseCaseImplTest {
                     any(Money.class));
             verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
             verify(saveTransferPort, times(2)).save(transferCaptor.capture());
-            verify(domainEventPublisherService, times(2)).publish(any());
+            verify(domainEventPublisherService, never()).publish(any());
             verify(domainEventPublisherService).publishEvents(any());
         }
 

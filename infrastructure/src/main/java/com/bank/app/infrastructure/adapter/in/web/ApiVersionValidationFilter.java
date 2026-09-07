@@ -40,9 +40,14 @@ public class ApiVersionValidationFilter implements Filter {
                 httpResponse.setStatus(HttpStatus.NOT_ACCEPTABLE.value());
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
+                // Never reflect the raw header: quote/control characters would
+                // break the JSON body (and quoted reflection is an XSS vector
+                // if ever rendered). Emit only a safe allowlisted token.
+                String safeHeader = versionHeader.matches("[A-Za-z0-9._-]{1,16}")
+                        ? versionHeader : "invalid";
                 httpResponse.getWriter().write(
                         "{\"status\":406,\"error\":\"API version mismatch\",\"message\":\"X-API-Version header '" +
-                        versionHeader + "' does not match requested API version '" + pathVersion + "'\"}");
+                        safeHeader + "' does not match requested API version '" + pathVersion + "'\"}");
                 return;
             }
         }

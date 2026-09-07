@@ -5,6 +5,7 @@ import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.application.usecase.AuditLoggerUseCaseImpl;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.UserContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,12 +28,15 @@ class AuditLoggerTest {
     private SaveAuditLogPort saveAuditLogPort;
     @Mock
     private UserContextService userContextService;
+    @Mock
+    private ClockProviderPort clockProvider;
 
     private AuditLoggerUseCase auditLogger;
 
     @BeforeEach
     void setUp() {
-        auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, userContextService);
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
+        auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, userContextService, clockProvider);
     }
 
     @Test

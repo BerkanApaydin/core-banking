@@ -1,8 +1,11 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.util.List;
 
@@ -16,8 +19,8 @@ class CorsConfigTest {
         CorsConfig corsConfig = new CorsConfig(properties);
 
         CorsConfigurationSource source = corsConfig.corsConfigurationSource();
-        jakarta.servlet.http.HttpServletRequest request = org.mockito.Mockito.mock(jakarta.servlet.http.HttpServletRequest.class);
-        org.mockito.Mockito.when(request.getAttribute(org.springframework.web.util.UrlPathHelper.PATH_ATTRIBUTE)).thenReturn("/");
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getAttribute(UrlPathHelper.PATH_ATTRIBUTE)).thenReturn("/");
         CorsConfiguration config = source.getCorsConfiguration(request);
 
         assertThat(config).isNotNull();

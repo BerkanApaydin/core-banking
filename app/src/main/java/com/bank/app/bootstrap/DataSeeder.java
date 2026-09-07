@@ -2,9 +2,9 @@ package com.bank.app.bootstrap;
 
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.user.adapter.out.security.CustomUserDetails;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -14,11 +14,14 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -87,7 +90,7 @@ public class DataSeeder {
     }
 
     private void runAsUser(Long userId, String username, Runnable action) {
-        var details = new CustomUserDetails(userId, username, "",
+        var details = new SeedPrincipal(userId, username,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
         var auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -95,6 +98,35 @@ public class DataSeeder {
             action.run();
         } finally {
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    /**
+     * Bootstrap-owned principal so {@code app} never depends on an
+     * infrastructure concrete adapter class. Consumed only through
+     * {@link AuthenticatedPrincipalPort} by the security adapter.
+     */
+    static final class SeedPrincipal extends User
+            implements AuthenticatedPrincipalPort {
+
+        private static final long serialVersionUID = 1L;
+
+        private final Long userId;
+
+        SeedPrincipal(Long userId, String username,
+                Collection<? extends GrantedAuthority> authorities) {
+            super(username, "", authorities);
+            this.userId = userId;
+        }
+
+        @Override
+        public Long getAuthenticatedUserId() {
+            return userId;
+        }
+
+        @Override
+        public String getAuthenticatedUsername() {
+            return getUsername();
         }
     }
 }

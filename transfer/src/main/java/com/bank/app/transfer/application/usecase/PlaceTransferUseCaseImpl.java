@@ -5,7 +5,6 @@ import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
@@ -19,7 +18,6 @@ import com.bank.app.transfer.domain.TransferParticipants;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -65,12 +63,13 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
         Transfer savedTransfer = saveTransferPort.save(transfer);
 
-        List<DomainEvent> accountEvents = accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
+        // Balance mutation runs in the Account context, which publishes its own
+        // domain events. Transfer only publishes its own events below.
+        accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
         savedTransfer.complete(clockProvider.clock());
         saveTransferPort.save(savedTransfer);
 
-        accountEvents.forEach(domainEventPublisherService::publish);
         domainEventPublisherService.publishEvents(savedTransfer);
 
         log.info("Transfer completed: id={}, senderId={}, receiverId={}",

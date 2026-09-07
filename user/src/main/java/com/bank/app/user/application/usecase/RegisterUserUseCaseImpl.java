@@ -1,6 +1,7 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -25,15 +26,18 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     private final PasswordEncoderPort passwordEncoderPort;
     private final PasswordPolicy passwordPolicy;
     private final DomainEventPublisherService domainEventPublisherService;
+    private final ClockProviderPort clockProvider;
 
     public RegisterUserUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
                                     PasswordEncoderPort passwordEncoderPort, PasswordPolicy passwordPolicy,
-                                    DomainEventPublisherService domainEventPublisherService) {
+                                    DomainEventPublisherService domainEventPublisherService,
+                                    ClockProviderPort clockProvider) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
         this.passwordEncoderPort = passwordEncoderPort;
         this.passwordPolicy = passwordPolicy;
         this.domainEventPublisherService = domainEventPublisherService;
+        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -50,7 +54,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         String encodedPassword = passwordEncoderPort.encode(request.password());
         EmailAddress email = request.email() != null ? new EmailAddress(request.email()) : null;
         PhoneNumber phone = request.phone() != null ? new PhoneNumber(request.phone()) : null;
-        User user = User.create(request.username(), encodedPassword, email, phone);
+        User user = User.create(request.username(), encodedPassword, email, phone, clockProvider.clock());
         saveUserPort.save(user);
         domainEventPublisherService.publishEvents(user);
 

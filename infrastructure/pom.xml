@@ -12,7 +12,7 @@
 
     <artifactId>infrastructure</artifactId>
     <name>infrastructure</name>
-    <description>Cross-cutting infrastructure: security, rate-limiting, idempotency, outbox, caching, web filters</description>
+    <description>[Platform] Cross-cutting adapters implementing context-owned ports: security filter chain, JWT/token-blacklist backends, outbox/idempotency persistence, rate limiting, caching, web filters, exception handling. Depends only on port-owning modules (common, user, audit, transfer for cache port) — never on account internals.</description>
 
     <dependencies>
         <dependency>
@@ -20,10 +20,17 @@
             <artifactId>common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- account: compile scope removed on purpose (Hexagon DIP — infrastructure
+             must never depend on account internals; cross-context reads go via the
+             account-api published language through transfer's ACL).
+             Test scope kept: infrastructure IT slices scan transfer's controllers,
+             whose wiring needs an AccountApi implementation at test runtime.
+             Production wires the real one via the app composition root. -->
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>account</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
@@ -85,6 +92,10 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

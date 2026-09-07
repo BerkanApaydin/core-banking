@@ -4,8 +4,7 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.List;
@@ -29,8 +28,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<Account> findByIbanWithLock(Iban iban) {
-        return repository.findByIbanWithLock(Iban.normalize(iban.value()))
+    public Optional<Account> findByIbanForUpdate(Iban iban) {
+        return repository.findByIbanForUpdate(Iban.normalize(iban.value()))
                 .map(mapper::toDomain);
     }
 
@@ -44,29 +43,21 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<Account> findByIdWithLock(Long id) {
-        return repository.findByIdWithLock(id)
+    public Optional<Account> findByIdForUpdate(Long id) {
+        return repository.findByIdForUpdate(id)
                 .map(mapper::toDomain);
     }
 
     @Override
-    @Deprecated(since = "1.0", forRemoval = false)
-    public List<Account> findAll() {
-        return repository.findAll().stream()
+    public List<Account> findByUserId(Long userId, int page, int size) {
+        return repository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size)).stream()
                 .map(mapper::toDomain)
                 .toList();
     }
 
     @Override
-    public Page<Account> findAll(Pageable pageable) {
-        return repository.findAll(pageable)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<Account> findByUserId(Long userId, Pageable pageable) {
-        return repository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
-                .map(mapper::toDomain);
+    public long countByUserId(Long userId) {
+        return repository.countByUserId(userId);
     }
 
     @Override

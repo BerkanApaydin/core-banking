@@ -1,6 +1,8 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,7 +19,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -27,13 +28,13 @@ public class RateLimitingFilter implements Filter {
     private final MessageSource messageSource;
     private final List<String> rateLimitedPaths;
     private final ObjectMapper objectMapper;
-    private final ClientIpResolver clientIpResolver;
+    private final ClientIpResolverPort clientIpResolver;
 
     public RateLimitingFilter(RateLimiter rateLimiter,
                               MessageSource messageSource,
                               RateLimitProperties rateLimitProperties,
                               ObjectMapper objectMapper,
-                              ClientIpResolver clientIpResolver) {
+                              ClientIpResolverPort clientIpResolver) {
         this.rateLimiter = rateLimiter;
         this.messageSource = messageSource;
         this.rateLimitedPaths = rateLimitProperties.getPaths();
@@ -61,16 +62,16 @@ public class RateLimitingFilter implements Filter {
 
         boolean matchesRateLimitedPath = rateLimitedPaths.stream().anyMatch(path::startsWith);
         if (matchesRateLimitedPath) {
-            String ip = clientIpResolver.resolveClientIp(httpRequest);
+            String ip = clientIpResolver.resolveClientIp(
+                    httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
 
             if (!rateLimiter.tryAcquire(ip)) {
                 String message = messageSource.getMessage("error.rate_limit_exceeded", null,
                         "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
-                httpResponse.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                httpResponse.setContentType("application/json");
-                httpResponse.setCharacterEncoding("UTF-8");
-                String json = objectMapper.writeValueAsString(Map.of("status", 429, "message", message));
-                httpResponse.getWriter().write(json);
+                // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
+                // not depend on the domain.exception package (see ArchitectureTest).
+                ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
+                        "RATE_LIMIT_EXCEEDED", message, path);
                 return;
             }
         }

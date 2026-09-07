@@ -13,6 +13,13 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 @Component
 public class UseCaseTransactionAspect {
 
+    /**
+     * Upper bound for a single use-case transaction. Programmatic transactions do not
+     * inherit Spring's {@code @Transactional(timeout=..)} semantics, so the timeout is
+     * set explicitly to avoid hung row locks (e.g. PESSIMISTIC_WRITE on accounts).
+     */
+    private static final int TRANSACTION_TIMEOUT_SECONDS = 30;
+
     private final PlatformTransactionManager transactionManager;
 
     public UseCaseTransactionAspect(PlatformTransactionManager transactionManager) {
@@ -32,6 +39,7 @@ public class UseCaseTransactionAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
+        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
         return executeWithTransaction(joinPoint, def);
     }
 
@@ -40,6 +48,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setReadOnly(true);
+        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
         return executeWithTransaction(joinPoint, def);
     }
 
@@ -48,6 +57,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
         return executeWithTransaction(joinPoint, def);
     }
 

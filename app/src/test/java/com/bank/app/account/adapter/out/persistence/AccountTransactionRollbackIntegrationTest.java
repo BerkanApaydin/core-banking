@@ -4,7 +4,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.user.adapter.out.security.CustomUserDetails;
+import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
                 user = userRepository.save(user);
                 userId = user.getId();
 
-                var details = new CustomUserDetails(user.getId(), "testuser", "",
+                var details = new SimpleAuthenticatedPrincipal(user.getId(), "testuser",
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
                 var auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);

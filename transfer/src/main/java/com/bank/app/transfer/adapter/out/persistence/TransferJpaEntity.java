@@ -1,6 +1,6 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
-import com.bank.app.common.adapter.out.persistence.AuditableJpaEntity;
+import com.bank.app.persistence.AuditableJpaEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "transfers")
@@ -32,6 +33,16 @@ public class TransferJpaEntity extends AuditableJpaEntity {
 
     @Column(nullable = false)
     private String status;
+
+    /**
+     * Business creation instant assigned by the domain ({@code Transfer.create}).
+     * Kept separate from the auditing {@code created_at} populated at insert time,
+     * so the cancellation window and time-travel tests stay deterministic across
+     * save→reload round trips. Null for rows written before V20 (mapper falls back
+     * to the auditing timestamp).
+     */
+    @Column(name = "business_created_at")
+    private LocalDateTime businessCreatedAt;
 
     @Version
     private Long version;
@@ -96,6 +107,14 @@ public class TransferJpaEntity extends AuditableJpaEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public LocalDateTime getBusinessCreatedAt() {
+        return businessCreatedAt;
+    }
+
+    public void setBusinessCreatedAt(LocalDateTime businessCreatedAt) {
+        this.businessCreatedAt = businessCreatedAt;
     }
 
     public Long getVersion() {

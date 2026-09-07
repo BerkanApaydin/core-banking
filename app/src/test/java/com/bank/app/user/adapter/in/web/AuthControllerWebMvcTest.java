@@ -6,7 +6,6 @@ import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
 import com.bank.app.user.application.dto.AuthRequest;
-import jakarta.servlet.http.HttpServletRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -57,7 +56,7 @@ class AuthControllerWebMvcTest {
 
     @BeforeEach
     void setUp() {
-        when(clientIpResolver.resolveClientIp(any(HttpServletRequest.class))).thenReturn("1.2.3.4");
+        when(clientIpResolver.resolveClientIp(any(), any())).thenReturn("1.2.3.4");
     }
 
     @Nested

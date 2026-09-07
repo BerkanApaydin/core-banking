@@ -5,7 +5,6 @@ import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.event.AuditEvent;
-import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
@@ -16,7 +15,6 @@ import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -54,7 +52,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     @Override
     public void execute(Long transferId) {
         Objects.requireNonNull(transferId, "Transfer ID must not be null");
-        Transfer transfer = loadTransferPort.findByIdWithLock(transferId)
+        Transfer transfer = loadTransferPort.findByIdForUpdate(transferId)
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
         Long senderAccountId = transfer.getSenderAccountId();
@@ -64,18 +62,19 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         transfer.cancel(clockProvider.clock(), cancellationWindowHours);
 
-        List<DomainEvent> accountEvents = accountAclPort.reverseBalancesForCancellation(
+        // Balance reversal runs in the Account context, which publishes its own
+        // domain events. Transfer only publishes its own events below.
+        accountAclPort.reverseBalancesForCancellation(
                 senderAccountId, receiverAccountId, transfer.getAmount());
 
         saveTransferPort.save(transfer);
 
         log.info("Transfer cancelled: id={}", transfer.getId());
 
-        accountEvents.forEach(domainEventPublisherService::publish);
         domainEventPublisherService.publishEvents(transfer);
         auditEventPort.publish(new AuditEvent("TRANSFER_CANCELLED",
             String.format("Transfer cancelled. Transfer ID: %d", transfer.getId()),
-            LocalDateTime.now()));
+            LocalDateTime.now(clockProvider.clock())));
     }
 
 }

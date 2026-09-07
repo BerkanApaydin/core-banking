@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
-import com.bank.app.common.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;

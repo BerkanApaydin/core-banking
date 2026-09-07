@@ -1,6 +1,6 @@
 package com.bank.app.user.adapter.out.persistence;
 
-import com.bank.app.common.adapter.out.persistence.AuditableJpaEntity;
+import com.bank.app.persistence.AuditableJpaEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

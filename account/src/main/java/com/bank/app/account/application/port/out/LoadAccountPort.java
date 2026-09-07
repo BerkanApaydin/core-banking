@@ -2,29 +2,22 @@ package com.bank.app.account.application.port.out;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.lang.Nullable;
-
 public interface LoadAccountPort {
     Optional<Account> findByIban(Iban iban);
 
-    Optional<Account> findByIbanWithLock(Iban iban);
+    Optional<Account> findByIbanForUpdate(Iban iban);
 
-    Optional<Account> findById(@Nullable Long id);
+    Optional<Account> findById(Long id);
 
-    Optional<Account> findByIdWithLock(Long id);
+    Optional<Account> findByIdForUpdate(Long id);
 
-    @Deprecated(since = "1.0", forRemoval = false)
-    List<Account> findAll();
+    List<Account> findByUserId(Long userId, int page, int size);
 
-    Page<Account> findByUserId(Long userId, Pageable pageable);
-
-    Page<Account> findAll(Pageable pageable);
+    long countByUserId(Long userId);
 
     List<Account> findByIds(Collection<Long> ids);
 }

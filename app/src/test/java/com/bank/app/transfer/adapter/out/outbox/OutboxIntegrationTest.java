@@ -7,6 +7,9 @@ import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.domain.TransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxPoller;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
 import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaEntity;
@@ -25,7 +28,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -37,6 +43,7 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = com.bank.app.BankApplication.class)
 @SuppressWarnings("null")
+@TestMethodOrder(OrderAnnotation.class)
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Autowired
@@ -110,6 +117,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    @Order(1)
     void shouldCreateOutboxEventAndProcessThroughRealPipeline() {
         TransferRequest request = new TransferRequest(
                 "TR290006200000000000000111",
@@ -144,6 +152,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    @Order(2)
     void shouldIncrementRetryCountOnFailedProcessing() {
         OutboxJpaEntity entity = new OutboxJpaEntity(
                 UUID.randomUUID().toString(),
@@ -162,6 +171,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    @Order(3)
     void shouldMoveToDeadLetterAfterMaxRetries() {
         OutboxJpaEntity entity = new OutboxJpaEntity(
                 UUID.randomUUID().toString(),
@@ -180,14 +190,15 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    @Order(4)
     void shouldProcessMultipleEventsInOnePoll() throws Exception {
         for (int i = 0; i < 3; i++) {
-            com.bank.app.transfer.domain.TransferCompletedEvent payload = new com.bank.app.transfer.domain.TransferCompletedEvent(
+            TransferCompletedEvent payload = new TransferCompletedEvent(
                     100L + i, 1L, 2L,
-                    com.bank.app.common.domain.Money.of(
+                    Money.of(
                             new BigDecimal("10.00"),
-                            com.bank.app.common.domain.Currency.TRY),
-                    com.bank.app.transfer.domain.TransferStatus.COMPLETED,
+                            Currency.TRY),
+                    TransferStatus.COMPLETED,
                     LocalDateTime.now());
             OutboxJpaEntity entity = new OutboxJpaEntity(
                     UUID.randomUUID().toString(),

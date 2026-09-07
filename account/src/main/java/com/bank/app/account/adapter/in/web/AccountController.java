@@ -11,8 +11,11 @@ import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +28,7 @@ import io.swagger.v3.oas.annotations.Operation;
 
 @RestController
 @ApiVersion("v1")
+@Validated
 @RequestMapping("/accounts")
 @Tag(name = "Account API", description = "API for managing bank accounts")
 public class AccountController {
@@ -57,8 +61,8 @@ public class AccountController {
     @GetMapping
     @Operation(summary = "Lists all accounts with pagination")
     public ResponseEntity<PageResponse<AccountResponse>> listAccounts(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ResponseEntity.ok(getAccountsByUserQuery.execute(page, size));
     }
 

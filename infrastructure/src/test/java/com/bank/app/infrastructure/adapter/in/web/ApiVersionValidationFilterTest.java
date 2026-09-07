@@ -172,4 +172,20 @@ class ApiVersionValidationFilterTest {
         verify(chain).doFilter(request, response);
         assertEquals(200, response.getStatus());
     }
+
+    @Test
+    void shouldNotReflectMaliciousVersionHeader() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/auth/login");
+        request.addHeader("X-API-Version", "v2\"<script>alert(1)</script>");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(406, response.getStatus());
+        String body = response.getContentAsString();
+        assertFalse(body.contains("<script>"));
+        assertTrue(body.contains("invalid"));
+    }
 }
