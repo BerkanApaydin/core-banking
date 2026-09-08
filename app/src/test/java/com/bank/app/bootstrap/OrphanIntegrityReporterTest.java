@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -138,7 +139,7 @@ class OrphanIntegrityReporterTest {
     @Test
     void shouldIncrementAlarmCounterWhenThresholdExceeded() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
-        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var registry = new SimpleMeterRegistry();
 
         new OrphanIntegrityReporter(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 0)).reportOrphans();
@@ -150,7 +151,7 @@ class OrphanIntegrityReporterTest {
     @Test
     void shouldNotIncrementAlarmCounterWhenBelowThreshold() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
-        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var registry = new SimpleMeterRegistry();
 
         new OrphanIntegrityReporter(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
@@ -168,7 +169,7 @@ class OrphanIntegrityReporterTest {
         return findEventAtLevel(Level.WARN);
     }
 
-    private ILoggingEvent findEventAtLevel(ch.qos.logback.classic.Level level) {
+    private ILoggingEvent findEventAtLevel(Level level) {
         Logger logger =
                 (Logger) LoggerFactory.getLogger(OrphanIntegrityReporter.class);
         ListAppender<ILoggingEvent> appender =

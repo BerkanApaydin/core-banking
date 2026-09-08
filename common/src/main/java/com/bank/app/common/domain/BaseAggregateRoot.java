@@ -5,6 +5,7 @@ import com.bank.app.common.domain.event.DomainEventProvider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public abstract class BaseAggregateRoot implements DomainEventProvider {
 
@@ -21,6 +22,6 @@ public abstract class BaseAggregateRoot implements DomainEventProvider {
     }
 
     protected void registerEvent(DomainEvent event) {
-        domainEvents.add(java.util.Objects.requireNonNull(event, "Domain event must not be null"));
+        domainEvents.add(Objects.requireNonNull(event, "Domain event must not be null"));
     }
 }

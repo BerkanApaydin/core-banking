@@ -8,9 +8,11 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -554,7 +556,7 @@ class GlobalExceptionHandlerTest {
         when(path.toString()).thenReturn("getHistory.size");
         when(violation.getPropertyPath()).thenReturn(path);
         when(violation.getMessage()).thenReturn("must be less than or equal to 100");
-        java.util.Set violations = new java.util.HashSet(java.util.List.of(violation));
+        Set violations = new HashSet(List.of(violation));
         jakarta.validation.ConstraintViolationException ex =
                 new jakarta.validation.ConstraintViolationException("validation failed", violations);
 

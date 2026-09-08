@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_AUTHORIZATION = "Authorization";
+    private static final String MDC_USER_KEY = "userId";
     // Single generic message for revoked AND invalid tokens: distinct messages
     // let callers oracle whether a token was revoked (information disclosure).
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
@@ -108,6 +110,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authToken.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                // MDC userId for downstream logs (prod JSON layout renders it).
+                // Removed in the finally below: Tomcat threads are reused and
+                // MDC is a ThreadLocal — leaking it would attribute the next
+                // request's logs to this user.
+                MDC.put(MDC_USER_KEY, String.valueOf(userId));
             }
         } catch (Exception e) {
             log.warn("JWT authentication failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
@@ -116,6 +123,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
             return;
         }
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove(MDC_USER_KEY);
+        }
     }
 }

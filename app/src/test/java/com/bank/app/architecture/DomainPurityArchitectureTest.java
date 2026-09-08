@@ -1,5 +1,7 @@
 package com.bank.app.architecture;
 
+import com.bank.app.user.domain.Role;
+import com.bank.app.user.domain.User;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
@@ -130,8 +132,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app..")
                 .and().resideOutsideOfPackage("com.bank.app.user.domain..")
-                .should().callMethod(com.bank.app.user.domain.User.class, "assignRole",
-                        com.bank.app.user.domain.Role.class)
+                .should().callMethod(User.class, "assignRole", Role.class)
                 .allowEmptyShould(true);
 
         rule.check(importedClasses);

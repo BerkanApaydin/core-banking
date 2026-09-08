@@ -57,6 +57,8 @@ public class SecurityConfig {
                 .httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true)
                     .maxAgeInSeconds(31536000))
+                .referrerPolicy(referrer -> referrer
+                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'")));
 
@@ -77,6 +79,8 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Cost 12 (~250ms/encode): existing hashes keep verifying (cost is
+        // embedded in the hash), only new encodings pay the higher price.
+        return new BCryptPasswordEncoder(12);
     }
 }

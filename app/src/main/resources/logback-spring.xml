@@ -19,6 +19,7 @@
                             "correlationId": "%mdc{correlationId}",
                             "traceId": "%mdc{traceId}",
                             "spanId": "%mdc{spanId}",
+                            "userId": "%mdc{userId}",
                             "exception": "%exception"
                             }
                         </pattern>

@@ -3,6 +3,7 @@ package com.bank.app.accountapi;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -60,7 +61,7 @@ class AccountSnapshotCacheDefaultsTest {
     @Test
     void shouldBuildOrderInsensitiveBatchKeys() {
         assertEquals(
-                AccountSnapshotCache.ibansBatchKey(java.util.List.of(2L, 1L)),
-                AccountSnapshotCache.ibansBatchKey(java.util.List.of(1L, 2L)));
+                AccountSnapshotCache.ibansBatchKey(List.of(2L, 1L)),
+                AccountSnapshotCache.ibansBatchKey(List.of(1L, 2L)));
     }
 }

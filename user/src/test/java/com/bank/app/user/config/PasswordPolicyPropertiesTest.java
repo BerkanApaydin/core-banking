@@ -1,5 +1,6 @@
 package com.bank.app.user.config;
 
+import com.bank.app.user.domain.PasswordPolicy;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,7 +11,7 @@ class PasswordPolicyPropertiesTest {
     @Test
     void shouldBuildDefaultPolicy() {
         assertThat(new PasswordPolicyProperties(8, true, true, true).toDomain())
-                .isEqualTo(new com.bank.app.user.domain.PasswordPolicy(8, true, true, true));
+                .isEqualTo(new PasswordPolicy(8, true, true, true));
     }
 
     @Test

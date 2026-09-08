@@ -11,6 +11,10 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -203,9 +207,9 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should fail when a new entity column is added without mapping decision")
         void shouldRejectUnmappedColumns() {
-            java.util.Set<String> declared = new java.util.HashSet<>();
-            for (java.lang.reflect.Field field : TransferJpaEntity.class.getDeclaredFields()) {
-                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+            java.util.Set<String> declared = new HashSet<>();
+            for (Field field : TransferJpaEntity.class.getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers())) {
                     declared.add(field.getName());
                 }
             }

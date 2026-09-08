@@ -27,6 +27,7 @@ public class RateLimitingFilter implements Filter {
     private final RateLimiter rateLimiter;
     private final MessageSource messageSource;
     private final List<String> rateLimitedPaths;
+    private final long retryAfterSeconds;
     private final ObjectMapper objectMapper;
     private final ClientIpResolverPort clientIpResolver;
 
@@ -38,6 +39,9 @@ public class RateLimitingFilter implements Filter {
         this.rateLimiter = rateLimiter;
         this.messageSource = messageSource;
         this.rateLimitedPaths = rateLimitProperties.getPaths();
+        // RFC 9110 Retry-After for 429 responses, derived from the same window
+        // the limiter enforces so clients back off exactly long enough.
+        this.retryAfterSeconds = Math.max(1, rateLimitProperties.getTimeWindowMs() / 1000);
         this.objectMapper = objectMapper;
         this.clientIpResolver = clientIpResolver;
     }
@@ -71,15 +75,16 @@ public class RateLimitingFilter implements Filter {
         String ip = clientIpResolver.resolveClientIp(
                 httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
 
-        if (!rateLimiter.tryAcquire(ip)) {
-            String message = messageSource.getMessage("error.rate_limit_exceeded", null,
-                    "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
-            // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
-            // not depend on the domain.exception package (see ArchitectureTest).
-            ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
-                    "RATE_LIMIT_EXCEEDED", message, path);
-            return;
-        }
+            if (!rateLimiter.tryAcquire(ip)) {
+                String message = messageSource.getMessage("error.rate_limit_exceeded", null,
+                        "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
+                // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
+                // not depend on the domain.exception package (see ArchitectureTest).
+                httpResponse.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
+                ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
+                        "RATE_LIMIT_EXCEEDED", message, path);
+                return;
+            }
 
         chain.doFilter(request, response);
     }

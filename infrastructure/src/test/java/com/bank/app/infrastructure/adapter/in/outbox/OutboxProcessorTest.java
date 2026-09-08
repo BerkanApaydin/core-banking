@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.outbox;
 import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -145,7 +146,7 @@ class OutboxProcessorTest {
 
     @Test
     void shouldCountProcessedFailedAndDeadLetterEvents() throws Exception {
-        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var registry = new SimpleMeterRegistry();
         var processor = new OutboxProcessor(outboxPort, List.of(handler), registry);
 
         EventEntry ok = event("evt-8", "TransferCompletedEvent");

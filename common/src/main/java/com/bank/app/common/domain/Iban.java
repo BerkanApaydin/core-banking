@@ -2,6 +2,7 @@ package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public record Iban(String value) {
     /**
@@ -11,16 +12,16 @@ public record Iban(String value) {
      * {@code app.common.iban.pattern}, but the default changes in one place.
      */
     public static final String DEFAULT_IBAN_REGEX = "^TR[0-9]{24}$";
-    private static final java.util.regex.Pattern DEFAULT_PATTERN =
-            java.util.regex.Pattern.compile(DEFAULT_IBAN_REGEX);
-    private static volatile java.util.regex.Pattern ibanPattern = DEFAULT_PATTERN;
+    private static final Pattern DEFAULT_PATTERN =
+            Pattern.compile(DEFAULT_IBAN_REGEX);
+    private static volatile Pattern ibanPattern = DEFAULT_PATTERN;
 
     /**
      * Overrides the global IBAN pattern (applied at startup from
      * {@code app.common.iban.pattern}).
      *
      * @deprecated Global mutable validation state on a value object breaks
-     * immutability and test isolation. Prefer {@link #Iban(String, java.util.regex.Pattern)}
+     * immutability and test isolation. Prefer {@link #Iban(String, Pattern)}
      * with an explicit pattern. Kept for backward compatibility with existing
      * configuration; will be removed once the pattern is injected.
      */
@@ -30,16 +31,16 @@ public record Iban(String value) {
         if (regex.isBlank()) {
             throw new IllegalArgumentException("IBAN pattern must not be blank");
         }
-        ibanPattern = java.util.regex.Pattern.compile(regex);
+        ibanPattern = Pattern.compile(regex);
     }
 
     /** Creates an IBAN validated against an explicit pattern (no global state). */
-    public Iban(String value, java.util.regex.Pattern pattern) {
+    public Iban(String value, Pattern pattern) {
         this(validateWithPattern(
                 Objects.requireNonNull(value, "IBAN must not be null"), pattern));
     }
 
-    private static String validateWithPattern(String value, java.util.regex.Pattern pattern) {
+    private static String validateWithPattern(String value, Pattern pattern) {
         Objects.requireNonNull(pattern, "IBAN pattern must not be null");
         String normalized = normalize(value);
         if (!pattern.matcher(normalized).matches()) {

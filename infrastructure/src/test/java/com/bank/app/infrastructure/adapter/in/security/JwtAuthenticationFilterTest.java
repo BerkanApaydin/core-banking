@@ -152,6 +152,25 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldExposeUserIdInMdcDuringChainAndRemoveItAfterwards() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer token");
+        when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
+        when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
+        when(JwtTokenProvider.extractRole("token")).thenReturn("ROLE_USER");
+        when(JwtTokenProvider.isTokenValid("token")).thenReturn(true);
+
+        var mdcSeenInChain = new String[1];
+        FilterChain capturingChain = (req, res) ->
+                mdcSeenInChain[0] = org.slf4j.MDC.get("userId");
+
+        filter.doFilterInternal(request, response, capturingChain);
+
+        assertEquals("42", mdcSeenInChain[0]);
+        // ThreadLocal must not leak to the next request on a reused thread.
+        assertNull(org.slf4j.MDC.get("userId"));
+    }
+
+    @Test
     void shouldSend401OnBearerTokenWithMalformedJwt() throws Exception {
         // Blank token is rejected before touching the JWT port.
         when(request.getHeader("Authorization")).thenReturn("Bearer ");

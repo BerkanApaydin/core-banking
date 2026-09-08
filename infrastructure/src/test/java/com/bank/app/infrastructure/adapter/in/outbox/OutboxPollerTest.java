@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.mockito.Mockito.*;
 
@@ -113,14 +114,14 @@ class OutboxPollerTest {
 
         outboxPoller.start();
         try {
-            var executor = (java.util.concurrent.ScheduledExecutorService) field.get(outboxPoller);
+            var executor = (ScheduledExecutorService) field.get(outboxPoller);
             org.junit.jupiter.api.Assertions.assertNotNull(executor);
             org.junit.jupiter.api.Assertions.assertFalse(executor.isShutdown());
         } finally {
             outboxPoller.stop();
         }
 
-        var stopped = (java.util.concurrent.ScheduledExecutorService) field.get(outboxPoller);
+        var stopped = (ScheduledExecutorService) field.get(outboxPoller);
         org.junit.jupiter.api.Assertions.assertTrue(stopped.isShutdown());
     }
 }

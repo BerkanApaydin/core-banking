@@ -94,6 +94,8 @@ class RateLimitingFilterTest {
 
         assertEquals(429, response.getStatus());
         assertTrue(response.getContentAsString().contains("Too many requests"));
+        // RFC 9110: clients must know how long to back off (window is 10s here).
+        assertEquals("10", response.getHeader("Retry-After"));
     }
 
     @Test

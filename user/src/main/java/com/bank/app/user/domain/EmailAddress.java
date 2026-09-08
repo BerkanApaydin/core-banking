@@ -1,5 +1,6 @@
 package com.bank.app.user.domain;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -8,7 +9,7 @@ public record EmailAddress(String value) {
 
     public EmailAddress {
         Objects.requireNonNull(value, "Email must not be null");
-        value = value.trim().toLowerCase(java.util.Locale.ROOT);
+        value = value.trim().toLowerCase(Locale.ROOT);
         if (value.length() > 254) {
             throw new IllegalArgumentException("Email must be at most 254 characters");
         }
