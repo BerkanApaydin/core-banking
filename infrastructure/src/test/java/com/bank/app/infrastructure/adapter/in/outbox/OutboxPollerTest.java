@@ -105,4 +105,22 @@ class OutboxPollerTest {
         verify(outboxProcessor).recordFailure(eq(event1), any(Throwable.class), eq(5));
         verify(outboxProcessor).processEvent(event2);
     }
+
+    @Test
+    void shouldShutDownExecutorOnStop() throws Exception {
+        var field = OutboxPoller.class.getDeclaredField("executor");
+        field.setAccessible(true);
+
+        outboxPoller.start();
+        try {
+            var executor = (java.util.concurrent.ScheduledExecutorService) field.get(outboxPoller);
+            org.junit.jupiter.api.Assertions.assertNotNull(executor);
+            org.junit.jupiter.api.Assertions.assertFalse(executor.isShutdown());
+        } finally {
+            outboxPoller.stop();
+        }
+
+        var stopped = (java.util.concurrent.ScheduledExecutorService) field.get(outboxPoller);
+        org.junit.jupiter.api.Assertions.assertTrue(stopped.isShutdown());
+    }
 }

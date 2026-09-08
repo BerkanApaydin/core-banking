@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.common.iban")
 public class IbanProperties {
 
-    private String pattern = "^TR[0-9]{24}$";
+    private String pattern = Iban.DEFAULT_IBAN_REGEX;
 
     public String getPattern() {
         return pattern;

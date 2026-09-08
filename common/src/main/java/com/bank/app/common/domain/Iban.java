@@ -4,7 +4,13 @@ import com.bank.app.common.domain.exception.InvalidIbanException;
 import java.util.Objects;
 
 public record Iban(String value) {
-    private static final String DEFAULT_IBAN_REGEX = "^TR[0-9]{24}$";
+    /**
+     * Default validation pattern (TR-only). Single source of truth for the
+     * web-layer {@code @Pattern} annotations and the {@code IbanProperties}
+     * default — a custom pattern stays runtime-configurable via
+     * {@code app.common.iban.pattern}, but the default changes in one place.
+     */
+    public static final String DEFAULT_IBAN_REGEX = "^TR[0-9]{24}$";
     private static final java.util.regex.Pattern DEFAULT_PATTERN =
             java.util.regex.Pattern.compile(DEFAULT_IBAN_REGEX);
     private static volatile java.util.regex.Pattern ibanPattern = DEFAULT_PATTERN;

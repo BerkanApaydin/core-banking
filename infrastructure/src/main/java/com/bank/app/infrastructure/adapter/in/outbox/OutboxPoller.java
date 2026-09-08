@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @ConditionalOnProperty(prefix = "app.outbox", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -41,7 +43,16 @@ public class OutboxPoller {
         long pollDelayMs = outboxProperties.pollDelayMs();
 
         int threadCount = partitionCount <= 0 ? 1 : partitionCount;
-        executor = Executors.newScheduledThreadPool(threadCount);
+        executor = Executors.newScheduledThreadPool(threadCount, new ThreadFactory() {
+            private final AtomicInteger counter = new AtomicInteger();
+
+            @Override
+            public Thread newThread(Runnable task) {
+                Thread thread = new Thread(task, "outbox-poller-" + counter.incrementAndGet());
+                thread.setDaemon(true);
+                return thread;
+            }
+        });
 
         if (partitionCount <= 0) {
             executor.scheduleWithFixedDelay(
@@ -91,7 +102,9 @@ public class OutboxPoller {
     private void processPartitionSafely(int partition, int batchSize, int maxRetries) {
         try {
             processPartition(partition, batchSize, maxRetries);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            // Catch Throwable (not just Exception): an Error must not silently
+            // cancel this partition's future scheduled runs.
             log.error("Error processing outbox partition {}: {}", partition, e.getMessage(), e);
         }
     }

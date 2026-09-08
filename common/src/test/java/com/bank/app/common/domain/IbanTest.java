@@ -78,7 +78,7 @@ class IbanTest {
             Iban iban = new Iban("TR12");
             assertThat(iban.toString()).isEqualTo("TR12");
         } finally {
-            Iban.configurePattern("^TR[0-9]{24}$");
+            Iban.configurePattern(Iban.DEFAULT_IBAN_REGEX);
         }
     }
 
@@ -89,7 +89,7 @@ class IbanTest {
             Iban iban = new Iban("TR123456");
             assertThat(iban.toString()).contains("*******");
         } finally {
-            Iban.configurePattern("^TR[0-9]{24}$");
+            Iban.configurePattern(Iban.DEFAULT_IBAN_REGEX);
         }
     }
 
