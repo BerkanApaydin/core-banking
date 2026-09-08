@@ -96,9 +96,11 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn(null);
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(filterChain).doFilter(request, response);
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
@@ -106,6 +108,8 @@ class JwtAuthenticationFilterTest {
     void shouldSkipAuthenticationWhenAlreadyAuthenticated() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
+        when(JwtTokenProvider.isTokenValid("token")).thenReturn(true);
+        when(tokenBlacklistPort.isBlacklisted("token")).thenReturn(false);
 
         Authentication existingAuth = mock(Authentication.class);
         SecurityContextHolder.getContext().setAuthentication(existingAuth);
@@ -120,13 +124,13 @@ class JwtAuthenticationFilterTest {
     void shouldSkipAuthenticationWhenTokenIsInvalid() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
-        when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
-        when(JwtTokenProvider.extractRole("token")).thenReturn("ROLE_USER");
         when(JwtTokenProvider.isTokenValid("token")).thenReturn(false);
 
-        filter.doFilterInternal(request, response, filterChain);
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
 
-        verify(filterChain).doFilter(request, response);
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
@@ -149,8 +153,8 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void shouldSend401OnBearerTokenWithMalformedJwt() throws Exception {
+        // Blank token is rejected before touching the JWT port.
         when(request.getHeader("Authorization")).thenReturn("Bearer ");
-        when(JwtTokenProvider.extractUsername("")).thenThrow(new RuntimeException("JWT string is empty"));
 
         MockHttpServletResponse errorResponse = new MockHttpServletResponse();
         filter.doFilterInternal(request, errorResponse, filterChain);
@@ -164,15 +168,17 @@ class JwtAuthenticationFilterTest {
     @DisplayName("should send 401 when token is blacklisted")
     void shouldSend401WhenTokenIsBlacklisted() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer blacklisted-token");
+        when(JwtTokenProvider.extractUsername("blacklisted-token")).thenReturn("user");
+        when(JwtTokenProvider.isTokenValid("blacklisted-token")).thenReturn(true);
         when(tokenBlacklistPort.isBlacklisted("blacklisted-token")).thenReturn(true);
 
         MockHttpServletResponse errorResponse = new MockHttpServletResponse();
         filter.doFilterInternal(request, errorResponse, filterChain);
 
-        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Token has been revoked");
+        // Revoked and invalid tokens share one message (no revocation oracle).
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(JwtTokenProvider);
     }
 
     @Test
@@ -200,6 +206,7 @@ class JwtAuthenticationFilterTest {
     void shouldRejectLegacyTokenWithoutRoleClaim() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");
         when(JwtTokenProvider.extractUsername("token")).thenReturn("user");
+        when(JwtTokenProvider.isTokenValid("token")).thenReturn(true);
         when(JwtTokenProvider.extractUserId("token")).thenReturn(42L);
         when(JwtTokenProvider.extractRole("token")).thenReturn(null);
 

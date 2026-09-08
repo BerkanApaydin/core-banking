@@ -40,7 +40,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
     }
 
     @Test
@@ -49,7 +49,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_EXECUTED), eq("Transfer executed"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.TRANSFER_EXECUTED), eq("Transfer executed"));
     }
 
     @Test
@@ -58,7 +58,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), eq("Transfer cancelled"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.TRANSFER_CANCELLED), eq("Transfer cancelled"));
     }
 
     @Test
@@ -67,7 +67,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_DEBITED), eq("Amount withdrawn from account"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_DEBITED), eq("Amount withdrawn from account"));
     }
 
     @Test
@@ -76,7 +76,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREDITED), eq("Amount deposited to account"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_CREDITED), eq("Amount deposited to account"));
     }
 
     @Test
@@ -85,7 +85,7 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_SUSPENDED), eq("Hesap donduruldu"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_SUSPENDED), eq("Hesap donduruldu"));
     }
 
     @Test
@@ -94,13 +94,13 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CLOSED), eq("Account closed"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_CLOSED), eq("Account closed"));
     }
 
     @Test
     void shouldRecordFailureMetricWhenPersistenceFails() {
         AuditEvent event = new AuditEvent("TRANSFER_CANCELLED", "Transfer cancelled", LocalDateTime.now());
-        doThrow(new RuntimeException("db down")).when(auditLogger).log(eq(AuditAction.TRANSFER_CANCELLED), anyString());
+        doThrow(new RuntimeException("db down")).when(auditLogger).log(eq("system"), eq(AuditAction.TRANSFER_CANCELLED), anyString());
 
         eventListener.onAuditEvent(event);
 
@@ -113,7 +113,17 @@ class AuditEventConsumerTest {
 
         eventListener.onAuditEvent(event);
 
-        verify(auditLogger).log(eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
+        verify(auditLogger).log(eq("system"), eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
+        verifyNoInteractions(auditFailurePort);
+    }
+
+    @Test
+    void shouldPropagatePublishTimeUsername() {
+        AuditEvent event = new AuditEvent("ACCOUNT_CREATED", "New account created", LocalDateTime.now(), "alice");
+
+        eventListener.onAuditEvent(event);
+
+        verify(auditLogger).log(eq("alice"), eq(AuditAction.ACCOUNT_CREATED), eq("New account created"));
         verifyNoInteractions(auditFailurePort);
     }
 }

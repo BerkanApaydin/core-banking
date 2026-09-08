@@ -31,7 +31,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_AUTHORIZATION = "Authorization";
-    private static final String MSG_TOKEN_REVOKED = "Token has been revoked";
+    // Single generic message for revoked AND invalid tokens: distinct messages
+    // let callers oracle whether a token was revoked (information disclosure).
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
 
     private final JwtPort jwtPort;
@@ -61,16 +62,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         jwt = authHeader.substring(BEARER_PREFIX.length());
-
-        if (tokenBlacklistPort.isBlacklisted(jwt)) {
+        if (jwt.isBlank()) {
             ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_REVOKED, request.getRequestURI());
+                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
             return;
         }
 
         try {
+            // Validate the signature FIRST so unauthenticated callers cannot use
+            // this endpoint as a blacklist oracle or force Redis/Caffeine lookups
+            // with arbitrary strings (DoS surface).
             username = jwtPort.extractUsername(jwt);
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (username == null || !jwtPort.isTokenValid(jwt)) {
+                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                return;
+            }
+            if (tokenBlacklistPort.isBlacklisted(jwt)) {
+                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                return;
+            }
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 Long userId = jwtPort.extractUserId(jwt);
                 String role = jwtPort.extractRole(jwt);
                 if (userId == null || role == null) {
@@ -87,15 +100,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         Collections.singletonList(
                                 new SimpleGrantedAuthority(role)));
 
-                if (jwtPort.isTokenValid(jwt)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities());
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+                // Signature already verified above; establish the security context.
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities());
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         } catch (Exception e) {
             log.warn("JWT authentication failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());

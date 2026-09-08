@@ -52,28 +52,33 @@ public class RateLimitingFilter implements Filter {
         String method = httpRequest.getMethod();
         String path = httpRequest.getRequestURI();
 
-        boolean isWriteOperation = "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method);
-        boolean isExpensiveRead = "GET".equals(method) && (path.endsWith("/report") || path.contains("/history/"));
-
-        if (!isWriteOperation && !isExpensiveRead) {
+        boolean matchesRateLimitedPath = rateLimitedPaths.stream().anyMatch(path::startsWith);
+        if (!matchesRateLimitedPath) {
             chain.doFilter(request, response);
             return;
         }
 
-        boolean matchesRateLimitedPath = rateLimitedPaths.stream().anyMatch(path::startsWith);
-        if (matchesRateLimitedPath) {
-            String ip = clientIpResolver.resolveClientIp(
-                    httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
+        boolean isWriteOperation = "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method);
+        // Single-resource GETs (by id/IBAN) enable enumeration if unlimited;
+        // list/report/history reads are expensive. Limit all GETs under the
+        // protected prefixes, not just report/history.
+        boolean isProtectedRead = "GET".equals(method);
 
-            if (!rateLimiter.tryAcquire(ip)) {
-                String message = messageSource.getMessage("error.rate_limit_exceeded", null,
-                        "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
-                // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
-                // not depend on the domain.exception package (see ArchitectureTest).
-                ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
-                        "RATE_LIMIT_EXCEEDED", message, path);
-                return;
-            }
+        if (!isWriteOperation && !isProtectedRead) {
+            chain.doFilter(request, response);
+            return;
+        }
+        String ip = clientIpResolver.resolveClientIp(
+                httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
+
+        if (!rateLimiter.tryAcquire(ip)) {
+            String message = messageSource.getMessage("error.rate_limit_exceeded", null,
+                    "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
+            // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
+            // not depend on the domain.exception package (see ArchitectureTest).
+            ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
+                    "RATE_LIMIT_EXCEEDED", message, path);
+            return;
         }
 
         chain.doFilter(request, response);

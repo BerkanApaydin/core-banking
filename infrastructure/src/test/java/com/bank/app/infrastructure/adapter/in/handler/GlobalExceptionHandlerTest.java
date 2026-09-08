@@ -130,25 +130,30 @@ class GlobalExceptionHandlerTest {
     @Test
     void shouldHandleIllegalArgumentException() {
         IllegalArgumentException ex = new IllegalArgumentException("Invalid argument");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenReturn("Invalid request argument.");
 
         ResponseEntity<ProblemDetail> response = handler.handleIllegalArgumentException(ex, null);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("INVALID_ARGUMENT", response.getBody().getProperties().get("code"));
-        assertEquals("Invalid argument", response.getBody().getProperties().get("message"));
+        // Raw exception detail must not leak to clients.
+        assertEquals("Invalid request argument.", response.getBody().getProperties().get("message"));
     }
 
     @Test
     void shouldHandleAuthenticationException() {
         AuthenticationException ex = new AuthenticationException("Bad credentials") {};
+        when(messageSource.getMessage(eq("error.authentication_failed"), any(), any(Locale.class)))
+                .thenReturn("Authentication failed.");
 
         ResponseEntity<ProblemDetail> response = handler.handleAuthenticationException(ex, null);
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("AUTHENTICATION_FAILED", response.getBody().getProperties().get("code"));
-        assertEquals("Bad credentials", response.getBody().getProperties().get("message"));
+        assertEquals("Authentication failed.", response.getBody().getProperties().get("message"));
     }
 
     @SuppressWarnings("serial")
@@ -205,13 +210,15 @@ class GlobalExceptionHandlerTest {
     @Test
     void shouldHandleAccessDeniedException() {
         AccessDeniedException ex = new AccessDeniedException("Access denied");
+        when(messageSource.getMessage(eq("error.access_denied"), any(), any(Locale.class)))
+                .thenReturn("Access denied.");
 
         ResponseEntity<ProblemDetail> response = handler.handleAccessDeniedException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
-        assertEquals("Access denied", response.getBody().getProperties().get("message"));
+        assertEquals("Access denied.", response.getBody().getProperties().get("message"));
     }
 
     @Test

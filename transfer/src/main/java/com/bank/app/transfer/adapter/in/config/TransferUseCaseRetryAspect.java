@@ -5,13 +5,17 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 @Aspect
 @Component
+@Order(Ordered.LOWEST_PRECEDENCE - 200)
 public class TransferUseCaseRetryAspect {
 
     private final TransferProperties transferProperties;
@@ -36,10 +40,15 @@ public class TransferUseCaseRetryAspect {
         for (int attempt = 1; attempt <= transferProperties.maxAttempts(); attempt++) {
             try {
                 return joinPoint.proceed();
-            } catch (OptimisticLockingFailureException e) {
+            } catch (OptimisticLockingFailureException | PessimisticLockingFailureException e) {
                 lastException = e;
                 if (attempt < transferProperties.maxAttempts()) {
-                    Thread.sleep(delay);
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw ie;
+                    }
                     delay = Math.min(delay * 2, transferProperties.maxDelayMs());
                 }
             }

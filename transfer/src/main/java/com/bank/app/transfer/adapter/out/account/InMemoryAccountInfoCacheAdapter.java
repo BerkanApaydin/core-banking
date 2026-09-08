@@ -66,7 +66,7 @@ public class InMemoryAccountInfoCacheAdapter implements AccountInfoCachePort {
         if (accountIds == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(ibansBatch.get(accountIds.toString()));
+        return Optional.ofNullable(ibansBatch.get(AccountInfoCachePort.ibansBatchKey(accountIds)));
     }
 
     @Override
@@ -74,7 +74,14 @@ public class InMemoryAccountInfoCacheAdapter implements AccountInfoCachePort {
         if (accountIds == null || ibans == null || ibans.isEmpty()) {
             return;
         }
-        ibansBatch.put(accountIds.toString(), Map.copyOf(ibans));
+        ibansBatch.put(AccountInfoCachePort.ibansBatchKey(accountIds), Map.copyOf(ibans));
+        ibans.forEach((id, iban) -> {
+            if (id != null && iban != null) {
+                String key = AccountInfoCachePort.ibanKey(iban);
+                ibanKeyToId.put(key, id);
+                idToIbanKeys.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet()).add(key);
+            }
+        });
     }
 
     @Override

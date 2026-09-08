@@ -4,6 +4,8 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -11,6 +13,7 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 @Aspect
 @Component
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class UseCaseTransactionAspect {
 
     /**

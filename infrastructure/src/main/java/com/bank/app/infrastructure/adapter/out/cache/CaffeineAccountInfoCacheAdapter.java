@@ -88,7 +88,7 @@ public class CaffeineAccountInfoCacheAdapter implements AccountInfoCachePort {
         if (accountIds == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(cache().get(accountIds.toString(), Map.class));
+        return Optional.ofNullable(cache().get(AccountInfoCachePort.ibansBatchKey(accountIds), Map.class));
     }
 
     @Override
@@ -96,7 +96,16 @@ public class CaffeineAccountInfoCacheAdapter implements AccountInfoCachePort {
         if (accountIds == null || ibans == null || ibans.isEmpty()) {
             return;
         }
-        cache().put(accountIds.toString(), Map.copyOf(ibans));
+        cache().put(AccountInfoCachePort.ibansBatchKey(accountIds), Map.copyOf(ibans));
+        // Feed the id->IBAN reverse index from batch data (IBANs are immutable):
+        // narrows the post-restart window where evictById cannot find IBAN keys.
+        ibans.forEach((id, iban) -> {
+            if (id != null && iban != null) {
+                String key = AccountInfoCachePort.ibanKey(iban);
+                ibanKeyToId.put(key, id);
+                idToIbanKeys.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet()).add(key);
+            }
+        });
     }
 
     @Override

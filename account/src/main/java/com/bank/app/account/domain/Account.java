@@ -29,13 +29,15 @@ public class Account extends BaseAggregateRoot {
         this.id = id;
         this.userId = Objects.requireNonNull(userId, "UserId must not be null");
         this.iban = Objects.requireNonNull(iban, "IBAN must not be null");
-        this.ownerName = Objects.requireNonNull(ownerName, "Owner name must not be null");
-        if (ownerName.trim().isEmpty()) {
+        Objects.requireNonNull(ownerName, "Owner name must not be null");
+        String trimmedOwnerName = ownerName.trim();
+        if (trimmedOwnerName.isEmpty()) {
             throw new IllegalArgumentException("Owner name must not be empty");
         }
-        if (ownerName.trim().length() > 255) {
+        if (trimmedOwnerName.length() > 255) {
             throw new IllegalArgumentException("Owner name can be at most 255 characters");
         }
+        this.ownerName = trimmedOwnerName;
         this.balance = Objects.requireNonNull(balance, "Balance must not be null");
         this.status = Objects.requireNonNull(status, "Account status must not be null");
         this.version = version;

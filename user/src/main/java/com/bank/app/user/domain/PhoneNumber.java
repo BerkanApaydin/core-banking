@@ -8,7 +8,12 @@ public record PhoneNumber(String value) {
 
     public PhoneNumber {
         Objects.requireNonNull(value, "Phone number must not be null");
+        value = value.trim();
         if (!PHONE_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid phone number format: " + value);
+        }
+        long digitCount = value.chars().filter(Character::isDigit).count();
+        if (digitCount < 6) {
             throw new IllegalArgumentException("Invalid phone number format: " + value);
         }
     }

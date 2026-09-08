@@ -61,4 +61,15 @@ public interface AccountInfoCachePort {
         Objects.requireNonNull(ibanValue, "ibanValue must not be null");
         return ibanValue.replaceAll("\\s", "").toUpperCase();
     }
+
+    /**
+     * Order-insensitive batch key: callers build the ID set with unordered
+     * collections (e.g. {@code Collectors.toSet()}), so the raw
+     * {@code collection.toString()} would miss on identical sets in different
+     * order. Sorting first keeps the key canonical.
+     */
+    static String ibansBatchKey(Collection<Long> accountIds) {
+        Objects.requireNonNull(accountIds, "accountIds must not be null");
+        return accountIds.stream().sorted().toList().toString();
+    }
 }

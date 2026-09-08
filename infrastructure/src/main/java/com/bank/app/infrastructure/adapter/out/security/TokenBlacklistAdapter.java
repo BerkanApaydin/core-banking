@@ -12,11 +12,16 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "caffeine", matchIfMissing = true)
 public class TokenBlacklistAdapter implements TokenBlacklistPort {
 
-    private final Cache<String, Boolean> blacklist;
+    private static final long MAX_TTL_MS = TimeUnit.DAYS.toMillis(30);
+
+    // Value = absolute expiry epoch-millis of the JWT. A revoked token stays
+    // blacklisted exactly until its JWT would expire — neither longer (memory
+    // bloat) nor shorter (revocation bypass when jwtExpiration > 1 day).
+    private final Cache<String, Long> blacklist;
 
     public TokenBlacklistAdapter() {
         this.blacklist = Caffeine.newBuilder()
-                .expireAfterWrite(1, TimeUnit.DAYS)
+                .expireAfterWrite(MAX_TTL_MS, TimeUnit.MILLISECONDS)
                 .maximumSize(1_000_000)
                 .build();
     }
@@ -26,12 +31,21 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
         if (expirationMs <= 0) {
             return;
         }
-        blacklist.put(token, Boolean.TRUE);
+        long ttl = Math.min(Math.max(expirationMs, 1_000L), MAX_TTL_MS);
+        blacklist.put(token, System.currentTimeMillis() + ttl);
     }
 
     @Override
     public boolean isBlacklisted(String token) {
-        return blacklist.getIfPresent(token) != null;
+        Long expiresAt = blacklist.getIfPresent(token);
+        if (expiresAt == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() >= expiresAt) {
+            blacklist.invalidate(token);
+            return false;
+        }
+        return true;
     }
 
     @Override

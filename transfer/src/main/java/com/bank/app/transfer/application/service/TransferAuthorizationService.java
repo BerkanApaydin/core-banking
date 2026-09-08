@@ -46,4 +46,8 @@ public class TransferAuthorizationService {
             throw new AuthorizationException(errorMessage);
         }
     }
+
+    public String getCurrentUsername() {
+        return userContextService.getCurrentUsername().orElse("system");
+    }
 }

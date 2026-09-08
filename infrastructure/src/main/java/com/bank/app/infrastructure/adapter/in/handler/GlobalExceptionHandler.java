@@ -96,17 +96,34 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, ex.getMessage(), request);
+        // Never echo raw exception messages: they may carry SQL fragments,
+        // paths, or validation internals. Log the detail, return a generic key.
+        log.warn("Illegal argument: {}", ex.getMessage());
+        String message = resolveMessage("error.invalid_argument");
+        if (message == null || message.isEmpty() || message.equals("error.invalid_argument")) {
+            message = "Invalid request argument.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ProblemDetail> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, ex.getMessage(), request);
+        log.warn("Authentication failed: {}", ex.getClass().getSimpleName());
+        String message = resolveMessage("error.authentication_failed");
+        if (message == null || message.isEmpty() || message.equals("error.authentication_failed")) {
+            message = "Authentication failed.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, ex.getMessage(), request);
+        log.warn("Access denied: {}", ex.getClass().getSimpleName());
+        String message = resolveMessage("error.access_denied");
+        if (message == null || message.isEmpty() || message.equals("error.access_denied")) {
+            message = "Access denied.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, message, request);
     }
 
     @ExceptionHandler(AuthorizationException.class)

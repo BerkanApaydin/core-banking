@@ -21,6 +21,6 @@ public abstract class BaseAggregateRoot implements DomainEventProvider {
     }
 
     protected void registerEvent(DomainEvent event) {
-        domainEvents.add(event);
+        domainEvents.add(java.util.Objects.requireNonNull(event, "Domain event must not be null"));
     }
 }

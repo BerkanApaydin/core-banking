@@ -30,7 +30,10 @@ public class AuditEventConsumer {
     public void onAuditEvent(AuditEvent event) {
         try {
             AuditAction action = AuditAction.fromString(event.action());
-            auditLoggerUseCase.log(action, event.details());
+            // Username is captured at publish time (request thread) because
+            // AFTER_COMMIT runs after the SecurityContext is cleared; falling
+            // back to "system" only for legacy events without a username.
+            auditLoggerUseCase.log(event.username(), action, event.details());
         } catch (Exception e) {
             log.error("Failed to persist audit event: action={}, details={}", event.action(), event.details(), e);
             auditFailurePort.recordFailure(event.action(), e.getClass().getSimpleName());

@@ -62,8 +62,9 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         transfer.cancel(clockProvider.clock(), cancellationWindowHours);
 
-        // Balance reversal runs in the Account context, which publishes its own
-        // domain events. Transfer only publishes its own events below.
+        // Balance reversal joins this use-case's local transaction (REQUIRED):
+        // atomic in the modular monolith (single DataSource). If the Account
+        // context ever moves to a separate service, this needs a Saga.
         accountAclPort.reverseBalancesForCancellation(
                 senderAccountId, receiverAccountId, transfer.getAmount());
 
@@ -74,7 +75,8 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         domainEventPublisherService.publishEvents(transfer);
         auditEventPort.publish(new AuditEvent("TRANSFER_CANCELLED",
             String.format("Transfer cancelled. Transfer ID: %d", transfer.getId()),
-            LocalDateTime.now(clockProvider.clock())));
+            LocalDateTime.now(clockProvider.clock()),
+            transferAuthorizationService.getCurrentUsername()));
     }
 
 }

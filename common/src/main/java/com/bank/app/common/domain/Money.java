@@ -22,10 +22,14 @@ public record Money(
     }
 
     public static Money of(String amount, Currency currency) {
+        Objects.requireNonNull(amount, "Amount must not be null");
+        Objects.requireNonNull(currency, "Currency must not be null");
         return new Money(new BigDecimal(amount).setScale(2, RoundingMode.HALF_UP), currency);
     }
 
     public static Money of(BigDecimal amount, Currency currency) {
+        Objects.requireNonNull(amount, "Amount must not be null");
+        Objects.requireNonNull(currency, "Currency must not be null");
         return new Money(amount.setScale(2, RoundingMode.HALF_UP), currency);
     }
 
@@ -59,6 +63,22 @@ public record Money(
 
     public boolean isZero() {
         return this.amount.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Money other)) return false;
+        // BigDecimal.equals is scale-sensitive ("10.0" != "10.00"); money
+        // equality must be numeric, so compare with compareTo == 0.
+        return this.currency == other.currency
+                && this.amount.compareTo(other.amount) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        // Normalize scale so equal amounts hash equally.
+        return Objects.hash(amount.stripTrailingZeros(), currency);
     }
 
     @Override

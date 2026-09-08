@@ -8,6 +8,10 @@ public record EmailAddress(String value) {
 
     public EmailAddress {
         Objects.requireNonNull(value, "Email must not be null");
+        value = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value.length() > 254) {
+            throw new IllegalArgumentException("Email must be at most 254 characters");
+        }
         if (!EMAIL_PATTERN.matcher(value).matches()) {
             throw new IllegalArgumentException("Invalid email format: " + value);
         }

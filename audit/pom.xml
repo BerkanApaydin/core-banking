@@ -15,6 +15,12 @@
     <description>[Supporting] Audit supporting subdomain: transactional audit log consumed via AFTER_COMMIT domain events.</description>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.bank</groupId>
             <artifactId>common</artifactId>

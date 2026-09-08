@@ -63,8 +63,9 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
         Transfer savedTransfer = saveTransferPort.save(transfer);
 
-        // Balance mutation runs in the Account context, which publishes its own
-        // domain events. Transfer only publishes its own events below.
+        // Balance mutation joins this use-case's local transaction (REQUIRED):
+        // atomic in the modular monolith (single DataSource). If the Account
+        // context ever moves to a separate service, this needs a Saga.
         accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
         savedTransfer.complete(clockProvider.clock());
