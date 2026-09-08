@@ -44,7 +44,7 @@
         <jacoco.branch.coverage>0.70</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
         <postgresql.image.tag>15-alpine</postgresql.image.tag>
-        <testcontainers.version>1.20.6</testcontainers.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
         <pitest.version>1.19.1</pitest.version>
         <jacoco.skip>false</jacoco.skip>
         <jjwt.version>0.12.7</jjwt.version>
