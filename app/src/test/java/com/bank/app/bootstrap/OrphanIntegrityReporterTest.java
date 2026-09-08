@@ -103,9 +103,59 @@ class OrphanIntegrityReporterTest {
     }
 
     @Test
-    void shouldLogWarnWhenOrphansExist() {
+    void shouldLogErrorWhenOrphansExceedThreshold() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
-        assertNotNull(findWarnEvent());
+        assertNotNull(findEventAtLevel(Level.ERROR));
+    }
+
+    @Test
+    void shouldLogWarnWhenOrphansBelowThreshold() {
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
+
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(OrphanIntegrityReporter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            new OrphanIntegrityReporter(jdbc, meterRegistry,
+                    new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertNotNull(appender.list.stream()
+                .filter(e -> e.getLevel() == Level.WARN)
+                .findFirst()
+                .orElse(null));
+        assertNull(appender.list.stream()
+                .filter(e -> e.getLevel() == Level.ERROR)
+                .findFirst()
+                .orElse(null));
+    }
+
+    @Test
+    void shouldIncrementAlarmCounterWhenThresholdExceeded() {
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+
+        new OrphanIntegrityReporter(jdbc, registry,
+                new OrphanIntegrityProperties(true, "0 0 3 * * *", 0)).reportOrphans();
+
+        // 2 orphans x 3 checks, all above threshold 0
+        assertEquals(6.0, registry.get("db.orphan.alarm").counter().count());
+    }
+
+    @Test
+    void shouldNotIncrementAlarmCounterWhenBelowThreshold() {
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+
+        new OrphanIntegrityReporter(jdbc, registry,
+                new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
+
+        assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
     }
 
     @Test
@@ -115,6 +165,10 @@ class OrphanIntegrityReporterTest {
     }
 
     private ILoggingEvent findWarnEvent() {
+        return findEventAtLevel(Level.WARN);
+    }
+
+    private ILoggingEvent findEventAtLevel(ch.qos.logback.classic.Level level) {
         Logger logger =
                 (Logger) LoggerFactory.getLogger(OrphanIntegrityReporter.class);
         ListAppender<ILoggingEvent> appender =
@@ -127,7 +181,7 @@ class OrphanIntegrityReporterTest {
             logger.detachAppender(appender);
         }
         return appender.list.stream()
-                .filter(e -> e.getLevel() == Level.WARN)
+                .filter(e -> e.getLevel() == level)
                 .findFirst()
                 .orElse(null);
     }

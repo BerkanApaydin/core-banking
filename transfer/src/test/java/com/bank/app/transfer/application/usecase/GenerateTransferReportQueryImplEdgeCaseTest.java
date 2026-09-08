@@ -102,7 +102,7 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
         assertNotNull(response);
-        assertEquals(0, response.totalTransfersCount());
+        assertEquals(0, response.pageTransferCount());
     }
 
     @Test
@@ -150,8 +150,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
 
         assertNotNull(response);
         assertEquals(1L, response.accountId());
-        assertEquals(0, response.totalTransfersCount());
-        assertEquals(BigDecimal.ZERO, response.totalVolume());
+        assertEquals(0, response.pageTransferCount());
+        assertEquals(BigDecimal.ZERO, response.pageVolume());
         assertEquals("TRY", response.currency());
         assertTrue(response.transfers().isEmpty());
     }
@@ -169,7 +169,7 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
-        assertEquals(0, response.totalTransfersCount());
+        assertEquals(0, response.pageTransferCount());
     }
 
     @Test
@@ -212,6 +212,6 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
                 .thenReturn(Collections.emptyList());
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
-        assertEquals(BigDecimal.ZERO, response.totalVolume());
+        assertEquals(BigDecimal.ZERO, response.pageVolume());
     }
 }

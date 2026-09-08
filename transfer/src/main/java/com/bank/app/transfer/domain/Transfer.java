@@ -3,6 +3,7 @@ package com.bank.app.transfer.domain;
 import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
+import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import java.time.Clock;
@@ -27,8 +28,14 @@ public class Transfer extends BaseAggregateRoot {
         this.id = id;
         this.senderAccountId = Objects.requireNonNull(senderAccountId, "Sender account ID must not be null");
         this.receiverAccountId = Objects.requireNonNull(receiverAccountId, "Receiver account ID must not be null");
+        if (Objects.equals(senderAccountId, receiverAccountId)) {
+            throw new SameAccountTransferException(String.valueOf(senderAccountId));
+        }
         this.amount = Objects.requireNonNull(amount, "Transfer amount must not be null");
         this.status = Objects.requireNonNull(status, "Status must not be null");
+        if (status == TransferStatus.PENDING && amount.isZero()) {
+            throw new IllegalArgumentException("Transfer amount must not be zero");
+        }
         this.createdAt = Objects.requireNonNull(createdAt, "Created date must not be null");
         this.version = version;
     }
@@ -37,6 +44,9 @@ public class Transfer extends BaseAggregateRoot {
         Objects.requireNonNull(amount, "Transfer amount must not be null");
         if (amount.isZero()) {
             throw new IllegalArgumentException("Transfer amount must not be zero");
+        }
+        if (Objects.equals(senderAccountId, receiverAccountId)) {
+            throw new SameAccountTransferException(String.valueOf(senderAccountId));
         }
         return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
     }

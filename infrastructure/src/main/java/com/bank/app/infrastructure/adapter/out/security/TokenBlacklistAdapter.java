@@ -4,13 +4,17 @@ import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Local (single-instance) token blacklist. Always present: it is the backend
+ * when {@code app.security.token-blacklist.backend=caffeine}, and the
+ * degradation fallback behind {@link ResilientTokenBlacklistAdapter} when
+ * the backend is redis.
+ */
 @Component
-@ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "caffeine", matchIfMissing = true)
 public class TokenBlacklistAdapter implements TokenBlacklistPort {
 
     private final long minTtlMs;

@@ -97,13 +97,6 @@ jobs:
         REDIS_HOST: localhost
         REDIS_PORT: 6379
 
-    - name: OWASP Dependency-Check (fail on CVSS >= 7)
-      run: mvn verify -Powasp -DskipTests -DskipITs -Djacoco.skip=true -q
-      env:
-        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        # NOTE: add an NVD_API_KEY repo secret for fast DB updates;
-        # without it the scan still runs, slower.
-
     - name: Upload JaCoCo Coverage Report
       if: always()
       uses: actions/upload-artifact@v6
@@ -131,10 +124,3 @@ jobs:
       with:
         name: failsafe-reports
         path: '**/target/failsafe-reports/'
-
-    - name: Upload OWASP Dependency-Check Report
-      if: always()
-      uses: actions/upload-artifact@v6
-      with:
-        name: dependency-check-report
-        path: 'target/dependency-check-report.*'

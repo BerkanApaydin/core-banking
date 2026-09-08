@@ -142,4 +142,29 @@ class OutboxProcessorTest {
 
         verify(outboxPort).markFailed("evt-7", null, 1);
     }
+
+    @Test
+    void shouldCountProcessedFailedAndDeadLetterEvents() throws Exception {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var processor = new OutboxProcessor(outboxPort, List.of(handler), registry);
+
+        EventEntry ok = event("evt-8", "TransferCompletedEvent");
+        when(outboxPort.findByIdForUpdateSkipLocked("evt-8")).thenReturn(Optional.of(ok));
+        when(handler.supports("TransferCompletedEvent")).thenReturn(true);
+        processor.processEvent(ok);
+
+        EventEntry retry = new EventEntry("evt-9", "transfer", "agg-1", "TransferCompletedEvent",
+                "{}", 1, false, false, null, 0, LocalDateTime.now());
+        when(outboxPort.findByIdForUpdateSkipLocked("evt-9")).thenReturn(Optional.of(retry));
+        processor.recordFailure(retry, new RuntimeException("transient"), 5);
+
+        EventEntry dead = new EventEntry("evt-10", "transfer", "agg-1", "TransferCompletedEvent",
+                "{}", 4, false, false, null, 0, LocalDateTime.now());
+        when(outboxPort.findByIdForUpdateSkipLocked("evt-10")).thenReturn(Optional.of(dead));
+        processor.recordFailure(dead, new RuntimeException("poison"), 5);
+
+        assertEquals(1.0, registry.get("outbox.event.processed").counter().count());
+        assertEquals(1.0, registry.get("outbox.event.failed").counter().count());
+        assertEquals(1.0, registry.get("outbox.event.dead_letter").counter().count());
+    }
 }

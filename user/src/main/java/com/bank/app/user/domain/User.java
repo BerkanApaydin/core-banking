@@ -24,10 +24,16 @@ public class User extends BaseAggregateRoot {
         this(id, username, password, role, email, phone, null);
     }
 
-    public User(UserId id, String username, String password, Role role, EmailAddress email, PhoneNumber phone, Long version) {
+    /**
+     * @param encodedPassword BCrypt-hashed password, NEVER raw input. Raw passwords
+     *                        must pass {@code PasswordPolicy.validate} BEFORE encoding
+     *                        (see {@code RegisterUserUseCaseImpl}); the domain cannot
+     *                        validate policy rules against a hash.
+     */
+    public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email, PhoneNumber phone, Long version) {
         this.id = id;
         this.username = validateUsername(username);
-        this.password = Objects.requireNonNull(password, "Password must not be null");
+        this.password = Objects.requireNonNull(encodedPassword, "Password must not be null");
         this.role = role != null ? role : Role.ROLE_USER;
         this.email = email;
         this.phone = phone;
@@ -77,6 +83,13 @@ public class User extends BaseAggregateRoot {
         this.phone = Objects.requireNonNull(newPhone, "Phone must not be null");
     }
 
+    /**
+     * Changes the role. WARNING: role is embedded in issued JWTs, so wiring this
+     * method into any production flow (admin endpoint, seeder, migration) silently
+     * leaves outstanding tokens with the old role until they expire. Such wiring
+     * requires token versioning first — enforced by the
+     * {@code roleChangesRequireTokenVersioning} architecture rule.
+     */
     public void assignRole(Role newRole) {
         this.role = Objects.requireNonNull(newRole, "Role must not be null");
     }

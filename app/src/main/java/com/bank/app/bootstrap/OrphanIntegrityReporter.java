@@ -1,5 +1,6 @@
 package com.bank.app.bootstrap;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import org.slf4j.Logger;
@@ -42,18 +43,35 @@ public class OrphanIntegrityReporter {
             "SELECT COUNT(*) FROM transfers t LEFT JOIN accounts r ON r.id = t.receiver_account_id WHERE r.id IS NULL";
 
     private final JdbcTemplate jdbc;
+    private final long alarmThreshold;
     private final AtomicLong accountsWithoutUser = new AtomicLong();
     private final AtomicLong transfersWithoutSender = new AtomicLong();
     private final AtomicLong transfersWithoutReceiver = new AtomicLong();
+    private final Counter alarmCounter;
 
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry) {
+        this(jdbc, meterRegistry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0));
+    }
+
+    @Autowired
+    public OrphanIntegrityReporter(JdbcTemplate jdbc,
+            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
+            OrphanIntegrityProperties properties) {
         this.jdbc = jdbc;
+        this.alarmThreshold = properties != null ? properties.orphanAlarmThreshold() : 0;
+        Counter counter = null;
         if (meterRegistry != null) {
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", ACCOUNTS_WITHOUT_USER)), accountsWithoutUser);
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", TRANSFERS_WITHOUT_SENDER)), transfersWithoutSender);
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", TRANSFERS_WITHOUT_RECEIVER)), transfersWithoutReceiver);
+            // Alarm hook for Alertmanager/PagerDuty, e.g.:
+            //   sum(increase(db_orphan_alarm_total[1h])) by (type) > 0
+            counter = Counter.builder("db.orphan.alarm")
+                    .description("Orphan rows above the alarm threshold (out-of-band deletion suspected)")
+                    .register(meterRegistry);
         }
+        this.alarmCounter = counter;
     }
 
     @Scheduled(cron = "${app.integrity.orphan-check-cron:0 0 3 * * *}")
@@ -67,9 +85,16 @@ public class OrphanIntegrityReporter {
         Long count = jdbc.queryForObject(sql, Long.class);
         long orphans = count == null ? 0 : count;
         gauge.set(orphans);
-        if (orphans > 0) {
-            log.warn("Orphan integrity: {} orphan row(s) of type '{}' detected. Manual review required; automatic cleanup is disabled by design.",
-                    orphans, type);
+        if (orphans > alarmThreshold) {
+            if (alarmCounter != null) {
+                alarmCounter.increment(orphans);
+            }
+            log.error("ORPHAN ALARM: {} orphan row(s) of type '{}' exceed threshold {}. "
+                            + "Out-of-band deletion suspected — manual review required; automatic cleanup is disabled by design.",
+                    orphans, type, alarmThreshold);
+        } else if (orphans > 0) {
+            log.warn("Orphan integrity: {} orphan row(s) of type '{}' detected (below alarm threshold {}). Manual review required; automatic cleanup is disabled by design.",
+                    orphans, type, alarmThreshold);
         } else {
             log.debug("Orphan integrity: no orphans of type '{}'.", type);
         }

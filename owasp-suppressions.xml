@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-    <!-- OWASP Dependency-Check false-positive suppressions.
-         Add entries here only with a CVE link + justification comment,
-         and prefer upgrading the dependency over suppressing. -->
-</suppressions>

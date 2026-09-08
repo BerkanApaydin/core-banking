@@ -40,6 +40,13 @@ public class Account extends BaseAggregateRoot {
         this.ownerName = trimmedOwnerName;
         this.balance = Objects.requireNonNull(balance, "Balance must not be null");
         this.status = Objects.requireNonNull(status, "Account status must not be null");
+        if (status == AccountStatus.CLOSED && !balance.isZero()) {
+            throw new InsufficientBalanceException(
+                "error.account_close_balance_not_zero",
+                new Object[]{this.balance.amount(), this.balance.currency().name()},
+                "Balance must be zero for closure. Current: " + this.balance.amount() + " " + this.balance.currency()
+            );
+        }
         this.version = version;
     }
 

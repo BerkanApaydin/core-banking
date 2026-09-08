@@ -45,7 +45,7 @@ class AccountResponseTest {
                 .userId(new UserId(20L))
                 .iban(new Iban("TR987654321098765432109876"))
                 .ownerName("Mehmet")
-                .balance(new Money(new BigDecimal("500.00"), Currency.USD))
+                .balance(new Money(new BigDecimal("0.00"), Currency.USD))
                 .status(AccountStatus.CLOSED)
                 .build();
 
@@ -55,7 +55,7 @@ class AccountResponseTest {
         assertEquals(20L, response.userId());
         assertEquals("TR987654321098765432109876", response.iban());
         assertEquals("Mehmet", response.ownerName());
-        assertEquals(0, new BigDecimal("500.00").compareTo(response.balance()));
+        assertEquals(0, new BigDecimal("0.00").compareTo(response.balance()));
         assertEquals("USD", response.currency());
         assertEquals(AccountStatus.CLOSED, response.status());
         assertFalse(response.active());

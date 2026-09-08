@@ -183,7 +183,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on closed account")
         void shouldThrowOnClosedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -275,7 +275,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on closed account")
         void shouldThrowOnClosedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -344,7 +344,7 @@ class AccountTest {
         @Test
         @DisplayName("isActive should return false for CLOSED")
         void isActiveFalseForClosed() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThat(account.isActive()).isFalse();
         }
@@ -437,6 +437,14 @@ class AccountTest {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("100.00", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThatThrownBy(() -> account.close(Clock.systemDefaultZone()))
+                    .isExactlyInstanceOf(InsufficientBalanceException.class);
+        }
+
+        @Test
+        @DisplayName("should reject direct construction of CLOSED account with non-zero balance")
+        void shouldRejectClosedWithNonZeroBalanceAtConstruction() {
+            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER,
+                    Money.of("100.00", Currency.TRY), AccountStatus.CLOSED))
                     .isExactlyInstanceOf(InsufficientBalanceException.class);
         }
 

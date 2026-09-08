@@ -63,14 +63,16 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
         // Batch load account IBANs to avoid N+1 query problem (see TransferViewEnricher)
         List<TransferResponse> responseList = viewEnricher.enrich(transfers);
 
-        BigDecimal totalVolume = transfers.stream()
+        // Page-scoped aggregates (see TransferReportResponse): totals across the
+        // whole date range would need separate aggregate queries.
+        BigDecimal pageVolume = transfers.stream()
             .map(t -> t.getAmount().amount())
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new TransferReportResponse(
             criteria.accountId(),
             transfers.size(),
-            totalVolume,
+            pageVolume,
             account.currency(),
             responseList
         );

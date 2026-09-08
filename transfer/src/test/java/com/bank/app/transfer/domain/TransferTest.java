@@ -2,6 +2,7 @@ package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import com.bank.app.transfer.domain.exception.TransferNotPendingException;
@@ -94,6 +95,28 @@ class TransferTest {
             assertThat(transfer.getReceiverAccountId()).isEqualTo(20L);
             assertThat(transfer.getCreatedAt()).isEqualTo(now);
             assertThat(transfer.getVersion()).isEqualTo(5L);
+        }
+
+        @Test
+        @DisplayName("should reject same sender and receiver in constructor")
+        void shouldRejectSameAccountInConstructor() {
+            assertThatThrownBy(() -> new Transfer(1L, 7L, 7L, AMOUNT, TransferStatus.COMPLETED, now()))
+                    .isExactlyInstanceOf(SameAccountTransferException.class);
+        }
+
+        @Test
+        @DisplayName("should reject same sender and receiver in create")
+        void shouldRejectSameAccountInCreate() {
+            assertThatThrownBy(() -> Transfer.create(7L, 7L, AMOUNT, Clock.systemDefaultZone()))
+                    .isExactlyInstanceOf(SameAccountTransferException.class);
+        }
+
+        @Test
+        @DisplayName("should reject zero amount for PENDING transfer in constructor")
+        void shouldRejectZeroAmountPendingInConstructor() {
+            assertThatThrownBy(() -> new Transfer(1L, 1L, 2L, Money.of("0.00", Currency.TRY),
+                    TransferStatus.PENDING, now()))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
         }
     }
 

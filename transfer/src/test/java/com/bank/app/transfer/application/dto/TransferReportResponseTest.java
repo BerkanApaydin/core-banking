@@ -12,8 +12,8 @@ class TransferReportResponseTest {
     void shouldCreateWithAllFields() {
         TransferReportResponse resp = new TransferReportResponse(1L, 5L, BigDecimal.valueOf(1000), "TRY", List.of());
         assertEquals(1L, resp.accountId());
-        assertEquals(5L, resp.totalTransfersCount());
-        assertEquals(BigDecimal.valueOf(1000), resp.totalVolume());
+        assertEquals(5L, resp.pageTransferCount());
+        assertEquals(BigDecimal.valueOf(1000), resp.pageVolume());
         assertEquals("TRY", resp.currency());
         assertTrue(resp.transfers().isEmpty());
     }

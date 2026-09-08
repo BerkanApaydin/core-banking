@@ -308,8 +308,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .param("endDate", end.toString()))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.accountId", is(accountId.intValue())))
-                                .andExpect(jsonPath("$.totalTransfersCount", is(2)))
-                                .andExpect(jsonPath("$.totalVolume", is(250.00)))
+.andExpect(jsonPath("$.pageTransferCount", is(2)))
+                                 .andExpect(jsonPath("$.pageVolume", is(250.00)))
                                 .andExpect(jsonPath("$.currency", is("TRY")))
                                 .andExpect(jsonPath("$.transfers", notNullValue()))
                                 .andExpect(jsonPath("$.transfers[0].senderIban", is("TR290006200000000000000111")))
@@ -500,7 +500,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .param("startDate", start.toString())
                                 .param("endDate", end.toString()))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.totalTransfersCount", is(0)))
-                                .andExpect(jsonPath("$.totalVolume", is(0)));
+.andExpect(jsonPath("$.pageTransferCount", is(0)))
+                                 .andExpect(jsonPath("$.pageVolume", is(0)));
         }
 }

@@ -120,4 +120,20 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
 
         rule.check(importedClasses);
     }
+
+    @Test
+    void roleChangesRequireTokenVersioning() {
+        // Role is embedded in issued JWTs: no production code may call
+        // User.assignRole until token versioning exists — outstanding tokens
+        // would otherwise keep the old role until expiry. (Test sources are
+        // excluded from the import, so UserTest may still exercise it.)
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app..")
+                .and().resideOutsideOfPackage("com.bank.app.user.domain..")
+                .should().callMethod(com.bank.app.user.domain.User.class, "assignRole",
+                        com.bank.app.user.domain.Role.class)
+                .allowEmptyShould(true);
+
+        rule.check(importedClasses);
+    }
 }

@@ -95,6 +95,7 @@ app:
   integrity:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
+    orphan-alarm-threshold: ${ORPHAN_ALARM_THRESHOLD:0}
   transfer:
     cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
   transaction:

@@ -282,7 +282,7 @@ class TransferControllerWebMvcTest {
                                         .param("endDate", "2025-01-10T00:00:00"))
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.accountId").value(1L))
-                                        .andExpect(jsonPath("$.totalVolume").value(350.00));
+                                        .andExpect(jsonPath("$.pageVolume").value(350.00));
                 }
 
                 @Test
@@ -298,8 +298,8 @@ class TransferControllerWebMvcTest {
                                         .param("startDate", "2025-01-01T00:00:00")
                                         .param("endDate", "2025-01-10T00:00:00"))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.totalTransfersCount").value(0))
-                                        .andExpect(jsonPath("$.totalVolume").value(0));
+.andExpect(jsonPath("$.pageTransferCount").value(0))
+                                         .andExpect(jsonPath("$.pageVolume").value(0));
                 }
         }
 }

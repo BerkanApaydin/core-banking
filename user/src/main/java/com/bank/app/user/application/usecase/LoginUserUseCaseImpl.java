@@ -1,6 +1,6 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -14,7 +14,11 @@ import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-@TransactionalUseCase
+// Read-only: all relational access here is reads (credential check + user
+// lookup); login-attempt state lives in Redis, outside the DB transaction.
+// A read-write transaction would hold a DB connection and row-lock budget
+// for the duration of external auth calls for no benefit.
+@ReadOnlyUseCase
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(LoginUserUseCaseImpl.class);

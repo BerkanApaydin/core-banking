@@ -1,6 +1,6 @@
 package com.bank.app.architecture;
 
-import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -122,11 +122,12 @@ class LayeringArchitectureTest extends ArchitectureTest {
 
     @Test
     void loginUseCaseShouldBeTransactional() {
-        // Login writes login-attempt state (reset/recordFailure), so it must run in a
-        // read-write transaction, not @ReadOnlyUseCase.
+        // Login's only relational access is reads (credential check + user lookup);
+        // login-attempt state lives in Redis, outside the DB transaction — so it
+        // must run read-only, not in a read-write transaction.
         ArchRule rule = classes()
                 .that().haveSimpleName("LoginUserUseCaseImpl")
-                .should().beAnnotatedWith(TransactionalUseCase.class)
+                .should().beAnnotatedWith(ReadOnlyUseCase.class)
                 .allowEmptyShould(true);
 
         rule.check(importedClasses);

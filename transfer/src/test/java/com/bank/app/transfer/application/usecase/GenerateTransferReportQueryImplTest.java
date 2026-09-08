@@ -71,8 +71,8 @@ class GenerateTransferReportQueryImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.accountId());
-        assertEquals(2, response.totalTransfersCount());
-        assertEquals(new BigDecimal("350.00"), response.totalVolume());
+        assertEquals(2, response.pageTransferCount());
+        assertEquals(new BigDecimal("350.00"), response.pageVolume());
         assertEquals("TRY", response.currency());
         assertEquals(2, response.transfers().size());
         assertEquals(10L, response.transfers().get(0).id());
@@ -97,8 +97,8 @@ class GenerateTransferReportQueryImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.accountId());
-        assertEquals(0, response.totalTransfersCount());
-        assertEquals(BigDecimal.ZERO, response.totalVolume());
+        assertEquals(0, response.pageTransferCount());
+        assertEquals(BigDecimal.ZERO, response.pageVolume());
         assertEquals("TRY", response.currency());
         assertTrue(response.transfers().isEmpty());
     }
