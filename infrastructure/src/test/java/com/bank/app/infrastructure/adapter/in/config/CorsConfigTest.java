@@ -10,6 +10,7 @@ import org.springframework.web.util.UrlPathHelper;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CorsConfigTest {
 
@@ -29,5 +30,15 @@ class CorsConfigTest {
         assertThat(config.getAllowedHeaders()).containsExactly("Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With");
         assertThat(config.getExposedHeaders()).containsExactly("X-Correlation-ID");
         assertThat(config.getAllowCredentials()).isTrue();
+    }
+
+    @Test
+    void shouldRejectWildcardOriginWithCredentials() {
+        CorsProperties properties = new CorsProperties(List.of("*"));
+        CorsConfig corsConfig = new CorsConfig(properties);
+
+        assertThatThrownBy(corsConfig::corsConfigurationSource)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must not contain '*'");
     }
 }

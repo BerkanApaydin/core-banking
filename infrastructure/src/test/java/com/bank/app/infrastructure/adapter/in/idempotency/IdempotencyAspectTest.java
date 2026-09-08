@@ -530,4 +530,22 @@ class IdempotencyAspectTest {
         assertEquals("OK", result);
         verify(clientIpResolver, never()).resolveClientIp(any(), any());
     }
+
+    @Test
+    void shouldRejectOverlongIdempotencyKey() {
+        mockRequest("a".repeat(129));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+    }
+
+    @Test
+    void shouldRejectIdempotencyKeyWithIllegalCharacters() {
+        mockRequest("abc def;DROP");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+    }
 }

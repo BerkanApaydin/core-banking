@@ -23,8 +23,16 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> origins = corsProperties.allowedOrigins();
+        // allowCredentials=true combined with "*" is both insecure and a Spring
+        // runtime error: fail fast on a misconfigured env value at startup.
+        if (origins != null && origins.stream().anyMatch("*"::equals)) {
+            throw new IllegalStateException(
+                    "CORS allowedOrigins must not contain '*' when allowCredentials is true. "
+                    + "Set CORS_ALLOWED_ORIGINS to explicit origins.");
+        }
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(ALLOWED_METHODS);
         configuration.setAllowedHeaders(ALLOWED_HEADERS);
         configuration.setExposedHeaders(EXPOSED_HEADERS);

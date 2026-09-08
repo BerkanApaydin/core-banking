@@ -23,6 +23,10 @@ import com.bank.app.user.application.port.out.ClientIpResolverPort;
 @Order(1)
 public class IdempotencyAspect {
 
+    private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+    private static final java.util.regex.Pattern SAFE_KEY =
+            java.util.regex.Pattern.compile("[A-Za-z0-9\\-_.:]+");
+
     private final IdempotencyGuard idempotencyGuard;
     private final UserContextService userContextService;
     private final ObjectMapper objectMapper;
@@ -56,15 +60,26 @@ public class IdempotencyAspect {
             return joinPoint.proceed();
         }
 
+        String trimmedKey = idempotencyKeyHeader.trim();
+        // Unbounded header values reach the idempotency_keys table verbatim:
+        // cap length + allowlist charset so oversized/garbage keys cannot bloat
+        // the table or smuggle control characters into keys/logs.
+        if (trimmedKey.length() > MAX_IDEMPOTENCY_KEY_LENGTH
+                || !SAFE_KEY.matcher(trimmedKey).matches()) {
+            throw new IllegalArgumentException(
+                    "Invalid Idempotency-Key header format.");
+        }
+        String idempotencyKeyHeaderValidated = trimmedKey;
+
         String key;
         if (idempotent.publicEndpoint()) {
             String clientIp = clientIpResolver.resolveClientIp(
                     request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
-            key = clientIp + "_" + idempotencyKeyHeader;
+            key = clientIp + "_" + idempotencyKeyHeaderValidated;
         } else {
             String username = userContextService.getCurrentUsername()
                     .orElseThrow(() -> new AuthorizationException("You must be logged in."));
-            key = username + "_" + idempotencyKeyHeader;
+            key = username + "_" + idempotencyKeyHeaderValidated;
         }
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);

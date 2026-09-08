@@ -92,4 +92,31 @@ class CreateAccountWebRequestTest {
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
     }
+
+    @Test
+    void shouldFailValidationWhenOwnerNameTooLong() {
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                1L, "TR290006200000000000000123", "A".repeat(256),
+                new BigDecimal("1000.00"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertThat(violations).isNotEmpty();
+    }
+
+    @Test
+    void shouldFailValidationWhenBalanceHasTooManyDecimals() {
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                1L, "TR290006200000000000000123", "Ahmet",
+                new BigDecimal("100.001"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertThat(violations).isNotEmpty();
+    }
+
+    @Test
+    void shouldFailValidationWhenBalanceExceedsMax() {
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                1L, "TR290006200000000000000123", "Ahmet",
+                new BigDecimal("1000000000.01"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertThat(violations).isNotEmpty();
+    }
 }

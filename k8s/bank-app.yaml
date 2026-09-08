@@ -60,7 +60,12 @@ spec:
             - name: REDIS_PORT
               value: "6379"
             - name: JAVA_OPTS
-              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"
+          volumeMounts:
+            # With readOnlyRootFilesystem=true the embedded Tomcat/JVM cannot write
+            # to its temp directory -> CrashLoop. Keep only /tmp writable.
+            - name: tmp-volume
+              mountPath: /tmp
           resources:
             requests:
               cpu: 500m
@@ -90,6 +95,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -90,4 +90,24 @@ class TransferWebRequestTest {
         var violations = validator.validate(request);
         assertFalse(violations.isEmpty());
     }
+
+    @Test
+    void shouldFailValidationWhenAmountHasTooManyDecimals() {
+        TransferWebRequest request = new TransferWebRequest(
+                "TR290006200000000000000111",
+                "TR290006200000000000000222",
+                new BigDecimal("10.001"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertFalse(violations.isEmpty());
+    }
+
+    @Test
+    void shouldFailValidationWhenAmountExceedsMax() {
+        TransferWebRequest request = new TransferWebRequest(
+                "TR290006200000000000000111",
+                "TR290006200000000000000222",
+                new BigDecimal("1000000000.01"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertFalse(violations.isEmpty());
+    }
 }
