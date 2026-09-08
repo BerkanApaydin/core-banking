@@ -3,6 +3,7 @@ package com.bank.app.account.adapter.in.api;
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
+import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshot;
@@ -33,12 +34,22 @@ public class AccountApiAdapter implements AccountApi {
 
     @Override
     public AccountSnapshot getSnapshotById(Long accountId) {
-        return toSnapshot(accountQueryUseCase.getAccountInfo(accountId));
+        try {
+            return toSnapshot(accountQueryUseCase.getAccountInfo(accountId));
+        } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
+            // Translate to the published language: downstream contexts must
+            // never observe account domain types, not even as exceptions.
+            throw new AccountNotFoundException(accountId);
+        }
     }
 
     @Override
     public AccountSnapshot getSnapshotByIban(String ibanValue) {
-        return toSnapshot(accountQueryUseCase.getAccountInfoForTransfer(ibanValue));
+        try {
+            return toSnapshot(accountQueryUseCase.getAccountInfoForTransfer(ibanValue));
+        } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
+            throw new AccountNotFoundException(ibanValue);
+        }
     }
 
     @Override

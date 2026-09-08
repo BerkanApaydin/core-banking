@@ -308,4 +308,48 @@ class MoneyTest {
     interface MismatchOperation {
         void apply(Money m1, Money m2);
     }
+
+    @Nested
+    @DisplayName("equality")
+    class Equality {
+
+        @Test
+        @DisplayName("should equal itself")
+        void shouldEqualItself() {
+            Money money = Money.of("10.00", Currency.TRY);
+            assertThat(money.equals(money)).isTrue();
+        }
+
+        @Test
+        @DisplayName("should ignore scale when comparing amounts")
+        void shouldIgnoreScale() {
+            // BigDecimal.equals is scale-sensitive; money equality must be numeric.
+            // of() normalizes scale, so the direct constructor (scale 1, still
+            // valid) is needed to prove scale-insensitivity.
+            assertThat(new Money(new BigDecimal("10.0"), Currency.TRY))
+                    .isEqualTo(Money.of("10.00", Currency.TRY));
+        }
+
+        @Test
+        @DisplayName("should hash equal amounts equally regardless of scale")
+        void shouldHashEquallyAcrossScales() {
+            assertThat(new Money(new BigDecimal("10.0"), Currency.TRY).hashCode())
+                    .isEqualTo(Money.of("10.00", Currency.TRY).hashCode());
+        }
+
+        @Test
+        @DisplayName("should not equal null or other types")
+        void shouldNotEqualNullOrOtherTypes() {
+            Money money = Money.of("10.00", Currency.TRY);
+            assertThat(money.equals(null)).isFalse();
+            assertThat(money.equals("10.00 TRY")).isFalse();
+        }
+
+        @Test
+        @DisplayName("should not equal different amount or currency")
+        void shouldNotEqualDifferentAmountOrCurrency() {
+            assertThat(Money.of("10.00", Currency.TRY)).isNotEqualTo(Money.of("20.00", Currency.TRY));
+            assertThat(Money.of("10.00", Currency.TRY)).isNotEqualTo(Money.of("10.00", Currency.USD));
+        }
+    }
 }

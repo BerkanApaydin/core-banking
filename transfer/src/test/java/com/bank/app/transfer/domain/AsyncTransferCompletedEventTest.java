@@ -70,4 +70,13 @@ class AsyncTransferCompletedEventTest {
         assertThrows(NullPointerException.class,
                 () -> AsyncTransferCompletedEvent.from(null));
     }
+
+    @Test
+    void shouldExposeTransferAggregateIdentity() {
+        AsyncTransferCompletedEvent event = new AsyncTransferCompletedEvent(42L, 10L, 20L,
+                Money.of("100.00", Currency.TRY), TransferStatus.PENDING, LocalDateTime.now());
+
+        assertEquals("Transfer", event.aggregateType());
+        assertEquals("42", event.aggregateId());
+    }
 }

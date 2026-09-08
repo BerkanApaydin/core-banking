@@ -163,7 +163,7 @@ class TransferJpaMapperTest {
         // A new column breaks the subset assertion below and forces a conscious
         // decision: map it (toJpaEntity/toDomain) and state whether
         // updateJpaEntity must sync it on merge.
-        private static final java.util.Set<String> KNOWN_COLUMNS = java.util.Set.of(
+        private static final Set<String> KNOWN_COLUMNS = Set.of(
                 "id", "senderAccountId", "receiverAccountId", "amount",
                 "currency", "status", "businessCreatedAt", "version");
 
@@ -207,7 +207,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should fail when a new entity column is added without mapping decision")
         void shouldRejectUnmappedColumns() {
-            java.util.Set<String> declared = new HashSet<>();
+            Set<String> declared = new HashSet<>();
             for (Field field : TransferJpaEntity.class.getDeclaredFields()) {
                 if (!Modifier.isStatic(field.getModifiers())) {
                     declared.add(field.getName());

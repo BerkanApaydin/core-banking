@@ -3,8 +3,6 @@ package com.bank.app.infrastructure.adapter.in.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
-import java.util.concurrent.TimeUnit;
-
 @ConfigurationProperties(prefix = "app.security.token-blacklist")
 public record TokenBlacklistProperties(
         @DefaultValue("1000") long minTtlMs,
@@ -17,10 +15,5 @@ public record TokenBlacklistProperties(
         if (maxTtlMs < minTtlMs) {
             throw new IllegalArgumentException("Blacklist max TTL must not be less than min TTL");
         }
-    }
-
-    /** Default upper bound: 30 days (also the Caffeine {@code expireAfterWrite} ceiling). */
-    public static long defaultMaxTtlMs() {
-        return TimeUnit.DAYS.toMillis(30);
     }
 }

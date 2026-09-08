@@ -20,7 +20,7 @@ public record PhoneNumber(String value) {
 
     @Override
     public String toString() {
-        if (value.length() < 6) return value;
+        // Length is always >= 6: the constructor rejects shorter values.
         return value.replaceAll(".(?=.{3})", "*");
     }
 }

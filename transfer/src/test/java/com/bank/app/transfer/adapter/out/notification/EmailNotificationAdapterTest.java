@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.out.notification;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -28,5 +29,19 @@ class EmailNotificationAdapterTest {
     @Test
     void shouldHandleNullTransferGracefully() {
         assertDoesNotThrow(() -> adapter.notifyTransferCompleted(null));
+    }
+
+    @Test
+    void shouldLogSuccessfullyOnCancelNotify() {
+        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
+                1L, 10L, 20L, Money.of("100.00", Currency.TRY),
+                TransferStatus.CANCELLED, LocalDateTime.now());
+
+        assertDoesNotThrow(() -> adapter.notifyTransferCancelled(event));
+    }
+
+    @Test
+    void shouldHandleNullCancelGracefully() {
+        assertDoesNotThrow(() -> adapter.notifyTransferCancelled(null));
     }
 }

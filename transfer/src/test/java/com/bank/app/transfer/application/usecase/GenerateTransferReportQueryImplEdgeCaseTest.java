@@ -1,6 +1,6 @@
 package com.bank.app.transfer.application.usecase;
 
-import com.bank.app.transfer.domain.exception.AccountNotFoundException;
+import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.service.TransferViewEnricher;

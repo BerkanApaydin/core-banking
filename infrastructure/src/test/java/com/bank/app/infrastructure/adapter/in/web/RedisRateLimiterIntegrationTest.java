@@ -9,6 +9,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RedisRateLimiterIntegrationTest {
 
@@ -67,7 +68,7 @@ class RedisRateLimiterIntegrationTest {
 
     @Test
     void shouldHandleNullKey() {
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> rateLimiter.tryAcquire(null));
     }
 }

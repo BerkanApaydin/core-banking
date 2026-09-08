@@ -64,4 +64,10 @@ class AccountSnapshotCacheDefaultsTest {
                 AccountSnapshotCache.ibansBatchKey(List.of(2L, 1L)),
                 AccountSnapshotCache.ibansBatchKey(List.of(1L, 2L)));
     }
+
+    @Test
+    void shouldBuildCanonicalBatchKey() {
+        // Literal assertion: an empty-string mutant must die here.
+        assertEquals("[1, 2]", AccountSnapshotCache.ibansBatchKey(List.of(2L, 1L)));
+    }
 }

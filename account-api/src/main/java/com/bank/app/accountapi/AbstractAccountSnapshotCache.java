@@ -85,13 +85,6 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
             return;
         }
         writeBatch(AccountSnapshotCache.ibansBatchKey(accountIds), Map.copyOf(ibans));
-        // Feed the reverse index from batch data (IBANs are immutable): narrows
-        // the post-restart window where evictById cannot find IBAN keys.
-        ibans.forEach((id, iban) -> {
-            if (id != null && iban != null) {
-                trackIban(id, AccountSnapshotCache.ibanKey(iban));
-            }
-        });
     }
 
     @Override

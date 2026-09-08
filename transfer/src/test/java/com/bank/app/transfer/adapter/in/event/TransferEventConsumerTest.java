@@ -4,6 +4,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -22,6 +25,9 @@ class TransferEventConsumerTest {
 
     @Mock
     private SendNotificationPort notificationPort;
+
+    @Mock
+    private SendNotificationPort failingPort;
 
     @Test
     void shouldSendNotificationWhenTransferCompletedEventIsTriggered() {
@@ -33,5 +39,54 @@ class TransferEventConsumerTest {
         listener.handleTransferCompleted(event);
 
         verify(notificationPort).notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+    }
+
+    @Test
+    void shouldSendNotificationWhenTransferCancelledEventIsTriggered() {
+        TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
+
+        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
+                1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
+
+        listener.handleTransferCancelled(event);
+
+        verify(notificationPort).notifyTransferCancelled(event);
+    }
+
+    @Test
+    void shouldContinueWithOtherPortsWhenOnePortFailsOnCompleted() {
+        TransferEventConsumer listener = new TransferEventConsumer(List.of(failingPort, notificationPort));
+
+        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
+        doThrow(new RuntimeException("smtp down")).when(failingPort).notifyTransferCompleted(event);
+
+        listener.handleTransferCompleted(event);
+
+        verify(notificationPort).notifyTransferCompleted(event);
+    }
+
+    @Test
+    void shouldContinueWithOtherPortsWhenOnePortFailsOnCancelled() {
+        TransferEventConsumer listener = new TransferEventConsumer(List.of(failingPort, notificationPort));
+
+        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
+                1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
+        doThrow(new RuntimeException("sms down")).when(failingPort).notifyTransferCancelled(event);
+
+        listener.handleTransferCancelled(event);
+
+        verify(notificationPort).notifyTransferCancelled(event);
+    }
+
+    @Test
+    void shouldDoNothingWhenNoPortsConfigured() {
+        TransferEventConsumer listener = new TransferEventConsumer(List.of());
+
+        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+
+        listener.handleTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+
+        verifyNoInteractions(notificationPort);
     }
 }

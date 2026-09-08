@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Locale;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -88,6 +90,27 @@ class EmailAddressTest {
         void shouldNotMaskSingleCharLocalPart() {
             EmailAddress email = new EmailAddress("a@test.com");
             assertThat(email.toString()).isEqualTo("a@test.com");
+        }
+    }
+
+    @Nested
+    @DisplayName("length limit")
+    class LengthLimit {
+
+        @Test
+        void shouldRejectOverlongEmail() {
+            String email = "a".repeat(250) + "@b.co";
+
+            assertThatThrownBy(() -> new EmailAddress(email))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at most 254 characters");
+        }
+
+        @Test
+        void shouldAcceptMaxLengthEmail() {
+            String email = "a".repeat(248) + "@b.co";
+
+            assertThat(new EmailAddress(email).value()).isEqualTo(email.toLowerCase(Locale.ROOT));
         }
     }
 }

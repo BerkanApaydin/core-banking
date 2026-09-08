@@ -13,6 +13,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
@@ -115,13 +120,18 @@ class OutboxPollerTest {
         outboxPoller.start();
         try {
             var executor = (ScheduledExecutorService) field.get(outboxPoller);
-            org.junit.jupiter.api.Assertions.assertNotNull(executor);
-            org.junit.jupiter.api.Assertions.assertFalse(executor.isShutdown());
+            assertNotNull(executor);
+            assertFalse(executor.isShutdown());
         } finally {
             outboxPoller.stop();
         }
 
         var stopped = (ScheduledExecutorService) field.get(outboxPoller);
-        org.junit.jupiter.api.Assertions.assertTrue(stopped.isShutdown());
+        assertTrue(stopped.isShutdown());
+    }
+
+    @Test
+    void shouldTolerateStopWithoutStart() {
+        assertDoesNotThrow(outboxPoller::stop);
     }
 }

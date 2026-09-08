@@ -72,29 +72,13 @@ class IbanTest {
     }
 
     @Test
-    void toStringShouldReturnValueWhenLengthLessThanEight() {
-        Iban.configurePattern("^[A-Z0-9]{1,}$");
-        try {
-            Iban iban = new Iban("TR12");
-            assertThat(iban.toString()).isEqualTo("TR12");
-        } finally {
-            Iban.configurePattern(Iban.DEFAULT_IBAN_REGEX);
-        }
-    }
-
-    @Test
-    void toStringShouldMaskWhenLengthIsEight() {
-        Iban.configurePattern("^[A-Z0-9]{8}$");
-        try {
-            Iban iban = new Iban("TR123456");
-            assertThat(iban.toString()).contains("*******");
-        } finally {
-            Iban.configurePattern(Iban.DEFAULT_IBAN_REGEX);
-        }
-    }
-
-    @Test
     void normalizeShouldReturnNullWhenNull() {
         assertThat(Iban.normalize(null)).isNull();
+    }
+
+    @Test
+    void shouldNormalizeTabsAndMixedCase() {
+        Iban iban = new Iban("tr29\t0006 2000\n0000 0000 0001 23");
+        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
     }
 }

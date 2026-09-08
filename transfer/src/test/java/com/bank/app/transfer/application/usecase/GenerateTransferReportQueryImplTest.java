@@ -143,4 +143,22 @@ class GenerateTransferReportQueryImplTest {
         NullPointerException exception = assertThrows(NullPointerException.class, () -> generateTransferReportUseCase.execute(null));
         assertEquals("Criteria must not be null", exception.getMessage());
     }
+
+    @Test
+    void shouldFallBackToDefaultPageSizeWhenMisconfigured() {
+        GenerateTransferReportQuery misconfigured = new GenerateTransferReportQueryImpl(loadTransferPort,
+                new TransferViewEnricher(accountOperationPort), transferAuthorizationService, 0);
+        LocalDateTime start = LocalDateTime.now().minusDays(5);
+        LocalDateTime end = LocalDateTime.now();
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
+                .thenReturn(Collections.emptyList());
+
+        misconfigured.execute(new ReportCriteria(1L, start, end));
+
+        verify(loadTransferPort).findHistoryBetween(1L, start, end, 0, 100);
+    }
 }

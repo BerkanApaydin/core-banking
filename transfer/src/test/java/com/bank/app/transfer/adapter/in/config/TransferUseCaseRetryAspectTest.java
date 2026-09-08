@@ -13,6 +13,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,7 +59,7 @@ class TransferUseCaseRetryAspectTest {
             assertThatThrownBy(() -> aspect.around(joinPoint))
                     .isExactlyInstanceOf(OptimisticLockingFailureException.class)
                     .hasMessage("persistent conflict");
-            verify(joinPoint, org.mockito.Mockito.times(3)).proceed();
+            verify(joinPoint, times(3)).proceed();
         }
 
         @Test
@@ -70,6 +71,22 @@ class TransferUseCaseRetryAspectTest {
             assertThatThrownBy(() -> aspect.around(joinPoint))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("invalid argument");
+        }
+
+        @Test
+        @DisplayName("should restore interrupt flag and rethrow when sleep is interrupted")
+        void shouldRestoreInterruptFlagOnInterruptedSleep() throws Throwable {
+            when(joinPoint.proceed())
+                    .thenThrow(new OptimisticLockingFailureException("conflict"));
+            Thread.currentThread().interrupt();
+            try {
+                assertThatThrownBy(() -> aspect.around(joinPoint))
+                        .isExactlyInstanceOf(InterruptedException.class);
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                // Never leak the interrupt flag to the shared test thread.
+                Thread.interrupted();
+            }
         }
 
         @Test
@@ -86,7 +103,7 @@ class TransferUseCaseRetryAspectTest {
             assertThatThrownBy(() -> aspect1.around(joinPoint))
                     .isExactlyInstanceOf(OptimisticLockingFailureException.class)
                     .hasMessage("conflict");
-            verify(joinPoint, org.mockito.Mockito.times(1)).proceed();
+            verify(joinPoint, times(1)).proceed();
         }
 
         @Test
@@ -110,7 +127,7 @@ class TransferUseCaseRetryAspectTest {
             assertThat(result).isEqualTo("success");
             // Original takes ~3000ms; any sleep/delay mutant takes < 2000ms
             assertThat(elapsedMs).isGreaterThan(2000L);
-            verify(joinPoint, org.mockito.Mockito.times(3)).proceed();
+            verify(joinPoint, times(3)).proceed();
         }
     }
 }

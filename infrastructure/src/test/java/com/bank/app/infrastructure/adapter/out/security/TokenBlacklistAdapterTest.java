@@ -55,6 +55,19 @@ class TokenBlacklistAdapterTest {
             adapter.blacklist("expired-token", -1L);
             assertThat(adapter.isBlacklisted("expired-token")).isFalse();
         }
+
+        @Test
+        @DisplayName("should expire entries after their TTL elapses")
+        void shouldExpireEntriesAfterTtl() throws InterruptedException {
+            TokenBlacklistAdapter shortLived =
+                    new TokenBlacklistAdapter(new TokenBlacklistProperties(1L, 100L));
+            shortLived.blacklist("short-token", 1L);
+            assertThat(shortLived.isBlacklisted("short-token")).isTrue();
+
+            Thread.sleep(50);
+
+            assertThat(shortLived.isBlacklisted("short-token")).isFalse();
+        }
     }
 
     @Nested

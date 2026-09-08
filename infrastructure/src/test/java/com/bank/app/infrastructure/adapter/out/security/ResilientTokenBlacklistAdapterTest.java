@@ -57,4 +57,21 @@ class ResilientTokenBlacklistAdapterTest {
 
         assertThat(adapter.isBlacklisted("revoked")).isTrue();
     }
+
+    @Test
+    void shouldCleanBothBackends() {
+        adapter.blacklist("t", 60_000L);
+
+        adapter.cleanExpired();
+
+        verify(redis).cleanExpired();
+        assertThat(local.isBlacklisted("t")).isTrue();
+    }
+
+    @Test
+    void shouldStillCleanLocalWhenRedisCleanupFails() {
+        doThrow(new RedisConnectionFailureException("down")).when(redis).cleanExpired();
+
+        assertThatNoException().isThrownBy(() -> adapter.cleanExpired());
+    }
 }

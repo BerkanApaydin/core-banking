@@ -394,6 +394,15 @@ class TransferTest {
         }
 
         @Test
+        @DisplayName("equals should return false when only one ID is null")
+        void notEqualsWhenOneNullId() {
+            Transfer t1 = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer t2 = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
+            assertThat(t1).isNotEqualTo(t2);
+            assertThat(t2).isNotEqualTo(t1);
+        }
+
+        @Test
         @DisplayName("equals should return false when both IDs are null")
         void notEqualsWhenBothNullIds() {
             Transfer t1 = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());

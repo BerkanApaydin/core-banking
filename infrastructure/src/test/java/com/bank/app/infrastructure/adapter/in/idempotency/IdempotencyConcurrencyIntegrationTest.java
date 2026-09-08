@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
+import com.bank.app.common.TestApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings("null")
-@SpringBootTest(classes = com.bank.app.common.TestApplication.class)
+@SpringBootTest(classes = TestApplication.class)
 class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @MockitoBean

@@ -187,6 +187,7 @@ class AccountEventOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-6", "Account",
                     "5", "UnknownEventType", "{}", 0, false, false, null, 0, LocalDateTime.now());
 
+            mockDedupSuccess("evt-6");
             handler.handle(event);
 
             verify(eventPublisher, never()).publishEvent(any());

@@ -126,6 +126,33 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void shouldThrowWhenSecretIsNull() {
+        JwtTokenProvider nullProvider = new JwtTokenProvider(null, 86400000L, false);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, nullProvider::validateSecret);
+        assertTrue(ex.getMessage().contains("must not be blank"));
+    }
+
+    @Test
+    void shouldAllowDefaultSecretWithExplicitConsent() {
+        JwtTokenProvider consentingProvider = new JwtTokenProvider(SECRET, 86400000L, true);
+        assertDoesNotThrow(consentingProvider::validateSecret);
+    }
+
+    @Test
+    void shouldReturnFalseForTokenWithoutSubject() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, true);
+        SecretKey key = Keys.hmacShaKeyFor(
+                Decoders.BASE64.decode(SECRET));
+        String token = Jwts.builder()
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 86400000L))
+                .signWith(key)
+                .compact();
+
+        assertFalse(provider.isTokenValid(token));
+    }
+
+    @Test
     void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
         JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, true);
         SecretKey key = Keys.hmacShaKeyFor(

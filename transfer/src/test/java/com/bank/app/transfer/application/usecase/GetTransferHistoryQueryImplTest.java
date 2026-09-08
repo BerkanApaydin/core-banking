@@ -116,4 +116,20 @@ class GetTransferHistoryQueryImplTest {
         NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
         assertEquals("Account ID must not be null", exception.getMessage());
     }
+
+    @Test
+    void shouldFallBackToDefaultPageSizeWhenMisconfigured() {
+        GetTransferHistoryQuery misconfigured = new GetTransferHistoryQueryImpl(loadTransferPort,
+                new TransferViewEnricher(accountOperationPort), transferAuthorizationService, 0);
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
+        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+
+        misconfigured.execute(1L, 0, Integer.MAX_VALUE);
+
+        verify(loadTransferPort).findHistory(1L, 0, 100);
+    }
 }

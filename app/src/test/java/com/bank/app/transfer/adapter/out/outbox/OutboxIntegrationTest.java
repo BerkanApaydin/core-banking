@@ -3,7 +3,6 @@ package com.bank.app.transfer.adapter.out.outbox;
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
-import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.Currency;

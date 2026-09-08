@@ -35,8 +35,9 @@ public class ApiVersionValidationFilter implements Filter {
 
         String versionHeader = httpRequest.getHeader("X-API-Version");
         if (versionHeader != null && !versionHeader.isBlank()) {
+            // extractVersionFromPath never returns null here (path is /api/-prefixed).
             String pathVersion = extractVersionFromPath(path);
-            if (pathVersion != null && !versionHeader.equals(pathVersion)) {
+            if (!versionHeader.equals(pathVersion)) {
                 httpResponse.setStatus(HttpStatus.NOT_ACCEPTABLE.value());
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
@@ -57,7 +58,7 @@ public class ApiVersionValidationFilter implements Filter {
 
     @Nullable
     private String extractVersionFromPath(String path) {
-        if (!path.startsWith("/api/")) return null;
+        // Caller guarantees the "/api/" prefix (checked in doFilter above).
         String withoutPrefix = path.substring(5);
         int slashIndex = withoutPrefix.indexOf('/');
         if (slashIndex == -1) return withoutPrefix;

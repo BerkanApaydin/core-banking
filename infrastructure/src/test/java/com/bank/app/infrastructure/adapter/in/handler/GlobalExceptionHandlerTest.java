@@ -145,6 +145,42 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldFallBackToGenericMessageWhenBundleKeyIsMissing() {
+        IllegalArgumentException ex = new IllegalArgumentException("SELECT * FROM users");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenThrow(new NoSuchMessageException("error.invalid_argument"));
+
+        ResponseEntity<ProblemDetail> response = handler.handleIllegalArgumentException(ex, null);
+
+        assertNotNull(response.getBody());
+        assertEquals("Invalid request argument.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldFallBackToGenericMessageWhenBundleReturnsKeyItself() {
+        IllegalArgumentException ex = new IllegalArgumentException("internal detail");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenReturn("error.invalid_argument");
+
+        ResponseEntity<ProblemDetail> response = handler.handleIllegalArgumentException(ex, null);
+
+        assertNotNull(response.getBody());
+        assertEquals("Invalid request argument.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldFallBackToGenericMessageWhenBundleReturnsEmpty() {
+        IllegalArgumentException ex = new IllegalArgumentException("internal detail");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenReturn("");
+
+        ResponseEntity<ProblemDetail> response = handler.handleIllegalArgumentException(ex, null);
+
+        assertNotNull(response.getBody());
+        assertEquals("Invalid request argument.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
     void shouldHandleAuthenticationException() {
         AuthenticationException ex = new AuthenticationException("Bad credentials") {};
         when(messageSource.getMessage(eq("error.authentication_failed"), any(), any(Locale.class)))
@@ -155,6 +191,31 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("AUTHENTICATION_FAILED", response.getBody().getProperties().get("code"));
+        assertEquals("Authentication failed.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldSanitizeAuthenticationFailureWhenBundleIsMissing() {
+        // Real backend detail must never reach the client, even without i18n.
+        AuthenticationException ex = new AuthenticationException("Bad credentials for john: password expired") {};
+        when(messageSource.getMessage(eq("error.authentication_failed"), any(), any(Locale.class)))
+                .thenReturn("error.authentication_failed");
+
+        ResponseEntity<ProblemDetail> response = handler.handleAuthenticationException(ex, null);
+
+        assertNotNull(response.getBody());
+        assertEquals("Authentication failed.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldSanitizeAuthenticationFailureWhenBundleReturnsNull() {
+        AuthenticationException ex = new AuthenticationException("Bad credentials") {};
+        when(messageSource.getMessage(eq("error.authentication_failed"), any(), any(Locale.class)))
+                .thenReturn(null);
+
+        ResponseEntity<ProblemDetail> response = handler.handleAuthenticationException(ex, null);
+
+        assertNotNull(response.getBody());
         assertEquals("Authentication failed.", response.getBody().getProperties().get("message"));
     }
 
@@ -220,6 +281,30 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
+        assertEquals("Access denied.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldSanitizeAccessDeniedWhenBundleIsMissing() {
+        AccessDeniedException ex = new AccessDeniedException("missing role ROLE_ADMIN on /api/v1/users/42");
+        when(messageSource.getMessage(eq("error.access_denied"), any(), any(Locale.class)))
+                .thenReturn("error.access_denied");
+
+        ResponseEntity<ProblemDetail> response = handler.handleAccessDeniedException(ex, null);
+
+        assertNotNull(response.getBody());
+        assertEquals("Access denied.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldSanitizeAccessDeniedWhenBundleReturnsNull() {
+        AccessDeniedException ex = new AccessDeniedException("Access denied");
+        when(messageSource.getMessage(eq("error.access_denied"), any(), any(Locale.class)))
+                .thenReturn(null);
+
+        ResponseEntity<ProblemDetail> response = handler.handleAccessDeniedException(ex, null);
+
+        assertNotNull(response.getBody());
         assertEquals("Access denied.", response.getBody().getProperties().get("message"));
     }
 

@@ -4,6 +4,7 @@ import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.accountapi.AccountAdjustmentResult;
+import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -56,6 +57,34 @@ class AccountApiAdapterTest {
 
         assertEquals(1L, snapshot.id());
         assertEquals(10L, snapshot.userId());
+    }
+
+    @Test
+    void shouldTranslateDomainNotFoundToPublishedLanguageById() {
+        when(accountQueryUseCase.getAccountInfo(999L))
+                .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException(999L));
+
+        AccountNotFoundException ex = assertThrows(
+                AccountNotFoundException.class,
+                () -> adapter.getSnapshotById(999L));
+
+        assertEquals("Account not found. ID: 999", ex.getMessage());
+        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals("ACCOUNT_NOT_FOUND_ID", ex.getErrorCode());
+    }
+
+    @Test
+    void shouldTranslateDomainNotFoundToPublishedLanguageByIban() {
+        when(accountQueryUseCase.getAccountInfoForTransfer("TR000"))
+                .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException("TR000"));
+
+        AccountNotFoundException ex = assertThrows(
+                AccountNotFoundException.class,
+                () -> adapter.getSnapshotByIban("TR000"));
+
+        assertEquals("Account not found. IBAN: TR000", ex.getMessage());
+        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals("ACCOUNT_NOT_FOUND_IBAN", ex.getErrorCode());
     }
 
     @Test

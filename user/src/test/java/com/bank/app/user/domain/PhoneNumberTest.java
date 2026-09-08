@@ -64,6 +64,14 @@ class PhoneNumberTest {
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Invalid phone number format");
         }
+
+        @Test
+        @DisplayName("should reject separator-only input that passes the length check")
+        void shouldRejectWithoutEnoughDigits() {
+            assertThatThrownBy(() -> new PhoneNumber("+-.-.-"))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid phone number format");
+        }
     }
 
     @Nested

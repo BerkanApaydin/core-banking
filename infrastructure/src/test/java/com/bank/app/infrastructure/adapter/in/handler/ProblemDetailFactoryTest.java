@@ -15,6 +15,7 @@ import java.net.URI;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @DisplayName("ProblemDetailFactory")
@@ -157,6 +158,31 @@ class ProblemDetailFactoryTest {
 
             assertThat(response.getStatus()).isEqualTo(429);
             assertThat(response.getContentAsString()).contains("RATE_LIMIT_EXCEEDED");
+        }
+
+        @Test
+        @DisplayName("should omit instance when URI creation fails")
+        void shouldOmitInstanceWhenUriCreationFails() throws Exception {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            // Spaces make URI.create throw; the factory must degrade gracefully.
+            ProblemDetailFactory.writeProblem(response, new ObjectMapper(), HttpStatus.BAD_REQUEST,
+                    ErrorCode.INVALID_ARGUMENT.code(), "Bad request", "/api/v1/a b");
+
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(response.getContentAsString()).contains("INVALID_ARGUMENT");
+        }
+    }
+
+    @Nested
+    @DisplayName("createResponse guards")
+    class CreateResponseGuards {
+
+        @Test
+        @DisplayName("should reject null status")
+        void shouldRejectNullStatus() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> ProblemDetailFactory.create((HttpStatus) null, "CODE", "message", null));
         }
     }
 }

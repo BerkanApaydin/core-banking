@@ -64,6 +64,57 @@ class ApplicationStartupValidatorTest {
     }
 
     @Test
+    void shouldThrowWhenJwtSecretIsNullInProd() {
+        when(environment.getActiveProfiles())
+                .thenReturn(new String[] { "prod" });
+
+        when(environment.getProperty(
+                "jwt.secret",
+                DEFAULT_JWT_SECRET)).thenReturn(null);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> validator.validateProductionConfig());
+
+        assertThat(exception.getMessage()).contains("non-default JWT secret");
+    }
+
+    @Test
+    void shouldThrowWhenJwtSecretIsBlankInProd() {
+        when(environment.getActiveProfiles())
+                .thenReturn(new String[] { "prod" });
+
+        when(environment.getProperty(
+                "jwt.secret",
+                DEFAULT_JWT_SECRET)).thenReturn("   ");
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> validator.validateProductionConfig());
+    }
+
+    @Test
+    void shouldThrowWhenDatabasePasswordIsNullInProd() {
+        when(environment.getActiveProfiles())
+                .thenReturn(new String[] { "prod" });
+
+        when(environment.getProperty(
+                "jwt.secret",
+                DEFAULT_JWT_SECRET)).thenReturn("secure-jwt-secret");
+
+        when(environment.getProperty(
+                "spring.datasource.password",
+                "")).thenReturn(null);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> validator.validateProductionConfig());
+
+        assertThat(exception.getMessage())
+                .contains("database password");
+    }
+
+    @Test
     void shouldThrowWhenDatabasePasswordIsBlankInProd() {
         when(environment.getActiveProfiles())
                 .thenReturn(new String[] { "prod" });

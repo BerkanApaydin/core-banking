@@ -69,4 +69,29 @@ class AuditEventTest {
         assertTrue(str.contains("ACCOUNT_CREATED"));
         assertTrue(str.contains("Details"));
     }
+
+    @Test
+    void shouldDefaultToSystemUserWhenUsernameIsNull() {
+        AuditEvent event = new AuditEvent("ACTION", "Details", LocalDateTime.now(), null);
+        assertEquals("system", event.username());
+    }
+
+    @Test
+    void shouldDefaultToSystemUserWhenUsernameIsBlank() {
+        AuditEvent event = new AuditEvent("ACTION", "Details", LocalDateTime.now(), "   ");
+        assertEquals("system", event.username());
+    }
+
+    @Test
+    void shouldKeepExplicitUsername() {
+        AuditEvent event = new AuditEvent("ACTION", "Details", LocalDateTime.now(), "alice");
+        assertEquals("alice", event.username());
+    }
+
+    @Test
+    void shouldExposeAggregateIdentity() {
+        AuditEvent event = new AuditEvent("ACTION", "Details", LocalDateTime.now());
+        assertEquals("Audit", event.aggregateType());
+        assertEquals("system", event.aggregateId());
+    }
 }

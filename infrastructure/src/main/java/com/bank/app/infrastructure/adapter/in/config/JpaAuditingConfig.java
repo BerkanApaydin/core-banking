@@ -1,6 +1,5 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
@@ -14,7 +13,6 @@ import java.util.Optional;
 
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
-@EnableConfigurationProperties(IbanProperties.class)
 public class JpaAuditingConfig {
 
     @Bean
