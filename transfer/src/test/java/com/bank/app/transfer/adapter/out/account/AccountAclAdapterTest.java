@@ -146,8 +146,8 @@ class AccountAclAdapterTest {
             when(accountApi.adjustBalances(1L, 2L, amount)).thenReturn(apiResult);
 
             // unrelated cached entry must survive the mutation
-            cache.putById(99L, new AccountAclPort.AccountInfo(99L, 30L, "TRY", "ACTIVE"));
-            cache.putById(1L, new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+            cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
+            cache.putById(1L, new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
 
             adapter.debitAndCredit(1L, 2L, amount);
 
@@ -162,7 +162,7 @@ class AccountAclAdapterTest {
                     Money.of("1000.00", Currency.TRY), Money.of("1000.00", Currency.TRY));
             when(accountApi.reverseForCancellation(1L, 2L, amount)).thenReturn(apiResult);
 
-            cache.putById(99L, new AccountAclPort.AccountInfo(99L, 30L, "TRY", "ACTIVE"));
+            cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
 
             adapter.reverseBalancesForCancellation(1L, 2L, amount);
 

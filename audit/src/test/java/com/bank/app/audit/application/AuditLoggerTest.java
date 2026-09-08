@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -54,7 +53,7 @@ class AuditLoggerTest {
 
     @Test
     void shouldUseSystemUserWhenNoAuthentication() {
-        when(userContextService.getCurrentUsername()).thenReturn(Optional.empty());
+        when(userContextService.getCurrentUsernameOrSystem()).thenReturn("system");
 
         auditLogger.log(AuditAction.TRANSFER_EXECUTED, "Transfer executed");
 
@@ -71,7 +70,7 @@ class AuditLoggerTest {
 
     @Test
     void shouldLogWithCurrentUsernameWhenAuthenticated() {
-        when(userContextService.getCurrentUsername()).thenReturn(Optional.of("jane.doe"));
+        when(userContextService.getCurrentUsernameOrSystem()).thenReturn("jane.doe");
 
         auditLogger.log(AuditAction.ACCOUNT_CREATED, "Details");
 

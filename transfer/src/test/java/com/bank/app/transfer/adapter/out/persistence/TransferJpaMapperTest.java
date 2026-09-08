@@ -150,4 +150,69 @@ class TransferJpaMapperTest {
                     .hasMessage("Entity and Transfer must not be null");
         }
     }
+
+    @Nested
+    @DisplayName("mapping completeness")
+    class MappingCompleteness {
+
+        // Every persistent column of TransferJpaEntity, explicitly enumerated.
+        // A new column breaks the subset assertion below and forces a conscious
+        // decision: map it (toJpaEntity/toDomain) and state whether
+        // updateJpaEntity must sync it on merge.
+        private static final java.util.Set<String> KNOWN_COLUMNS = java.util.Set.of(
+                "id", "senderAccountId", "receiverAccountId", "amount",
+                "currency", "status", "businessCreatedAt", "version");
+
+        @Test
+        @DisplayName("should round-trip every domain field")
+        void shouldRoundTripEveryField() {
+            Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
+                    TransferStatus.COMPLETED, CREATED_AT, VERSION);
+
+            Transfer reloaded = mapper.toDomain(mapper.toJpaEntity(transfer));
+
+            assertThat(reloaded.getId()).isEqualTo(transfer.getId());
+            assertThat(reloaded.getSenderAccountId()).isEqualTo(transfer.getSenderAccountId());
+            assertThat(reloaded.getReceiverAccountId()).isEqualTo(transfer.getReceiverAccountId());
+            assertThat(reloaded.getAmount()).isEqualTo(transfer.getAmount());
+            assertThat(reloaded.getStatus()).isEqualTo(transfer.getStatus());
+            assertThat(reloaded.getCreatedAt()).isEqualTo(transfer.getCreatedAt());
+            assertThat(reloaded.getVersion()).isEqualTo(transfer.getVersion());
+        }
+
+        @Test
+        @DisplayName("updateJpaEntity should sync only the mutable columns by design")
+        void shouldUpdateOnlyMutableColumns() {
+            TransferJpaEntity entity = mapper.toJpaEntity(new Transfer(ID, SENDER_ACCOUNT_ID,
+                    RECEIVER_ACCOUNT_ID, AMOUNT, TransferStatus.PENDING, CREATED_AT, 1L));
+            Transfer completed = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
+                    TransferStatus.COMPLETED, CREATED_AT, 2L);
+
+            mapper.updateJpaEntity(entity, completed);
+
+            assertThat(entity.getStatus()).isEqualTo("COMPLETED");
+            assertThat(entity.getVersion()).isEqualTo(2L);
+            assertThat(entity.getId()).isEqualTo(ID);
+            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
+            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);
+            assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
+            assertThat(entity.getCurrency()).isEqualTo(CURRENCY.name());
+            assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);
+        }
+
+        @Test
+        @DisplayName("should fail when a new entity column is added without mapping decision")
+        void shouldRejectUnmappedColumns() {
+            java.util.Set<String> declared = new java.util.HashSet<>();
+            for (java.lang.reflect.Field field : TransferJpaEntity.class.getDeclaredFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                    declared.add(field.getName());
+                }
+            }
+
+            assertThat(declared)
+                    .as("new TransferJpaEntity column requires an explicit mapping decision in this test")
+                    .isSubsetOf(KNOWN_COLUMNS);
+        }
+    }
 }

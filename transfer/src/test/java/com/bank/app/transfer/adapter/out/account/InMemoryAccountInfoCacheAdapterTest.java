@@ -1,6 +1,8 @@
 package com.bank.app.transfer.adapter.out.account;
 
+import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +26,7 @@ class InMemoryAccountInfoCacheAdapterTest {
     void shouldMissThenHitById() {
         assertTrue(cache.getById(1L).isEmpty());
 
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
+        var info = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         cache.putById(1L, info);
 
         assertEquals(info, cache.getById(1L).orElseThrow());
@@ -32,7 +34,7 @@ class InMemoryAccountInfoCacheAdapterTest {
 
     @Test
     void shouldNormalizeIbanKeys() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
+        var info = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         cache.putByIban("tr33 0006 1005 1978 6456 8412 34", info);
 
         assertEquals(info, cache.getByIban("TR330006100519786456841234").orElseThrow());
@@ -51,8 +53,8 @@ class InMemoryAccountInfoCacheAdapterTest {
 
     @Test
     void shouldEvictAll() {
-        cache.putById(1L, new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE"));
-        cache.putByIban("TR1", new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+        cache.putById(1L, new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
+        cache.putByIban("TR1", new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
         cache.putIbans(Set.of(1L), Map.of(1L, "TR1"));
 
         cache.evictAll();
@@ -64,10 +66,10 @@ class InMemoryAccountInfoCacheAdapterTest {
 
     @Test
     void shouldEvictIbanEntryWhenEvictingById() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
+        var info = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         cache.putById(1L, info);
         cache.putByIban("TR330006100519786456841234", info);
-        cache.putById(99L, new AccountAclPort.AccountInfo(99L, 30L, "TRY", "ACTIVE"));
+        cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
 
         cache.evictById(1L);
 
@@ -79,8 +81,8 @@ class InMemoryAccountInfoCacheAdapterTest {
 
     @Test
     void shouldEvictSingleIbanEntry() {
-        var info1 = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
-        var info2 = new AccountAclPort.AccountInfo(2L, 20L, "TRY", "ACTIVE");
+        var info1 = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+        var info2 = new AccountSnapshot(2L, 20L, "TRY", "ACTIVE");
         cache.putByIban("TR111111111111111111111111", info1);
         cache.putByIban("TR222222222222222222222222", info2);
 

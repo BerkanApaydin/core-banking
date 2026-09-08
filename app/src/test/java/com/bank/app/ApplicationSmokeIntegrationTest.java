@@ -336,6 +336,111 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         assertThat(afterLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void shouldReplayIdenticalTransferOnIdempotencyKeyReuse() {
+        String sender = "replay_sender_" + System.currentTimeMillis();
+        String receiver = "replay_receiver_" + System.currentTimeMillis();
+
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(sender, "Test1234"), Void.class);
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(receiver, "Test1234"), Void.class);
+
+        ResponseEntity<AuthResponse> loginSender = restTemplate.postForEntity("/api/v1/auth/login",
+                new AuthRequest(sender, "Test1234"), AuthResponse.class);
+        ResponseEntity<AuthResponse> loginReceiver = restTemplate.postForEntity("/api/v1/auth/login",
+                new AuthRequest(receiver, "Test1234"), AuthResponse.class);
+
+        HttpHeaders headersSender = new HttpHeaders();
+        headersSender.setBearerAuth(loginSender.getBody().token());
+        HttpHeaders headersReceiver = new HttpHeaders();
+        headersReceiver.setBearerAuth(loginReceiver.getBody().token());
+
+        ResponseEntity<AccountResponse> accountSender = restTemplate.exchange("/api/v1/accounts",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "userId", loginSender.getBody().userId(),
+                        "iban", "TR330006200000000000000011",
+                        "ownerName", "Replay Sender",
+                        "initialBalance", new BigDecimal("5000.00"),
+                        "currency", "TRY"
+                ), headersSender), AccountResponse.class);
+        assertThat(accountSender.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        restTemplate.exchange("/api/v1/accounts",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "userId", loginReceiver.getBody().userId(),
+                        "iban", "TR330006200000000000000012",
+                        "ownerName", "Replay Receiver",
+                        "initialBalance", new BigDecimal("0"),
+                        "currency", "TRY"
+                ), headersReceiver), AccountResponse.class);
+
+        HttpHeaders transferHeaders = new HttpHeaders();
+        transferHeaders.setBearerAuth(loginSender.getBody().token());
+        transferHeaders.set("Idempotency-Key", "replay-" + UUID.randomUUID());
+        HttpEntity<Map<String, Object>> transferEntity = new HttpEntity<>(Map.of(
+                "senderIban", "TR330006200000000000000011",
+                "receiverIban", "TR330006200000000000000012",
+                "amount", new BigDecimal("250.00"),
+                "currency", "TRY"
+        ), transferHeaders);
+
+        ResponseEntity<TransferResponse> first = restTemplate.exchange("/api/v1/transfers",
+                HttpMethod.POST, transferEntity, TransferResponse.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(first.getBody()).isNotNull();
+
+        // Same key + same payload must replay the stored response, not move money twice.
+        ResponseEntity<TransferResponse> replay = restTemplate.exchange("/api/v1/transfers",
+                HttpMethod.POST, transferEntity, TransferResponse.class);
+        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(replay.getBody()).isNotNull();
+        assertThat(replay.getBody().id()).isEqualTo(first.getBody().id());
+
+        ResponseEntity<Map> history = restTemplate.exchange(
+                "/api/v1/transfers/history/" + accountSender.getBody().id() + "?page=0&size=20",
+                HttpMethod.GET, new HttpEntity<>(headersSender), Map.class);
+        assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) history.getBody().get("totalElements")).longValue()).isEqualTo(1L);
+
+        ResponseEntity<AccountResponse> senderAfter = restTemplate.exchange(
+                "/api/v1/accounts/" + accountSender.getBody().id(),
+                HttpMethod.GET, new HttpEntity<>(headersSender), AccountResponse.class);
+        assertThat(senderAfter.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(senderAfter.getBody().balance()).isEqualByComparingTo("4750.00");
+    }
+
+    @Test
+    void shouldRejectTransferToSameAccount() {
+        String user = "sameacc_" + System.currentTimeMillis();
+
+        restTemplate.postForEntity("/api/v1/auth/register",
+                new AuthRequest(user, "Test1234"), Void.class);
+
+        ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
+                new AuthRequest(user, "Test1234"), AuthResponse.class);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(login.getBody().token());
+
+        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
+                new HttpEntity<>(Map.of(
+                        "userId", login.getBody().userId(),
+                        "iban", "TR330006200000000000000013",
+                        "ownerName", "Same",
+                        "initialBalance", new BigDecimal("5000.00"),
+                        "currency", "TRY"
+                ), headers), AccountResponse.class);
+
+        ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
+                HttpMethod.POST, new HttpEntity<>(Map.of(
+                        "senderIban", "TR330006200000000000000013",
+                        "receiverIban", "TR330006200000000000000013",
+                        "amount", new BigDecimal("100.00"),
+                        "currency", "TRY"
+                ), transferHeaders(headers)), ProblemDetail.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     /**
      * Builds transfer-call headers with a fresh idempotency key. The key must
      * differ from any key used on account creation: reusing an account-create

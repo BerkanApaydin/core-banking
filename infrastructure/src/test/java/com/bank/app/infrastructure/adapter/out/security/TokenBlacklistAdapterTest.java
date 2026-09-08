@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,7 +15,7 @@ class TokenBlacklistAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new TokenBlacklistAdapter();
+        adapter = new TokenBlacklistAdapter(new TokenBlacklistProperties(1_000L, 2_592_000_000L));
     }
 
     @Nested
@@ -77,6 +78,29 @@ class TokenBlacklistAdapterTest {
         void shouldHandleEmptyBlacklist() {
             adapter.cleanExpired();
             assertThat(adapter.isBlacklisted("any")).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("ttl bounds")
+    class TtlBounds {
+
+        @Test
+        @DisplayName("should clamp tiny TTL up to the configured minimum")
+        void shouldClampToMinTtl() {
+            TokenBlacklistAdapter bounded = new TokenBlacklistAdapter(
+                    new TokenBlacklistProperties(60_000L, 2_592_000_000L));
+            bounded.blacklist("token", 1L);
+            assertThat(bounded.isBlacklisted("token")).isTrue();
+        }
+
+        @Test
+        @DisplayName("should respect a custom max TTL ceiling")
+        void shouldRespectMaxTtl() {
+            TokenBlacklistAdapter bounded = new TokenBlacklistAdapter(
+                    new TokenBlacklistProperties(1_000L, 3_600_000L));
+            bounded.blacklist("token", Long.MAX_VALUE / 2);
+            assertThat(bounded.isBlacklisted("token")).isTrue();
         }
     }
 }

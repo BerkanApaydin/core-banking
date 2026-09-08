@@ -1,4 +1,4 @@
-package com.bank.app.transfer.application.port.out;
+package com.bank.app.accountapi;
 
 import java.util.Collection;
 import java.util.Map;
@@ -6,22 +6,28 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Cache boundary for account reads at the transfer ACL edge.
+ * Cache boundary for account reads at context edges.
  *
- * <p>Keeps Spring-Cache (or any caching technology) out of the transfer module:
- * the ACL adapter programs against this port, infrastructure provides the
- * Caffeine/Redis-backed implementation. Mutations evict through this port so
- * subsequent reads never observe pre-transaction values.
+ * <p>Part of the Account published language: downstream contexts (e.g. transfer)
+ * program their anti-corruption adapters against this port, and infrastructure
+ * provides the backend. Keeping the contract here — instead of in a consuming
+ * context — is what lets {@code infrastructure} stay compile-independent of
+ * downstream bounded contexts.
+ *
+ * <p>Keeps caching technology out of consuming modules: the ACL adapter programs
+ * against this port, infrastructure provides the Caffeine/Redis-backed
+ * implementation. Mutations evict through this port so subsequent reads never
+ * observe pre-transaction values.
  */
-public interface AccountInfoCachePort {
+public interface AccountSnapshotCache {
 
-    Optional<AccountAclPort.AccountInfo> getById(Long accountId);
+    Optional<AccountSnapshot> getById(Long accountId);
 
-    void putById(Long accountId, AccountAclPort.AccountInfo info);
+    void putById(Long accountId, AccountSnapshot snapshot);
 
-    Optional<AccountAclPort.AccountInfo> getByIban(String ibanValue);
+    Optional<AccountSnapshot> getByIban(String ibanValue);
 
-    void putByIban(String ibanValue, AccountAclPort.AccountInfo info);
+    void putByIban(String ibanValue, AccountSnapshot snapshot);
 
     Optional<Map<Long, String>> getIbans(Collection<Long> accountIds);
 
@@ -40,7 +46,7 @@ public interface AccountInfoCachePort {
 
     /**
      * Removes the cached entry for a single IBAN. Required because the same
-     * {@code AccountInfo} (including mutable {@code status}) is cached under
+     * {@code AccountSnapshot} (including mutable {@code status}) is cached under
      * both {@code id-*} and {@code iban-*} keys: evicting only the id entry
      * would leave the IBAN entry serving stale status (e.g. ACTIVE after a
      * suspend) until TTL expiry.

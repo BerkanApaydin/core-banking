@@ -10,10 +10,10 @@ import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.accountapi.AccountApi;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.transfer.adapter.out.account.AccountAclAdapter;
 import com.bank.app.transfer.adapter.out.account.InMemoryAccountInfoCacheAdapter;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
-import com.bank.app.transfer.application.port.out.AccountInfoCachePort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
@@ -45,13 +45,13 @@ public class TransferBeanConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean(AccountInfoCachePort.class)
-    public AccountInfoCachePort accountInfoCachePort() {
+    @ConditionalOnMissingBean(AccountSnapshotCache.class)
+    public AccountSnapshotCache accountInfoCachePort() {
         return new InMemoryAccountInfoCacheAdapter();
     }
 
     @Bean
-    public AccountAclPort accountAclPort(AccountApi accountApi, AccountInfoCachePort cache) {
+    public AccountAclPort accountAclPort(AccountApi accountApi, AccountSnapshotCache cache) {
         return new AccountAclAdapter(accountApi, cache);
     }
 

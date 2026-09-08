@@ -32,9 +32,12 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- account-api: the shared cache contract (AccountSnapshotCache) lives in the
+              Account published language, so infrastructure no longer needs a
+              compile dependency on the transfer module. -->
         <dependency>
             <groupId>com.bank</groupId>
-            <artifactId>transfer</artifactId>
+            <artifactId>account-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

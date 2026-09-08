@@ -87,6 +87,8 @@ app:
         - /api/v1/transfers
     token-blacklist:
       backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
+      min-ttl-ms: ${TOKEN_BLACKLIST_MIN_TTL_MS:1000}
+      max-ttl-ms: ${TOKEN_BLACKLIST_MAX_TTL_MS:2592000000}
   idempotency:
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
@@ -95,6 +97,8 @@ app:
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
   transfer:
     cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
+  transaction:
+    timeout-seconds: ${TRANSACTION_TIMEOUT_SECONDS:30}
   outbox:
     enabled: ${OUTBOX_POLL_ENABLED:true}
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}

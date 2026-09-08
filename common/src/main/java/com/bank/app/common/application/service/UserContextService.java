@@ -19,6 +19,15 @@ public class UserContextService {
         return securityContextPort.getCurrentUsername();
     }
 
+    /**
+     * Username for audit trails and cache keys. Falls back to {@code "system"}
+     * for background jobs and legacy events without a user — the single place
+     * defining this default (previously copy-pasted in 3 call sites).
+     */
+    public String getCurrentUsernameOrSystem() {
+        return securityContextPort.getCurrentUsername().orElse("system");
+    }
+
     public void checkUserAuthorization(Long resourceUserId, String errorMessage) {
         securityContextPort.checkUserAuthorization(resourceUserId, errorMessage);
     }

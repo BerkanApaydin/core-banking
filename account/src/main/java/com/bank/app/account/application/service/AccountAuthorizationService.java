@@ -26,6 +26,6 @@ public class AccountAuthorizationService {
     }
 
     public String getCurrentUsername() {
-        return userContextService.getCurrentUsername().orElse("system");
+        return userContextService.getCurrentUsernameOrSystem();
     }
 }

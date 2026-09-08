@@ -1,4 +1,4 @@
-package com.bank.app.transfer.application.port.out;
+package com.bank.app.accountapi;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,27 +8,27 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class AccountInfoCachePortDefaultsTest {
+class AccountSnapshotCacheDefaultsTest {
 
-    static class CountingCache implements AccountInfoCachePort {
+    static class CountingCache implements AccountSnapshotCache {
         int evictAllCalls;
 
         @Override
-        public Optional<AccountAclPort.AccountInfo> getById(Long accountId) {
+        public Optional<AccountSnapshot> getById(Long accountId) {
             return Optional.empty();
         }
 
         @Override
-        public void putById(Long accountId, AccountAclPort.AccountInfo info) {
+        public void putById(Long accountId, AccountSnapshot snapshot) {
         }
 
         @Override
-        public Optional<AccountAclPort.AccountInfo> getByIban(String ibanValue) {
+        public Optional<AccountSnapshot> getByIban(String ibanValue) {
             return Optional.empty();
         }
 
         @Override
-        public void putByIban(String ibanValue, AccountAclPort.AccountInfo info) {
+        public void putByIban(String ibanValue, AccountSnapshot snapshot) {
         }
 
         @Override
@@ -55,5 +55,12 @@ class AccountInfoCachePortDefaultsTest {
         cache.evictIbansBatch();
 
         assertEquals(3, cache.evictAllCalls);
+    }
+
+    @Test
+    void shouldBuildOrderInsensitiveBatchKeys() {
+        assertEquals(
+                AccountSnapshotCache.ibansBatchKey(java.util.List.of(2L, 1L)),
+                AccountSnapshotCache.ibansBatchKey(java.util.List.of(1L, 2L)));
     }
 }

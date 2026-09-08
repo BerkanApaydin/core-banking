@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 
 @Aspect
 @Component
@@ -19,14 +20,17 @@ public class UseCaseTransactionAspect {
     /**
      * Upper bound for a single use-case transaction. Programmatic transactions do not
      * inherit Spring's {@code @Transactional(timeout=..)} semantics, so the timeout is
-     * set explicitly to avoid hung row locks (e.g. PESSIMISTIC_WRITE on accounts).
+     * set explicitly (see {@code app.transaction.timeout-seconds}) to avoid hung row
+     * locks (e.g. PESSIMISTIC_WRITE on accounts).
      */
-    private static final int TRANSACTION_TIMEOUT_SECONDS = 30;
+    private final int transactionTimeoutSeconds;
 
     private final PlatformTransactionManager transactionManager;
 
-    public UseCaseTransactionAspect(PlatformTransactionManager transactionManager) {
+    public UseCaseTransactionAspect(PlatformTransactionManager transactionManager,
+            TransactionProperties transactionProperties) {
         this.transactionManager = transactionManager;
+        this.transactionTimeoutSeconds = transactionProperties.timeoutSeconds();
     }
 
     @Pointcut("@within(com.bank.app.common.application.port.in.ReadOnlyUseCase)")
@@ -42,7 +46,7 @@ public class UseCaseTransactionAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
-        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
+        def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }
 
@@ -51,7 +55,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setReadOnly(true);
-        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
+        def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }
 
@@ -60,7 +64,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        def.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
+        def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }
 

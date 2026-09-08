@@ -10,8 +10,27 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
-@EnableJpaRepositories(basePackages = "com.bank.app")
-@EntityScan(basePackages = "com.bank.app")
+// Explicit per-BC persistence packages instead of a broad "com.bank.app" scan:
+// every bounded context (and platform persistence) must opt in, so a new
+// module can never silently join — or leave — the persistence unit.
+// Single persistence unit is intentional: transfer+account mutations commit
+// atomically in one local transaction (see UseCaseTransactionAspect).
+@EnableJpaRepositories(basePackages = {
+        "com.bank.app.account.adapter.out.persistence",
+        "com.bank.app.transfer.adapter.out.persistence",
+        "com.bank.app.user.adapter.out.persistence",
+        "com.bank.app.audit.adapter.out.persistence",
+        "com.bank.app.infrastructure.adapter.out.persistence",
+        "com.bank.app.persistence"
+})
+@EntityScan(basePackages = {
+        "com.bank.app.account.adapter.out.persistence",
+        "com.bank.app.transfer.adapter.out.persistence",
+        "com.bank.app.user.adapter.out.persistence",
+        "com.bank.app.audit.adapter.out.persistence",
+        "com.bank.app.infrastructure.adapter.out.persistence",
+        "com.bank.app.persistence"
+})
 @EnableAsync
 @EnableScheduling
 public class BankApplication {

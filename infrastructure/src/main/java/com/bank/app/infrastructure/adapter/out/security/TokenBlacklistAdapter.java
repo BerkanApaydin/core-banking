@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,16 +13,20 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "caffeine", matchIfMissing = true)
 public class TokenBlacklistAdapter implements TokenBlacklistPort {
 
-    private static final long MAX_TTL_MS = TimeUnit.DAYS.toMillis(30);
+    private final long minTtlMs;
+    private final long maxTtlMs;
 
     // Value = absolute expiry epoch-millis of the JWT. A revoked token stays
     // blacklisted exactly until its JWT would expire — neither longer (memory
     // bloat) nor shorter (revocation bypass when jwtExpiration > 1 day).
+    // Bounds come from {@code app.security.token-blacklist.min/max-ttl-ms}.
     private final Cache<String, Long> blacklist;
 
-    public TokenBlacklistAdapter() {
+    public TokenBlacklistAdapter(TokenBlacklistProperties properties) {
+        this.minTtlMs = properties.minTtlMs();
+        this.maxTtlMs = properties.maxTtlMs();
         this.blacklist = Caffeine.newBuilder()
-                .expireAfterWrite(MAX_TTL_MS, TimeUnit.MILLISECONDS)
+                .expireAfterWrite(maxTtlMs, TimeUnit.MILLISECONDS)
                 .maximumSize(1_000_000)
                 .build();
     }
@@ -31,7 +36,7 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
         if (expirationMs <= 0) {
             return;
         }
-        long ttl = Math.min(Math.max(expirationMs, 1_000L), MAX_TTL_MS);
+        long ttl = Math.min(Math.max(expirationMs, minTtlMs), maxTtlMs);
         blacklist.put(token, System.currentTimeMillis() + ttl);
     }
 

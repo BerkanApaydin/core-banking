@@ -1,38 +1,30 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.transfer.application.port.out.AccountAclPort;
-import com.bank.app.transfer.application.port.out.AccountInfoCachePort;
+import com.bank.app.accountapi.AbstractAccountSnapshotCache;
+import com.bank.app.accountapi.AccountSnapshot;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Caffeine-backed {@link AccountInfoCachePort} implementation.
+ * Caffeine-backed account snapshot cache implementation.
  *
  * <p>Reuses the {@code accountAclInfo} cache region defined in
  * {@code CacheConfig}. Takes precedence over the transfer module's in-memory
- * fallback via {@code @Primary}.
+ * fallback via {@code @Primary}. Invalidation semantics live in
+ * {@link AbstractAccountSnapshotCache}; this class is storage only.
  */
 @Component
 @Primary
-public class CaffeineAccountInfoCacheAdapter implements AccountInfoCachePort {
+public class CaffeineAccountInfoCacheAdapter extends AbstractAccountSnapshotCache {
 
     private static final String CACHE_NAME = "accountAclInfo";
 
     private final CacheManager cacheManager;
-    // Ephemeral reverse index id -> normalized IBAN keys so evictById can also
-    // drop the IBAN entries holding the same (mutable-status) AccountInfo.
-    // Rebuilt lazily on putByIban; a restart may miss an IBAN evict, bounded by
-    // the 60s TTL. Never used as a source of truth, only for invalidation.
-    private final ConcurrentHashMap<Long, Set<String>> idToIbanKeys = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Long> ibanKeyToId = new ConcurrentHashMap<>();
 
     public CaffeineAccountInfoCacheAdapter(CacheManager cacheManager) {
         this.cacheManager = cacheManager;
@@ -47,109 +39,33 @@ public class CaffeineAccountInfoCacheAdapter implements AccountInfoCachePort {
     }
 
     @Override
-    public Optional<AccountAclPort.AccountInfo> getById(Long accountId) {
-        if (accountId == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(cache().get("id-" + accountId, AccountAclPort.AccountInfo.class));
+    protected Optional<AccountSnapshot> readSnapshot(String key) {
+        return Optional.ofNullable(cache().get(key, AccountSnapshot.class));
     }
 
     @Override
-    public void putById(Long accountId, AccountAclPort.AccountInfo info) {
-        if (accountId == null || info == null) {
-            return;
-        }
-        cache().put("id-" + accountId, info);
+    protected void writeSnapshot(String key, AccountSnapshot snapshot) {
+        cache().put(key, snapshot);
     }
 
     @Override
-    public Optional<AccountAclPort.AccountInfo> getByIban(String ibanValue) {
-        if (ibanValue == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(
-                cache().get("iban-" + AccountInfoCachePort.ibanKey(ibanValue), AccountAclPort.AccountInfo.class));
-    }
-
-    @Override
-    public void putByIban(String ibanValue, AccountAclPort.AccountInfo info) {
-        if (ibanValue == null || info == null) {
-            return;
-        }
-        String key = AccountInfoCachePort.ibanKey(ibanValue);
-        cache().put("iban-" + key, info);
-        ibanKeyToId.put(key, info.id());
-        idToIbanKeys.computeIfAbsent(info.id(), k -> ConcurrentHashMap.newKeySet()).add(key);
+    protected void removeSnapshot(String key) {
+        cache().evict(key);
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public Optional<Map<Long, String>> getIbans(Collection<Long> accountIds) {
-        if (accountIds == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(cache().get(AccountInfoCachePort.ibansBatchKey(accountIds), Map.class));
+    protected Optional<Map<Long, String>> readBatch(String key) {
+        return Optional.ofNullable(cache().get(key, Map.class));
     }
 
     @Override
-    public void putIbans(Collection<Long> accountIds, Map<Long, String> ibans) {
-        if (accountIds == null || ibans == null || ibans.isEmpty()) {
-            return;
-        }
-        cache().put(AccountInfoCachePort.ibansBatchKey(accountIds), Map.copyOf(ibans));
-        // Feed the id->IBAN reverse index from batch data (IBANs are immutable):
-        // narrows the post-restart window where evictById cannot find IBAN keys.
-        ibans.forEach((id, iban) -> {
-            if (id != null && iban != null) {
-                String key = AccountInfoCachePort.ibanKey(iban);
-                ibanKeyToId.put(key, id);
-                idToIbanKeys.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet()).add(key);
-            }
-        });
+    protected void writeBatch(String key, Map<Long, String> batch) {
+        cache().put(key, batch);
     }
 
     @Override
-    public void evictAll() {
+    protected void clearStorage() {
         cache().clear();
-        idToIbanKeys.clear();
-        ibanKeyToId.clear();
-    }
-
-    @Override
-    public void evictById(Long accountId) {
-        if (accountId == null) {
-            return;
-        }
-        cache().evict("id-" + accountId);
-        Set<String> ibanKeys = idToIbanKeys.remove(accountId);
-        if (ibanKeys != null) {
-            ibanKeys.forEach(key -> {
-                cache().evict("iban-" + key);
-                ibanKeyToId.remove(key);
-            });
-        }
-    }
-
-    @Override
-    public void evictByIban(String ibanValue) {
-        if (ibanValue == null) {
-            return;
-        }
-        String key = AccountInfoCachePort.ibanKey(ibanValue);
-        cache().evict("iban-" + key);
-        Long accountId = ibanKeyToId.remove(key);
-        if (accountId != null) {
-            Set<String> keys = idToIbanKeys.get(accountId);
-            if (keys != null) {
-                keys.remove(key);
-            }
-        }
-    }
-
-    @Override
-    public void evictIbansBatch() {
-        // id->IBAN mappings are immutable (IBAN never changes on transfer), so batch
-        // entries cannot go stale due to balance mutations. No-op by design; TTL (60s)
-        // bounds any residual staleness from out-of-band account changes.
     }
 }

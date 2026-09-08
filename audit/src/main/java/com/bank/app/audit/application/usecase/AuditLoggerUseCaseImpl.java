@@ -41,6 +41,6 @@ public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
     }
 
     private String getCurrentUsername() {
-        return userContextService.getCurrentUsername().orElse("system");
+        return userContextService.getCurrentUsernameOrSystem();
     }
 }

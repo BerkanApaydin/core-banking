@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,7 +42,7 @@ class UseCaseTransactionAspectTest {
 
     @BeforeEach
     void setUp() {
-        aspect = new UseCaseTransactionAspect(transactionManager);
+        aspect = new UseCaseTransactionAspect(transactionManager, new TransactionProperties(30));
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         when(joinPoint.getSignature()).thenReturn(signature);
         when(signature.toShortString()).thenReturn("testSignature");
@@ -60,6 +61,16 @@ class UseCaseTransactionAspectTest {
         DefaultTransactionDefinition def = definitionCaptor.getValue();
         assertEquals("testSignature", def.getName());
         verify(transactionManager).commit(transactionStatus);
+    }
+
+    @Test
+    void shouldApplyConfiguredTimeout() throws Throwable {
+        when(joinPoint.proceed()).thenReturn("result");
+
+        aspect.around(joinPoint);
+
+        verify(transactionManager).getTransaction(definitionCaptor.capture());
+        assertEquals(30, definitionCaptor.getValue().getTimeout());
     }
 
     @Test

@@ -48,6 +48,6 @@ public class TransferAuthorizationService {
     }
 
     public String getCurrentUsername() {
-        return userContextService.getCurrentUsername().orElse("system");
+        return userContextService.getCurrentUsernameOrSystem();
     }
 }

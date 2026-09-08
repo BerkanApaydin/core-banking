@@ -1,12 +1,12 @@
 package com.bank.app.transfer.config;
 
 import com.bank.app.accountapi.AccountApi;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
-import com.bank.app.transfer.application.port.out.AccountInfoCachePort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
@@ -30,7 +30,7 @@ class TransferBeanConfigTest {
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AccountApi accountApi;
-    @Mock private AccountInfoCachePort cachePort;
+    @Mock private AccountSnapshotCache cachePort;
 
     private final TransferProperties transferProperties = new TransferProperties(24, 3, 500L, 2000L, 100);
 

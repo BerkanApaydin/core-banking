@@ -3,9 +3,9 @@ package com.bank.app.transfer.adapter.out.account;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
-import com.bank.app.transfer.application.port.out.AccountInfoCachePort;
 
 import java.util.Collection;
 import java.util.Map;
@@ -17,7 +17,7 @@ import java.util.Objects;
  * This module depends only on {@code account-api}, never on the
  * {@code account} module itself.
  *
- * <p>Caching goes through {@link AccountInfoCachePort} (infrastructure owns the
+ * <p>Caching goes through {@link AccountSnapshotCache} (infrastructure owns the
  * backend) instead of Spring-Cache annotations, so this adapter stays
  * framework-free. Reads populate the cache; balance mutations evict only the two
  * involved accounts (granular) so unrelated entries never stampede.
@@ -25,31 +25,33 @@ import java.util.Objects;
 public class AccountAclAdapter implements AccountAclPort {
 
     private final AccountApi accountApi;
-    private final AccountInfoCachePort cache;
+    private final AccountSnapshotCache cache;
 
-    public AccountAclAdapter(AccountApi accountApi, AccountInfoCachePort cache) {
+    public AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache) {
         this.accountApi = Objects.requireNonNull(accountApi, "AccountApi must not be null");
-        this.cache = Objects.requireNonNull(cache, "AccountInfoCachePort must not be null");
+        this.cache = Objects.requireNonNull(cache, "AccountSnapshotCache must not be null");
     }
 
     @Override
     public AccountAclPort.AccountInfo getAccountInfo(Long accountId) {
-        return cache.getById(accountId)
+        AccountSnapshot snapshot = cache.getById(accountId)
                 .orElseGet(() -> {
-                    AccountAclPort.AccountInfo info = toAccountInfo(accountApi.getSnapshotById(accountId));
-                    cache.putById(accountId, info);
-                    return info;
+                    AccountSnapshot fresh = accountApi.getSnapshotById(accountId);
+                    cache.putById(accountId, fresh);
+                    return fresh;
                 });
+        return toAccountInfo(snapshot);
     }
 
     @Override
     public AccountAclPort.AccountInfo getAccountInfoForTransfer(String ibanValue) {
-        return cache.getByIban(ibanValue)
+        AccountSnapshot snapshot = cache.getByIban(ibanValue)
                 .orElseGet(() -> {
-                    AccountAclPort.AccountInfo info = toAccountInfo(accountApi.getSnapshotByIban(ibanValue));
-                    cache.putByIban(ibanValue, info);
-                    return info;
+                    AccountSnapshot fresh = accountApi.getSnapshotByIban(ibanValue);
+                    cache.putByIban(ibanValue, fresh);
+                    return fresh;
                 });
+        return toAccountInfo(snapshot);
     }
 
     @Override

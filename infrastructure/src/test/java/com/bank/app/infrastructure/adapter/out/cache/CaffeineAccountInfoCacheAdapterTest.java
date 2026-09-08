@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.transfer.application.port.out.AccountAclPort;
+import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,10 +36,10 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @Test
     void shouldGetById() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
-        when(cache.get("id-1", AccountAclPort.AccountInfo.class)).thenReturn(info);
+        var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+        when(cache.get("id-1", AccountSnapshot.class)).thenReturn(snapshot);
 
-        assertEquals(info, adapter.getById(1L).orElseThrow());
+        assertEquals(snapshot, adapter.getById(1L).orElseThrow());
     }
 
     @Test
@@ -50,16 +51,16 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @Test
     void shouldPutAndEvict() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
+        var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
 
-        adapter.putById(1L, info);
-        verify(cache).put("id-1", info);
+        adapter.putById(1L, snapshot);
+        verify(cache).put("id-1", snapshot);
 
-        adapter.putByIban("tr1", info);
-        verify(cache).put("iban-TR1", info);
+        adapter.putByIban("tr1", snapshot);
+        verify(cache).put("iban-TR1", snapshot);
 
         adapter.putIbans(Set.of(1L), Map.of(1L, "TR1"));
-        verify(cache).put(eq(Set.of(1L).toString()), anyMap());
+        verify(cache).put(AccountSnapshotCache.ibansBatchKey(Set.of(1L)), Map.of(1L, "TR1"));
 
         adapter.evictAll();
         verify(cache).clear();
@@ -87,8 +88,8 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @Test
     void shouldEvictIbanEntryWhenEvictingById() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
-        adapter.putByIban("TR330006100519786456841234", info);
+        var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+        adapter.putByIban("TR330006100519786456841234", snapshot);
 
         adapter.evictById(1L);
 
@@ -99,8 +100,8 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @Test
     void shouldEvictSingleIbanEntry() {
-        var info = new AccountAclPort.AccountInfo(1L, 10L, "TRY", "ACTIVE");
-        adapter.putByIban("TR330006100519786456841234", info);
+        var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+        adapter.putByIban("TR330006100519786456841234", snapshot);
 
         adapter.evictByIban("TR330006100519786456841234");
 

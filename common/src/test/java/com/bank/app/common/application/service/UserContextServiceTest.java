@@ -45,6 +45,18 @@ class UserContextServiceTest {
     }
 
     @Test
+    void getCurrentUsernameOrSystemShouldReturnUsernameWhenPresent() {
+        port.username = Optional.of("testuser");
+        assertThat(service.getCurrentUsernameOrSystem()).isEqualTo("testuser");
+    }
+
+    @Test
+    void getCurrentUsernameOrSystemShouldFallBackToSystem() {
+        port.username = Optional.empty();
+        assertThat(service.getCurrentUsernameOrSystem()).isEqualTo("system");
+    }
+
+    @Test
     void checkUserAuthorizationShouldDelegateToPort() {
         service.checkUserAuthorization(1L, "not authorized");
         assertThat(port.lastCheckedUserId).isEqualTo(1L);

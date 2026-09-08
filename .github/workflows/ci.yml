@@ -74,7 +74,11 @@ jobs:
         JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
 
     - name: Architecture Tests
-      run: mvn test -pl app -am -Dtest="ArchitectureTest" -Dsurefire.failIfNoSpecifiedTests=false -q
+      run: mvn test -pl app -am -Dtest="DomainPurityArchitectureTest,LayeringArchitectureTest,ModuleBoundariesArchitectureTest,PortsAndNamingArchitectureTest,PersistenceScanPackagesTest" -Dsurefire.failIfNoSpecifiedTests=false -q
+
+    - name: Dependency Analysis (advisory — starter aggregation causes false positives)
+      run: mvn dependency:analyze -q
+      continue-on-error: true
 
     - name: Cache PIT History
       uses: actions/cache@v5
@@ -92,6 +96,13 @@ jobs:
         DB_PASSWORD: bank_password
         REDIS_HOST: localhost
         REDIS_PORT: 6379
+
+    - name: OWASP Dependency-Check (fail on CVSS >= 7)
+      run: mvn verify -Powasp -DskipTests -DskipITs -Djacoco.skip=true -q
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        # NOTE: add an NVD_API_KEY repo secret for fast DB updates;
+        # without it the scan still runs, slower.
 
     - name: Upload JaCoCo Coverage Report
       if: always()
@@ -120,3 +131,10 @@ jobs:
       with:
         name: failsafe-reports
         path: '**/target/failsafe-reports/'
+
+    - name: Upload OWASP Dependency-Check Report
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: dependency-check-report
+        path: 'target/dependency-check-report.*'
