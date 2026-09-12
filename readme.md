@@ -14,7 +14,7 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 
 ### Data & Caching
 
-- **PostgreSQL 15:** Relational database with full transaction isolation and optimistic locking.
+- **PostgreSQL 15:** Relational database with optimistic locking.
 - **Flyway:** Automated database migration and schema version control. Migrations run on startup (`spring.jpa.hibernate.ddl-auto=validate`) to guarantee schema consistency with JPA entities.
 - **Redis 7:** Shared account-snapshot cache in production, login attempts storage, and sliding window rate limiting (via Lua scripts).
 - **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production switches snapshots, rate limiting, login attempts, and token blacklist to Redis.
@@ -46,9 +46,10 @@ The project follows Hexagonal Architecture rules where the domain core remains i
 ### Module Breakdown:
 
 Modules fall into three categories: **platform** (stable, shared, no BC dependencies),
-**bounded contexts** (hexagonal slices, independently understandable), and **bootstrap**.
+**bounded contexts** (hexagonal slices, independently understandable), and **bootstrap** —
+plus one supporting module (`audit`).
 
-- **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses all integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled job (read-only No-FK compensating observer).
+- **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled job (read-only No-FK compensating observer).
 - **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
@@ -58,7 +59,7 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 - **`transfer`** [BC]: Fund transfers, cancellations (24-hour window), and reporting. Talks to `account` only via the `account-api` published language; money-movement endpoints require `Idempotency-Key`.
 - **`audit`** [Supporting]: Transactional audit logging triggered by commit-phase domain events via `@TransactionalEventListener(AFTER_COMMIT)`.
 
-**Module dependencies** (arrow = compile-time dependency direction; dashed arrow = port implementation):
+**Module dependencies** (arrow = compile-time dependency direction; dashed arrow = port implementation or composition-root wiring):
 
 ```mermaid
 %%{init: {'flowchart': {'rankSpacing': 0, 'nodeSpacing': 25, 'curve': 'natural', 'padding': 0}}}%%
@@ -89,11 +90,11 @@ graph LR
     app --> transfer & account & user & audit
     app -. wires .-> infra
     transfer -- published language --> api
-    account -- implements --> api
+    account -. implements .-> api
     transfer & account & user & audit --> shared
     api --> shared
-    infra --> shared & api
-    infra -. implements ports of .-> user & audit
+    infra --> shared
+    infra -. implements ports of .-> api & user & audit
 ```
 
 | Rule                                        | Meaning                                                                                                                                                      |
@@ -111,14 +112,14 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bearer token except registration and login.
+All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bearer token except registration and login. Rate limiting applies to `/auth/*`, `/accounts` and `/transfers`.
 
 | Module       | Endpoint                         | Method | Description                                                                      | Special Headers / Notes         |
 | :----------- | :------------------------------- | :----- | :------------------------------------------------------------------------------- | :------------------------------ |
 | **User**     | `/auth/register`                 | `POST` | Register a new user                                                              | `Idempotency-Key` (Recommended) |
 | **User**     | `/auth/login`                    | `POST` | Log in and obtain JWT                                                            | Brute-force & Rate-limited      |
 | **User**     | `/auth/logout`                   | `POST` | Log out and blacklist token                                                      | `Authorization: Bearer <token>` |
-| **Account**  | `/accounts`                      | `POST` | Create a new bank account                                                        | `Authorization: Bearer <token>` |
+| **Account**  | `/accounts`                      | `POST` | Create a new bank account                                                        | `Authorization: Bearer <token>`, `Idempotency-Key` (Recommended) |
 | **Account**  | `/accounts`                      | `GET`  | List current user's accounts (Paged)                                             | `Authorization: Bearer <token>` |
 | **Account**  | `/accounts/{id}`                 | `GET`  | Query account details by ID                                                      | `Authorization: Bearer <token>` |
 | **Account**  | `/accounts/iban/{iban}`          | `GET`  | Query account details by IBAN                                                    | `Authorization: Bearer <token>` |
@@ -136,12 +137,12 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Audit events are published via `ApplicationEventPublisher` within the transaction boundary and consumed by `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`, ensuring audit logging is only persisted on successful commit.
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, concurrent-safe claiming (`SKIP LOCKED`), and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter).
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
-- **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
+- **Sorted Resource Locking (Deadlock Prevention):** Acquires pessimistic write locks (`SELECT ... FOR UPDATE`) in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
 - **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules communicate only through the `account-api` published language (Open Host Service), consumed via transfer's `AccountAclPort` contract and implemented via `AccountAclAdapter` (in `transfer.adapter.out.account`) delegating to `AccountApi`. This protects the transfer domain from database or structure changes inside the account module, and account domain events never leak across the boundary.
 - **AOP Idempotency Guard:** Write endpoints are protected against duplicate submissions via `Idempotency-Key` headers stored in the `idempotency_keys` table.
 - **Resilience:** Token blacklist degrades to a local per-token-TTL cache when Redis is unreachable (auth stays up); rate-limited responses carry `Retry-After`; login runs read-only against the DB.
-- **Observability:** Structured JSON logs with correlation IDs, Micrometer counters (outbox, orphan alarms), Redis health indicator, Prometheus-ready Actuator endpoints.
-- **Configuration:** All tunables are `@ConfigurationProperties` with env overrides documented in `.env.example` (timeouts, TTL bounds, retry/backoff, cron schedules, alarm thresholds).
+- **Observability:** JSON logs in production (plain text locally), always with correlation IDs; Micrometer counters (outbox, orphan alarms), Redis health indicator, Prometheus-ready Actuator endpoints.
+- **Configuration:** All tunables are externalized with env overrides documented in `.env.example` (timeouts, TTL bounds, retry/backoff, cron schedules, alarm thresholds).
 
 ---
 

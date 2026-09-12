@@ -142,7 +142,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
 
     @Test
     void transferAdapterShouldNotUseSpringCacheDirectly() {
-        // Caching at the ACL edge goes through AccountInfoCachePort (infrastructure owns backend).
+        // Caching at the ACL edge goes through AccountSnapshotCache (infrastructure owns backend).
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.springframework.cache..")
