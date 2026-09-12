@@ -59,12 +59,15 @@ class TokenBlacklistAdapterTest {
         @Test
         @DisplayName("should expire entries after their TTL elapses")
         void shouldExpireEntriesAfterTtl() throws InterruptedException {
+            // Margins matter: with a 1ms TTL any CI scheduling hiccup between
+            // put and get flakes the first assertion (surefire runs classes in
+            // parallel). 50ms TTL + 200ms sleep keeps the same semantics.
             TokenBlacklistAdapter shortLived =
-                    new TokenBlacklistAdapter(new TokenBlacklistProperties(1L, 100L));
-            shortLived.blacklist("short-token", 1L);
+                    new TokenBlacklistAdapter(new TokenBlacklistProperties(50L, 10_000L));
+            shortLived.blacklist("short-token", 50L);
             assertThat(shortLived.isBlacklisted("short-token")).isTrue();
 
-            Thread.sleep(50);
+            Thread.sleep(200);
 
             assertThat(shortLived.isBlacklisted("short-token")).isFalse();
         }
