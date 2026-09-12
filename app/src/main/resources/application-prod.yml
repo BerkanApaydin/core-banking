@@ -23,6 +23,10 @@ management:
   # tracing is added (then reintroduce sampling config + OTLP endpoint).
 
 app:
+  cache:
+    caffeine:
+      account-info:
+        backend: redis
   security:
     rate-limit:
       backend: redis

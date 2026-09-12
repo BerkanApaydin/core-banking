@@ -113,10 +113,29 @@ class RedisRateLimitConfigurationTest {
     }
 
     @Test
+    void shouldCreateRedisBeansWhenSnapshotCacheBackendIsRedis() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
+                        "app.cache.caffeine.account-info.backend=redis")
+                .run(context -> {
+
+                    assertThat(context)
+                            .hasSingleBean(RedisConnectionFactory.class);
+
+                    assertThat(context)
+                            .hasSingleBean(StringRedisTemplate.class);
+                });
+    }
+
+    @Test
     void shouldInstantiateConditionClasses() {
         assertThat(new RedisRateLimitConfiguration()).isNotNull();
         assertThat(new RedisRateLimitConfiguration.RedisBackendCondition()).isNotNull();
         assertThat(new RedisRateLimitConfiguration.RedisBackendCondition.RateLimitRedis()).isNotNull();
         assertThat(new RedisRateLimitConfiguration.RedisBackendCondition.LoginAttemptRedis()).isNotNull();
+        assertThat(new RedisRateLimitConfiguration.RedisBackendCondition.TokenBlacklistRedis()).isNotNull();
+        assertThat(new RedisRateLimitConfiguration.RedisBackendCondition.SnapshotCacheRedis()).isNotNull();
     }
 }

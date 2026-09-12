@@ -16,8 +16,8 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 
 - **PostgreSQL 15:** Relational database with full transaction isolation and optimistic locking.
 - **Flyway:** Automated database migration and schema version control. Migrations run on startup (`spring.jpa.hibernate.ddl-auto=validate`) to guarantee schema consistency with JPA entities.
-- **Redis 7:** Caching, login attempts storage, and sliding window rate limiting (via Lua scripts).
-- **Caffeine Cache:** Primary account-snapshot cache in every environment (60s TTL); also the default backend for rate limiting, login attempts, and token blacklist (production switches those three to Redis).
+- **Redis 7:** Shared account-snapshot cache in production, login attempts storage, and sliding window rate limiting (via Lua scripts).
+- **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production switches snapshots, rate limiting, login attempts, and token blacklist to Redis.
 - **Micrometer + Prometheus:** Custom business metrics (outbox, orphan alarms) scraped via Actuator.
 - **springdoc-openapi:** Swagger UI for API exploration (disabled in production).
 
@@ -32,10 +32,10 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 ### DevOps & Prerequisites
 
 - **Docker & Docker Compose:** Multi-container orchestration.
-- **Kubernetes:** Production-ready manifests in `k8s/` (Deployment with rolling updates, HPA, PDB, probes, secret refs).
+- **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and PostgreSQL/Redis deployments are not included.
 - **Maven 3.9.x:** Recommended build system (Maven 3.9.16 wrapper configuration is pre-configured).
 - **Prerequisites:** Java 21 JDK, Docker installed.
-- **Environment:** All variables documented in `.env.example` (DB, Redis, JWT, rate-limit, outbox, cache, integrity).
+- **Environment:** All variables documented in `.env.example`.
 
 ---
 
@@ -52,10 +52,10 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 - **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
-- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports, with local fallback when Redis is down), outbox poller/processor, Redis/Caffeine adapters (incl. the Caffeine backend for the `account-api` snapshot cache), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
-- **`user`** [BC]: User registration, authentication, token lifecycle. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login runs as `@ReadOnlyUseCase` (DB reads only; login-attempt state lives in Redis, outside the DB transaction).
+- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports, with local fallback when Redis is down), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production, fail-open when Redis is down), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
+- **`user`** [BC]: User registration, authentication, token lifecycle. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login runs as `@ReadOnlyUseCase` (DB reads only; login-attempt state lives outside the DB transaction — Redis backend in production, Caffeine locally).
 - **`account`** [BC]: Bank account lifecycle, balance mutations, and details. Implements `account-api`. Publishes its own domain events; callers only see the opaque `AccountAdjustmentResult`.
-- **`transfer`** [BC]: Fund transfers, cancellations (24-hour window), and reporting. Defines `AccountAclPort` (with owned `AccountInfo` + `MutationResult` types) as its outbound port; implements it via `AccountAclAdapter` + in-memory fallback, delegating to `account-api`. Snapshot caching goes through the `account-api` cache contract (infrastructure Caffeine backend, in-memory fallback in transfer). Depends on `account-api` at compile time — never on `account`; `account` does not depend on `transfer`. Money-movement endpoints (`POST /transfers`, `POST /transfers/{id}/cancel`) require `Idempotency-Key` (`@Idempotent(required=true)`).
+- **`transfer`** [BC]: Fund transfers, cancellations (24-hour window), and reporting. Talks to `account` only via the `account-api` published language; money-movement endpoints require `Idempotency-Key`.
 - **`audit`** [Supporting]: Transactional audit logging triggered by commit-phase domain events via `@TransactionalEventListener(AFTER_COMMIT)`.
 
 **Module dependencies** (arrow = compile-time dependency direction; dashed arrow = port implementation):
@@ -100,7 +100,7 @@ graph LR
 | :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `transfer` → `account` **forbidden**        | Transfer must never touch the account module at compile time — `account-api` only                                                                            |
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
-| No-FK (V19/V22)                             | `accounts.user_id`, `transfers.*_account_id` are not FKs (V3 leftovers dropped in V22); integrity lives in the application layer + `OrphanIntegrityReporter` |
+| No-FK                                     | `accounts.user_id`, `transfers.*_account_id` are not FKs; integrity lives in the application layer + `OrphanIntegrityReporter` |
 
 > The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary and naming rules); the above are the only three rules you need to know.
 
@@ -132,15 +132,15 @@ All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bea
 
 ## Key Features & Design Decisions
 
-- **Hexagonal Architecture (Ports & Adapters):** All bounded context modules (`account`, `transfer`, `user`, `audit`) are compile-time independent of `infrastructure`. Infrastructure adapters depend on context-owned ports, never on concrete adapter classes (e.g. `SecurityContextAdapter` consumes the framework-free `AuthenticatedPrincipalPort`, not `CustomUserDetails`). Ports are owned by their defining module — `AccountAclPort` lives in `transfer.application.port.out`, `JwtPort`/`TokenBlacklistPort` in `user.application.port.out`, the `AccountApi` published language and snapshot-cache contract in `account-api`.
+- **Hexagonal Architecture (Ports & Adapters):** Bounded contexts (`account`, `transfer`, `user`, `audit`) never depend on `infrastructure`; infrastructure implements context-owned ports, and each port lives in its owning module.
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Audit events are published via `ApplicationEventPublisher` within the transaction boundary and consumed by `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`, ensuring audit logging is only persisted on successful commit.
-- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, concurrent-safe claiming, and idempotent handlers (at-most-once processing across restarts and retries).
+- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, concurrent-safe claiming (`SKIP LOCKED`), and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter).
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
 - **Sorted Resource Locking (Deadlock Prevention):** Acquires database locks in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
 - **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules communicate only through the `account-api` published language (Open Host Service), consumed via transfer's `AccountAclPort` contract and implemented via `AccountAclAdapter` (in `transfer.adapter.out.account`) delegating to `AccountApi`. This protects the transfer domain from database or structure changes inside the account module, and account domain events never leak across the boundary.
-- **AOP Idempotency Guard:** Protects write endpoints against duplicate submissions using a unique composite key stored in the `idempotency_keys` table. Authenticated endpoints use a `username_idempotencyKey` key; public endpoints (e.g., `/auth/register`) use a `clientIp_idempotencyKey` key via `ClientIpResolverPort`, configured with `@Idempotent(publicEndpoint = true)`.
+- **AOP Idempotency Guard:** Write endpoints are protected against duplicate submissions via `Idempotency-Key` headers stored in the `idempotency_keys` table.
 - **Resilience:** Token blacklist degrades to a local per-token-TTL cache when Redis is unreachable (auth stays up); rate-limited responses carry `Retry-After`; login runs read-only against the DB.
-- **Observability:** Structured JSON logs with correlation/trace/user IDs, Micrometer counters for outbox (`processed/failed/dead_letter`) and orphan alarms (`db.orphan.alarm`), Redis health indicator, Prometheus-ready Actuator endpoints.
+- **Observability:** Structured JSON logs with correlation IDs, Micrometer counters (outbox, orphan alarms), Redis health indicator, Prometheus-ready Actuator endpoints.
 - **Configuration:** All tunables are `@ConfigurationProperties` with env overrides documented in `.env.example` (timeouts, TTL bounds, retry/backoff, cron schedules, alarm thresholds).
 
 ---

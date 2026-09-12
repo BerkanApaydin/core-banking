@@ -11,8 +11,16 @@ class CachePropertiesTest {
         CacheProperties props = new CacheProperties();
         CacheProperties.AccountInfoCache cache = props.getAccountInfo();
 
+        assertEquals("caffeine", cache.getBackend());
         assertEquals(1000, cache.getMaximumSize());
         assertEquals(60, cache.getExpireAfterWrite());
+    }
+
+    @Test
+    void shouldSetAndGetBackend() {
+        CacheProperties.AccountInfoCache cache = new CacheProperties.AccountInfoCache();
+        cache.setBackend("redis");
+        assertEquals("redis", cache.getBackend());
     }
 
     @Test

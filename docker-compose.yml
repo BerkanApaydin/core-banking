@@ -53,6 +53,7 @@ services:
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       TOKEN_BLACKLIST_BACKEND: redis
+      CACHE_ACCOUNT_INFO_BACKEND: redis
     depends_on:
       postgres:
         condition: service_healthy

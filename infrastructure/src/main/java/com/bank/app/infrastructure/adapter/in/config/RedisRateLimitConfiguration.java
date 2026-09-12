@@ -52,5 +52,8 @@ public class RedisRateLimitConfiguration {
 
         @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "redis")
         static class TokenBlacklistRedis {}
+
+        @ConditionalOnProperty(name = "app.cache.caffeine.account-info.backend", havingValue = "redis")
+        static class SnapshotCacheRedis {}
     }
 }

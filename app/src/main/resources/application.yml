@@ -113,6 +113,7 @@ app:
   cache:
     caffeine:
       account-info:
+        backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
         maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
         expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}
 
