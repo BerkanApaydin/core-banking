@@ -67,7 +67,9 @@ jobs:
         restore-keys: ${{ runner.os }}-m2
 
     - name: Unit & Integration Tests (with coverage)
-      run: mvn -B -ntp clean verify
+      # PIT runs in a separate parallel Maven invocation and needs reactor JARs
+      # (including common's test JAR) installed in the local repository.
+      run: mvn -B -ntp clean install
       env:
         DB_HOST: localhost
         DB_PORT: 5432

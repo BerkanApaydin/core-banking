@@ -2,7 +2,8 @@
 
 This runbook describes the checked-in application and deployment templates. Passing the smoke check below proves only the listed HTTP contracts at that moment. It does not certify financial correctness, Redis revocation durability, restore capability, capacity or production readiness. Run fault injection and recovery drills in an isolated staging environment with synthetic accounts.
 
-CI runs a sequential Maven `clean verify` before the per-module coverage gate.
+CI runs a sequential Maven `clean install` (including `verify`) before the per-module coverage gate.
+The install phase publishes reactor JARs and the shared test JAR to the runner's local Maven repository so the separate, parallel PIT invocation can resolve them.
 Pull requests also run GitHub dependency review, which rejects newly introduced
 high/critical advisories, and the build publishes an aggregate CycloneDX SBOM
 (`cyclonedx-sbom` artifact). Dependency review checks changes in a PR, so the
