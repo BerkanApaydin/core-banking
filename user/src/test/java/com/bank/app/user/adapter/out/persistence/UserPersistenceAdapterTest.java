@@ -45,12 +45,13 @@ class UserJpaAdapterTest {
     void shouldSaveUserSuccessfully() {
         UserJpaEntity existingEntity = new UserJpaEntity();
         existingEntity.setId(1L);
+        existingEntity.setVersion(0L);
         existingEntity.setUsername("testuser");
         existingEntity.setPassword("oldpassword");
         existingEntity.setRole("ROLE_USER");
         when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-        User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER);
+        User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER, null, null, 0L);
         adapter.save(user);
 
         verify(userJpaRepository).save(any(UserJpaEntity.class));
@@ -147,13 +148,14 @@ class UserJpaAdapterTest {
         void shouldUpdateEntityWhenFound() {
             UserJpaEntity existingEntity = new UserJpaEntity();
             existingEntity.setId(1L);
+            existingEntity.setVersion(0L);
             existingEntity.setUsername("testuser");
             existingEntity.setPassword("oldpassword");
             existingEntity.setRole("ROLE_USER");
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
             User user = new User(new UserId(1L), "testuser", "newpassword", Role.ROLE_USER,
-                    new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"));
+                    new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"), 0L);
             adapter.save(user);
 
             ArgumentCaptor<UserJpaEntity> captor = ArgumentCaptor.forClass(UserJpaEntity.class);
@@ -179,11 +181,12 @@ class UserJpaAdapterTest {
         void shouldSetEmailAndPhoneToNullWhenNotPresent() {
             UserJpaEntity existingEntity = new UserJpaEntity();
             existingEntity.setId(1L);
+            existingEntity.setVersion(0L);
             existingEntity.setEmail("old@example.com");
             existingEntity.setPhone("+901234567890");
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER);
+            User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER, null, null, 0L);
             adapter.save(user);
 
             ArgumentCaptor<UserJpaEntity> captor = ArgumentCaptor.forClass(UserJpaEntity.class);

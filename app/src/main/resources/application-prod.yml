@@ -5,6 +5,7 @@ jwt:
 
 spring:
   flyway:
+    baseline-on-migrate: false
     validate-on-migrate: true
 
 springdoc:

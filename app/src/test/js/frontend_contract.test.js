@@ -5,6 +5,32 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/app.js'), 'utf8');
+const accountSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/accounts.js'), 'utf8');
+
+test('browser loads feature scripts in dependency order', () => {
+    const staticDirectory = path.resolve(__dirname, '../../main/resources/static');
+    const html = fs.readFileSync(path.join(staticDirectory, 'index.html'), 'utf8');
+    const scripts = Array.from(html.matchAll(/<script src="([^"]+)"/g), match => match[1].split('?')[0]);
+    assert.deepEqual(scripts, ['boot.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js']);
+    for (const script of scripts) {
+        assert.equal(fs.existsSync(path.join(staticDirectory, script)), true, `${script} must be served`);
+    }
+
+    const context = vm.createContext({
+        localStorage: { getItem: () => 'tr' },
+        document: { querySelectorAll: () => [], getElementById: () => null, addEventListener() {} },
+        window: {}
+    });
+    for (const script of scripts.slice(1)) {
+        vm.runInContext(fs.readFileSync(path.join(staticDirectory, script), 'utf8'), context,
+            { filename: script });
+    }
+    assert.equal(vm.runInContext('getLanguage()', context), 'tr');
+    assert.notEqual(vm.runInContext("__('app.title')", context), 'app.title');
+    assert.equal(vm.runInContext('typeof getIdempotencyKey', context), 'function');
+    assert.equal(vm.runInContext('typeof loadAccounts', context), 'function');
+    assert.equal(vm.runInContext('typeof populateTransferDropdowns', context), 'function');
+});
 
 test('recipient IBAN validation matches backend MOD 97 rule', () => {
     const functions = 'function isValidIban(value) {'
@@ -68,7 +94,7 @@ test('account creation sends no IBAN and displays the server-generated value', a
         __: (key, ...args) => `${key}:${args.join(',')}`
     });
     const functionSource = 'function initModal() {'
-        + source.split('function initModal() {')[1].split('// --- Transfer Page Operations ---')[0];
+        + accountSource.split('function initModal() {')[1];
     vm.runInContext(functionSource, context);
     vm.runInContext('initModal()', context);
     await listeners.get('submit')({ preventDefault() {} });
@@ -208,7 +234,7 @@ test('opening-balance field follows the authenticated backend capability', async
         }
     });
     const functions = 'function renderFundingMode() {'
-        + source.split('function renderFundingMode() {')[1].split('function initModal()')[0];
+        + accountSource.split('function renderFundingMode() {')[1].split('function initModal()')[0];
     vm.runInContext(functions, context);
 
     await vm.runInContext('loadAccountCapabilities()', context);

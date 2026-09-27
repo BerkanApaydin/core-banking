@@ -40,8 +40,8 @@ public class UserBeanConfig {
 
     @Bean
     public LoginUserUseCase loginUserUseCase(AuthenticationPort authenticationPort, JwtPort jwtPort,
-                                             LoadUserPort loadUserPort, LoginAttemptPort loginAttemptPort) {
-        return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort, loginAttemptPort);
+                                             LoginAttemptPort loginAttemptPort) {
+        return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort);
     }
 
     @Bean

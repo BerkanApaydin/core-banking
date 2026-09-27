@@ -51,6 +51,6 @@ public class TransferJpaMapper {
             throw new IllegalArgumentException("Entity and Transfer must not be null");
         }
         entity.setStatus(transfer.getStatus().name());
-        entity.setVersion(transfer.getVersion());
+        // The managed version belongs to Hibernate; the adapter checks the expected version.
     }
 }

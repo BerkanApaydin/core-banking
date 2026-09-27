@@ -571,4 +571,105 @@ class IdempotencyAspectTest {
                 IllegalArgumentException.class,
                 () -> aspect.handleIdempotency(joinPoint, annotation()));
     }
+
+    private void reserveNewRequest() {
+        mockRequest("abc");
+        when(userContextService.getCurrentUsername()).thenReturn(Optional.of("user"));
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
+                .thenReturn(IdempotencyGuard.IdempotencyResult.newRequest());
+    }
+
+    @Test
+    void interruptedRetryReleasesReservationOnlyAfterRollbackAndRestoresInterrupt() throws Throwable {
+        reserveNewRequest();
+        when(joinPoint.proceed()).thenThrow(new org.springframework.dao.OptimisticLockingFailureException("stale"));
+        try {
+            Thread.currentThread().interrupt();
+            assertThrows(InterruptedException.class, () -> aspect.handleIdempotency(joinPoint, annotation()));
+            assertTrue(Thread.currentThread().isInterrupted());
+            var order = inOrder(transactionManager, idempotencyGuard);
+            order.verify(transactionManager).rollback(any());
+            order.verify(idempotencyGuard).failRequest(userKey());
+            verify(joinPoint).proceed();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void cleanupFailureDoesNotHideOriginalBusinessFailure() throws Throwable {
+        reserveNewRequest();
+        var original = new IllegalArgumentException("invalid business operation");
+        var cleanup = new IllegalStateException("database unavailable");
+        when(joinPoint.proceed()).thenThrow(original);
+        doThrow(cleanup).when(idempotencyGuard).failRequest(userKey());
+
+        Throwable result = assertThrows(IllegalArgumentException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation()));
+        assertSame(original, result);
+        assertArrayEquals(new Throwable[]{cleanup}, result.getSuppressed());
+        verify(transactionManager).rollback(any());
+    }
+
+    @Test
+    void interruptionIsPreservedEvenWhenCleanupFails() throws Throwable {
+        reserveNewRequest();
+        when(joinPoint.proceed()).thenThrow(new org.springframework.dao.PessimisticLockingFailureException("busy"));
+        var cleanup = new IllegalStateException("database unavailable");
+        doThrow(cleanup).when(idempotencyGuard).failRequest(userKey());
+        try {
+            Thread.currentThread().interrupt();
+            var interrupted = assertThrows(InterruptedException.class,
+                    () -> aspect.handleIdempotency(joinPoint, annotation()));
+            assertTrue(Thread.currentThread().isInterrupted());
+            assertArrayEquals(new Throwable[]{cleanup}, interrupted.getSuppressed());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void ambiguousCommitFailureMustRetainReservation() throws Throwable {
+        reserveNewRequest();
+        when(joinPoint.proceed()).thenReturn(ResponseEntity.ok().build());
+        var commitFailure = new org.springframework.transaction.TransactionSystemException("commit acknowledgement lost");
+        doThrow(commitFailure).when(transactionManager).commit(any());
+
+        assertSame(commitFailure, assertThrows(org.springframework.transaction.TransactionSystemException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation())));
+        verify(idempotencyGuard, never()).failRequest(anyString());
+        verify(joinPoint).proceed();
+    }
+
+    @Test
+    void uncertainRollbackFailureMustRetainReservation() throws Throwable {
+        reserveNewRequest();
+        when(joinPoint.proceed()).thenThrow(new IllegalArgumentException("business failure"));
+        var rollbackFailure = new org.springframework.transaction.TransactionSystemException("rollback failed");
+        doThrow(rollbackFailure).when(transactionManager).rollback(any());
+
+        assertSame(rollbackFailure, assertThrows(org.springframework.transaction.TransactionSystemException.class,
+                () -> aspect.handleIdempotency(joinPoint, annotation())));
+        verify(idempotencyGuard, never()).failRequest(anyString());
+    }
+
+    @Test
+    void retriesOnlyAfterRollbackUsingANewTransaction() throws Throwable {
+        reserveNewRequest();
+        when(joinPoint.proceed())
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("stale"))
+                .thenReturn(ResponseEntity.ok().build());
+
+        aspect.handleIdempotency(joinPoint, annotation());
+
+        var order = inOrder(transactionManager, joinPoint, idempotencyGuard);
+        order.verify(transactionManager).getTransaction(any());
+        order.verify(joinPoint).proceed();
+        order.verify(transactionManager).rollback(any());
+        order.verify(transactionManager).getTransaction(any());
+        order.verify(joinPoint).proceed();
+        order.verify(idempotencyGuard).completeRequest(userKey(), "", 200);
+        order.verify(transactionManager).commit(any());
+        verify(idempotencyGuard, never()).failRequest(anyString());
+    }
 }

@@ -107,8 +107,8 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldUpdateExistingTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        // domain transfer has updated version=2L vs existing entity version=1L
-        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 2L);
+        // The domain carries the version it read; only Hibernate advances it at flush.
+        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
         TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
                 "COMPLETED", 1L, now);
         TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
@@ -129,8 +129,7 @@ class TransferPersistenceAdapterTest {
         ArgumentCaptor<TransferJpaEntity> captor = ArgumentCaptor.forClass(TransferJpaEntity.class);
         verify(springDataRepo).save(captor.capture());
         TransferJpaEntity capturedEntity = captor.getValue();
-        // If updateJpaEntity was not called, version would still be 1L (from existingEntity)
-        assertEquals(2L, capturedEntity.getVersion());
+        assertEquals(1L, capturedEntity.getVersion());
     }
 
     @Test

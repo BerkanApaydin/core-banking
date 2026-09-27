@@ -6,6 +6,7 @@ import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableEx
 import com.bank.app.user.domain.User;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
@@ -39,6 +40,9 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
             entity = repository.findById(user.getId().value())
                     .orElseThrow(() -> new IllegalArgumentException(
                             "User not found with id: " + user.getId().value()));
+            if (user.getVersion() == null || !user.getVersion().equals(entity.getVersion())) {
+                throw new ObjectOptimisticLockingFailureException(UserJpaEntity.class, user.getId().value());
+            }
             mapper.updateJpaEntity(entity, user);
         }
         return mapper.toDomain(repository.save(entity));

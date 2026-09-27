@@ -1,192 +1,89 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.mock.env.MockEnvironment;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 
-@SuppressWarnings("null")
-@ExtendWith(MockitoExtension.class)
 class ApplicationStartupValidatorTest {
 
-    @Mock private Environment environment;
+    private MockEnvironment validProductionEnvironment() {
+        return new MockEnvironment().withProperty("jwt.secret", "non-default-secret")
+                .withProperty("spring.datasource.password", "non-default-password")
+                .withProperty("app.security.token-blacklist.backend", "hybrid")
+                .withProperty("app.security.browser-session.secure", "true")
+                .withProperty("app.security.failed-login.backend", "redis")
+                .withProperty("app.security.rate-limit.backend", "redis")
+                .withProperty("spring.profiles.active", "prod");
+    }
 
-    private ApplicationStartupValidator validator;
+    @ParameterizedTest
+    @ValueSource(strings = {"dev", "local", "test"})
+    void permitsExplicitNonProductionProfiles(String profile) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles(profile);
+        assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .doesNotThrowAnyException();
+    }
 
-    private static final String DEFAULT_JWT_SECRET = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+    @ParameterizedTest
+    @ValueSource(strings = {"hybrid", "database"})
+    void acceptsDurableProductionBackends(String backend) {
+        var environment = validProductionEnvironment()
+                .withProperty("app.security.token-blacklist.backend", backend);
+        assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .doesNotThrowAnyException();
+    }
 
-    @BeforeEach
-    void setUp() {
-        validator = new ApplicationStartupValidator(environment);
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "jwt.secret | '' | non-default JWT secret",
+            "jwt.secret | '   ' | non-default JWT secret",
+            "jwt.secret | 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970 | non-default JWT secret",
+            "spring.datasource.password | '' | database password",
+            "spring.datasource.password | bank_password | default database password",
+            "app.security.token-blacklist.backend | redis | hybrid or database",
+            "app.security.token-blacklist.backend | caffeine | hybrid or database",
+            "app.security.browser-session.secure | false | Secure cookies",
+            "app.security.failed-login.backend | caffeine | shared Redis",
+            "app.security.rate-limit.backend | caffeine | shared Redis",
+            "app.security.failed-login.max-attempts | 0 | positive value",
+            "app.security.failed-login.window-minutes | -1 | positive value",
+            "app.security.rate-limit.max-requests | 0 | positive value",
+            "app.security.rate-limit.time-window-ms | -1 | positive value"
+    })
+    void rejectsUnsafeProductionOverrides(String property, String value, String reason) {
+        var environment = validProductionEnvironment().withProperty(property, value);
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining(reason);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"dev", "demo", "test", "testcontainers"})
+    void rejectsMixedProductionAndUnsafeProfiles(String profile) {
+        var environment = validProductionEnvironment();
+        environment.setActiveProfiles("prod", profile);
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .hasMessageContaining("must not be combined");
     }
 
     @Test
-    void shouldSkipValidationWhenProfileIsNotProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "local" });
-
-        assertDoesNotThrow(() -> validator.validateProductionConfig());
+    void checksProductionWhenItIsTheDefaultProfile() {
+        var environment = new MockEnvironment();
+        environment.setDefaultProfiles("prod");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .hasMessageContaining("non-default JWT secret");
     }
 
     @Test
-    void shouldWarnWhenDefaultJwtSecretInNonProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "local" });
-        when(environment.getProperty("jwt.secret", DEFAULT_JWT_SECRET))
-                .thenReturn(DEFAULT_JWT_SECRET);
-        when(environment.getProperty("spring.datasource.password", ""))
-                .thenReturn("");
-
-        assertDoesNotThrow(() -> validator.validateProductionConfig());
-    }
-
-    @Test
-    void shouldThrowWhenJwtSecretIsDefaultInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn(DEFAULT_JWT_SECRET);
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertEquals("Production profile requires a non-default JWT secret. Set JWT_SECRET environment variable.",
-                exception.getMessage());
-    }
-
-    @Test
-    void shouldThrowWhenJwtSecretIsNullInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn(null);
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertThat(exception.getMessage()).contains("non-default JWT secret");
-    }
-
-    @Test
-    void shouldThrowWhenJwtSecretIsBlankInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn("   ");
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-    }
-
-    @Test
-    void shouldThrowWhenDatabasePasswordIsNullInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn("secure-jwt-secret");
-
-        when(environment.getProperty(
-                "spring.datasource.password",
-                "")).thenReturn(null);
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertThat(exception.getMessage())
-                .contains("database password");
-    }
-
-    @Test
-    void shouldThrowWhenDatabasePasswordIsBlankInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn("secure-jwt-secret");
-
-        when(environment.getProperty(
-                "spring.datasource.password",
-                "")).thenReturn("");
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertThat(exception.getMessage())
-                .contains("database password");
-    }
-
-    @Test
-    void shouldThrowWhenDatabasePasswordIsDefaultInProd() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn("secure-jwt-secret");
-
-        when(environment.getProperty(
-                "spring.datasource.password",
-                "")).thenReturn("bank_password");
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> validator.validateProductionConfig());
-
-        assertThat(exception.getMessage())
-                .contains("default database password");
-    }
-
-    @Test
-    void shouldPassWhenProductionConfigurationIsValid() {
-        when(environment.getActiveProfiles())
-                .thenReturn(new String[] { "prod" });
-
-        when(environment.getProperty(
-                "jwt.secret",
-                DEFAULT_JWT_SECRET)).thenReturn("very-secure-secret");
-
-        when(environment.getProperty(
-                "spring.datasource.password",
-                "")).thenReturn("very-secure-password");
-        when(environment.getProperty("app.security.token-blacklist.backend", ""))
-                .thenReturn("hybrid");
-
-        assertDoesNotThrow(() -> validator.validateProductionConfig());
-    }
-
-    @Test
-    void shouldRejectNonDurableRevocationBackendInProduction() {
-        when(environment.getActiveProfiles()).thenReturn(new String[] { "prod" });
-        when(environment.getProperty("jwt.secret", DEFAULT_JWT_SECRET))
-                .thenReturn("very-secure-secret");
-        when(environment.getProperty("spring.datasource.password", ""))
-                .thenReturn("very-secure-password");
-        when(environment.getProperty("app.security.token-blacklist.backend", ""))
-                .thenReturn("redis");
-
-        assertThatThrownBy(() -> validator.validateProductionConfig())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("hybrid or database");
+    void rejectsMissingDatabasePassword() {
+        var environment = new MockEnvironment().withProperty("jwt.secret", "non-default-secret");
+        environment.setActiveProfiles("prod");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .hasMessageContaining("database password");
     }
 }

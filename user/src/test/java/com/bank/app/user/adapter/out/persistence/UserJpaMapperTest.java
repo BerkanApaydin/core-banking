@@ -138,7 +138,7 @@ class UserJpaMapperTest {
             assertThat(entity.getRole()).isEqualTo("ROLE_ADMIN");
             assertThat(entity.getEmail()).isEqualTo("new@example.com");
             assertThat(entity.getPhone()).isEqualTo("555-9999");
-            assertThat(entity.getVersion()).isEqualTo(2L);
+            assertThat(entity.getVersion()).isEqualTo(0L);
         }
 
         @Test

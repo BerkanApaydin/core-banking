@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 import uuid
@@ -7,14 +8,17 @@ import json
 import math
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
+try:
+    import requests
+except ModuleNotFoundError:
+    requests = None
 
 # ==============================================================================
 #                             TEST CONFIGURATIONS
 # ==============================================================================
-BASE_URL = os.environ.get("TARGET_URL", "http://localhost:8080")
-# Bootstrap opens funded accounts; target a dev/demo deployment, where demo
-# funding is explicitly enabled. Production account opening starts at zero.
+BASE_URL = os.environ.get("TARGET_URL", "http://localhost:8080").rstrip("/")
+# Workload mode opens funded accounts. Use an isolated dev or simulation
+# deployment with a rate-limit budget appropriate for the intended load.
 
 # --- Multiple Test Users ---
 # In real-world scenarios, testing with a single token is unrealistic with thousands of users.
@@ -67,12 +71,6 @@ W_TRANSFER         = 0.07
 W_CREATE_ACCOUNT   = 0.01
 W_CANCEL_TRANSFER  = 0.01
 
-AUTH_IP            = f"192.168.1.{random.randint(10, 99)}"
-RATE_LIMIT_TEST_IP = f"192.168.2.{random.randint(10, 99)}"
-
-# Per-request source IP pool
-IP_POOL = [f"10.0.{random.randint(0, 255)}.{random.randint(1, 254)}" for _ in range(256)]
-
 # Runtime context
 ctx = {
     "account_ids": [],
@@ -95,10 +93,9 @@ def print_header(title):
     print("=" * 60)
 
 
-def get_auth_token(username, password, source_ip=None):
+def get_auth_token(username, password):
     url = f"{BASE_URL}/api/v1/auth/login"
-    ip = source_ip or _random_ip()
-    headers = {"Content-Type": "application/json", "X-Forwarded-For": ip}
+    headers = {"Content-Type": "application/json"}
     try:
         r = requests.post(url, json={"username": username, "password": password}, headers=headers)
         if r.status_code == 200:
@@ -108,10 +105,6 @@ def get_auth_token(username, password, source_ip=None):
     except Exception as e:
         print(f"Auth error: {e}")
     return None, None
-
-
-def _random_ip():
-    return random.choice(IP_POOL)
 
 
 def _random_amount():
@@ -151,19 +144,35 @@ def _page_items(response):
     return data["content"]
 
 
-def _create_account(token, user_id, owner_name, initial_balance):
-    iban = f"TR{random.randint(0, 10**24 - 1):024d}"
+def _account_payload(owner_name, initial_balance):
+    return {"ownerName": owner_name, "initialBalance": initial_balance,
+            "currency": TRANSFER_CURRENCY}
+
+
+def _create_account(token, owner_name, initial_balance):
     response = requests.post(
         f"{BASE_URL}/api/v1/accounts",
-        json={"userId": user_id, "ownerName": owner_name, "iban": iban,
-              "initialBalance": initial_balance, "currency": TRANSFER_CURRENCY},
+        json=_account_payload(owner_name, initial_balance),
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                 "Idempotency-Key": str(uuid.uuid4()), "X-Forwarded-For": _random_ip()},
+                 "Idempotency-Key": str(uuid.uuid4())},
         timeout=(3, 10),
     )
     if response.status_code != 201:
         raise RuntimeError(f"Account bootstrap failed: HTTP {response.status_code} {response.text[:120]}")
     return response.json()
+
+
+def _require_workload_target(token):
+    response = requests.get(
+        f"{BASE_URL}/api/v1/accounts/capabilities",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=(3, 10),
+    )
+    if response.status_code != 200 or response.json().get("initialFundingEnabled") is not True:
+        raise RuntimeError(
+            "Workload requires an isolated dev or simulation deployment with "
+            "simulated opening balances enabled"
+        )
 
 def _validate_response(url_label, status_code, body, expected_fields=None):
     if status_code == "ERROR":
@@ -220,7 +229,7 @@ def _print_phase_result(phase_label, dur, rps, avg, lat_p50, error_cnt, statuses
 def bootstrap_context(token):
     """Load context for the main user — used by Test 2."""
     global SENDER_IBAN, RECEIVER_IBAN
-    headers = {"Authorization": f"Bearer {token}", "X-Forwarded-For": AUTH_IP}
+    headers = {"Authorization": f"Bearer {token}"}
 
     r = requests.get(f"{BASE_URL}/api/v1/accounts", headers=headers)
     if r.status_code == 200:
@@ -258,17 +267,15 @@ def bootstrap_context(token):
         print(f"Using own account for transfer tests: sender={SENDER_IBAN}, receiver={RECEIVER_IBAN}")
 
 
-def _create_single_user(i):
+def _create_single_user(i, verify_target=False):
     """Create one load test user: register, login, create account, fetch accounts.
-       Returns a user dict on success, None on failure.
-       Each request uses a random source IP to spread rate-limit across IPs."""
+       Returns a user dict on success, None on failure."""
     uname = f"ldu_{i}_{uuid.uuid4().hex[:6]}"
     password = "TestPass123!"
-    reg_ip = _random_ip()
 
     for attempt in range(3):
         try:
-            reg_headers = {"Content-Type": "application/json", "X-Forwarded-For": reg_ip}
+            reg_headers = {"Content-Type": "application/json"}
             r = requests.post(f"{BASE_URL}/api/v1/auth/register",
                               json={"username": uname, "password": password},
                               headers=reg_headers)
@@ -276,7 +283,6 @@ def _create_single_user(i):
                 break
             if r.status_code == 429:
                 time.sleep(12)
-                reg_ip = _random_ip()
                 continue
             if r.status_code == 409:
                 return None
@@ -287,25 +293,25 @@ def _create_single_user(i):
     else:
         return None
 
-    login_ip = _random_ip()
     for attempt in range(3):
-        user_token, uid = get_auth_token(uname, password, source_ip=login_ip)
+        user_token, uid = get_auth_token(uname, password)
         if user_token:
             break
         time.sleep(12)
-        login_ip = _random_ip()
     if not user_token:
         return None
 
     try:
-        first = _create_account(user_token, uid, uname, 50000.00)
-        second = _create_account(user_token, uid, uname, 50000.00)
+        if verify_target:
+            _require_workload_target(user_token)
+        first = _create_account(user_token, uname, 50000.00)
+        second = _create_account(user_token, uname, 50000.00)
         seed = requests.post(
             f"{BASE_URL}/api/v1/transfers",
             json={"senderIban": first["iban"], "receiverIban": second["iban"],
                   "amount": 1.00, "currency": TRANSFER_CURRENCY},
             headers={"Authorization": f"Bearer {user_token}", "Content-Type": "application/json",
-                     "Idempotency-Key": str(uuid.uuid4()), "X-Forwarded-For": _random_ip()},
+                     "Idempotency-Key": str(uuid.uuid4())},
             timeout=(3, 10),
         )
         if seed.status_code != 201:
@@ -316,7 +322,7 @@ def _create_single_user(i):
 
     try:
         r = requests.get(f"{BASE_URL}/api/v1/accounts",
-                         headers={"Authorization": f"Bearer {user_token}", "X-Forwarded-For": _random_ip()})
+                         headers={"Authorization": f"Bearer {user_token}"})
         if r.status_code == 200:
             accounts = _page_items(r)
             print(f"  [{i}] ok ({uname})")
@@ -337,14 +343,16 @@ def _create_single_user(i):
 
 
 def bootstrap_users():
-    """Create NUM_LOAD_USERS users in parallel using ThreadPoolExecutor.
-       Each user uses random source IPs to spread auth rate-limit across IPs."""
+    """Create NUM_LOAD_USERS users in parallel using ThreadPoolExecutor."""
     global user_pool
     print(f"\nCreating {NUM_LOAD_USERS} load test users... (concurrency={BOOTSTRAP_CONCURRENCY})")
-    user_pool = []
-    completed = 0
+    first = _create_single_user(0, verify_target=True)
+    if first is None:
+        raise RuntimeError("Initial load user bootstrap failed; check target profile, rate limit and logs")
+    user_pool = [first]
+    completed = 1
     with ThreadPoolExecutor(max_workers=BOOTSTRAP_CONCURRENCY) as ex:
-        futures = {ex.submit(_create_single_user, i): i for i in range(NUM_LOAD_USERS)}
+        futures = {ex.submit(_create_single_user, i): i for i in range(1, NUM_LOAD_USERS)}
         for f in as_completed(futures):
             i = futures[f]
             result = f.result()
@@ -361,7 +369,7 @@ def bootstrap_users():
 
 
 def get_account_balances(token):
-    headers = {"Authorization": f"Bearer {token}", "X-Forwarded-For": AUTH_IP}
+    headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(f"{BASE_URL}/api/v1/accounts", headers=headers)
     if r.status_code == 200:
         return {a["iban"]: {"balance": a.get("balance"), "currency": a.get("currency")} for a in _page_items(r)}
@@ -372,13 +380,13 @@ def get_account_balances(token):
 # TEST 1 – RATE LIMIT
 # ==============================================================================
 
-def test_rate_limiting():
+def check_rate_limiting():
     print_header("1. RATE LIMITING TEST")
     url = f"{BASE_URL}/api/v1/auth/register"
-    print(f"IP: {RATE_LIMIT_TEST_IP} – Sending 15 requests (limit: 10 req / 10 sec)...")
+    print("Sending 15 requests from this client (expected limit: 10 req / 10 sec)...")
 
     results = []
-    headers = {"Content-Type": "application/json", "X-Forwarded-For": RATE_LIMIT_TEST_IP}
+    headers = {"Content-Type": "application/json"}
 
     for i in range(1, 16):
         uname = f"user_{uuid.uuid4().hex[:8]}"
@@ -416,7 +424,7 @@ def test_rate_limiting():
 # TEST 2 – CONCURRENCY & IDEMPOTENCY
 # ==============================================================================
 
-def test_concurrency_and_idempotency(token):
+def check_concurrency_and_idempotency(token):
     print_header("2. CONCURRENCY & IDEMPOTENCY TEST")
 
     if SENDER_IBAN is None or RECEIVER_IBAN is None:
@@ -433,12 +441,11 @@ def test_concurrency_and_idempotency(token):
     payload = {"senderIban": SENDER_IBAN, "receiverIban": RECEIVER_IBAN,
                "amount": 10.00, "currency": TRANSFER_CURRENCY}
 
-    def send_transfer(key, pld, ip):
+    def send_transfer(key, pld):
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "Idempotency-Key": key,
-            "X-Forwarded-For": ip,
         }
         try:
             r = requests.post(f"{BASE_URL}/api/v1/transfers", json=pld, headers=headers)
@@ -447,7 +454,7 @@ def test_concurrency_and_idempotency(token):
             return "ERROR", str(e)
 
     with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = [ex.submit(send_transfer, ikey, payload, f"192.168.3.{10+i}") for i in range(5)]
+        futures = [ex.submit(send_transfer, ikey, payload) for _ in range(5)]
         phase_a = [f.result() for f in futures]
 
     for i, (s, b) in enumerate(phase_a, 1):
@@ -473,14 +480,13 @@ def test_concurrency_and_idempotency(token):
     print(f"Current balance: {cur_bal} {TRANSFER_CURRENCY}")
     print(f"{n} concurrent transfers x {amount} {TRANSFER_CURRENCY} = {n*amount} {TRANSFER_CURRENCY} requested")
 
-    def send_unique(idx):
+    def send_unique():
         return send_transfer(str(uuid.uuid4()),
-                             {"senderIban": SENDER_IBAN, "receiverIban": RECEIVER_IBAN,
-                              "amount": amount, "currency": TRANSFER_CURRENCY},
-                             f"192.168.4.{10+idx}")
+                              {"senderIban": SENDER_IBAN, "receiverIban": RECEIVER_IBAN,
+                               "amount": amount, "currency": TRANSFER_CURRENCY})
 
     with ThreadPoolExecutor(max_workers=n) as ex:
-        phase_b = [f.result() for f in [ex.submit(send_unique, i) for i in range(n)]]
+        phase_b = [f.result() for f in [ex.submit(send_unique) for _ in range(n)]]
 
     ok_b   = sum(1 for s, _ in phase_b if s == 201)
     fail_b = n - ok_b
@@ -545,7 +551,6 @@ def make_worker(pool, think_time=None):
             return "ERROR", 0, "__no_user__"
 
         token = user["token"]
-        thread_ip = _random_ip()
         roll = random.random()
         ep = ""
 
@@ -556,8 +561,7 @@ def make_worker(pool, think_time=None):
             if roll < THRESHOLDS[1]:
                 ep = "GET /accounts"
                 r = _req("GET", f"{BASE_URL}/api/v1/accounts",
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
                 if r.status_code == 200:
                     _validate_response(ep, r.status_code, r.json() if r.text else {},
                                        expected_fields=["id", "iban", "balance"])
@@ -568,8 +572,7 @@ def make_worker(pool, think_time=None):
                     return "SKIP", 0, ep
                 acc_id = random.choice(user["account_ids"])
                 r = _req("GET", f"{BASE_URL}/api/v1/accounts/{acc_id}",
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
                 if r.status_code == 200:
                     _validate_response(ep, r.status_code, r.json(),
                                        expected_fields=["id", "iban", "balance"])
@@ -580,8 +583,7 @@ def make_worker(pool, think_time=None):
                     return "SKIP", 0, ep
                 iban = random.choice(user["account_ibans"])
                 r = _req("GET", f"{BASE_URL}/api/v1/accounts/iban/{iban}",
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
 
             elif roll < THRESHOLDS[4]:
                 ep = "GET /transfers/{id}"
@@ -590,8 +592,7 @@ def make_worker(pool, think_time=None):
                 if tid is None:
                     return "SKIP", 0, ep
                 r = _req("GET", f"{BASE_URL}/api/v1/transfers/{tid}",
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
                 if r.status_code == 200:
                     _validate_response(ep, r.status_code, r.json(),
                                        expected_fields=["id", "amount", "status"])
@@ -602,8 +603,7 @@ def make_worker(pool, think_time=None):
                     return "SKIP", 0, ep
                 acc_id = random.choice(user["account_ids"])
                 r = _req("GET", f"{BASE_URL}/api/v1/transfers/history/{acc_id}",
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
                 if r.status_code == 200:
                     data = r.json()
                     _validate_response(ep, r.status_code, data,
@@ -622,16 +622,14 @@ def make_worker(pool, think_time=None):
                     "endDate":   end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
                 }
                 r = _req("GET", f"{BASE_URL}/api/v1/transfers/report", params=params,
-                                headers={"Authorization": f"Bearer {token}",
-                                         "X-Forwarded-For": thread_ip})
+                                headers={"Authorization": f"Bearer {token}"})
 
             elif roll < THRESHOLDS[7]:
                 ep = "POST /auth/register"
                 uname = f"u_{uuid.uuid4().hex[:10]}_{index}"
                 r = _req("POST", f"{BASE_URL}/api/v1/auth/register",
-                                 json={"username": uname, "password": "Password123!"},
-                                 headers={"Content-Type": "application/json",
-                                          "X-Forwarded-For": thread_ip})
+                                  json={"username": uname, "password": "Password123!"},
+                                  headers={"Content-Type": "application/json"})
 
             elif roll < THRESHOLDS[8]:
                 ep = "POST /transfers"
@@ -643,10 +641,9 @@ def make_worker(pool, think_time=None):
                 r = _req("POST", f"{BASE_URL}/api/v1/transfers",
                                  json={"senderIban": sender, "receiverIban": receiver,
                                        "amount": amount, "currency": TRANSFER_CURRENCY},
-                                 headers={"Authorization": f"Bearer {token}",
-                                          "Content-Type": "application/json",
-                                          "Idempotency-Key": str(uuid.uuid4()),
-                                          "X-Forwarded-For": thread_ip})
+                                  headers={"Authorization": f"Bearer {token}",
+                                           "Content-Type": "application/json",
+                                           "Idempotency-Key": str(uuid.uuid4())})
                 if r.status_code == 201:
                     transfer_id = r.json()["id"]
                     with user["transfer_ids_lock"]:
@@ -655,19 +652,11 @@ def make_worker(pool, think_time=None):
 
             elif roll < THRESHOLDS[9]:
                 ep = "POST /accounts"
-                digits = f"{random.randint(0, 10**24 - 1):024d}"
-                ibanr  = f"TR{digits}"
                 r = _req("POST", f"{BASE_URL}/api/v1/accounts",
-                                 json={
-                                     "userId": user["user_id"],
-                                     "ownerName": f"Load Test User {index}",
-                                     "iban": ibanr,
-                                     "initialBalance": 100.0,
-                                     "currency": TRANSFER_CURRENCY,
-                                 },
+                                 json=_account_payload(f"Load Test User {index}", 100.0),
                                  headers={"Authorization": f"Bearer {token}",
-                                          "Content-Type": "application/json",
-                                          "X-Forwarded-For": thread_ip})
+                                           "Content-Type": "application/json",
+                                           "Idempotency-Key": str(uuid.uuid4())})
 
             else:
                 ep = "POST /transfers/{id}/cancel"
@@ -676,9 +665,8 @@ def make_worker(pool, think_time=None):
                 if tid is None:
                     return "SKIP", 0, ep
                 r = _req("POST", f"{BASE_URL}/api/v1/transfers/{tid}/cancel",
-                                 headers={"Authorization": f"Bearer {token}",
-                                          "Idempotency-Key": str(uuid.uuid4()),
-                                          "X-Forwarded-For": thread_ip})
+                                  headers={"Authorization": f"Bearer {token}",
+                                           "Idempotency-Key": str(uuid.uuid4())})
                 if r.status_code != 204:
                     with user["transfer_ids_lock"]:
                         user["cancellable_transfer_ids"].append(tid)
@@ -763,7 +751,7 @@ def _run_phase(pool, concurrency, label, duration=None, req_count=None, think_ti
     return total, latencies, statuses
 
 
-def test_load(pool):
+def run_load_phases(pool):
     print_header("3. HTTP LOAD TEST – All Controllers (with Ramp-up)")
     _print_workload_legend()
 
@@ -880,36 +868,50 @@ def find_max_throughput_under_latency(pool, target_ms=100.0):
 # MAIN
 # ==============================================================================
 
-if __name__ == "__main__":
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Run one isolated load-test mode against TARGET_URL (default: http://localhost:8080).")
+    parser.add_argument("--mode", choices=("rate-limit", "workload"), required=True,
+                        help="Rate-limit checks the default 10/10s policy; workload creates synthetic users and transfers.")
+    args = parser.parse_args(argv)
+    if requests is None:
+        parser.error("Install the client dependency: python -m pip install -r load_tests/requirements.txt")
+
     import traceback
     try:
-        # 1. Rate Limiting Test
-        rate_limit_passed = test_rate_limiting()
+        if args.mode == "rate-limit":
+            return 0 if check_rate_limiting() else 1
 
-        # 3. Create load test users
+        # Workload mode requires a separate, isolated target with enough rate-limit
+        # headroom to measure the application rather than its protection filter.
         bootstrap_users()
         if len(user_pool) != NUM_LOAD_USERS:
             raise RuntimeError(
                 f"Only {len(user_pool)}/{NUM_LOAD_USERS} load users could be bootstrapped; "
-                "capacity figures would use a different workload")
+                "capacity figures would use a different workload. Check the target rate limit.")
 
-        # 4. Load a prepared user context (for Test 2)
+        # Load a prepared user context for concurrency and idempotency checks.
         print("\nLoading prepared user context (account and transfer IDs)...")
         token = user_pool[0]["token"]
         bootstrap_context(token)
 
-        # 5. Concurrency & Idempotency
-        consistency_passed = test_concurrency_and_idempotency(token)
+        # Concurrency and idempotency.
+        consistency_passed = check_concurrency_and_idempotency(token)
+        if not consistency_passed:
+            raise RuntimeError("Concurrency or idempotency check failed; workload measurement aborted")
 
-        # 6. Static Load (with user_pool, ramp-up)
-        test_load(user_pool)
-
-        # 7. Capacity Finder (with user_pool)
+        # Static load and capacity measurement.
+        run_load_phases(user_pool)
         capacity_passed = find_max_throughput_under_latency(user_pool, CAPACITY_TEST_TARGET_LATENCY_MS)
-        if not (rate_limit_passed and consistency_passed and capacity_passed):
-            raise RuntimeError("At least one load-test acceptance check failed")
+        if not capacity_passed:
+            raise RuntimeError("Capacity acceptance check failed")
+        return 0
 
     except Exception as e:
         print(f"\n[ERROR] Unexpected error: {e}")
         traceback.print_exc()
-        exit(1)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

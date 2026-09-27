@@ -84,7 +84,9 @@ def run_checks(url, timeout=5.0, require_probes=False):
             ("/actuator/health/liveness", 200, "UP"),
             ("/actuator/health/readiness", 200, "UP"),
         ])
-    contracts.append(("/api/v1/accounts", 401, 401))
+    # Browser session is protected but not covered by the IP rate limiter.
+    # Checking /accounts here could yield 429 during legitimate load.
+    contracts.append(("/api/v1/auth/browser/session", 401, 401))
     return [check(opener, url, path, timeout, status, payload_status)
             for path, status, payload_status in contracts]
 

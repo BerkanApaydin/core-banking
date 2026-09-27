@@ -6,8 +6,7 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/app.js'), 'utf8');
-const helpers = source.split('// --- Idempotency Key Helpers ---')[1]
-    .split('// --- State Management ---')[0];
+const helpers = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/idempotency.js'), 'utf8');
 
 function storage() {
     const values = new Map();

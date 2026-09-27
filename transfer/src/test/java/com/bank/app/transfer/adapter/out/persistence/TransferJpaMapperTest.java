@@ -130,7 +130,7 @@ class TransferJpaMapperTest {
             mapper.updateJpaEntity(entity, transfer);
 
             assertThat(entity.getStatus()).isEqualTo("CANCELLED");
-            assertThat(entity.getVersion()).isEqualTo(5L);
+            assertThat(entity.getVersion()).isEqualTo(1L);
         }
 
         @Test
@@ -195,7 +195,7 @@ class TransferJpaMapperTest {
             mapper.updateJpaEntity(entity, completed);
 
             assertThat(entity.getStatus()).isEqualTo("COMPLETED");
-            assertThat(entity.getVersion()).isEqualTo(2L);
+            assertThat(entity.getVersion()).isEqualTo(1L);
             assertThat(entity.getId()).isEqualTo(ID);
             assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
             assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);

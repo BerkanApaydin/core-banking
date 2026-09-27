@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @Component
 public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransferPort {
@@ -32,6 +33,11 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
             entity = repository.findById(transfer.getId())
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Transfer not found: " + transfer.getId()));
+            // Loading a managed entity must not discard the caller's expected version.
+            // Hibernate still detects a concurrent write after this comparison at flush.
+            if (transfer.getVersion() == null || !transfer.getVersion().equals(entity.getVersion())) {
+                throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
+            }
             mapper.updateJpaEntity(entity, transfer);
         }
         TransferJpaEntity saved = repository.save(entity);

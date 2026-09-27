@@ -19,7 +19,7 @@ spring:
     # 30s use-case tx timeout) get room to finish before the context closes.
     timeout-per-shutdown-phase: 30s
   profiles:
-    active: dev
+    default: prod
   application:
     name: clean-architecture-bank
   messages:

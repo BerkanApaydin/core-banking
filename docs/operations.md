@@ -2,6 +2,13 @@
 
 This runbook describes the checked-in application and deployment templates. Passing the smoke check below proves only the listed HTTP contracts at that moment. It does not certify financial correctness, Redis revocation durability, restore capability, capacity or production readiness. Run fault injection and recovery drills in an isolated staging environment with synthetic accounts.
 
+CI runs a sequential Maven `clean verify` before the per-module coverage gate.
+Pull requests also run GitHub dependency review, which rejects newly introduced
+high/critical advisories, and the build publishes an aggregate CycloneDX SBOM
+(`cyclonedx-sbom` artifact). Dependency review checks changes in a PR, so the
+existing dependency baseline still needs a scheduled security review. The SBOM
+lists components; it does not itself test whether they are vulnerable.
+
 ## Read-only deployment smoke check
 
 From the repository root, with Python 3.10 or newer:
@@ -12,7 +19,7 @@ python ops/health_smoke.py https://your-staging-host --require-probes --json
 python -m unittest ops.test_health_smoke -v
 ```
 
-The script sends only unauthenticated GET requests. It requires HTTP 200 and JSON `status: UP` from `/actuator/health`, and HTTP 401 with a Problem Detail JSON status of 401 from `/api/v1/accounts`. `--require-probes` also requires `/actuator/health/liveness` and `/actuator/health/readiness` to return HTTP 200 with `status: UP`. Use it for the Kubernetes deployment; outside Kubernetes, enable probe endpoints explicitly if they are needed (`MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true`). A missing required endpoint fails the check. The script does not change that setting.
+The script sends only unauthenticated GET requests. It requires HTTP 200 and JSON `status: UP` from `/actuator/health`, and HTTP 401 with a Problem Detail JSON status of 401 from `/api/v1/auth/browser/session`. In the checked-in rate-limit configuration, the session path is protected but outside the limited prefixes, so normal account traffic cannot turn this authorization check into a 429. `--require-probes` also requires `/actuator/health/liveness` and `/actuator/health/readiness` to return HTTP 200 with `status: UP`. Use it for the Kubernetes deployment; outside Kubernetes, enable probe endpoints explicitly if they are needed (`MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true`). A missing required endpoint fails the check. The script does not change that setting.
 
 Redirects, HTML login pages, malformed/oversized responses, DOWN status and network errors fail the check. Exit code 0 means all selected checks passed, 1 means a check failed, and 2 means invalid command arguments. `--timeout` is a socket timeout per request, not a total deployment deadline. Output does not include response bodies or credentials. Save `--json` output with the release identifier and check time as rollout evidence.
 
@@ -30,7 +37,7 @@ The production readiness group includes `readinessState`, `db`, and the custom `
 | Redis security | The custom factory supports standalone host/port, database, username/password, TLS enabled and connection/command timeouts. Configure supported `spring.data.redis` properties through the deployment secret/config mechanism. Sentinel, cluster, URL and SSL bundle configurations are explicitly rejected. |
 | Database connection capacity | Hikari permits 50 connections per replica. HPA permits six replicas: 300 connections, or 350 with one rollout surge replica, before migrations, operators and other clients. Derive the pool limit from the actual database budget and measure pool wait/lock wait; these figures are configured ceilings, not measured usage. |
 
-The base profile is `dev`; production deployment must select `prod` explicitly and supply valid secrets. This application is a bank simulation: a hosted demo that needs simulated opening balances should select `prod,simulation`, preserving the `prod` security settings. `prod` alone opens zero-balance accounts; see [simulation mode](simulation-mode.md). Do not use `test` for operational health verification: `application-test.yml` deliberately maps DOWN to HTTP 200. The smoke check also examines JSON status, so that override cannot turn DOWN into a pass.
+The default profile is `prod`; production deployment should still select `prod` explicitly and supply valid secrets. Local development must select `dev` explicitly (the development scripts and Compose already do this). Production safety checks run before application singleton initialization: default secrets, non-durable token revocation, insecure browser cookies, process-local security limiters, non-positive limiter settings, and mixing `prod` with `dev`, `demo`, `test` or `testcontainers` stop startup. Flyway automatic baselining is disabled in production; adopting an existing non-empty schema requires a reviewed migration baseline. This application is a bank simulation: a hosted demo that needs simulated opening balances should select `prod,simulation`, preserving the `prod` security settings. `prod` alone opens zero-balance accounts; see [simulation mode](simulation-mode.md). Do not use `test` for operational health verification: `application-test.yml` deliberately maps DOWN to HTTP 200. The smoke check also examines JSON status, so that override cannot turn DOWN into a pass.
 
 The static UI uses a cookie session; [browser session contract](browser-session.md) documents `Secure`/`__Host-` requirements, CSRF and logout behavior. Verify the session flow through the actual TLS ingress before release. The read-only smoke check does not exercise login or logout.
 

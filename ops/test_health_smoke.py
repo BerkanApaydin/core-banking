@@ -51,13 +51,16 @@ class HealthSmokeTest(unittest.TestCase):
         self.requests.clear()
         for path in ("/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness"):
             self.routes[path] = (200, "application/vnd.spring-boot.actuator.v3+json", b'{"status":"UP"}', {})
-        self.routes["/api/v1/accounts"] = (401, "application/problem+json", b'{"status":401}', {})
+        self.routes["/api/v1/auth/browser/session"] = (
+            401, "application/problem+json", b'{"status":401}', {})
 
     def test_success_requires_health_probes_and_anonymous_access_denial(self):
         results = run_checks(self.url, require_probes=True)
         self.assertEqual(4, len(results))
         self.assertTrue(all(result.passed for result in results))
         self.assertTrue(all(method == "GET" and auth is None for method, _, auth in self.requests))
+        self.assertIn(("GET", "/api/v1/auth/browser/session", None), self.requests)
+        self.assertNotIn(("GET", "/api/v1/accounts", None), self.requests)
 
     def test_down_global_health_fails_even_when_probes_are_up(self):
         for status in (200, 503):
@@ -88,8 +91,9 @@ class HealthSmokeTest(unittest.TestCase):
                 self.routes["/actuator/health"] = (200, content_type, body, {})
                 self.assertFalse(run_checks(self.url)[0].passed)
 
-    def test_anonymously_readable_account_api_fails(self):
-        self.routes["/api/v1/accounts"] = (200, "application/json", b'{"content":[]}', {})
+    def test_anonymously_readable_browser_session_fails(self):
+        self.routes["/api/v1/auth/browser/session"] = (
+            200, "application/json", b'{"userId":1}', {})
         self.assertFalse(run_checks(self.url)[-1].passed)
 
     def test_connection_closed_without_response_is_a_failed_check(self):

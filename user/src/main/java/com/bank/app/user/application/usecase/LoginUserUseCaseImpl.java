@@ -3,12 +3,10 @@ package com.bank.app.user.application.usecase;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
-import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
-import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
@@ -22,14 +20,12 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private final AuthenticationPort authenticationPort;
     private final JwtPort jwtPort;
-    private final LoadUserPort loadUserPort;
     private final LoginAttemptPort loginAttemptPort;
 
     public LoginUserUseCaseImpl(AuthenticationPort authenticationPort, JwtPort jwtPort,
-                                LoadUserPort loadUserPort, LoginAttemptPort loginAttemptPort) {
+                                LoginAttemptPort loginAttemptPort) {
         this.authenticationPort = authenticationPort;
         this.jwtPort = jwtPort;
-        this.loadUserPort = loadUserPort;
         this.loginAttemptPort = loginAttemptPort;
     }
 
@@ -55,14 +51,12 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         }
 
         try {
-            authenticationPort.authenticate(username, request.password());
-            User user = loadUserPort.findByUsername(username)
-                    .orElseThrow(() -> new UserNotFoundException("User not found"));
-            String token = jwtPort.generateToken(user.getId().value(), user.getUsername(), user.getRole().name());
+            AuthenticationPort.AuthenticatedUser user = authenticationPort.authenticate(username, request.password());
+            String token = jwtPort.generateToken(user.id().value(), user.username(), user.role().name());
             if (clientIp != null) loginAttemptPort.reset(clientIp);
             loginAttemptPort.resetByUsername(username);
-            log.info("User logged in: userId={}", user.getId().value());
-            return new AuthResponse(token, user.getId().value(), user.getUsername());
+            log.info("User logged in: userId={}", user.id().value());
+            return new AuthResponse(token, user.id().value(), user.username());
         } catch (AuthenticationFailedException | UserNotFoundException e) {
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);

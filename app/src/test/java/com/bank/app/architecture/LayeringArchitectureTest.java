@@ -121,6 +121,14 @@ class LayeringArchitectureTest extends ArchitectureTest {
     }
 
     @Test
+    void loginShouldUseTheIdentityReturnedByAuthentication() {
+        noClasses().that().haveSimpleName("LoginUserUseCaseImpl")
+                .should().dependOnClassesThat().haveSimpleName("LoadUserPort")
+                .because("reloading a user both adds SQL and disconnects token claims from the credential check")
+                .check(importedClasses);
+    }
+
+    @Test
     void loginUseCaseShouldNotHoldTransactionAcrossRedisCalls() {
         // Each credential lookup owns a short read-only adapter transaction.
         // The login use case also calls Redis and must not hold a DB transaction.

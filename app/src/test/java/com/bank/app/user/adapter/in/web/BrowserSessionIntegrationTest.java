@@ -37,6 +37,13 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
     @Autowired ObjectMapper objectMapper;
 
     @Test
+    void anonymousBrowserSessionMatchesHealthSmokeContract() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/browser/session"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
     void expiredCookieDoesNotBlockPublicUiButProtectedApiRemainsUnauthorized() throws Exception {
         Cookie expiredSession = new Cookie("BANK_SESSION", "expired-token");
 

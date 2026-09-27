@@ -11,6 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v5
+    - name: Reject newly vulnerable dependencies
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: high
+
   build:
     runs-on: ubuntu-latest
     services:
@@ -54,16 +66,8 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
 
-    - name: Build and Compile
-      run: mvn compile -q
-      env:
-        DB_HOST: localhost
-        DB_PORT: 5432
-        DB_USERNAME: bank_user
-        DB_PASSWORD: bank_password
-
     - name: Unit & Integration Tests (with coverage)
-      run: mvn clean install -T 4 -q
+      run: mvn -B -ntp clean verify
       env:
         DB_HOST: localhost
         DB_PORT: 5432
@@ -73,17 +77,33 @@ jobs:
         REDIS_PORT: 6379
         JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
 
+    - name: Generate aggregate CycloneDX SBOM
+      run: |
+        mvn -B -ntp org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom
+        test -s target/bom.json
+
+    - name: Upload CycloneDX SBOM
+      uses: actions/upload-artifact@v6
+      with:
+        name: cyclonedx-sbom
+        path: target/bom.json
+        if-no-files-found: error
+
     - name: Check aggregate coverage for every module
       run: python3 scripts/check_aggregate_coverage.py app/target/site/jacoco-aggregate/jacoco.xml
 
     - name: Check load-test acceptance criteria
-      run: python3 -m unittest load_tests.test_load_test -v
+      run: python3 -m unittest load_tests.test_runner -v
 
     - name: Check deployment smoke-check contracts
       run: python3 -m unittest ops.test_health_smoke -v
 
     - name: Check browser API contracts and idempotency behavior
       run: |
+        node --check app/src/main/resources/static/i18n.js
+        node --check app/src/main/resources/static/idempotency.js
+        node --check app/src/main/resources/static/accounts.js
+        node --check app/src/main/resources/static/transfers.js
         node --check app/src/main/resources/static/app.js
         node app/src/test/js/idempotency.test.js
         node app/src/test/js/frontend_contract.test.js

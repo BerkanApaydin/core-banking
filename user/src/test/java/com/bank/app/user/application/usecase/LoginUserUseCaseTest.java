@@ -6,11 +6,10 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
-import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
-import com.bank.app.user.domain.User;
+import com.bank.app.user.application.port.out.AuthenticationPort.AuthenticatedUser;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,7 +34,6 @@ class LoginUserUseCaseTest {
 
     @Mock private AuthenticationPort authenticationPort;
     @Mock private JwtPort jwtPort;
-    @Mock private LoadUserPort loadUserPort;
     @Mock private LoginAttemptPort loginAttemptPort;
     private LoginUserUseCase loginUserUseCase;
 
@@ -46,7 +43,7 @@ class LoginUserUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loadUserPort, loginAttemptPort);
+        loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort);
     }
 
     @Nested
@@ -57,10 +54,9 @@ class LoginUserUseCaseTest {
         @DisplayName("should login successfully without client IP")
         void shouldLoginSuccessfully() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
-            User user = new User(new UserId(100L), USERNAME, "hashed", Role.ROLE_USER);
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
-            doNothing().when(authenticationPort).authenticate(anyString(), anyString());
-            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER")).thenReturn("mock-jwt-token");
 
             AuthResponse response = loginUserUseCase.execute(request);
@@ -70,7 +66,6 @@ class LoginUserUseCaseTest {
             assertThat(response.username()).isEqualTo(USERNAME);
 
             verify(authenticationPort).authenticate(anyString(), anyString());
-            verify(loadUserPort).findByUsername(USERNAME);
             verify(jwtPort).generateToken(100L, USERNAME, "ROLE_USER");
         }
 
@@ -78,12 +73,11 @@ class LoginUserUseCaseTest {
         @DisplayName("should login successfully with client IP and reset login attempts")
         void shouldLoginWithClientIpAndResetAttempts() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
-            User user = new User(new UserId(100L), USERNAME, "hashed", Role.ROLE_USER);
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
             when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
-            doNothing().when(authenticationPort).authenticate(anyString(), anyString());
-            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER")).thenReturn("mock-jwt-token");
 
             AuthResponse response = loginUserUseCase.execute(request, CLIENT_IP);
@@ -97,11 +91,10 @@ class LoginUserUseCaseTest {
         @DisplayName("should login successfully with null client IP")
         void shouldLoginWithNullClientIp() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
-            User user = new User(new UserId(100L), USERNAME, "hashed", Role.ROLE_USER);
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
             when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
-            doNothing().when(authenticationPort).authenticate(anyString(), anyString());
-            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER")).thenReturn("mock-jwt-token");
 
             AuthResponse response = loginUserUseCase.execute(request, null);
@@ -167,8 +160,8 @@ class LoginUserUseCaseTest {
 
         @Test
         void shouldNotReturnTokenWhenAttemptStoreFailsDuringReset() {
-            User user = new User(new UserId(100L), USERNAME, "hashed", Role.ROLE_USER);
-            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER")).thenReturn("mock-jwt-token");
             doThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")))
                     .when(loginAttemptPort).reset(CLIENT_IP);
@@ -185,15 +178,13 @@ class LoginUserUseCaseTest {
         void shouldThrowWhenUserNotFound() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
-            doNothing().when(authenticationPort).authenticate(anyString(), anyString());
-            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.empty());
+            doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
                     .isExactlyInstanceOf(UserNotFoundException.class)
                     .hasMessage("User not found");
 
             verify(authenticationPort).authenticate(anyString(), anyString());
-            verify(loadUserPort).findByUsername(USERNAME);
         }
 
         @Test
@@ -208,7 +199,7 @@ class LoginUserUseCaseTest {
                     .hasMessage("Authentication failed: Bad credentials");
 
             verify(authenticationPort).authenticate(anyString(), anyString());
-            verifyNoInteractions(loadUserPort);
+            verifyNoInteractions(jwtPort);
         }
 
         @Test
@@ -235,7 +226,7 @@ class LoginUserUseCaseTest {
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
-            verifyNoInteractions(loadUserPort);
+            verifyNoInteractions(jwtPort);
         }
 
         @Test
@@ -271,10 +262,10 @@ class LoginUserUseCaseTest {
         }
 
         @Test
-        void shouldPropagateUserLookupFailureWithoutIssuingTokenOrCountingAttempt() {
+        void shouldPropagateCredentialLookupFailureWithoutIssuingTokenOrCountingAttempt() {
             AuthenticationBackendUnavailableException failure = new AuthenticationBackendUnavailableException(
                     new RuntimeException("Database unavailable"));
-            when(loadUserPort.findByUsername(USERNAME)).thenThrow(failure);
+            doThrow(failure).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD), CLIENT_IP))
                     .isSameAs(failure);

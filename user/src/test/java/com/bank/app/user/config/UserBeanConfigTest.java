@@ -40,7 +40,7 @@ class UserBeanConfigTest {
     @Test
     void shouldCreateLoginUserUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
-        LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort, loadUserPort, loginAttemptPort);
+        LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort, loginAttemptPort);
         assertNotNull(useCase);
     }
 }

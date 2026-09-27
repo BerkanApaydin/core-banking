@@ -40,6 +40,8 @@ class UserDetailsAdapterTest {
         assertNotNull(details);
         assertEquals("john", details.getUsername());
         assertEquals("pass", details.getPassword());
+        assertEquals(java.util.List.of("ROLE_USER"), details.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority).toList());
     }
 
     @Test

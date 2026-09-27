@@ -10,8 +10,12 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import com.bank.app.user.domain.Role;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,11 +27,53 @@ class AuthenticationAdapterTest {
     @Test
     void shouldAuthenticateSuccessfully() {
         AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
+        var principal = new CustomUserDetails(42L, "user", "encoded",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
 
-        adapter.authenticate("user", "pass");
+        var authenticated = adapter.authenticate("user", "pass");
+        assertEquals(42L, authenticated.id().value());
+        assertEquals("user", authenticated.username());
+        assertEquals(Role.ROLE_ADMIN, authenticated.role());
 
         verify(authenticationManager).authenticate(
                 new UsernamePasswordAuthenticationToken("user", "pass"));
+    }
+
+    @Test
+    void shouldRejectMissingProviderResult() {
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+    }
+
+    @Test
+    void shouldRejectUnauthenticatedProviderResult() {
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken("user", "pass"));
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+    }
+
+    @Test
+    void shouldRejectUnexpectedPrincipalType() {
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken("user", null, List.of()));
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+    }
+
+    @Test
+    void shouldRejectMissingOrUnknownAuthority() {
+        var principal = new CustomUserDetails(42L, "user", "encoded", List.of());
+        for (var authorities : List.of(List.<SimpleGrantedAuthority>of(),
+                List.of(new SimpleGrantedAuthority("UNSUPPORTED")),
+                List.of(new SimpleGrantedAuthority("ROLE_USER"), new SimpleGrantedAuthority("ROLE_ADMIN")))) {
+            when(authenticationManager.authenticate(any())).thenReturn(
+                    new UsernamePasswordAuthenticationToken(principal, null, authorities));
+            assertThrows(AuthenticationBackendUnavailableException.class,
+                    () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+        }
     }
 
     @Test

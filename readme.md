@@ -14,8 +14,8 @@ A modular simulation of selected core banking workflows—account management and
 
 ### Data & Caching
 
-- **PostgreSQL 15:** Relational database with optimistic locking.
-- **Flyway:** Automated database migration and schema version control. Migrations run on startup (`spring.jpa.hibernate.ddl-auto=validate`) to guarantee schema consistency with JPA entities.
+- **PostgreSQL 15:** Relational database with row locks, constraints, and Hibernate optimistic versions.
+- **Flyway:** Database migrations run on startup; Hibernate's `ddl-auto=validate` checks the mapped schema and fails startup on detected mismatches.
 - **Redis 7:** Shared account-snapshot cache in production, login attempts storage, and sliding window rate limiting (via Lua scripts).
 - **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production uses Redis for snapshots, rate limiting and login attempts, and PostgreSQL+Redis hybrid token revocation during migration.
 - **Micrometer + Prometheus:** Custom outbox, idempotency-backlog and orphan-integrity metrics exposed via Actuator. A scraper and alert destination must be installed separately.
@@ -27,14 +27,14 @@ A modular simulation of selected core banking workflows—account management and
 - **Testcontainers:** Integration testing with a single shared PostgreSQL container (plus per-test Redis containers where needed).
 - **ArchUnit:** Architecture verification to enforce Hexagonal boundary rules.
 - **JaCoCo:** Quality gates enforcing $\ge 80\%$ Line and $\ge 70\%$ Branch coverage.
-- **Pitest:** Mutation testing quality gate enforcing $\ge 80\%$ mutation coverage to verify test assertion strength.
+- **Pitest:** A separate CI mutation-testing step is configured with a $\ge 80\%$ mutation threshold; it is not part of `test-all` or Maven `clean verify`.
 
 ### DevOps & Prerequisites
 
 - **Docker & Docker Compose:** Multi-container orchestration.
 - **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and PostgreSQL/Redis deployments are not included.
 - **Maven 3.9.x:** Recommended build system (Maven 3.9.16 wrapper configuration is pre-configured).
-- **Prerequisites:** Java 21 JDK, Docker installed.
+- **Prerequisites:** Java 21 JDK and a running Docker daemon. The local test launcher also needs Python 3.10+ and Node.js.
 - **Environment:** Common local variables are shown in `.env.example`; profile-specific settings and deployment checks are in [operations](docs/operations.md).
 
 ---
@@ -107,7 +107,7 @@ graph LR
 > The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary and naming rules); the above are the only three rules you need to know.
 
 > [!NOTE]
-> `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and cached snapshots are invalidated per-account so stale reads cannot occur.
+> `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and account mutations invalidate affected cached snapshots.
 
 ---
 
@@ -140,8 +140,8 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 - **Hexagonal Architecture (Ports & Adapters):** Bounded contexts (`account`, `transfer`, `user`, `audit`) never depend on `infrastructure`; infrastructure implements context-owned ports, and each port lives in its owning module.
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Mandatory audit records are saved through `AuditEventPublisherAdapter` in the caller's transaction, so an audit write failure rolls back the associated money movement.
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, `SKIP LOCKED` row selection, and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter). The initial batch lock ends after selection; processing reacquires each event lock in a separate transaction. Partition changes, dead letters, and retention are covered in [outbox operations](docs/outbox-operations.md).
-- **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
-- **Sorted Resource Locking (Deadlock Prevention):** Acquires pessimistic write locks (`SELECT ... FOR UPDATE`) in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
+- **Optimistic Concurrency Control (OCC):** Hibernate `@Version` rejects stale aggregate updates; transfer balance changes also use pessimistic account locks and domain balance checks.
+- **Sorted Resource Locking:** Acquires pessimistic write locks (`SELECT ... FOR UPDATE`) in a consistent account-ID order (via `OrderedPair`) during debit/credit operations to reduce deadlock risk under concurrent transfers.
 - **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules communicate only through the `account-api` published language (Open Host Service), consumed via transfer's `AccountAclPort` contract and implemented via `AccountAclAdapter` (in `transfer.adapter.out.account`) delegating to `AccountApi`. This protects the transfer domain from database or structure changes inside the account module, and account domain events never leak across the boundary.
 - **AOP Idempotency Guard:** Annotated account and transfer commands use `Idempotency-Key` records in the `idempotency_keys` table. Transfer and cancellation keys are required; account creation and registration keys are recommended.
 - **Resilience:** Revocation lookup fails closed with 503 when a required store is unavailable; production starts in hybrid DB+Redis mode to preserve Redis-only revocations during rollout. See [token revocation migration](docs/token-revocation-migration.md) and the [operations runbook](docs/operations.md). Rate-limited responses carry `Retry-After`.
@@ -157,29 +157,33 @@ You can run PostgreSQL, Redis and the application together, or run Java on the h
 
 ### Option A: Run Everything via Docker Compose (Recommended)
 
-To build and spin up PostgreSQL, Redis, and the Spring Boot application together:
+Install and start Docker Desktop (with Docker Compose). Java, Maven, PostgreSQL and Redis do not need separate host installations. Clone the repository once, enter it, then build and start all three services while waiting for their health checks. If you are already in the repository root, run only the last command:
 
 ```bash
-docker compose up --build
+git clone https://github.com/BerkanApaydin/core-banking.git
+cd core-banking
+docker compose up --build --wait
 ```
 
-Open the bundled UI at `http://localhost:8080/`. The default `dev` profile permits **simulated** opening balances. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
+Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL or `.env` file is needed for this local development setup. The first run downloads images and Maven dependencies, so it needs internet access and can take longer. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
+
+Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 
 ### Option B: Run Java on Your Computer
 
-From the repository root, use one command (Java 21, Docker and Docker Compose required):
+From the repository root, use the launcher for your operating system (Java 21, Docker and Docker Compose required):
 
 ```powershell
 # Windows PowerShell or Command Prompt
-.\dev.cmd
+.\start-app-dev.cmd
 ```
 
 ```bash
 # Linux/macOS
-bash scripts/dev.sh
+bash start-app-dev.sh
 ```
 
-The launcher stops the Compose app container if it is running, waits for PostgreSQL and Redis, builds the app with tests skipped, then serves the UI at `http://localhost:8080/`. It supplies the Compose database credentials and host Redis port (`6389`) and generates a fresh JWT secret automatically. No `.env` file or manual environment setup is needed. A fresh secret logs out existing browser sessions on each restart. Press Ctrl+C to stop Java; `docker compose down` stops the dependency containers. Run `./mvnw clean verify` separately for the full test suite.
+The launcher stops the Compose app container if it is running, waits for PostgreSQL and Redis, builds the app with tests skipped, then serves the UI at `http://localhost:8080/`. It supplies the Compose database credentials and host Redis port (`6389`) and generates a fresh JWT secret automatically. No `.env` file or manual environment setup is needed. A fresh secret logs out existing browser sessions on each restart. Press Ctrl+C to stop Java; `docker compose down` stops the dependency containers. Run `test-all.cmd` (Windows) or `bash test-all.sh` (macOS/Linux) separately for the standard test suites and coverage checks.
 
 - **Swagger UI (local profiles):** `http://localhost:8080/swagger-ui/index.html` (disabled in `prod`)
 - **Actuator Health:** `http://localhost:8080/actuator/health`
@@ -188,9 +192,12 @@ The launcher stops the Compose app container if it is running, waits for Postgre
 
 ## Testing & Quality Gates
 
-- **Test Suite:** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in `app`, with adapter-level integration tests also in `infrastructure`. The last full verification on 24 September 2026 passed 1,740 Java tests.
+- **Run standard local checks:** `test-all.cmd` on Windows or `bash test-all.sh` on macOS/Linux. The launchers run Maven `clean verify`, enforce aggregate JaCoCo coverage, then run the offline Python checks, JavaScript syntax checks, and browser contract tests. Java 21, a running Docker daemon (for Testcontainers), Python 3.10+, and Node.js are required. The command stops at the first failure and returns a nonzero exit code. PIT mutation testing, live health smoke, and data-writing load tests are separate checks.
+- **Test Suite:** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in `app`, with adapter-level integration tests also in `infrastructure`.
 - **Verify Architecture Boundaries (ArchUnit):** Boundary rules from the table above, verified automatically on every build.
 - **Integration Testing with Testcontainers & Flyway:** Integration tests run against a real PostgreSQL via Testcontainers with Flyway migrations and `ddl-auto=validate` for schema consistency.
 - **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-module report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
 - **Browser contract checks:** `node app/src/test/js/idempotency.test.js` and `node app/src/test/js/frontend_contract.test.js` exercise session/idempotency, report pagination and funding-capability behavior. CI runs both; a real browser/TLS acceptance test is not yet included.
-- **Run Mutation Testing (Pitest):** `./mvnw pitest:mutationCoverage` (or `.\mvnw.cmd pitest:mutationCoverage`)
+- **CI dependency checks:** CI is configured to reject newly introduced high/critical dependency advisories on pull requests and to publish an aggregate CycloneDX SBOM. These checks do not replace a review of vulnerabilities already present in the dependency baseline.
+- **Operational checks:** The read-only [health smoke](docs/operations.md) validates health and anonymous authorization responses. The [load-test guide](load_tests/README.md) separates rate-limit verification from data-writing capacity tests on an isolated simulation deployment.
+- **Run Mutation Testing (Pitest) separately:** `./mvnw pitest:mutationCoverage -Dpitest.skip=false` (or `.\mvnw.cmd pitest:mutationCoverage -Dpitest.skip=false` on Windows); CI runs this as a separate step.

@@ -52,6 +52,6 @@ public class UserJpaMapper {
         entity.setRole(user.getRole().name());
         entity.setEmail(user.getEmail() != null ? user.getEmail().value() : null);
         entity.setPhone(user.getPhone() != null ? user.getPhone().value() : null);
-        entity.setVersion(user.getVersion());
+        // The managed version belongs to Hibernate; the adapter checks the expected version.
     }
 }

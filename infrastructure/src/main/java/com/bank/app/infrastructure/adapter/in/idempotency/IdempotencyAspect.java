@@ -101,7 +101,11 @@ public class IdempotencyAspect {
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException interrupted) {
-                        Thread.currentThread().interrupt();
+                        try {
+                            failAfterRollback(key, interrupted);
+                        } finally {
+                            Thread.currentThread().interrupt();
+                        }
                         throw interrupted;
                     }
                     delay = Math.min(delay * 2, 2_000L);
@@ -110,11 +114,22 @@ public class IdempotencyAspect {
                 // The transaction callback failed and was rolled back. An
                 // exception during commit takes a different path below, where
                 // the outcome is unknown and PENDING must be retained.
-                idempotencyGuard.failRequest(key);
+                failAfterRollback(key, original);
                 throw original;
             }
         }
         throw new IllegalStateException("Idempotent operation exhausted retry attempts");
+    }
+
+    private void failAfterRollback(String key, Throwable original) {
+        try {
+            idempotencyGuard.failRequest(key);
+        } catch (RuntimeException cleanupFailure) {
+            // Preserve the failure that caused rollback for callers and diagnostics.
+            if (cleanupFailure != original) {
+                original.addSuppressed(cleanupFailure);
+            }
+        }
     }
 
     private static boolean isRetryable(Throwable failure) {

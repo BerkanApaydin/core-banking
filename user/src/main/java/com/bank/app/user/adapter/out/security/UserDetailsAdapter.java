@@ -5,10 +5,11 @@ import com.bank.app.user.domain.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class UserDetailsAdapter implements UserDetailsService {
@@ -29,7 +30,7 @@ public class UserDetailsAdapter implements UserDetailsService {
                 user.getId().value(),
                 user.getUsername(),
                 user.getPassword(),
-                new ArrayList<>()
+                List.of(new SimpleGrantedAuthority(user.getRole().name()))
         );
     }
 }
