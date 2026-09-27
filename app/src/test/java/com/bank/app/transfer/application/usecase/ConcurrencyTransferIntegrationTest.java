@@ -78,9 +78,9 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER", null, null, null));
 
             AccountJpaEntity sender = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR290006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                    "TR770006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
             AccountJpaEntity receiver = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR290006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                    "TR870006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
             senderAccountId = sender.getId();
             receiverAccountId = receiver.getId();
         });
@@ -138,8 +138,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         assertEquals(threadCount, successCount.get(), "All parallel transfers should complete successfully");
         assertEquals(0, failureCount.get(), "There should be no concurrent locking failures");
 
-        BigDecimal balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
-        BigDecimal balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
+        BigDecimal balanceSender = accountRepo.findByIban("TR770006200000000000000111").get().getBalance();
+        BigDecimal balanceReceiver = accountRepo.findByIban("TR870006200000000000000222").get().getBalance();
 
         assertEquals(new BigDecimal("900.00"), balanceSender, "Sender balance should be exactly 900.00");
         assertEquals(new BigDecimal("1100.00"), balanceReceiver, "Receiver balance should be exactly 1100.00");
@@ -184,8 +184,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         assertEquals(4, successCount.get(), "Exactly 4 transfers should succeed");
         assertEquals(1, failureCount.get(), "Exactly 1 transfer should fail due to insufficient balance");
 
-        BigDecimal balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
-        BigDecimal balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
+        BigDecimal balanceSender = accountRepo.findByIban("TR770006200000000000000111").get().getBalance();
+        BigDecimal balanceReceiver = accountRepo.findByIban("TR870006200000000000000222").get().getBalance();
 
         assertEquals(new BigDecimal("0.00"), balanceSender, "Sender balance should be 0.00");
         assertEquals(new BigDecimal("2000.00"), balanceReceiver, "Receiver balance should be 2000.00");

@@ -38,7 +38,7 @@ class AccountPersistenceAdapterTest {
     @Test
     @SuppressWarnings("null")
     void shouldSaveNewAccount() {
-        Iban iban = new Iban("TR290006200000000000000111");
+        Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         AccountJpaEntity savedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
 
@@ -56,7 +56,7 @@ class AccountPersistenceAdapterTest {
     @Test
     @SuppressWarnings("null")
     void shouldSaveExistingAccount() {
-        Iban iban = new Iban("TR290006200000000000000111");
+        Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
         AccountJpaEntity savedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("2000.00"), "TRY", "ACTIVE", 1L);
 
@@ -92,7 +92,7 @@ class AccountPersistenceAdapterTest {
         @Test
         @DisplayName("should return account when found")
         void shouldReturnAccountWhenFound() {
-            AccountJpaEntity entity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111",
+            AccountJpaEntity entity = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111",
                     "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
             when(springDataRepo.findById(1L)).thenReturn(Optional.of(entity));
 
@@ -130,9 +130,9 @@ class AccountPersistenceAdapterTest {
         @Test
         @DisplayName("should return accounts when ids are found")
         void shouldReturnAccountsWhenFound() {
-            AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111",
+            AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111",
                     "Ahmet", new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
-            AccountJpaEntity entity2 = new AccountJpaEntity(2L, 100L, "TR290006200000000000000222",
+            AccountJpaEntity entity2 = new AccountJpaEntity(2L, 100L, "TR870006200000000000000222",
                     "Mehmet", new BigDecimal("500.00"), "USD", "ACTIVE", null);
             when(springDataRepo.findByIdIn(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));
 

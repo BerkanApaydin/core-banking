@@ -56,21 +56,20 @@ class GetAccountsByUserQueryImplTest {
         @Test
         @DisplayName("should return accounts for current user")
         void shouldReturnAccountsForCurrentUser() {
-            Account account1 = account(1L, 100L, "TR290006200000000000000111", new BigDecimal("500.00"),
+            Account account1 = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"),
                     AccountStatus.ACTIVE);
-            Account account2 = account(2L, 100L, "TR290006200000000000000222", new BigDecimal("300.00"),
+            Account account2 = account(2L, 100L, "TR870006200000000000000222", new BigDecimal("300.00"),
                     AccountStatus.ACTIVE);
 
             when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
-            when(loadAccountPort.findByUserId(100L, 0, 20))
-                    .thenReturn(List.of(account1, account2));
-            when(loadAccountPort.countByUserId(100L)).thenReturn(2L);
+            when(loadAccountPort.findPageByUserId(100L, 0, 20))
+                    .thenReturn(new LoadAccountPort.AccountPage(List.of(account1, account2), 2));
 
             PageResponse<AccountResponse> responses = query.execute(0, 20);
 
             assertThat(responses.content()).hasSize(2);
-            assertThat(responses.content().get(0).iban()).isEqualTo("TR290006200000000000000111");
-            assertThat(responses.content().get(1).iban()).isEqualTo("TR290006200000000000000222");
+            assertThat(responses.content().get(0).iban()).isEqualTo("TR770006200000000000000111");
+            assertThat(responses.content().get(1).iban()).isEqualTo("TR870006200000000000000222");
             assertThat(responses.totalElements()).isEqualTo(2);
             assertThat(responses.page()).isEqualTo(0);
             assertThat(responses.size()).isEqualTo(20);
@@ -80,9 +79,8 @@ class GetAccountsByUserQueryImplTest {
         @DisplayName("should return empty page when user has no accounts")
         void shouldReturnEmptyListWhenNoAccounts() {
             when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
-            when(loadAccountPort.findByUserId(100L, 0, 20))
-                    .thenReturn(List.of());
-            when(loadAccountPort.countByUserId(100L)).thenReturn(0L);
+            when(loadAccountPort.findPageByUserId(100L, 0, 20))
+                    .thenReturn(new LoadAccountPort.AccountPage(List.of(), 0));
 
             PageResponse<AccountResponse> responses = query.execute(0, 20);
 

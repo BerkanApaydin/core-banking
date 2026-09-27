@@ -39,5 +39,6 @@ class AuthorizationExceptionTest {
     void shouldBeRuntimeException() {
         AuthorizationException ex = new AuthorizationException("test");
         assertInstanceOf(RuntimeException.class, ex);
+        assertEquals(BusinessFailureKind.ACCESS_DENIED, ex.getFailureKind());
     }
 }

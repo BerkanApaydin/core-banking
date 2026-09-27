@@ -17,6 +17,10 @@ import java.util.Optional;
 @Repository
 public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, String> {
 
+    @Query("SELECT COUNT(e) FROM OutboxJpaEntity e WHERE e.processed = false AND e.deadLetter = false "
+           + "AND (e.partition < 0 OR e.partition >= :partitionCount)")
+    long countPendingOutsidePartitionRange(@Param("partitionCount") int partitionCount);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
     @Query("SELECT e FROM OutboxJpaEntity e WHERE e.processed = false AND e.deadLetter = false "
@@ -27,22 +31,23 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
-    @Query("SELECT e FROM OutboxJpaEntity e WHERE e.id = :id")
+    @Query("SELECT e FROM OutboxJpaEntity e WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     Optional<OutboxJpaEntity> findByIdForUpdateSkipLocked(@Param("id") String id);
 
     @Modifying
-    @Query("UPDATE OutboxJpaEntity e SET e.processed = true, e.processedAt = CURRENT_TIMESTAMP WHERE e.id = :id")
+    @Query("UPDATE OutboxJpaEntity e SET e.processed = true, e.processedAt = CURRENT_TIMESTAMP "
+           + "WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markProcessed(@Param("id") String id);
 
     @Modifying
     @Query("UPDATE OutboxJpaEntity e SET e.processed = false, e.retryCount = :retryCount, "
-           + "e.lastError = :error WHERE e.id = :id")
+           + "e.lastError = :error WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markFailed(@Param("id") String id, @Param("error") String error,
                     @Param("retryCount") int retryCount);
 
     @Modifying
     @Query("UPDATE OutboxJpaEntity e SET e.deadLetter = true, e.retryCount = :retryCount, "
-           + "e.lastError = :error WHERE e.id = :id")
+           + "e.lastError = :error WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markDeadLetter(@Param("id") String id, @Param("error") String error,
                         @Param("retryCount") int retryCount);
 }

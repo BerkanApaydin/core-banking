@@ -54,22 +54,31 @@ class IdempotencyPersistenceAdapterTest {
     @Test
     void shouldTryCreateSuccessfully() {
         var now = LocalDateTime.now();
-        when(repository.tryInsert("key1", now)).thenReturn(1);
+        when(repository.tryInsert("key1", null, now)).thenReturn(1);
 
         boolean result = adapter.tryCreate("key1", now);
 
         assertThat(result).isTrue();
-        verify(repository).tryInsert("key1", now);
+        verify(repository).tryInsert("key1", null, now);
     }
 
     @Test
     void shouldReturnFalseWhenTryCreateFailsWithDuplicate() {
         var now = LocalDateTime.now();
-        when(repository.tryInsert("key1", now)).thenReturn(0);
+        when(repository.tryInsert("key1", null, now)).thenReturn(0);
 
         boolean result = adapter.tryCreate("key1", now);
 
         assertThat(result).isFalse();
+    }
+
+    @Test
+    void shouldOnlyClaimFailedKeyWhenConditionalUpdateWins() {
+        var now = LocalDateTime.now();
+        when(repository.resetFailed("key1", null, now)).thenReturn(1);
+
+        assertThat(adapter.tryResetFailed("key1", now)).isTrue();
+        verify(repository).resetFailed("key1", null, now);
     }
 
     @Test
@@ -86,10 +95,11 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
-    void shouldMarkCompletedWhenEntityNotFound() {
+    void shouldRejectCompletionWhenReservationIsMissing() {
         when(repository.findById("missing")).thenReturn(Optional.empty());
 
-        adapter.markCompleted("missing", "response", 200);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> adapter.markCompleted("missing", "response", 200));
 
         verify(repository, never()).save(any());
     }
@@ -124,7 +134,7 @@ class IdempotencyPersistenceAdapterTest {
     @Test
     void shouldDeleteExpired() {
         var threshold = LocalDateTime.now();
-        when(repository.deleteByCreatedAtBefore(threshold)).thenReturn(3);
+        when(repository.deleteExpiredTerminalRequests(threshold)).thenReturn(3);
 
         int deleted = adapter.deleteExpired(threshold);
 

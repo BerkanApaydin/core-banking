@@ -1,6 +1,7 @@
 package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,5 +27,6 @@ class TooManyFailedLoginAttemptsExceptionTest {
     void shouldReturnCorrectErrorCode() {
         TooManyFailedLoginAttemptsException ex = new TooManyFailedLoginAttemptsException("test");
         assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", ex.getErrorCode());
+        assertEquals(BusinessFailureKind.RATE_LIMITED, ex.getFailureKind());
     }
 }

@@ -5,6 +5,7 @@ import com.bank.app.user.domain.EmailAddress;
 import com.bank.app.user.domain.PhoneNumber;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.Role;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.util.Optional;
 
@@ -31,6 +33,12 @@ class UserJpaAdapterTest {
     @BeforeEach
     void setUp() {
         adapter = new UserPersistenceAdapter(userJpaRepository, new UserJpaMapper());
+        lenient().when(userJpaRepository.save(any(UserJpaEntity.class))).thenAnswer(invocation -> {
+            UserJpaEntity entity = invocation.getArgument(0);
+            return new UserJpaEntity(entity.getId() == null ? 42L : entity.getId(),
+                    entity.getUsername(), entity.getPassword(), entity.getRole(),
+                    entity.getEmail(), entity.getPhone(), entity.getVersion());
+        });
     }
 
     @Test
@@ -72,6 +80,15 @@ class UserJpaAdapterTest {
 
         assertFalse(result.isPresent());
         verify(userJpaRepository).findByUsername("nonexistent");
+    }
+
+    @Test
+    void shouldClassifyUserLookupDatabaseFailureAsBackendUnavailable() {
+        when(userJpaRepository.findByUsername("testuser"))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> adapter.findByUsername("testuser"));
     }
 
     @Nested

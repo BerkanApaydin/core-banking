@@ -27,7 +27,8 @@ class CorsConfigTest {
         assertThat(config).isNotNull();
         assertThat(config.getAllowedOrigins()).containsExactly("http://allowed-origin.com");
         assertThat(config.getAllowedMethods()).containsExactly("GET", "POST", "PUT", "DELETE", "OPTIONS");
-        assertThat(config.getAllowedHeaders()).containsExactly("Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With");
+        assertThat(config.getAllowedHeaders()).containsExactly("Authorization", "Content-Type", "Idempotency-Key",
+                "X-Requested-With", "X-CSRF-Token");
         assertThat(config.getExposedHeaders()).containsExactly("X-Correlation-ID");
         assertThat(config.getAllowCredentials()).isTrue();
     }

@@ -69,7 +69,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
         void shouldRollbackTransactionWhenDuplicateIbanExceptionThrown() {
                 CreateAccountRequest request = new CreateAccountRequest(
                                 userId,
-                                "TR290006200000000000000999",
+                                "TR600006200000000000000999",
                                 "Test User",
                                 new BigDecimal("500.00"),
                                 Currency.TRY);
@@ -80,7 +80,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
 
                 CreateAccountRequest duplicateRequest = new CreateAccountRequest(
                                 userId,
-                                "TR290006200000000000000999",
+                                "TR600006200000000000000999",
                                 "Test User 2",
                                 new BigDecimal("1000.00"),
                                 Currency.TRY);

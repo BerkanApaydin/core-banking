@@ -24,6 +24,7 @@ const translations = {
         'auth.register.failed': 'Registration failed: ',
         'auth.logout': 'Logout',
         'auth.logout.success': 'Logged out successfully.',
+        'auth.logout.local_only': 'Logout could not be confirmed. Please try again.',
         'auth.session_expired': 'Your session has expired, please log in again.',
         'nav.accounts': 'Accounts',
         'nav.transfer': 'Money Transfer',
@@ -42,11 +43,14 @@ const translations = {
         'account.inactive': 'Inactive',
         'account.no_accounts': 'No accounts found. You can start by opening a new account.',
         'account.load_error': 'Account information could not be loaded. Please refresh the page.',
-        'account.created': 'Your account has been successfully created.',
+        'account.created': 'Your account has been created. IBAN: {0}',
         'portfolio.summary': '{0} accounts',
         'account.iban_hint': 'TR is filled in for you — just type the 24 digits.',
-        'account.iban_must_be_26': 'IBAN is incomplete — it should be TR followed by 24 digits.',
         'account.invalid_balance': 'Please enter a valid initial balance (0 or more, max 2 decimals).',
+        'account.funding_checking': 'Checking simulation funding mode…',
+        'account.funding_enabled': 'Simulated starting funds only. No real money is created.',
+        'account.funding_disabled': 'Opening balance is 0 in this environment.',
+        'account.funding_unavailable': 'Funding mode could not be verified; opening balance is locked to 0.',
         'transfer.title': 'Money Transfer',
         'transfer.subtitle': 'Transfer securely and instantly between your accounts or to other IBANs.',
         'transfer.sender_label': 'Sender Account',
@@ -73,7 +77,7 @@ const translations = {
         'transfer.success': 'Transfer completed successfully!',
         'transfer.info_title': 'Transaction Information',
         'transfer.info_instant': 'Your transfers are processed instantly, 24/7, over our <strong>instant settlement</strong> network.',
-        'transfer.info_cancel': 'Per our security standards, transfers made within the last <strong>24 hours</strong> can be cancelled.',
+        'transfer.info_cancel': 'A completed transfer can be cancelled within the configured window if the recipient has enough balance for the reversal.',
         'transfer.info_currency': 'Inter-account transfers require matching currencies.',
         'transfer.cancel_confirm': 'Are you sure you want to cancel this transfer and refund the money?',
         'transfer.cancelled': 'Transfer successfully cancelled and balances updated.',
@@ -92,10 +96,13 @@ const translations = {
         'report.generator_title': 'Date-Based Report Generation',
         'report.start_date': 'Start Date',
         'report.end_date': 'End Date',
+        'report.inclusive_dates': 'Both selected dates are included. The range can be at most 12 months.',
+        'report.invalid_date_range': 'Start date cannot be after end date.',
+        'report.select_dates': 'Please select both dates.',
         'report.generate': 'Generate Report',
         'report.select_account_first': 'Please select an account first.',
-        'report.stat_count': 'Total Transactions',
-        'report.stat_volume': 'Total Volume',
+        'report.stat_count': 'Transactions on This Page',
+        'report.stat_volume': 'Volume on This Page',
         'report.no_transactions': 'No transactions found in the selected date range.',
         'report.table_date': 'Date',
         'report.table_description': 'Description',
@@ -109,11 +116,12 @@ const translations = {
         'report.history_loading': 'Loading transactions...',
         'report.load_error': 'Account history could not be loaded.',
         'modal.create_title': 'Create New Account',
-        'modal.sub': 'Takes ~10 seconds. Just type the 24 digits after TR.',
-        'modal.owner_name': 'Account Holder Name',
-        'modal.owner_placeholder': 'e.g. John Doe',
+        'modal.sub': 'Your new IBAN is generated automatically.',
+        'modal.account_name': 'Account Name',
+        'modal.account_name_placeholder': 'e.g. Everyday Spending',
+        'modal.account_name_hint': 'Choose a name to distinguish this account from your other accounts.',
         'modal.iban': 'IBAN Number',
-        'modal.iban_placeholder': 'TR000000000000000000000000',
+        'modal.iban_placeholder': 'TR470000000000000000000000',
         'modal.balance': 'Initial Balance',
         'modal.currency': 'Currency',
         'modal.cancel': 'Cancel',
@@ -124,6 +132,10 @@ const translations = {
         'general.loading': 'Loading...',
         'general.retry_in': 'Please retry in {0} seconds.',
         'general.timeout': 'Request timed out after 30 seconds. Please try again.',
+        'general.outcome_unknown': 'The outcome may be unknown. Check your accounts and transfer history before retrying.',
+        'general.uncertain_retry': 'The previous request may have completed. Check your accounts and transfer history first. Retry the exact same request with its original key?',
+        'general.uncertain_changed': 'The previous request may have completed. A changed request uses a new key and could create another operation. Check your accounts and transfer history first. Continue?',
+        'general.uncertain_new': 'A previous request on this device had an unknown outcome. Its original key cannot be recovered in this browser context. Check your accounts and transfer history first. Start a new operation?',
         'general.offline': 'You appear to be offline. Check your connection and try again.',
         'general.back_online': 'Connection restored.',
         'general.load_more': 'Load more',
@@ -194,10 +206,15 @@ const translations = {
         'transfer.sum_hint': 'Fill the form to preview your transfer.',
         'transfer.sum_ready': 'Ready to send. Please review.',
         'transfer.secure_note': 'Idempotency-protected · double-submit safe.',
-        'report.print': 'Print / PDF',
+        'report.print': 'Print This Page / PDF',
         'report.tip_title': 'Tip',
-        'report.tip': 'Use the generator for audits — results are page-scoped with totals.',
-        'report.stat_avg': 'Average',
+        'report.tip': 'Reports are paginated. The figures and printout cover only the current page.',
+        'report.page': 'Page {0}',
+        'report.previous': 'Previous page',
+        'report.next': 'Next page',
+        'report.scope': 'Account {0} · {1} to {2} · page {3} (current page only)',
+        'a11y.report_pages': 'Report pages',
+        'report.stat_avg': 'Page Average',
         'report.chart': 'Volume by day',
     },
     tr: {
@@ -221,6 +238,7 @@ const translations = {
         'auth.register.failed': 'Kayıt başarısız: ',
         'auth.logout': 'Çıkış Yap',
         'auth.logout.success': 'Başarıyla çıkış yapıldı.',
+        'auth.logout.local_only': 'Çıkış işlemi doğrulanamadı. Lütfen yeniden deneyin.',
         'auth.session_expired': 'Oturumunuzun süresi doldu, lütfen tekrar giriş yapın.',
         'nav.accounts': 'Hesaplar',
         'nav.transfer': 'Para Transferi',
@@ -239,11 +257,14 @@ const translations = {
         'account.inactive': 'Pasif',
         'account.no_accounts': 'Hiç hesap bulunamadı. Yeni bir hesap açarak başlayabilirsiniz.',
         'account.load_error': 'Hesap bilgileri yüklenemedi. Lütfen sayfayı yenileyin.',
-        'account.created': 'Hesabınız başarıyla oluşturuldu.',
+        'account.created': 'Hesabınız oluşturuldu. IBAN: {0}',
         'portfolio.summary': '{0} hesap',
         'account.iban_hint': 'TR otomatik yazılır — yalnızca 24 rakamı girmeniz yeterli.',
-        'account.iban_must_be_26': 'IBAN eksik — TR harflerinden sonra 24 rakam olmalı.',
         'account.invalid_balance': 'Lütfen geçerli bir başlangıç bakiyesi girin (0 veya üzeri, en fazla 2 ondalık).',
+        'account.funding_checking': 'Simülasyon fonlama modu kontrol ediliyor…',
+        'account.funding_enabled': 'Yalnızca simülasyon bakiyesidir; gerçek para oluşturulmaz.',
+        'account.funding_disabled': 'Bu ortamda açılış bakiyesi 0 olarak belirlenir.',
+        'account.funding_unavailable': 'Fonlama modu doğrulanamadı; açılış bakiyesi 0 ile sınırlandı.',
         'transfer.title': 'Para Transferi',
         'transfer.subtitle': 'Hesaplarınız arasında veya diğer IBAN’lara güvenli ve anında transfer yapın.',
         'transfer.sender_label': 'Gönderen Hesap',
@@ -270,7 +291,7 @@ const translations = {
         'transfer.success': 'Transfer başarıyla tamamlandı!',
         'transfer.info_title': 'İşlem Bilgileri',
         'transfer.info_instant': 'Transferleriniz <strong>anlık mutabakat ağımız</strong> üzerinden 7/24 işlenir.',
-        'transfer.info_cancel': 'Güvenlik standartlarımız gereği son <strong>24 saat</strong> içinde yapılan transferler iptal edilebilir.',
+        'transfer.info_cancel': 'Tamamlanmış bir transfer, yapılandırılmış süre içinde ve alıcı bakiyesi geri almaya yeterliyse iptal edilebilir.',
         'transfer.info_currency': 'Hesaplar arası transferlerde para birimleri eşleşmelidir.',
         'transfer.cancel_confirm': 'Bu transferi iptal edip tutarı iade etmek istediğinize emin misiniz?',
         'transfer.cancelled': 'Transfer başarıyla iptal edildi ve bakiyeler güncellendi.',
@@ -289,10 +310,13 @@ const translations = {
         'report.generator_title': 'Tarih Bazlı Rapor Oluşturma',
         'report.start_date': 'Başlangıç Tarihi',
         'report.end_date': 'Bitiş Tarihi',
+        'report.inclusive_dates': 'Başlangıç ve bitiş günlerinin tamamı dahildir. Aralık en fazla 12 ay olabilir.',
+        'report.invalid_date_range': 'Başlangıç tarihi bitiş tarihinden sonra olamaz.',
+        'report.select_dates': 'Lütfen iki tarihi de seçin.',
         'report.generate': 'Rapor Oluştur',
         'report.select_account_first': 'Lütfen önce bir hesap seçin.',
-        'report.stat_count': 'Toplam İşlem',
-        'report.stat_volume': 'Toplam Hacim',
+        'report.stat_count': 'Bu Sayfadaki İşlem',
+        'report.stat_volume': 'Bu Sayfadaki Hacim',
         'report.no_transactions': 'Seçilen tarih aralığında işlem bulunamadı.',
         'report.table_date': 'Tarih',
         'report.table_description': 'Açıklama',
@@ -306,11 +330,12 @@ const translations = {
         'report.history_loading': 'İşlemler yükleniyor...',
         'report.load_error': 'Hesap geçmişi yüklenemedi.',
         'modal.create_title': 'Yeni Hesap Oluştur',
-        'modal.sub': 'Yaklaşık 10 saniye sürer. TR’den sonra 24 rakamı yazmanız yeterli.',
-        'modal.owner_name': 'Hesap Sahibi Adı',
-        'modal.owner_placeholder': 'örn. Ad Soyad',
+        'modal.sub': 'Yeni IBAN’ınız otomatik oluşturulur.',
+        'modal.account_name': 'Hesap Adı',
+        'modal.account_name_placeholder': 'örn. Günlük Harcamalar',
+        'modal.account_name_hint': 'Bu hesabı diğer hesaplarınızdan ayıracak bir ad belirleyin.',
         'modal.iban': 'IBAN Numarası',
-        'modal.iban_placeholder': 'TR000000000000000000000000',
+        'modal.iban_placeholder': 'TR470000000000000000000000',
         'modal.balance': 'Başlangıç Bakiyesi',
         'modal.currency': 'Para Birimi',
         'modal.cancel': 'İptal',
@@ -321,6 +346,10 @@ const translations = {
         'general.loading': 'Yükleniyor...',
         'general.retry_in': 'Lütfen {0} saniye sonra tekrar deneyin.',
         'general.timeout': 'İstek 30 saniye içinde zaman aşımına uğradı. Lütfen tekrar deneyin.',
+        'general.outcome_unknown': 'İşlemin sonucu belirsiz olabilir. Tekrar denemeden önce hesaplarınızı ve transfer geçmişini kontrol edin.',
+        'general.uncertain_retry': 'Önceki istek tamamlanmış olabilir. Önce hesaplarınızı ve transfer geçmişini kontrol edin. Aynı isteği eski anahtarıyla tekrar denemek istiyor musunuz?',
+        'general.uncertain_changed': 'Önceki istek tamamlanmış olabilir. Değişen istek yeni anahtar kullanır ve ikinci bir işlem oluşturabilir. Önce hesaplarınızı ve transfer geçmişini kontrol edin. Devam edilsin mi?',
+        'general.uncertain_new': 'Bu cihazdaki önceki isteğin sonucu belirsizdi. Eski anahtar bu tarayıcı bağlamında kurtarılamıyor. Önce hesaplarınızı ve transfer geçmişini kontrol edin. Yeni işlem başlatılsın mı?',
         'general.offline': 'Çevrimdışı görünüyorsunuz. Bağlantınızı kontrol edip tekrar deneyin.',
         'general.back_online': 'Bağlantı yeniden kuruldu.',
         'general.load_more': 'Daha fazla yükle',
@@ -391,10 +420,15 @@ const translations = {
         'transfer.sum_hint': 'Önizleme için formu doldurun.',
         'transfer.sum_ready': 'Gönderime hazır. Lütfen kontrol edin.',
         'transfer.secure_note': 'Idempotency korumalı · çift gönderim güvenli.',
-        'report.print': 'Yazdır / PDF',
+        'report.print': 'Bu Sayfayı Yazdır / PDF',
         'report.tip_title': 'İpucu',
-        'report.tip': 'Denetimler için oluşturucuyu kullanın — sonuçlar sayfa bazında toplanır.',
-        'report.stat_avg': 'Ortalama',
+        'report.tip': 'Raporlar sayfalıdır. Gösterilen değerler ve yazdırılan belge yalnız geçerli sayfayı kapsar.',
+        'report.page': 'Sayfa {0}',
+        'report.previous': 'Önceki sayfa',
+        'report.next': 'Sonraki sayfa',
+        'report.scope': 'Hesap {0} · {1} - {2} · sayfa {3} (yalnız bu sayfa)',
+        'a11y.report_pages': 'Rapor sayfaları',
+        'report.stat_avg': 'Sayfa Ortalaması',
         'report.chart': 'Günlük hacim',
     }
 };
@@ -504,6 +538,13 @@ function newUuid() {
         if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
             return crypto.randomUUID();
         }
+        if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+            const bytes = crypto.getRandomValues(new Uint8Array(16));
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        }
     } catch (e) { /* fall through to Math.random fallback */ }
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = Math.floor(Math.random() * 16);
@@ -511,36 +552,185 @@ function newUuid() {
     });
 }
 
-function getIdempotencyKey(keyName) {
-    let key = localStorage.getItem(keyName);
-    if (!key) {
-        key = newUuid();
-        localStorage.setItem(keyName, key);
+const IDEMPOTENCY_STORAGE_PREFIX = 'idempotency:v2:';
+// The server removes terminal idempotency records after 24 hours. Never
+// silently reuse a browser key beyond that window.
+const IDEMPOTENCY_KEY_MAX_AGE_MS = 23 * 60 * 60 * 1000;
+const idempotencyMemory = new Map();
+const idempotencyActive = new Map();
+
+async function requestSignature(payload) {
+    if (typeof crypto === 'undefined' || !crypto.subtle || typeof crypto.subtle.digest !== 'function') {
+        return null;
     }
-    return key;
+    try {
+        const bytes = new TextEncoder().encode(JSON.stringify(payload));
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+        return null;
+    }
 }
 
-function renewIdempotencyKey(keyName) {
-    const key = newUuid();
-    localStorage.setItem(keyName, key);
-    return key;
+function draftStorageKey(keyName, fingerprint) {
+    return `${IDEMPOTENCY_STORAGE_PREFIX}draft:${keyName}:${fingerprint}`;
+}
+
+function loadIdempotencyDrafts(keyName, persistent) {
+    if (!persistent) {
+        if (!idempotencyMemory.has(keyName)) idempotencyMemory.set(keyName, new Map());
+        const drafts = idempotencyMemory.get(keyName);
+        for (const [fingerprint, state] of drafts) {
+            if (!state.uncertain && Date.now() - state.createdAt >= IDEMPOTENCY_KEY_MAX_AGE_MS) {
+                drafts.delete(fingerprint);
+            }
+        }
+        return drafts;
+    }
+    // Refresh from storage so another tab's completion cannot leave a stale
+    // in-memory key. Separate records preserve an uncertain older draft when
+    // the user changes fields and later returns to the original payload.
+    const drafts = new Map();
+    const prefix = `${IDEMPOTENCY_STORAGE_PREFIX}draft:${keyName}:`;
+    const expired = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const name = localStorage.key(i);
+        if (!name || !name.startsWith(prefix)) continue;
+        try {
+            const state = JSON.parse(localStorage.getItem(name));
+            if (state && state.version === 2 && typeof state.key === 'string'
+                && typeof state.fingerprint === 'string') {
+                if (!state.uncertain && Date.now() - state.createdAt >= IDEMPOTENCY_KEY_MAX_AGE_MS) {
+                    expired.push(name);
+                } else {
+                    drafts.set(state.fingerprint, state);
+                }
+            }
+        } catch (e) { /* malformed old browser state is ignored */ }
+    }
+    expired.forEach(name => localStorage.removeItem(name));
+    idempotencyMemory.set(keyName, drafts);
+    return drafts;
+}
+
+function saveIdempotencyState(keyName, state) {
+    const drafts = idempotencyMemory.get(keyName);
+    drafts.set(state.fingerprint, state);
+    if (state.persistent) {
+        localStorage.setItem(draftStorageKey(keyName, state.fingerprint), JSON.stringify(state));
+    }
+}
+
+function syncIdempotencyWarning(keyName) {
+    const drafts = idempotencyMemory.get(keyName);
+    if (drafts && Array.from(drafts.values()).some(state => state.uncertain)) {
+        localStorage.setItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName, '1');
+    } else {
+        localStorage.removeItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName);
+    }
+}
+
+// Persist only a SHA-256 request signature, never raw IBANs or passwords.
+// Registration is memory-only so a password-derived digest is not retained.
+// On insecure HTTP origins without SubtleCrypto, all drafts are memory-only;
+// an uncertainty marker survives reload and forces an explicit new intent.
+async function getIdempotencyKey(keyName, payload, persist = true) {
+    localStorage.removeItem(keyName); // Discard unbound keys from older frontend versions.
+    const signature = await requestSignature(payload);
+    const persistent = Boolean(signature && persist);
+    const fingerprint = signature || JSON.stringify(payload);
+    const drafts = loadIdempotencyDrafts(keyName, persistent);
+    const previous = drafts.get(fingerprint);
+    const matching = previous && Date.now() - previous.createdAt < IDEMPOTENCY_KEY_MAX_AGE_MS;
+    const anyUncertain = Array.from(drafts.values()).some(state => state.uncertain);
+    if (matching && previous.uncertain) {
+        if (!await confirmDialog(__('general.uncertain_retry'))) return null;
+    } else if (anyUncertain) {
+        if (!await confirmDialog(__('general.uncertain_changed'))) return null;
+    } else if (localStorage.getItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName)) {
+        if (!await confirmDialog(__('general.uncertain_new'))) return null;
+    }
+
+    if (matching) {
+        idempotencyActive.set(keyName, fingerprint);
+        return previous.key;
+    }
+    if (previous) {
+        drafts.delete(fingerprint);
+        if (previous.persistent) localStorage.removeItem(draftStorageKey(keyName, fingerprint));
+    }
+    const state = { version: 2, key: newUuid(), fingerprint, createdAt: Date.now(), uncertain: false, persistent };
+    saveIdempotencyState(keyName, state);
+    idempotencyActive.set(keyName, fingerprint);
+    syncIdempotencyWarning(keyName);
+    return state.key;
+}
+
+function markIdempotencyStarted(keyName) {
+    const state = idempotencyMemory.get(keyName)?.get(idempotencyActive.get(keyName));
+    if (!state) return;
+    state.uncertain = true;
+    saveIdempotencyState(keyName, state);
+    syncIdempotencyWarning(keyName);
+}
+
+function isAmbiguousFailure(err) {
+    if (!err || err.offline) return false;
+    return !err.status || err.status >= 500
+        || (err.status === 409 && err.code === 'CONCURRENT_REQUEST');
+}
+
+function markIdempotencyFailed(keyName, err) {
+    if (isAmbiguousFailure(err)) return;
+    const state = idempotencyMemory.get(keyName)?.get(idempotencyActive.get(keyName));
+    if (state) {
+        state.uncertain = false;
+        saveIdempotencyState(keyName, state);
+    }
+    syncIdempotencyWarning(keyName);
+}
+
+function idempotencyErrorMessage(err) {
+    return isAmbiguousFailure(err) ? `${err.message} ${__('general.outcome_unknown')}` : err.message;
 }
 
 function clearIdempotencyKey(keyName) {
-    localStorage.removeItem(keyName);
+    const fingerprint = idempotencyActive.get(keyName);
+    const drafts = idempotencyMemory.get(keyName);
+    const state = drafts?.get(fingerprint);
+    if (state?.persistent) localStorage.removeItem(draftStorageKey(keyName, fingerprint));
+    if (drafts) drafts.delete(fingerprint);
+    idempotencyActive.delete(keyName);
+    syncIdempotencyWarning(keyName);
+}
+
+function clearAllIdempotencyKeys() {
+    idempotencyMemory.clear();
+    idempotencyActive.clear();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const name = localStorage.key(i);
+        if (name && (name.startsWith(IDEMPOTENCY_STORAGE_PREFIX)
+            || name === 'accountKey' || name === 'transferKey' || name === 'registerKey'
+            || name.startsWith('cancelKey_'))) {
+            localStorage.removeItem(name);
+        }
+    }
 }
 
 // --- State Management ---
 let accounts = [];
 let activeTab = 'accounts-section';
-let token = localStorage.getItem('token') || null;
-let userId = localStorage.getItem('userId') || null;
-let username = localStorage.getItem('username') || null;
+let authenticated = false;
+let userId = null;
+let username = null;
+let fundingMode = 'unknown';
 // Paged-list state: backend caps size at 100, so long lists need "load more".
 // Filters/sorts apply to the items loaded so far.
 let accountPager = { page: 0, last: true, total: 0 };
 let historyCache = { accountId: null, items: [] };
 let historyPager = { accountId: null, page: 0, last: true, total: 0 };
+let reportPager = { criteria: null, page: 0, hasNext: false, loading: false, requestVersion: 0 };
+const cancellationsInFlight = new Set();
 
 // --- DOM Elements ---
 const navItems = document.querySelectorAll('.nav-item');
@@ -565,6 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDetailModals();
     initUxEnhancements();
     checkAuthStatus();
+    restoreBrowserSession();
 });
 
 function initLanguageSwitcher() {
@@ -586,7 +777,8 @@ function initLanguageSwitcher() {
 // Re-render every dynamically built string on language change so the whole
 // UI (not just static labels) follows the new locale.
 document.addEventListener('languagechange', () => {
-    if (!token) return;
+    renderFundingMode();
+    if (!authenticated) return;
     renderPortfolioSummary();
     loadAccounts();
     populateTransferDropdowns();
@@ -595,6 +787,7 @@ document.addEventListener('languagechange', () => {
     if (window.__lastReport && resultsEl && !resultsEl.classList.contains('d-none')) {
         renderReportResults(window.__lastReport);
     }
+    updateReportPagination();
     // Re-run transfer summary + sender-limit lines in the new language.
     document.getElementById('transfer-amount')?.dispatchEvent(new Event('input', { bubbles: true }));
     document.getElementById('sender-account-select')?.dispatchEvent(new Event('change', { bubbles: true }));
@@ -697,13 +890,15 @@ async function fetchApi(endpoint, options = {}) {
             'Content-Type': 'application/json',
             ...options.headers
         };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method.toUpperCase())) {
+            const csrf = browserCsrfToken();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
         }
         headers['Accept-Language'] = getLanguage();
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers,
+            credentials: 'same-origin',
             ...(controller ? { signal: controller.signal } : {})
         });
 
@@ -716,9 +911,11 @@ async function fetchApi(endpoint, options = {}) {
             if (text) {
                 try { data = JSON.parse(text); } catch (e) { data = { message: text }; }
             }
-            if (token) {
+            if (authenticated) {
                 logout();
-                throw new Error(__('auth.session_expired'));
+                const expired = new Error(__('auth.session_expired'));
+                expired.status = 401;
+                throw expired;
             }
             throw new Error(extractErrorMessage(data) || __('auth.login.failed'));
         }
@@ -739,6 +936,7 @@ async function fetchApi(endpoint, options = {}) {
             // then joined field errors.
             const err = new Error(extractErrorMessage(data) || __('general.error'));
             err.status = response.status;
+            err.code = data && typeof data.code === 'string' ? data.code : null;
             // 429 carries RFC 9110 Retry-After (seconds, = rate-limit window).
             // Never auto-retry it: the sliding window would just reject again.
             if (response.status === 429) {
@@ -757,14 +955,36 @@ async function fetchApi(endpoint, options = {}) {
         return data;
     } catch (error) {
         if (error && (error.name === 'AbortError' || error.code === 20)) {
-            // Backend tx timeout is 30s; the idempotency key dedupes any
-            // late-completing write, so surfacing (and retrying) is safe.
-            throw new Error(__('general.timeout'));
+            // Aborting the browser request does not roll back a server commit.
+            const timedOut = new Error(__('general.timeout'));
+            timedOut.timeout = true;
+            throw timedOut;
         }
         console.error('API Error:', error);
         throw error;
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
+    }
+}
+
+function browserCsrfToken() {
+    const match = document.cookie.match(/(?:^|; )(?:(?:__Host-)?BANK_CSRF)=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function restoreBrowserSession() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/browser/session`, {
+            credentials: 'same-origin', headers: { 'Accept-Language': getLanguage() }
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        authenticated = true;
+        userId = result.userId;
+        username = result.username;
+        checkAuthStatus();
+    } catch (e) {
+        // A network error does not create a local authenticated state.
     }
 }
 
@@ -960,6 +1180,33 @@ async function loadAccounts(loadMore = false) {
 }
 
 // --- Account Creation Modal ---
+function renderFundingMode() {
+    const balanceInput = document.getElementById('acc-balance');
+    const hint = document.getElementById('acc-funding-hint');
+    if (!balanceInput || !hint) return;
+    balanceInput.readOnly = fundingMode !== 'enabled';
+    if (balanceInput.readOnly) balanceInput.value = '0.00';
+    const hintKey = fundingMode === 'enabled' ? 'account.funding_enabled'
+        : fundingMode === 'disabled' ? 'account.funding_disabled'
+        : fundingMode === 'unavailable' ? 'account.funding_unavailable'
+        : 'account.funding_checking';
+    hint.textContent = __(hintKey);
+}
+
+async function loadAccountCapabilities() {
+    fundingMode = 'unknown';
+    renderFundingMode();
+    try {
+        const capability = await fetchApi('/accounts/capabilities');
+        if (!authenticated) return;
+        fundingMode = capability.initialFundingEnabled === true ? 'enabled' : 'disabled';
+    } catch (error) {
+        if (!authenticated) return;
+        fundingMode = 'unavailable';
+    }
+    renderFundingMode();
+}
+
 function initModal() {
     const modal = document.getElementById('create-account-modal');
     const openBtn = document.getElementById('open-create-modal');
@@ -972,7 +1219,8 @@ function initModal() {
     function openModal() {
         modal.classList.add('active');
         form.reset();
-        const firstField = document.getElementById('acc-owner-name');
+        renderFundingMode();
+        const firstField = document.getElementById('acc-account-name');
         if (firstField) {
             firstField.focus();
         }
@@ -1002,24 +1250,11 @@ function initModal() {
         if (e.target === modal) closeModal();
     });
 
-    // Format IBAN input dynamically (TR locked in, digits only)
-    const ibanInput = document.getElementById('acc-iban');
-    ibanInput.addEventListener('input', (e) => {
-        e.target.value = sanitizeIban(e.target.value);
-    });
-    ibanInput.addEventListener('focus', (e) => {
-        if (!e.target.value) {
-            e.target.value = 'TR';
-            e.target.dispatchEvent(new Event('input'));
-        }
-    });
-
     // Handle Form Submit
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const ownerName = document.getElementById('acc-owner-name').value.trim();
-        const iban = document.getElementById('acc-iban').value.trim();
+        const ownerName = document.getElementById('acc-account-name').value.trim();
         // Round to 2 decimals: backend @Digits(integer=13, fraction=2).
         const balance = Math.round(parseFloat(document.getElementById('acc-balance').value) * 100) / 100;
         const currency = document.getElementById('acc-currency').value;
@@ -1029,31 +1264,37 @@ function initModal() {
             return;
         }
 
-        if (!isValidIban(iban)) {
-            showAlert(__('account.iban_must_be_26'), 'danger');
+        if (fundingMode !== 'enabled' && balance > 0) {
+            showAlert(__('account.funding_disabled'), 'danger');
             return;
         }
-
         spinner.classList.remove('d-none');
         submitBtn.disabled = true;
         submitBtn.setAttribute('aria-busy', 'true');
 
+        const request = { ownerName, initialBalance: balance, currency };
+        const keyName = `accountKey:${userId}`;
+        let started = false;
         try {
-            const idempotencyKey = getIdempotencyKey('accountKey');
-            await fetchApi('/accounts', {
+            const idempotencyKey = await getIdempotencyKey(keyName, request);
+            if (!idempotencyKey) return;
+            markIdempotencyStarted(keyName);
+            started = true;
+            const createdAccount = await fetchApi('/accounts', {
                 method: 'POST',
                 headers: {
                     'Idempotency-Key': idempotencyKey
                 },
-                body: JSON.stringify({ userId: parseInt(userId), iban, ownerName, initialBalance: balance, currency })
+                body: JSON.stringify(request)
             });
 
-            showAlert(__('account.created'));
-            renewIdempotencyKey('accountKey');
+            clearIdempotencyKey(keyName);
+            showAlert(__('account.created', createdAccount.iban));
             closeModal();
             loadAccounts();
         } catch (err) {
-            showAlert(err.message, 'danger');
+            if (started) markIdempotencyFailed(keyName, err);
+            showAlert(started ? idempotencyErrorMessage(err) : err.message, 'danger');
         } finally {
             spinner.classList.add('d-none');
             submitBtn.disabled = false;
@@ -1196,6 +1437,7 @@ function initTransferForm() {
     // Form submission
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (submitBtn.disabled) return;
 
         const senderId = senderSelect.value;
         const receiverType = document.querySelector('input[name="receiver-type"]:checked').value;
@@ -1211,11 +1453,6 @@ function initTransferForm() {
 
         if (!Number.isFinite(amount) || amount <= 0) {
             showAlert(__('transfer.invalid_amount'), 'danger');
-            return;
-        }
-
-        if (amount > senderAcc.balance) {
-            showAlert(__('transfer.insufficient_balance'), 'danger');
             return;
         }
 
@@ -1248,55 +1485,39 @@ function initTransferForm() {
             }
         }
 
-        const idempotencyKey = getIdempotencyKey('transferKey');
-        let lastError = null;
-
-        for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt > 0) {
-                showAlert(`Retrying... (${attempt + 1}/3)`, 'warning');
-                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
-            }
-
-            spinner.classList.remove('d-none');
-            submitBtn.disabled = true;
-            submitBtn.setAttribute('aria-busy', 'true');
-
-            try {
-                const result = await fetchApi('/transfers', {
-                    method: 'POST',
-                    headers: {
-                        'Idempotency-Key': idempotencyKey
-                    },
-                    body: JSON.stringify({
-                        senderIban: senderAcc.iban,
-                        receiverIban: receiverIban,
-                        amount: amount,
-                        currency: currency
-                    })
-                });
-
-                showAlert(`${__('transfer.success')} (${__('transfer.amount')}: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
-                form.reset();
-                renewIdempotencyKey('transferKey');
-                document.getElementById('sender-balance-indicator').textContent = '';
-
-                await loadAccounts();
-                lastError = null;
-                break;
-            } catch (err) {
-                lastError = err;
-                if (attempt < 2 && isRetryableError(err)) {
-                    continue;
-                }
-            } finally {
-                spinner.classList.add('d-none');
-                submitBtn.disabled = false;
-                submitBtn.removeAttribute('aria-busy');
-            }
-        }
-
-        if (lastError) {
-            showAlert(lastError.message, 'danger');
+        const request = {
+            senderIban: senderAcc.iban,
+            receiverIban,
+            amount,
+            currency
+        };
+        const keyName = `transferKey:${userId}`;
+        let started = false;
+        spinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+        try {
+            const idempotencyKey = await getIdempotencyKey(keyName, request);
+            if (!idempotencyKey) return;
+            markIdempotencyStarted(keyName);
+            started = true;
+            const result = await fetchApi('/transfers', {
+                method: 'POST',
+                headers: { 'Idempotency-Key': idempotencyKey },
+                body: JSON.stringify(request)
+            });
+            clearIdempotencyKey(keyName);
+            showAlert(`${__('transfer.success')} (${__('transfer.amount')}: ${formatMoney(result.amount)} ${escapeHtml(result.currency)})`);
+            form.reset();
+            document.getElementById('sender-balance-indicator').textContent = '';
+            await loadAccounts();
+        } catch (err) {
+            if (started) markIdempotencyFailed(keyName, err);
+            showAlert(started ? idempotencyErrorMessage(err) : err.message, 'danger');
+        } finally {
+            spinner.classList.add('d-none');
+            submitBtn.disabled = false;
+            submitBtn.removeAttribute('aria-busy');
         }
     });
 }
@@ -1326,19 +1547,21 @@ function initReportSection() {
     const tabContents = document.querySelectorAll('.report-tab-content');
     const reportFilterForm = document.getElementById('report-filter-form');
 
-    // Set default dates for report filters (last 30 days)
+    // Last 30 calendar days, including today.
     const now = new Date();
     const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(now.getDate() - 30);
+    thirtyDaysAgo.setDate(now.getDate() - 29);
 
-    document.getElementById('report-start-date').value = formatDateTimeLocal(thirtyDaysAgo);
-    document.getElementById('report-end-date').value = formatDateTimeLocal(now);
+    document.getElementById('report-start-date').value = formatDateInput(thirtyDaysAgo);
+    document.getElementById('report-end-date').value = formatDateInput(now);
 
     // Dropdown change triggers history load
     reportSelect.addEventListener('change', (e) => {
         loadAccountHistory(e.target.value);
-        document.getElementById('report-results').classList.add('d-none');
+        invalidateGeneratedReport();
     });
+    reportFilterForm.addEventListener('input', invalidateGeneratedReport);
+    reportFilterForm.addEventListener('change', invalidateGeneratedReport);
 
     // Tab buttons toggle
     tabBtns.forEach(btn => {
@@ -1358,6 +1581,7 @@ function initReportSection() {
                     content.classList.remove('active');
                 }
             });
+            document.getElementById('btn-print-report').disabled = target !== 'generator-tab' || !window.__lastReport;
 
             // The volume chart measures its canvas on draw; a hidden tab has
             // zero width, so redraw when returning to the generator view.
@@ -1369,7 +1593,7 @@ function initReportSection() {
     });
 
     // Report Generation Form submit
-    reportFilterForm.addEventListener('submit', async (e) => {
+    reportFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const accountId = reportSelect.value;
         const startDate = document.getElementById('report-start-date').value;
@@ -1380,13 +1604,70 @@ function initReportSection() {
             return;
         }
 
+        let range;
         try {
-            const report = await fetchApi(`/transfers/report?accountId=${accountId}&startDate=${startDate}&endDate=${endDate}`);
-            renderReportResults(report);
-        } catch (err) {
-            showAlert(err.message, 'danger');
+            range = buildReportDateRange(startDate, endDate);
+        } catch (error) {
+            showAlert(error.message, 'warning');
+            return;
         }
+
+        invalidateGeneratedReport();
+        reportPager.criteria = { accountId, ...range };
+        loadReportPage(0);
     });
+    document.getElementById('report-page-previous').addEventListener('click', () => loadReportPage(reportPager.page - 1));
+    document.getElementById('report-page-next').addEventListener('click', () => loadReportPage(reportPager.page + 1));
+}
+
+function invalidateGeneratedReport() {
+    reportPager = { criteria: null, page: 0, hasNext: false, loading: false,
+        requestVersion: reportPager.requestVersion + 1 };
+    window.__lastReport = null;
+    document.getElementById('report-results')?.classList.add('d-none');
+    const printButton = document.getElementById('btn-print-report');
+    if (printButton) printButton.disabled = true;
+    updateReportPagination();
+}
+
+function updateReportPagination() {
+    const controls = document.getElementById('report-pagination');
+    if (!controls) return;
+    controls.classList.toggle('d-none', !reportPager.criteria || (reportPager.page === 0 && !reportPager.hasNext));
+    document.getElementById('report-page-previous').disabled = reportPager.loading || reportPager.page === 0;
+    document.getElementById('report-page-next').disabled = reportPager.loading || !reportPager.hasNext;
+    document.getElementById('report-page-label').textContent = __('report.page', reportPager.page + 1);
+    const scope = document.getElementById('report-scope');
+    if (scope) {
+        const criteria = reportPager.criteria;
+        scope.textContent = criteria ? __('report.scope', criteria.accountId,
+            criteria.startDate.slice(0, 10), criteria.endDate.slice(0, 10), reportPager.page + 1) : '';
+    }
+}
+
+async function loadReportPage(page) {
+    if (!reportPager.criteria || reportPager.loading || page < 0
+            || (page > reportPager.page && !reportPager.hasNext && reportPager.page !== 0)) return;
+    reportPager.loading = true;
+    const requestVersion = ++reportPager.requestVersion;
+    const criteria = reportPager.criteria;
+    updateReportPagination();
+    try {
+        const query = new URLSearchParams({ ...criteria, page: String(page), size: '100' });
+        const report = await fetchApi(`/transfers/report?${query}`);
+        if (requestVersion !== reportPager.requestVersion) return;
+        reportPager.page = page;
+        reportPager.hasNext = report.hasNext === true;
+        renderReportResults(report);
+        document.getElementById('btn-print-report').disabled = !document.getElementById('generator-tab').classList.contains('active');
+    } catch (err) {
+        if (requestVersion === reportPager.requestVersion) showAlert(err.message, 'danger');
+    } finally {
+        if (requestVersion === reportPager.requestVersion) {
+            reportPager.loading = false;
+            updateReportPagination();
+        }
+    }
 }
 
 async function loadAccountHistory(accountId, loadMore = false) {
@@ -1466,9 +1747,10 @@ async function loadAccountHistory(accountId, loadMore = false) {
                 prefix = '+';
             }
 
-            // Cancellation eligibility mirrors backend Transfer.cancel():
-            // only COMPLETED transfers within the 24-hour window.
-            const isEligibleForCancel = t.status === 'COMPLETED' && isOutgoing && (new Date() - new Date(t.createdAt)) < 24 * 60 * 60 * 1000;
+            // The backend owns the configurable cancellation window. Showing
+            // the action for a completed outgoing transfer avoids a stale
+            // client-side 24h rule hiding a server-eligible operation.
+            const isEligibleForCancel = t.status === 'COMPLETED' && isOutgoing;
             const showStatusPill = !isCancelled && t.status !== 'COMPLETED';
 
             item.innerHTML = `
@@ -1485,11 +1767,19 @@ async function loadAccountHistory(accountId, loadMore = false) {
                 <div class="history-right">
                     <span class="history-amount ${amountClass}">${prefix}${formatMoney(t.amount)} ${escapeHtml(t.currency)}</span>
                     ${showStatusPill ? `<span class="card-status-badge ${statusMeta.cls}">${statusMeta.label}</span>` : ''}
-                    ${isEligibleForCancel ? `<button class="btn-cancel-transfer" onclick="cancelTransfer(${t.id}, ${accountId})">${__('transfer.cancel_btn')}</button>` : ''}
+                    ${isEligibleForCancel ? `<button type="button" class="btn-cancel-transfer">${__('transfer.cancel_btn')}</button>` : ''}
                 </div>
             `;
 
             historyList.appendChild(item);
+
+            const cancelButton = item.querySelector('.btn-cancel-transfer');
+            if (cancelButton) {
+                cancelButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    cancelTransfer(t.id, accountId);
+                });
+            }
 
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.btn-cancel-transfer')) return;
@@ -1520,46 +1810,33 @@ async function loadAccountHistory(accountId, loadMore = false) {
 }
 
 // Exposed to global window scope so it can be called from dynamic HTML
-window.cancelTransfer = async function (transferId, accountId) {
-    const confirmed = await confirmDialog(__('transfer.cancel_confirm'));
-    if (!confirmed) {
-        return;
+async function cancelTransfer(transferId, accountId) {
+    const keyName = `cancelKey:${userId}:${transferId}`;
+    if (cancellationsInFlight.has(keyName)) return;
+    cancellationsInFlight.add(keyName);
+    let started = false;
+    try {
+        const confirmed = await confirmDialog(__('transfer.cancel_confirm'));
+        if (!confirmed) return;
+        const idempotencyKey = await getIdempotencyKey(keyName, { transferId });
+        if (!idempotencyKey) return;
+        markIdempotencyStarted(keyName);
+        started = true;
+        await fetchApi(`/transfers/${transferId}/cancel`, {
+            method: 'POST',
+            headers: { 'Idempotency-Key': idempotencyKey }
+        });
+        clearIdempotencyKey(keyName);
+        showAlert(__('transfer.cancelled'));
+        await loadAccounts();
+        loadAccountHistory(accountId);
+    } catch (err) {
+        if (started) markIdempotencyFailed(keyName, err);
+        showAlert(started ? idempotencyErrorMessage(err) : err.message, 'danger');
+    } finally {
+        cancellationsInFlight.delete(keyName);
     }
-
-    const idempotencyKey = getIdempotencyKey('cancelKey_' + transferId);
-    let lastError = null;
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
-        }
-
-        try {
-            await fetchApi(`/transfers/${transferId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Idempotency-Key': idempotencyKey
-                }
-            });
-            showAlert(__('transfer.cancelled'));
-            clearIdempotencyKey('cancelKey_' + transferId);
-
-            await loadAccounts();
-            loadAccountHistory(accountId);
-            lastError = null;
-            break;
-        } catch (err) {
-            lastError = err;
-            if (!isRetryableError(err)) {
-                break;
-            }
-        }
-    }
-
-    if (lastError) {
-        showAlert(lastError.message, 'danger');
-    }
-};
+}
 
 // --- Detail surfaces (cover the remaining read endpoints) ---
 function showModal(id) {
@@ -1642,7 +1919,7 @@ async function openAccountDetail(accountId) {
                 </div>
             </div>
             <dl class="summary-list">
-                <div><dt>${__('modal.owner_name')}</dt><dd>${escapeHtml(acc.ownerName)}</dd></div>
+                <div><dt>${__('modal.account_name')}</dt><dd>${escapeHtml(acc.ownerName)}</dd></div>
                 <div><dt>${__('modal.iban')}</dt><dd class="mono">${escapeHtml(formatIbanDisplay(acc.iban))} <button type="button" class="copy-btn" data-copy="${escapeHtml(acc.iban)}" title="${escapeHtml(__('general.copy_iban'))}" aria-label="${escapeHtml(__('general.copy_iban'))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></dd></div>
                 <div><dt>${__('report.table_status')}</dt><dd><span class="card-status-badge ${acc.active ? 'badge-active' : 'badge-inactive'}">${acc.active ? __('account.active') : __('account.inactive')}</span> <span class="text-muted mono">${escapeHtml(acc.status || '')}</span></dd></div>
             </dl>
@@ -1694,7 +1971,7 @@ let lastIbanLookup = '';
 
 async function lookupManualIban(iban) {
     const note = document.getElementById('iban-lookup-note');
-    if (!note || !token) return;
+    if (!note || !authenticated) return;
     const v = String(iban || '').trim();
     if (!isValidIban(v)) {
         note.classList.add('d-none');
@@ -1850,17 +2127,6 @@ function renderReportResults(report) {
 }
 
 // --- Utility Formatters ---
-function isRetryableError(err) {
-    // Retry only network failures (no status), 409 optimistic-lock conflicts
-    // and server errors. 409 is safe: every write endpoint is idempotency
-    // guarded and failed keys are never stored, so the retry dedupes.
-    // 4xx validation/auth errors would just fail identically again, 429 must
-    // respect Retry-After, and offline retries are pointless.
-    if (!err || err.offline) return false;
-    if (err.status === 409) return true;
-    return !err.status || err.status >= 500;
-}
-
 // Localized badge metadata for backend TransferStatus values.
 function transferStatusMeta(status) {
     switch (status) {
@@ -1897,6 +2163,18 @@ function isValidIban(value) {
     return /^TR[0-9]{24}$/.test(v);
 }
 
+function hasValidIbanChecksum(value) {
+    const v = String(value || '').toUpperCase().replace(/\s+/g, '');
+    if (!isValidIban(v)) return false;
+    // Same ISO 13616 MOD 97-10 calculation as the account creation use case.
+    const rearranged = v.slice(4) + '2927' + v.slice(2, 4);
+    let remainder = 0;
+    for (const digit of rearranged) {
+        remainder = (remainder * 10 + Number(digit)) % 97;
+    }
+    return remainder === 1;
+}
+
 function formatIbanDisplay(iban) {
     if (!iban) return '';
     return iban.replace(/(.{4})/g, '$1 ').trim();
@@ -1913,25 +2191,37 @@ function formatDate(dateString) {
     });
 }
 
-function formatDateTimeLocal(date) {
+function formatDateInput(date) {
     const pad = (n) => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function buildReportDateRange(startDay, endDay) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay) || !/^\d{4}-\d{2}-\d{2}$/.test(endDay)) {
+        throw new Error(__('report.select_dates'));
+    }
+    if (startDay > endDay) {
+        throw new Error(__('report.invalid_date_range'));
+    }
+    // PostgreSQL stores transfer time as TIMESTAMP(6); BETWEEN is inclusive.
+    return { startDate: `${startDay}T00:00:00`, endDate: `${endDay}T23:59:59.999999` };
 }
 
 // --- Authentication Operations ---
 function checkAuthStatus() {
-    // Take over from the head boot-guard (data-boot): explicit classes rule now.
-    document.documentElement.removeAttribute('data-boot');
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
     const displayUsername = document.getElementById('display-username');
 
-    if (token) {
+    if (authenticated) {
         authContainer.classList.add('d-none');
         appContainer.classList.remove('d-none');
         displayUsername.textContent = username;
         switchTab('accounts-section');
+        loadAccountCapabilities();
     } else {
+        fundingMode = 'unknown';
+        renderFundingMode();
         authContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
     }
@@ -1978,18 +2268,14 @@ function initAuth() {
         btnLoginSubmit.setAttribute('aria-busy', 'true');
 
         try {
-            const result = await fetchApi('/auth/login', {
+            const result = await fetchApi('/auth/browser/login', {
                 method: 'POST',
                 body: JSON.stringify({ username: usernameVal, password: passwordVal })
             });
 
-            token = result.token;
+            authenticated = true;
             userId = result.userId;
             username = result.username;
-
-            localStorage.setItem('token', token);
-            localStorage.setItem('userId', userId);
-            localStorage.setItem('username', username);
 
             showAlert(__('auth.login.success'));
             checkAuthStatus();
@@ -2005,6 +2291,7 @@ function initAuth() {
     // Register Form Submit
     registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (btnRegisterSubmit.disabled) return;
         const usernameVal = document.getElementById('register-username').value.trim();
         const passwordVal = document.getElementById('register-password').value;
 
@@ -2019,23 +2306,30 @@ function initAuth() {
         btnRegisterSubmit.disabled = true;
         btnRegisterSubmit.setAttribute('aria-busy', 'true');
 
+        const request = { username: usernameVal, password: passwordVal };
+        const keyName = 'registerKey';
+        let started = false;
         try {
-            const registerKey = getIdempotencyKey('registerKey');
+            const registerKey = await getIdempotencyKey(keyName, request, false);
+            if (!registerKey) return;
+            markIdempotencyStarted(keyName);
+            started = true;
             await fetchApi('/auth/register', {
                 method: 'POST',
                 headers: {
                     'Idempotency-Key': registerKey
                 },
-                body: JSON.stringify({ username: usernameVal, password: passwordVal })
+                body: JSON.stringify(request)
             });
-            renewIdempotencyKey('registerKey');
+            clearIdempotencyKey(keyName);
 
             showAlert(__('auth.register.success'));
             registerForm.reset();
             // Switch to login tab
             tabLoginBtn.click();
         } catch (err) {
-            showAlert(__('auth.register.failed') + err.message, 'danger');
+            if (started) markIdempotencyFailed(keyName, err);
+            showAlert(__('auth.register.failed') + (started ? idempotencyErrorMessage(err) : err.message), 'danger');
         } finally {
             registerSpinner.classList.add('d-none');
             btnRegisterSubmit.disabled = false;
@@ -2043,35 +2337,56 @@ function initAuth() {
         }
     });
 
-    // Logout Click: revoke server-side first so the JWT lands on the
-    // blacklist, then clear local state even if the call fails.
+    // Revoke server-side first. A failed/aborted request means the JWT may
+    // remain usable until expiry; make that distinction visible to the user.
     btnLogout.addEventListener('click', async () => {
-        if (token) {
-            try {
-                await fetch(`${API_BASE}/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+        if (btnLogout.disabled) return;
+        btnLogout.disabled = true;
+        let revoked = !authenticated;
+        try {
+            if (authenticated) {
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                    const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+                    try {
+                        const response = await fetch(`${API_BASE}/auth/browser/logout`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': browserCsrfToken() || ''
+                            },
+                            credentials: 'same-origin',
+                            ...(controller ? { signal: controller.signal } : {})
+                        });
+                        revoked = response.ok;
+                        if (!response.ok) console.error('Logout revoke failed with HTTP', response.status);
+                        break; // Only a lost/aborted response warrants retrying.
+                    } catch (e) {
+                        console.error('Logout revoke attempt failed:', e);
+                    } finally {
+                        if (timeoutId) clearTimeout(timeoutId);
                     }
-                });
-            } catch (e) {
-                console.error('Logout revoke failed:', e);
+                }
             }
+        } catch (e) {
+            console.error('Logout revoke failed:', e);
+        } finally {
+            btnLogout.disabled = false;
         }
-        logout();
-        showAlert(__('auth.logout.success'));
+        if (revoked) logout();
+        showAlert(__(revoked ? 'auth.logout.success' : 'auth.logout.local_only'), revoked ? 'success' : 'warning');
     });
 }
 
 function logout() {
-    token = null;
+    authenticated = false;
     userId = null;
     username = null;
     accounts = [];
     accountPager = { page: 0, last: true, total: 0 };
     historyCache = { accountId: null, items: [] };
     historyPager = { accountId: null, page: 0, last: true, total: 0 };
+    invalidateGeneratedReport();
     detailAccountId = null;
     detailTransferId = null;
     lastIbanLookup = '';
@@ -2082,12 +2397,7 @@ function logout() {
         ibanNote.classList.add('d-none');
         ibanNote.innerHTML = '';
     }
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
-    localStorage.removeItem('transferKey');
-    localStorage.removeItem('accountKey');
-    localStorage.removeItem('registerKey');
+    clearAllIdempotencyKeys();
 
     // Reset all forms
     document.getElementById('login-form').reset();
@@ -2239,7 +2549,6 @@ function initUxEnhancements() {
         inp.addEventListener('input', upd);
         upd();
     };
-    bindCounter('acc-iban', 'acc-iban-counter');
     bindCounter('receiver-iban-input', 'iban-counter');
 
     // Copy IBAN (event delegation, works for dynamic cards)
@@ -2268,17 +2577,17 @@ function initUxEnhancements() {
             document.querySelectorAll('.seg-pill[data-currency]').forEach(p => p.classList.remove('is-active'));
             pill.classList.add('is-active');
             window.__accountView.currency = pill.getAttribute('data-currency') || 'all';
-            if (token) loadAccounts();
+            if (authenticated) loadAccounts();
         });
     });
     if (sort) {
         sort.addEventListener('change', () => {
             window.__accountView.sort = sort.value;
-            if (token) loadAccounts();
+            if (authenticated) loadAccounts();
         });
     }
     const refreshBtn = document.getElementById('btn-refresh-accounts');
-    if (refreshBtn) refreshBtn.addEventListener('click', () => { if (token) loadAccounts(); });
+    if (refreshBtn) refreshBtn.addEventListener('click', () => { if (authenticated) loadAccounts(); });
 
     // Quick-transfer + generic goto buttons
     document.querySelectorAll('[data-goto]').forEach(b => {
@@ -2352,11 +2661,12 @@ function initUxEnhancements() {
             const days = parseInt(ch.getAttribute('data-range'), 10) || 30;
             const end = new Date();
             const start = new Date();
-            start.setDate(end.getDate() - days);
+            start.setDate(end.getDate() - (days - 1));
             const s = document.getElementById('report-start-date');
             const e = document.getElementById('report-end-date');
-            if (s) s.value = formatDateTimeLocal(start);
-            if (e) e.value = formatDateTimeLocal(end);
+            if (s) s.value = formatDateInput(start);
+            if (e) e.value = formatDateInput(end);
+            invalidateGeneratedReport();
         });
     });
     const printBtn = document.getElementById('btn-print-report');

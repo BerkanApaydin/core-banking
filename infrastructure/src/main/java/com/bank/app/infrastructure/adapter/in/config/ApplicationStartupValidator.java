@@ -49,6 +49,11 @@ public class ApplicationStartupValidator {
                     "Production profile must not use the default database password. "
                     + "Set DB_PASSWORD environment variable to a secure password.");
         }
+        String blacklistBackend = environment.getProperty("app.security.token-blacklist.backend", "");
+        if (!"hybrid".equals(blacklistBackend) && !"database".equals(blacklistBackend)) {
+            throw new IllegalStateException(
+                    "Production token revocations require the hybrid or database backend");
+        }
     }
 
     private boolean isProdProfile() {

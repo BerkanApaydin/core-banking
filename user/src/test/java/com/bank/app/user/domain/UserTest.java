@@ -40,16 +40,21 @@ class UserTest {
         }
 
         @Test
-        @DisplayName("should create via static factory with registration event")
+        @DisplayName("should record registration only after persistence assigns an ID")
         void shouldCreateViaStaticFactory() {
             User user = User.create("testuser", "raw_password");
             assertThat(user.getId()).isNull();
             assertThat(user.getUsername()).isEqualTo("testuser");
             assertThat(user.getPassword()).isEqualTo("raw_password");
             assertThat(user.getRole()).isEqualTo(Role.ROLE_USER);
-            assertThat(user.getDomainEvents())
-                    .hasSize(1)
-                    .allMatch(e -> e instanceof UserRegisteredEvent);
+            assertThat(user.getDomainEvents()).isEmpty();
+            assertThatThrownBy(() -> user.recordRegistration(java.time.Clock.systemUTC()))
+                    .isInstanceOf(IllegalStateException.class);
+
+            User persisted = new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole());
+            persisted.recordRegistration(java.time.Clock.systemUTC());
+            assertThat(persisted.getDomainEvents()).hasSize(1);
+            assertThat(((UserRegisteredEvent) persisted.getDomainEvents().get(0)).userId()).isEqualTo("42");
         }
 
         @Test

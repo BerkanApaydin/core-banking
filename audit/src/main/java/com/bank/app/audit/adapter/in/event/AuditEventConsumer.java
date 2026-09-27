@@ -35,7 +35,8 @@ public class AuditEventConsumer {
             // back to "system" only for legacy events without a username.
             auditLoggerUseCase.log(event.username(), action, event.details());
         } catch (Exception e) {
-            log.error("Failed to persist audit event: action={}, details={}", event.action(), event.details(), e);
+            log.error("Failed to persist audit event: action={}, failureType={}",
+                    event.action(), e.getClass().getSimpleName());
             auditFailurePort.recordFailure(event.action(), e.getClass().getSimpleName());
         }
     }

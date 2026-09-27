@@ -51,7 +51,7 @@ class TransferBeanConfigTest {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         assertNotNull(config.placeTransferUseCase(accountAclPort, saveTransferPort,
-                config.transferDomainService(), authService, domainEventPublisherService, clockProvider));
+                config.transferDomainService(), authService, domainEventPublisherService, clockProvider, auditEventPort));
     }
 
     @Test

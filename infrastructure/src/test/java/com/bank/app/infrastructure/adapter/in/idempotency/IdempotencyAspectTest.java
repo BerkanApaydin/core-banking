@@ -15,6 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -48,6 +51,9 @@ class IdempotencyAspectTest {
     @Mock
     private HttpServletRequest request;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private IdempotencyAspect aspect;
 
     @BeforeEach
@@ -56,7 +62,14 @@ class IdempotencyAspectTest {
                 idempotencyGuard,
                 userContextService,
                 objectMapper,
-                clientIpResolver);
+                clientIpResolver,
+                transactionManager,
+                new TransactionProperties(30),
+                3,
+                0);
+        lenient().when(transactionManager.getTransaction(any())).thenAnswer(
+                ignored -> new SimpleTransactionStatus());
+        lenient().when(userContextService.getCurrentUserId()).thenReturn(Optional.of(42L));
     }
 
     @AfterEach
@@ -70,6 +83,16 @@ class IdempotencyAspectTest {
 
         when(request.getHeader("Idempotency-Key"))
                 .thenReturn(header);
+        lenient().when(request.getMethod()).thenReturn("POST");
+        lenient().when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+    }
+
+    private String userKey() {
+        return IdempotencyFingerprint.operationKey("user", "42", "POST", "/api/v1/transfers", "abc");
+    }
+
+    private String publicKey() {
+        return IdempotencyFingerprint.operationKey("public", "10.0.0.1", "POST", "/api/v1/transfers", "abc");
     }
 
     private Idempotent annotation() {
@@ -208,7 +231,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 "{\"message\":\"cached\"}",
@@ -231,7 +254,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 "{}",
@@ -254,7 +277,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.pending());
 
@@ -271,7 +294,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -287,7 +310,7 @@ class IdempotencyAspectTest {
 
         verify(idempotencyGuard)
                 .completeRequest(
-                        eq("user_abc"),
+                        eq(userKey()),
                         anyString(),
                         eq(200));
         assertNotNull(result);
@@ -303,7 +326,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -313,7 +336,7 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, annotation());
 
         verify(idempotencyGuard)
-                .completeRequest("user_abc", "", 200);
+                .completeRequest(userKey(), "", 200);
         assertNotNull(result);
         assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
     }
@@ -326,7 +349,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -336,7 +359,7 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, annotation());
 
         verify(idempotencyGuard)
-                .failRequest("user_abc");
+                .failRequest(userKey());
         assertNotNull(result);
         assertEquals(400, ((ResponseEntity<?>) result).getStatusCode().value());
     }
@@ -349,7 +372,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -362,7 +385,7 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, annotation());
 
         verify(idempotencyGuard)
-                .completeRequest("user_abc", "\"OK\"", 200);
+                .completeRequest(userKey(), "\"OK\"", 200);
         assertEquals("OK", result);
     }
 
@@ -374,7 +397,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -386,7 +409,7 @@ class IdempotencyAspectTest {
                 () -> aspect.handleIdempotency(joinPoint, annotation()));
 
         verify(idempotencyGuard)
-                .failRequest("user_abc");
+                .failRequest(userKey());
     }
 
     @Test
@@ -397,7 +420,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 null,
@@ -419,7 +442,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 "",
@@ -441,7 +464,7 @@ class IdempotencyAspectTest {
         when(userContextService.getCurrentUsername())
                 .thenReturn(Optional.of("user"));
 
-        when(idempotencyGuard.startRequest("user_abc"))
+        when(idempotencyGuard.startRequest(eq(userKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 "null",
@@ -463,7 +486,7 @@ class IdempotencyAspectTest {
         when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
-        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+        when(idempotencyGuard.startRequest(eq(publicKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.newRequest());
 
@@ -473,7 +496,7 @@ class IdempotencyAspectTest {
         Object result = aspect.handleIdempotency(joinPoint, publicAnnotation());
 
         verify(idempotencyGuard)
-                .completeRequest("10.0.0.1_abc", "", 200);
+                .completeRequest(publicKey(), "", 200);
         assertNotNull(result);
         assertEquals(200, ((ResponseEntity<?>) result).getStatusCode().value());
     }
@@ -486,7 +509,7 @@ class IdempotencyAspectTest {
         when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
-        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+        when(idempotencyGuard.startRequest(eq(publicKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.completed(
                                 "{\"message\":\"cached\"}",
@@ -509,7 +532,7 @@ class IdempotencyAspectTest {
         when(clientIpResolver.resolveClientIp(any(), any()))
                 .thenReturn("10.0.0.1");
 
-        when(idempotencyGuard.startRequest("10.0.0.1_abc"))
+        when(idempotencyGuard.startRequest(eq(publicKey()), anyString()))
                 .thenReturn(
                         IdempotencyGuard.IdempotencyResult.pending());
 

@@ -1,12 +1,13 @@
 package com.bank.app.account.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 
 public class DuplicateIbanException extends BusinessException {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public int getHttpStatusCode() { return 409; }
+    public BusinessFailureKind getFailureKind() { return BusinessFailureKind.CONFLICT; }
 
     public DuplicateIbanException(String iban) {
         super("error.duplicate_iban", new Object[]{iban}, "An account already exists with this IBAN: " + iban);

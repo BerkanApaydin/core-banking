@@ -29,8 +29,8 @@ public class RedisBackendsHealthIndicator implements HealthIndicator {
         if (factory == null) {
             return Health.up().withDetail("redis", "not configured").build();
         }
-        try {
-            String pong = factory.getConnection().ping();
+        try (var connection = factory.getConnection()) {
+            String pong = connection.ping();
             return Health.up().withDetail("redis", pong).build();
         } catch (Exception e) {
             return Health.down(e).build();

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class TransferEventConsumerEdgeCaseTest {
@@ -32,7 +33,7 @@ class TransferEventConsumerEdgeCaseTest {
         doThrow(new RuntimeException("Service unavailable"))
                 .when(notificationPort).notifyTransferCompleted(event);
 
-        listener.handleTransferCompleted(event);
+        assertThrows(RuntimeException.class, () -> listener.handleTransferCompleted(event));
 
         verify(notificationPort).notifyTransferCompleted(event);
     }

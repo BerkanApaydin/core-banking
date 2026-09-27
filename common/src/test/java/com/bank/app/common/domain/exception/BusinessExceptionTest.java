@@ -86,21 +86,21 @@ class BusinessExceptionTest {
     }
 
     @Nested
-    @DisplayName("HTTP status code")
-    class HttpStatusCode {
+    @DisplayName("failure meaning")
+    class FailureMeaning {
 
         @Test
-        @DisplayName("should return 400 as default HTTP status code")
-        void shouldReturnDefaultHttpStatusCode() {
+        @DisplayName("should describe an unspecified business rule violation")
+        void shouldDefaultToRuleViolation() {
             BusinessException ex = new BusinessException("Test message") {};
-            assertThat(ex.getHttpStatusCode()).isEqualTo(400);
+            assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.RULE_VIOLATION);
         }
 
         @Test
-        @DisplayName("ConcurrentRequestException should return 409")
-        void shouldReturn409ForConcurrentRequest() {
+        @DisplayName("ConcurrentRequestException should describe a conflict")
+        void shouldDescribeConcurrentRequestAsConflict() {
             ConcurrentRequestException ex = new ConcurrentRequestException("test");
-            assertThat(ex.getHttpStatusCode()).isEqualTo(409);
+            assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.CONFLICT);
         }
     }
 

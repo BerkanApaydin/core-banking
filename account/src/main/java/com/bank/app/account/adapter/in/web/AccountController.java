@@ -7,6 +7,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.adapter.in.api.ApiVersion;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
@@ -37,23 +38,26 @@ public class AccountController {
     private final GetAccountByIdQuery getAccountByIdQuery;
     private final GetAccountByIbanQuery getAccountByIbanQuery;
     private final GetAccountsByUserQuery getAccountsByUserQuery;
+    private final AccountAuthorizationService accountAuthorizationService;
 
     public AccountController(CreateAccountUseCase createAccountUseCase,
                              GetAccountByIdQuery getAccountByIdQuery,
                              GetAccountByIbanQuery getAccountByIbanQuery,
-                             GetAccountsByUserQuery getAccountsByUserQuery) {
+                             GetAccountsByUserQuery getAccountsByUserQuery,
+                             AccountAuthorizationService accountAuthorizationService) {
         this.createAccountUseCase = createAccountUseCase;
         this.getAccountByIdQuery = getAccountByIdQuery;
         this.getAccountByIbanQuery = getAccountByIbanQuery;
         this.getAccountsByUserQuery = getAccountsByUserQuery;
+        this.accountAuthorizationService = accountAuthorizationService;
     }
 
     @PostMapping
     @Idempotent
-    @Operation(summary = "Creates a new account", description = "Opens a new account with the given information and verified IBAN. Duplicate requests can be prevented with the Idempotency-Key header.")
+    @Operation(summary = "Creates a new account", description = "Opens a new account with a server-generated simulation IBAN. Duplicate requests can be prevented with the Idempotency-Key header.")
     public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountWebRequest webRequest) {
         CreateAccountRequest request = new CreateAccountRequest(
-                webRequest.userId(), webRequest.iban(), webRequest.ownerName(),
+                accountAuthorizationService.getCurrentUserId(), webRequest.ownerName(),
                 webRequest.initialBalance(), webRequest.currency());
         return ResponseEntity.status(HttpStatus.CREATED).body(createAccountUseCase.execute(request));
     }
@@ -67,13 +71,13 @@ public class AccountController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Queries account by ID")
+    @Operation(summary = "Queries account by ID", description = "Returns only an account owned by the authenticated user; unknown and other-owned IDs both return 404.")
     public ResponseEntity<AccountResponse> getAccountById(@PathVariable Long id) {
         return ResponseEntity.ok(getAccountByIdQuery.execute(id));
     }
 
     @GetMapping("/iban/{iban}")
-    @Operation(summary = "Queries account by IBAN")
+    @Operation(summary = "Queries account by IBAN", description = "Returns only an account owned by the authenticated user; unknown and other-owned IBANs both return 404.")
     public ResponseEntity<AccountResponse> getAccountByIban(@PathVariable String iban) {
         return ResponseEntity.ok(getAccountByIbanQuery.execute(iban));
     }

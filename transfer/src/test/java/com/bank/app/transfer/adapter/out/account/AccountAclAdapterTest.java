@@ -61,15 +61,15 @@ class AccountAclAdapterTest {
     class GetAccountInfoForTransfer {
         @Test
         void shouldMapAccountInfoForValidIban() {
-            when(accountApi.getSnapshotByIban("TR330006100519786456841234"))
+            when(accountApi.getSnapshotByIban("TR450006100519786456841234"))
                     .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
 
             AccountAclPort.AccountInfo result =
-                    adapter.getAccountInfoForTransfer("TR330006100519786456841234");
+                    adapter.getAccountInfoForTransfer("TR450006100519786456841234");
 
             assertEquals(1L, result.id());
             assertEquals("TRY", result.currency());
-            verify(accountApi).getSnapshotByIban("TR330006100519786456841234");
+            verify(accountApi).getSnapshotByIban("TR450006100519786456841234");
         }
     }
 
@@ -79,12 +79,12 @@ class AccountAclAdapterTest {
         @Test
         void shouldDelegateIbanLookup() {
             when(accountApi.getIbansForAccounts(Set.of(1L, 2L)))
-                    .thenReturn(Map.of(1L, "TR330006100519786456841234", 2L, "TR660006100519786456841235"));
+                    .thenReturn(Map.of(1L, "TR450006100519786456841234", 2L, "TR180006100519786456841235"));
 
             var result = adapter.getIbansForAccounts(Set.of(1L, 2L));
 
-            assertEquals("TR330006100519786456841234", result.get(1L));
-            assertEquals("TR660006100519786456841235", result.get(2L));
+            assertEquals("TR450006100519786456841234", result.get(1L));
+            assertEquals("TR180006100519786456841235", result.get(2L));
             verify(accountApi).getIbansForAccounts(Set.of(1L, 2L));
         }
     }
@@ -171,7 +171,7 @@ class AccountAclAdapterTest {
 
         @Test
         void shouldEvictIbanEntryOnDebitAndCredit() {
-            String senderIban = "TR330006100519786456841234";
+            String senderIban = "TR450006100519786456841234";
             Money amount = Money.of("200.00", Currency.TRY);
             AccountAdjustmentResult apiResult = new AccountAdjustmentResult(1L, 2L,
                     Money.of("800.00", Currency.TRY), Money.of("1200.00", Currency.TRY));

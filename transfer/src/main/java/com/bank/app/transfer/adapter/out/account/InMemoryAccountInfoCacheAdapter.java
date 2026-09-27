@@ -4,6 +4,7 @@ import com.bank.app.accountapi.AbstractAccountSnapshotCache;
 import com.bank.app.accountapi.AccountSnapshot;
 
 import java.util.Map;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,6 +34,15 @@ public class InMemoryAccountInfoCacheAdapter extends AbstractAccountSnapshotCach
     @Override
     protected void removeSnapshot(String key) {
         snapshots.remove(key);
+    }
+
+    @Override
+    protected Collection<String> ibanSnapshotKeysForAccount(Long accountId) {
+        return snapshots.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith("iban-"))
+                .filter(entry -> accountId.equals(entry.getValue().id()))
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     @Override

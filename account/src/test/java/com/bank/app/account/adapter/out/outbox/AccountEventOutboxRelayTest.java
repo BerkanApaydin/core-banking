@@ -95,7 +95,7 @@ class AccountEventOutboxRelayTest {
         @DisplayName("should publish AccountCreatedEvent on success")
         void shouldPublishAccountCreatedEvent() throws Exception {
             AccountCreatedEvent domainEvent = new AccountCreatedEvent(
-                    1L, new UserId(100L),                     new Iban("TR290006200000000000000111"), "TEST", Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
+                    1L, new UserId(100L),                     new Iban("TR770006200000000000000111"), "TEST", Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
             String json = objectMapper.writeValueAsString(domainEvent);
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-1", "Account",
                     "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
@@ -221,7 +221,7 @@ class AccountEventOutboxRelayTest {
         @DisplayName("should skip duplicate event when idempotency key already exists")
         void shouldSkipDuplicateEvent() throws Exception {
             AccountCreatedEvent domainEvent = new AccountCreatedEvent(
-                    1L, new UserId(100L), new Iban("TR290006200000000000000111"), "TEST",
+                    1L, new UserId(100L), new Iban("TR770006200000000000000111"), "TEST",
                     Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
             String json = objectMapper.writeValueAsString(domainEvent);
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-9", "Account",
@@ -239,7 +239,7 @@ class AccountEventOutboxRelayTest {
         @DisplayName("should process event when idempotency key is created successfully")
         void shouldProcessWhenIdempotencyKeyCreated() throws Exception {
             AccountCreatedEvent domainEvent = new AccountCreatedEvent(
-                    1L, new UserId(100L), new Iban("TR290006200000000000000111"), "TEST",
+                    1L, new UserId(100L), new Iban("TR770006200000000000000111"), "TEST",
                     Money.of(new BigDecimal("1000.00"), Currency.TRY), LocalDateTime.now());
             String json = objectMapper.writeValueAsString(domainEvent);
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-10", "Account",

@@ -49,10 +49,10 @@ public class UserEventOutboxRelay implements OutboxEventPort {
             UserRegisteredEvent userEvent = objectMapper.readValue(
                     event.payload(), UserRegisteredEvent.class);
             eventPublisher.publishEvent(userEvent);
-            log.debug("Published UserRegisteredEvent: username={}, id={}",
-                    userEvent.username(), event.id());
+            log.debug("Published UserRegisteredEvent: id={}", event.id());
         } catch (Exception e) {
-            log.error("Failed to handle UserRegisteredEvent: id={}", event.id(), e);
+            log.error("Failed to handle UserRegisteredEvent: id={}, failureType={}",
+                    event.id(), e.getClass().getName());
             throw new RuntimeException("UserEventOutboxRelay failed", e);
         }
     }

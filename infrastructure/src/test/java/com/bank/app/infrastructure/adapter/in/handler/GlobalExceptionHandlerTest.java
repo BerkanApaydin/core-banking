@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,6 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.context.NoSuchMessageException;
 import org.springframework.dao.DataIntegrityViolationException;
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
+import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -42,6 +46,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.bank.app.common.domain.exception.AuthorizationException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
@@ -222,27 +228,24 @@ class GlobalExceptionHandlerTest {
     @SuppressWarnings("serial")
     private static final class TestRateLimitException extends BusinessException {
         TestRateLimitException() { super("error.rate_limit", new Object[]{}, "Rate limit"); }
-        @Override public int getHttpStatusCode() { return 429; }
+        @Override public BusinessFailureKind getFailureKind() { return BusinessFailureKind.RATE_LIMITED; }
     }
 
     @SuppressWarnings("serial")
     private static final class TestDuplicateException extends BusinessException {
         TestDuplicateException() { super("error.duplicate", new Object[]{}, "Duplicate"); }
-        @Override public int getHttpStatusCode() { return 409; }
+        @Override public BusinessFailureKind getFailureKind() { return BusinessFailureKind.CONFLICT; }
     }
 
     @Test
     void shouldHandleTooManyFailedLoginAttemptsException() {
-        BusinessException ex = mock(BusinessException.class);
-        when(ex.getMessageKey()).thenReturn("error.too_many_failed_login_attempts");
-        when(ex.getArgs()).thenReturn(new Object[]{});
-        when(ex.getErrorCode()).thenReturn("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
+        BusinessException ex = new TooManyFailedLoginAttemptsException("Too many failed login attempts");
         when(messageSource.getMessage(eq(ex.getMessageKey()), any(), any(Locale.class)))
                 .thenReturn("Too many failed login attempts");
 
         ResponseEntity<ProblemDetail> response = handler.handleBusinessException(ex, null);
 
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("TOO_MANY_FAILED_LOGIN_ATTEMPTS", response.getBody().getProperties().get("code"));
         assertEquals("Too many failed login attempts", response.getBody().getProperties().get("message"));
@@ -470,7 +473,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldHandleDataIntegrityViolationExceptionWithConstraintCause() {
-        ConstraintViolationException cause = new ConstraintViolationException("Constraint fail", null, "uk_name");
+        ConstraintViolationException cause = new ConstraintViolationException(
+                "Constraint fail", new SQLException("duplicate", "23505"), "uk_name");
         DataIntegrityViolationException ex = new DataIntegrityViolationException("Violation", cause);
         when(messageSource.getMessage(eq("error.unique_constraint_violation"), isNull(), any(Locale.class)))
                 .thenReturn("Unique constraint violation");
@@ -481,6 +485,32 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals("UNIQUE_CONSTRAINT_VIOLATION", response.getBody().getProperties().get("code"));
         assertEquals("Unique constraint violation", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldNotClassifyForeignKeyOrCheckConstraintAsUnique() {
+        when(messageSource.getMessage(eq("error.db_integrity_violation"), isNull(), any(Locale.class)))
+                .thenReturn("DB integrity violation");
+        for (String sqlState : List.of("23503", "23514")) {
+            ConstraintViolationException cause = new ConstraintViolationException(
+                    "Constraint fail", new SQLException("constraint", sqlState), "constraint_name");
+            ResponseEntity<ProblemDetail> response = handler.handleDataIntegrityViolationException(
+                    new DataIntegrityViolationException("Violation", cause), null);
+            assertNotNull(response.getBody());
+            assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().getProperties().get("code"));
+        }
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableForAuthenticationBackendFailure() {
+        when(messageSource.getMessage(eq("error.security_backend_unavailable"), isNull(), any(Locale.class)))
+                .thenReturn("Security service temporarily unavailable.");
+        ResponseEntity<ProblemDetail> response = handler.handleAuthenticationBackendUnavailable(
+                new AuthenticationBackendUnavailableException(new RuntimeException("private database detail")), null);
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("SECURITY_BACKEND_UNAVAILABLE", response.getBody().getProperties().get("code"));
+        assertFalse(response.getBody().getDetail().contains("private database detail"));
     }
 
     @Test
@@ -558,6 +588,35 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("GENERAL_INTERNAL_ERROR", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableForLoginAttemptBackendFailure() {
+        when(messageSource.getMessage(eq("error.security_backend_unavailable"), isNull(), any(Locale.class)))
+                .thenReturn("Security service temporarily unavailable.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleLoginAttemptStoreUnavailable(
+                new LoginAttemptStoreUnavailableException(new RuntimeException("Redis password leaked here")), null);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("SECURITY_BACKEND_UNAVAILABLE", response.getBody().getProperties().get("code"));
+        assertEquals("Security service temporarily unavailable.", response.getBody().getDetail());
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableForRevocationWriteFailure() {
+        when(messageSource.getMessage(eq("error.security_backend_unavailable"), isNull(), any(Locale.class)))
+                .thenReturn("Security service temporarily unavailable.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleRevocationStoreUnavailable(
+                new RevocationStoreUnavailableException(new RuntimeException("secret Redis detail")), null);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("SECURITY_BACKEND_UNAVAILABLE", response.getBody().getProperties().get("code"));
+        assertEquals("Security service temporarily unavailable.", response.getBody().getDetail());
+        assertFalse(response.getBody().getDetail().contains("secret Redis detail"));
     }
 
     @Test

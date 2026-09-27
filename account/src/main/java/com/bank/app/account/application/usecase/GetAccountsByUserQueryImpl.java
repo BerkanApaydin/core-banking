@@ -6,8 +6,6 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.common.application.dto.PageResponse;
-import com.bank.app.account.domain.Account;
-import java.util.List;
 
 @ReadOnlyUseCase
 public class GetAccountsByUserQueryImpl implements GetAccountsByUserQuery {
@@ -27,11 +25,10 @@ public class GetAccountsByUserQueryImpl implements GetAccountsByUserQuery {
         Long currentUserId = accountAuthorizationService.getCurrentUserId();
         int cappedPage = Math.max(page, 0);
         int cappedSize = Math.max(Math.min(size, MAX_PAGE_SIZE), 1);
-        List<Account> accounts = loadAccountPort.findByUserId(currentUserId, cappedPage, cappedSize);
-        long total = loadAccountPort.countByUserId(currentUserId);
-        var responses = accounts.stream()
+        var accounts = loadAccountPort.findPageByUserId(currentUserId, cappedPage, cappedSize);
+        var responses = accounts.content().stream()
                 .map(AccountResponse::from)
                 .toList();
-        return PageResponse.of(responses, cappedPage, cappedSize, total);
+        return PageResponse.of(responses, cappedPage, cappedSize, accounts.total());
     }
 }

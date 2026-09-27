@@ -6,15 +6,19 @@ import java.util.Objects;
 
 public record CreateAccountRequest(
         Long userId,
+        // Optional only for trusted demo seeding; web requests never supply an IBAN.
         String iban,
         String ownerName,
         BigDecimal initialBalance,
         Currency currency) {
     public CreateAccountRequest {
         Objects.requireNonNull(userId);
-        Objects.requireNonNull(iban);
         Objects.requireNonNull(ownerName);
         Objects.requireNonNull(initialBalance);
         Objects.requireNonNull(currency);
+    }
+
+    public CreateAccountRequest(Long userId, String ownerName, BigDecimal initialBalance, Currency currency) {
+        this(userId, null, ownerName, initialBalance, currency);
     }
 }

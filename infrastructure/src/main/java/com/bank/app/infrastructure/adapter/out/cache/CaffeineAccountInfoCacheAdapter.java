@@ -5,9 +5,11 @@ import com.bank.app.accountapi.AccountSnapshot;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
@@ -55,6 +57,19 @@ public class CaffeineAccountInfoCacheAdapter extends AbstractAccountSnapshotCach
     @Override
     protected void removeSnapshot(String key) {
         cache().evict(key);
+    }
+
+    @Override
+    protected Collection<String> ibanSnapshotKeysForAccount(Long accountId) {
+        if (!(cache() instanceof CaffeineCache caffeineCache)) {
+            throw new IllegalStateException("accountAclInfo must be a Caffeine cache");
+        }
+        return caffeineCache.getNativeCache().asMap().entrySet().stream()
+                .filter(entry -> entry.getKey() instanceof String key && key.startsWith("iban-"))
+                .filter(entry -> entry.getValue() instanceof AccountSnapshot snapshot
+                        && accountId.equals(snapshot.id()))
+                .map(entry -> (String) entry.getKey())
+                .toList();
     }
 
     @Override

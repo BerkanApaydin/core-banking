@@ -82,14 +82,15 @@ class IdempotencyTest {
     }
 
     @Test
-    void shouldDeleteFailedKeyAndReturnNewWhenKeyExistsAndFailed() {
+    void shouldReserveFailedKeyBeforeReturningNew() {
         Entry entry = new Entry("key-1", "FAILED", null, null, LocalDateTime.now());
         when(idempotencyPort.findById("key-1")).thenReturn(Optional.of(entry));
+        when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class))).thenReturn(true);
 
         IdempotencyGuard.IdempotencyResult result = manager.startRequest("key-1");
 
         assertEquals(IdempotencyGuard.IdempotencyResult.Status.NEW, result.status());
-        verify(idempotencyPort).deleteById("key-1");
+        verify(idempotencyPort).tryResetFailed(eq("key-1"), any(LocalDateTime.class));
     }
 
     @Test

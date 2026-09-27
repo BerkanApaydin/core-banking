@@ -35,9 +35,9 @@ class InMemoryAccountInfoCacheAdapterTest {
     @Test
     void shouldNormalizeIbanKeys() {
         var info = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
-        cache.putByIban("tr33 0006 1005 1978 6456 8412 34", info);
+        cache.putByIban("tr45 0006 1005 1978 6456 8412 34", info);
 
-        assertEquals(info, cache.getByIban("TR330006100519786456841234").orElseThrow());
+        assertEquals(info, cache.getByIban("TR450006100519786456841234").orElseThrow());
     }
 
     @Test
@@ -68,13 +68,13 @@ class InMemoryAccountInfoCacheAdapterTest {
     void shouldEvictIbanEntryWhenEvictingById() {
         var info = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         cache.putById(1L, info);
-        cache.putByIban("TR330006100519786456841234", info);
+        cache.putByIban("TR450006100519786456841234", info);
         cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
 
         cache.evictById(1L);
 
         assertTrue(cache.getById(1L).isEmpty(), "id entry must be evicted");
-        assertTrue(cache.getByIban("TR330006100519786456841234").isEmpty(),
+        assertTrue(cache.getByIban("TR450006100519786456841234").isEmpty(),
                 "IBAN entry for the same account must be evicted (status is mutable)");
         assertTrue(cache.getById(99L).isPresent(), "unrelated account must stay cached");
     }
@@ -83,13 +83,13 @@ class InMemoryAccountInfoCacheAdapterTest {
     void shouldEvictSingleIbanEntry() {
         var info1 = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         var info2 = new AccountSnapshot(2L, 20L, "TRY", "ACTIVE");
-        cache.putByIban("TR111111111111111111111111", info1);
-        cache.putByIban("TR222222222222222222222222", info2);
+        cache.putByIban("TR721111111111111111111111", info1);
+        cache.putByIban("TR972222222222222222222222", info2);
 
-        cache.evictByIban("TR111111111111111111111111");
+        cache.evictByIban("TR721111111111111111111111");
 
-        assertTrue(cache.getByIban("TR111111111111111111111111").isEmpty());
-        assertTrue(cache.getByIban("TR222222222222222222222222").isPresent());
+        assertTrue(cache.getByIban("TR721111111111111111111111").isEmpty());
+        assertTrue(cache.getByIban("TR972222222222222222222222").isPresent());
     }
 
     @Test

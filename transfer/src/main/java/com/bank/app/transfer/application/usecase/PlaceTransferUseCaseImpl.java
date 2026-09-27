@@ -1,7 +1,9 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -19,6 +21,7 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Objects;
+import java.time.LocalDateTime;
 
 @TransactionalUseCase
 public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
@@ -31,19 +34,22 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
     private final TransferAuthorizationService transferAuthorizationService;
     private final DomainEventPublisherService domainEventPublisherService;
     private final ClockProviderPort clockProvider;
+    private final AuditEventPort auditEventPort;
 
     public PlaceTransferUseCaseImpl(AccountAclPort accountAclPort,
             SaveTransferPort saveTransferPort,
             TransferDomainService transferDomainService,
             TransferAuthorizationService transferAuthorizationService,
             DomainEventPublisherService domainEventPublisherService,
-            ClockProviderPort clockProvider) {
+            ClockProviderPort clockProvider,
+            AuditEventPort auditEventPort) {
         this.accountAclPort = accountAclPort;
         this.saveTransferPort = saveTransferPort;
         this.transferDomainService = transferDomainService;
         this.transferAuthorizationService = transferAuthorizationService;
         this.domainEventPublisherService = domainEventPublisherService;
         this.clockProvider = clockProvider;
+        this.auditEventPort = auditEventPort;
     }
 
     @Override
@@ -72,6 +78,10 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         saveTransferPort.save(savedTransfer);
 
         domainEventPublisherService.publishEvents(savedTransfer);
+        auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
+                "Transfer completed. Transfer ID: " + savedTransfer.getId(),
+                LocalDateTime.now(clockProvider.clock()),
+                transferAuthorizationService.getCurrentUsername()));
 
         log.info("Transfer completed: id={}, senderId={}, receiverId={}",
             savedTransfer.getId(), savedTransfer.getSenderAccountId(),

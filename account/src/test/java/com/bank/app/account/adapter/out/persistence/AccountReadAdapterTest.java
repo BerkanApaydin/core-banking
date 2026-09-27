@@ -39,7 +39,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIbanSuccessfully() {
-        Iban iban = new Iban("TR290006200000000000000111");
+        Iban iban = new Iban("TR770006200000000000000111");
         AccountJpaEntity jpaEntity = createEntity(1L, iban.value(), "Ahmet", new BigDecimal("1000.00"), 100L);
 
         when(springDataRepo.findByIban(iban.value())).thenReturn(Optional.of(jpaEntity));
@@ -51,7 +51,7 @@ class AccountReadAdapterTest {
         assertEquals("Ahmet", account.getOwnerName());
         assertEquals(1L, account.getId());
         assertEquals(100L, account.getUserId().value());
-        assertEquals("TR290006200000000000000111", account.getIban().value());
+        assertEquals("TR770006200000000000000111", account.getIban().value());
         assertEquals(new BigDecimal("1000.00"), account.getBalance().amount());
         assertTrue(account.isActive());
         verify(springDataRepo).findByIban(iban.value());
@@ -59,7 +59,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenFindByIbanNotFound() {
-        Iban iban = new Iban("TR290006200000000000000999");
+        Iban iban = new Iban("TR600006200000000000000999");
 
         when(springDataRepo.findByIban(iban.value())).thenReturn(Optional.empty());
 
@@ -71,7 +71,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIdSuccessfully() {
-        AccountJpaEntity jpaEntity = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
+        AccountJpaEntity jpaEntity = createEntity(1L, "TR770006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
                 100L);
 
         when(springDataRepo.findById(1L)).thenReturn(Optional.of(jpaEntity));
@@ -99,7 +99,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIbanForUpdateSuccessfully() {
-        Iban iban = new Iban("TR290006200000000000000111");
+        Iban iban = new Iban("TR770006200000000000000111");
         AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"),
                 "TRY", "ACTIVE", null);
 
@@ -115,7 +115,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenFindByIbanForUpdateNotFound() {
-        Iban iban = new Iban("TR290006200000000000000999");
+        Iban iban = new Iban("TR600006200000000000000999");
 
         when(springDataRepo.findByIbanForUpdate(iban.value())).thenReturn(Optional.empty());
 
@@ -127,7 +127,7 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByIdForUpdateSuccessfully() {
-        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+        AccountJpaEntity jpaEntity = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111", "Ahmet",
                 new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
 
         when(springDataRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(jpaEntity));
@@ -151,12 +151,12 @@ class AccountReadAdapterTest {
 
     @Test
     void shouldFindByUserIdSuccessfully() {
-        AccountJpaEntity entity1 = createEntity(1L, "TR290006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
+        AccountJpaEntity entity1 = createEntity(1L, "TR770006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
                 100L);
-        AccountJpaEntity entity2 = createEntity(2L, "TR290006200000000000000222", "Mehmet", new BigDecimal("500.00"),
+        AccountJpaEntity entity2 = createEntity(2L, "TR870006200000000000000222", "Mehmet", new BigDecimal("500.00"),
                 100L);
 
-        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(100L, PageRequest.of(0, 20)))
+        when(springDataRepo.findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(entity1, entity2)));
 
         var result = adapter.findByUserId(100L, 0, 20);
@@ -164,18 +164,18 @@ class AccountReadAdapterTest {
         assertEquals(2, result.size());
         assertEquals("Ahmet", result.get(0).getOwnerName());
         assertEquals("Mehmet", result.get(1).getOwnerName());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(100L, PageRequest.of(0, 20));
+        verify(springDataRepo).findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20));
     }
 
     @Test
     void shouldReturnEmptyPageWhenFindByUserIdReturnsEmpty() {
-        when(springDataRepo.findByUserIdOrderByCreatedAtDesc(999L, PageRequest.of(0, 20)))
+        when(springDataRepo.findByUserIdOrderByCreatedAtDescIdDesc(999L, PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         var result = adapter.findByUserId(999L, 0, 20);
 
         assertTrue(result.isEmpty());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDesc(999L, PageRequest.of(0, 20));
+        verify(springDataRepo).findByUserIdOrderByCreatedAtDescIdDesc(999L, PageRequest.of(0, 20));
     }
 
     @Test
@@ -187,10 +187,24 @@ class AccountReadAdapterTest {
     }
 
     @Test
+    void shouldReturnContentAndTotalFromOneRepositoryPage() {
+        AccountJpaEntity entity = createEntity(1L, "TR770006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), 100L);
+        when(springDataRepo.findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(entity), PageRequest.of(0, 20), 37));
+
+        var page = adapter.findPageByUserId(100L, 0, 20);
+
+        assertEquals(1, page.content().size());
+        assertEquals(37, page.total());
+        verify(springDataRepo, never()).countByUserId(anyLong());
+    }
+
+    @Test
     void shouldFindByIdsSuccessfully() {
-        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR290006200000000000000111", "Ahmet",
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111", "Ahmet",
                 new BigDecimal("1000.00"), "TRY", "ACTIVE", null);
-        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR290006200000000000000222", "Mehmet",
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR870006200000000000000222", "Mehmet",
                 new BigDecimal("500.00"), "TRY", "ACTIVE", null);
 
         when(springDataRepo.findByIdIn(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));

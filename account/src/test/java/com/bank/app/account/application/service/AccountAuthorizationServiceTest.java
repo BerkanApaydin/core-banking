@@ -43,13 +43,33 @@ class AccountAuthorizationServiceTest {
         @Test
         @DisplayName("should authorize when user owns the account")
         void shouldAuthorizeWhenOwner() {
-            Account account = new Account(1L, new UserId(100L), new Iban("TR111111111111111111111111"),
+            Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
                     "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
 
             authorizationService.authorizeAccountOwner(account, "Not authorized");
 
             verify(userContextService).checkUserAuthorization(100L, "Not authorized");
         }
+    }
+
+    @Test
+    void shouldCheckQueryOwnershipWithoutExposingAnotherAccount() {
+        Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
+                "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(100L), Optional.of(200L));
+
+        assertThat(authorizationService.isCurrentUserOwner(account)).isTrue();
+        assertThat(authorizationService.isCurrentUserOwner(account)).isFalse();
+    }
+
+    @Test
+    void shouldStillRejectUnauthenticatedOwnershipChecks() {
+        Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
+                "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authorizationService.isCurrentUserOwner(account))
+                .isInstanceOf(AuthorizationException.class);
     }
 
     @Nested

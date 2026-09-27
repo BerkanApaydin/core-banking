@@ -5,6 +5,11 @@ package com.bank.app.user.application.port.out;
  * Implemented by infrastructure adapters (e.g. JWT provider).
  */
 public interface JwtPort {
+    record VerifiedToken(String username, Long userId, String role, String tokenId, long expiresAtMs) {}
+
+    /** Returns null for an invalid, expired or incomplete signed token. */
+    VerifiedToken verifyAndDecode(String token);
+
     String extractUsername(String token);
     String generateToken(Long userId, String username);
     String generateToken(Long userId, String username, String role);

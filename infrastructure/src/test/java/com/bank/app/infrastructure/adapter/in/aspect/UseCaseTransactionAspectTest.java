@@ -10,8 +10,12 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,10 +47,9 @@ class UseCaseTransactionAspectTest {
     @BeforeEach
     void setUp() {
         aspect = new UseCaseTransactionAspect(transactionManager, new TransactionProperties(30));
-        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         when(joinPoint.getSignature()).thenReturn(signature);
         when(signature.toShortString()).thenReturn("testSignature");
-        when(transactionStatus.isNewTransaction()).thenReturn(true);
     }
 
     @Test
@@ -99,16 +102,43 @@ class UseCaseTransactionAspectTest {
     }
 
     @Test
-    void shouldNotCommitWhenTransactionIsNotNew() throws Throwable {
+    void shouldCompleteParticipatingTransactionStatus() throws Throwable {
         when(joinPoint.proceed()).thenReturn("result");
-        when(transactionStatus.isNewTransaction()).thenReturn(false);
 
         Object result = aspect.around(joinPoint);
 
         assertEquals("result", result);
         verify(joinPoint).proceed();
-        verify(transactionManager, never()).commit(any());
+        verify(transactionManager).commit(transactionStatus);
         verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void shouldMarkParticipatingTransactionRollbackOnlyOnFailure() throws Throwable {
+        when(joinPoint.proceed()).thenThrow(new IllegalArgumentException("failed"));
+
+        assertThrows(IllegalArgumentException.class, () -> aspect.around(joinPoint));
+
+        verify(transactionManager).rollback(transactionStatus);
+    }
+
+    @Test
+    void shouldPreserveOriginalCommitFailureWithoutSecondRollback() throws Throwable {
+        var failingManager = new AbstractPlatformTransactionManager() {
+            @Override protected Object doGetTransaction() { return new Object(); }
+            @Override protected void doBegin(Object transaction, TransactionDefinition definition) {}
+            @Override protected void doCommit(DefaultTransactionStatus status) {
+                throw new TransactionSystemException("original commit failure");
+            }
+            @Override protected void doRollback(DefaultTransactionStatus status) {}
+        };
+        var realAspect = new UseCaseTransactionAspect(failingManager, new TransactionProperties(30));
+        when(joinPoint.proceed()).thenReturn("result");
+
+        TransactionSystemException failure = assertThrows(TransactionSystemException.class,
+                () -> realAspect.around(joinPoint));
+
+        assertEquals("original commit failure", failure.getMessage());
     }
 
     @Test

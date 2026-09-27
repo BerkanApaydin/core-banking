@@ -22,15 +22,43 @@ public record Money(
     }
 
     public static Money of(String amount, Currency currency) {
-        Objects.requireNonNull(amount, "Amount must not be null");
-        Objects.requireNonNull(currency, "Currency must not be null");
-        return new Money(new BigDecimal(amount).setScale(2, RoundingMode.HALF_UP), currency);
+        return exact(amount, currency);
     }
 
     public static Money of(BigDecimal amount, Currency currency) {
+        return exact(amount, currency);
+    }
+
+    /** Creates a monetary amount without changing its numeric value. */
+    public static Money exact(String amount, Currency currency) {
+        Objects.requireNonNull(amount, "Amount must not be null");
+        return exact(new BigDecimal(amount), currency);
+    }
+
+    public static Money exact(BigDecimal amount, Currency currency) {
         Objects.requireNonNull(amount, "Amount must not be null");
         Objects.requireNonNull(currency, "Currency must not be null");
-        return new Money(amount.setScale(2, RoundingMode.HALF_UP), currency);
+        requireNonNegative(amount);
+        return new Money(amount.setScale(MAX_SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
+    /** Applies an explicit HALF_UP policy, suitable only when rounding is intended. */
+    public static Money rounded(String amount, Currency currency) {
+        Objects.requireNonNull(amount, "Amount must not be null");
+        return rounded(new BigDecimal(amount), currency);
+    }
+
+    public static Money rounded(BigDecimal amount, Currency currency) {
+        Objects.requireNonNull(amount, "Amount must not be null");
+        Objects.requireNonNull(currency, "Currency must not be null");
+        requireNonNegative(amount);
+        return new Money(amount.setScale(MAX_SCALE, RoundingMode.HALF_UP), currency);
+    }
+
+    private static void requireNonNegative(BigDecimal amount) {
+        if (amount.signum() < 0) {
+            throw new IllegalArgumentException("Amount must not be negative");
+        }
     }
 
     public Money add(Money other) {

@@ -4,7 +4,7 @@ public class ConcurrentRequestException extends BusinessException {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public int getHttpStatusCode() { return 409; }
+    public BusinessFailureKind getFailureKind() { return BusinessFailureKind.CONFLICT; }
 
     public ConcurrentRequestException(String message) {
         super(message);

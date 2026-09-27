@@ -10,9 +10,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Local (single-instance) token blacklist. Always present: it is the backend
- * when {@code app.security.token-blacklist.backend=caffeine}, and the
- * degradation fallback behind {@link ResilientTokenBlacklistAdapter} when
- * the backend is redis.
+ * when {@code app.security.token-blacklist.backend=caffeine}, and an overlay
+ * of confirmed revocations behind {@link ResilientTokenBlacklistAdapter}
+ * when the backend is Redis.
  */
 @Component
 public class TokenBlacklistAdapter implements TokenBlacklistPort {

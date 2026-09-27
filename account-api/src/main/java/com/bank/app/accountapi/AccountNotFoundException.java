@@ -1,6 +1,7 @@
 package com.bank.app.accountapi;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 
 /**
  * Not-found signal of the Account published language.
@@ -8,14 +9,14 @@ import com.bank.app.common.domain.exception.BusinessException;
  * <p>Thrown by {@link AccountApi} implementations instead of the account
  * domain's own exception so downstream contexts never depend on
  * {@code com.bank.app.account..} types — not even for error handling.
- * Message keys and HTTP status intentionally mirror the account domain ones,
- * keeping wire responses byte-identical.
+ * Message keys and failure kind intentionally mirror the account domain ones,
+ * preserving the public failure contract across the context boundary.
  */
 public class AccountNotFoundException extends BusinessException {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public int getHttpStatusCode() { return 404; }
+    public BusinessFailureKind getFailureKind() { return BusinessFailureKind.NOT_FOUND; }
 
     public AccountNotFoundException(Long id) {
         super("error.account_not_found_id", new Object[]{id}, "Account not found. ID: " + id);

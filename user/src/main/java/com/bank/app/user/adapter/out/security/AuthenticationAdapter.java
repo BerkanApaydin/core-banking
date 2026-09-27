@@ -1,10 +1,12 @@
 package com.bank.app.user.adapter.out.security;
 
 import com.bank.app.user.application.port.out.AuthenticationPort;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,6 +24,8 @@ public class AuthenticationAdapter implements AuthenticationPort {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
+        } catch (AuthenticationServiceException e) {
+            throw new AuthenticationBackendUnavailableException(e);
         } catch (AuthenticationException e) {
             throw new AuthenticationFailedException(e.getMessage(), e);
         }

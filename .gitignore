@@ -59,6 +59,9 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
-/load_tests/
+/load_tests/__pycache__/
+/load_tests/.venv/
+*.pyc
+/audit-work/
 *.log
 run.err

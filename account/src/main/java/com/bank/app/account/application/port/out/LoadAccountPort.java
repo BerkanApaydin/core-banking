@@ -17,6 +17,10 @@ public interface LoadAccountPort {
 
     List<Account> findByUserId(Long userId, int page, int size);
 
+    record AccountPage(List<Account> content, long total) {}
+
+    AccountPage findPageByUserId(Long userId, int page, int size);
+
     long countByUserId(Long userId);
 
     List<Account> findByIds(Collection<Long> ids);

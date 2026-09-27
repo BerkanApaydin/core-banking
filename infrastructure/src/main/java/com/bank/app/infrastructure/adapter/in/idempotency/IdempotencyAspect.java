@@ -1,45 +1,51 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
-import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Aspect
 @Component
 @Order(1)
 public class IdempotencyAspect {
 
-    private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 128;
-    private static final java.util.regex.Pattern SAFE_KEY =
-            java.util.regex.Pattern.compile("[A-Za-z0-9\\-_.:]+");
-
     private final IdempotencyGuard idempotencyGuard;
-    private final UserContextService userContextService;
-    private final ObjectMapper objectMapper;
-    private final ClientIpResolverPort clientIpResolver;
+    private final IdempotencyRequestResolver requestResolver;
+    private final IdempotencyResponseCodec responseCodec;
+    private final TransactionTemplate transactionTemplate;
+    private final int maxAttempts;
+    private final long initialDelayMs;
 
     public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
             UserContextService userContextService,
             ObjectMapper objectMapper,
-            ClientIpResolverPort clientIpResolver) {
+            ClientIpResolverPort clientIpResolver,
+            PlatformTransactionManager transactionManager,
+            TransactionProperties transactionProperties,
+            @Value("${app.transfer.max-attempts:3}") int maxAttempts,
+            @Value("${app.transfer.initial-delay-ms:500}") long initialDelayMs) {
         this.idempotencyGuard = idempotencyGuard;
-        this.userContextService = userContextService;
-        this.objectMapper = objectMapper;
-        this.clientIpResolver = clientIpResolver;
+        this.requestResolver = new IdempotencyRequestResolver(userContextService, clientIpResolver, objectMapper);
+        this.responseCodec = new IdempotencyResponseCodec(objectMapper);
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setTimeout(transactionProperties.timeoutSeconds());
+        this.maxAttempts = Math.max(1, maxAttempts);
+        this.initialDelayMs = Math.max(0, initialDelayMs);
     }
 
     @Around("@annotation(idempotent)")
@@ -49,87 +55,77 @@ public class IdempotencyAspect {
             return joinPoint.proceed();
         }
 
-        HttpServletRequest request = attributes.getRequest();
-        String idempotencyKeyHeader = request.getHeader(idempotent.headerName());
-
-        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
-            if (idempotent.required()) {
-                throw new ConcurrentRequestException("error.idempotency_key_required", null,
-                        "Idempotency-Key header is required for this operation.");
-            }
+        IdempotencyRequestResolver.RequestIdentity identity = requestResolver.resolve(
+                attributes.getRequest(), idempotent, joinPoint.getArgs());
+        if (identity == null) {
             return joinPoint.proceed();
         }
+        String key = identity.key();
+        IdempotencyGuard.IdempotencyResult reservation = idempotencyGuard.startRequest(
+                key, identity.requestHash());
 
-        String trimmedKey = idempotencyKeyHeader.trim();
-        // Unbounded header values reach the idempotency_keys table verbatim:
-        // cap length + allowlist charset so oversized/garbage keys cannot bloat
-        // the table or smuggle control characters into keys/logs.
-        if (trimmedKey.length() > MAX_IDEMPOTENCY_KEY_LENGTH
-                || !SAFE_KEY.matcher(trimmedKey).matches()) {
-            throw new IllegalArgumentException(
-                    "Invalid Idempotency-Key header format.");
-        }
-        String idempotencyKeyHeaderValidated = trimmedKey;
-
-        String key;
-        if (idempotent.publicEndpoint()) {
-            String clientIp = clientIpResolver.resolveClientIp(
-                    request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
-            key = clientIp + "_" + idempotencyKeyHeaderValidated;
-        } else {
-            String username = userContextService.getCurrentUsername()
-                    .orElseThrow(() -> new AuthorizationException("You must be logged in."));
-            key = username + "_" + idempotencyKeyHeaderValidated;
-        }
-
-        IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
-
-        if (result.isCompleted()) {
-            return buildCachedResponse(result);
-        } else if (result.isPending()) {
+        if (reservation.isCompleted()) {
+            return responseCodec.replay(reservation);
+        } else if (reservation.isPending()) {
             throw new ConcurrentRequestException("error.concurrent_request", null,
                     "This operation is currently being processed. Please wait.");
         }
 
-        try {
-            Object responseObj = joinPoint.proceed();
-            if (responseObj instanceof ResponseEntity<?> responseEntity) {
-                if (responseEntity.getStatusCode().is2xxSuccessful()) {
-                    String jsonResponse = responseEntity.getBody() != null
-                            ? objectMapper.writeValueAsString(responseEntity.getBody())
-                            : "";
-                    idempotencyGuard.completeRequest(key, jsonResponse, responseEntity.getStatusCode().value());
-                } else {
+        long delay = initialDelayMs;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                ExecutionResult result = transactionTemplate.execute(status -> {
+                    try {
+                        Object response = joinPoint.proceed();
+                        IdempotencyResponseCodec.StoredResponse stored = responseCodec.serialize(response);
+                        if (!stored.successful()) {
+                            status.setRollbackOnly();
+                            return new ExecutionResult(response, false);
+                        }
+                        idempotencyGuard.completeRequest(key, stored.body(), stored.status());
+                        return new ExecutionResult(response, true);
+                    } catch (Throwable failure) {
+                        throw new InvocationFailure(failure);
+                    }
+                });
+                if (result == null) {
+                    throw new IllegalStateException("Idempotent operation produced no transaction result");
+                }
+                if (!result.successful()) {
                     idempotencyGuard.failRequest(key);
                 }
-            } else {
-                String jsonResponse = responseObj != null
-                        ? objectMapper.writeValueAsString(responseObj)
-                        : "";
-                idempotencyGuard.completeRequest(key, jsonResponse, 200);
+                return result.response();
+            } catch (InvocationFailure invocationFailure) {
+                Throwable original = invocationFailure.getCause();
+                if (isRetryable(original) && attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw interrupted;
+                    }
+                    delay = Math.min(delay * 2, 2_000L);
+                    continue;
+                }
+                // The transaction callback failed and was rolled back. An
+                // exception during commit takes a different path below, where
+                // the outcome is unknown and PENDING must be retained.
+                idempotencyGuard.failRequest(key);
+                throw original;
             }
-            return responseObj;
-        } catch (Throwable ex) {
-            idempotencyGuard.failRequest(key);
-            throw ex;
         }
+        throw new IllegalStateException("Idempotent operation exhausted retry attempts");
     }
 
-    private Object buildCachedResponse(IdempotencyGuard.IdempotencyResult result) {
-        HttpStatusCode status = result.responseStatus() != null
-                ? HttpStatusCode.valueOf(result.responseStatus())
-                : HttpStatusCode.valueOf(200);
-
-        String body = result.responseBody();
-        if (body == null || body.isBlank() || "null".equals(body)) {
-            return ResponseEntity.status(status).build();
-        }
-
-        // Return the stored payload byte-identical to the original response instead of
-        // re-deserializing it into a generic tree model, so replayed responses keep the
-        // exact JSON shape and content type of the first response.
-        return ResponseEntity.status(status)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(body);
+    private static boolean isRetryable(Throwable failure) {
+        return failure instanceof OptimisticLockingFailureException
+                || failure instanceof PessimisticLockingFailureException;
     }
+
+    private record ExecutionResult(Object response, boolean successful) {}
+
+    private static final class InvocationFailure extends RuntimeException {
+        private InvocationFailure(Throwable cause) { super(cause); }
+    }
+
 }

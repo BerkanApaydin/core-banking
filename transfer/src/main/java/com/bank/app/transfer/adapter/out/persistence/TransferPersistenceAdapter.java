@@ -53,7 +53,7 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
 
     @Override
     public List<Transfer> findHistory(Long accountId, int page, int size) {
-        return repository.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(
+        return repository.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(
                         accountId, accountId, PageRequest.of(page, size))
                 .stream()
                 .map(mapper::toDomain)

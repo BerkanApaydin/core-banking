@@ -70,18 +70,21 @@ public class UseCaseTransactionAspect {
 
     private Object executeWithTransaction(ProceedingJoinPoint joinPoint, DefaultTransactionDefinition def) throws Throwable {
         TransactionStatus status = transactionManager.getTransaction(def);
-        boolean isNew = status.isNewTransaction();
+        Object result;
         try {
-            Object result = joinPoint.proceed();
-            if (isNew) {
-                transactionManager.commit(status);
-            }
-            return result;
+            result = joinPoint.proceed();
         } catch (Throwable ex) {
-            if (isNew) {
+            try {
                 transactionManager.rollback(status);
+            } catch (Throwable rollbackFailure) {
+                rollbackFailure.addSuppressed(ex);
+                throw rollbackFailure;
             }
             throw ex;
         }
+        // Spring completes the status even when commit fails. Calling rollback
+        // after such a failure would hide the original commit exception.
+        transactionManager.commit(status);
+        return result;
     }
 }

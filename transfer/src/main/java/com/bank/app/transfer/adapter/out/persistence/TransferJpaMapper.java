@@ -39,7 +39,7 @@ public class TransferJpaMapper {
                 entity.getId(),
                 entity.getSenderAccountId(),
                 entity.getReceiverAccountId(),
-                Money.of(entity.getAmount(), Currency.valueOf(entity.getCurrency())),
+                Money.exact(entity.getAmount(), Currency.valueOf(entity.getCurrency())),
                 TransferStatus.valueOf(entity.getStatus()),
                 createdAt,
                 entity.getVersion()

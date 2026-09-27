@@ -7,65 +7,17 @@
     <meta name="description" content="X Bank — Corporate digital banking. Governed accounts, secure transfers and audit-ready reporting.">
     <meta name="theme-color" content="#060F22" id="meta-theme-color">
     <!-- index.html itself carries no ?v= query, so forbid heuristic caching of
-         the document: otherwise a stale copy (without the boot guard below)
-         keeps flashing the login screen after refresh. -->
+         the document and avoid serving an outdated session client. -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070F24'/%3E%3Cpath d='M20 18 L44 46 M44 18 L20 46' stroke='%23C6A15B' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
     <title>X Bank — Corporate Digital Banking</title>
-    <!-- Boot guard: pick auth/app visibility BEFORE first paint so a logged-in
-         refresh never flashes the login screen. Also drops expired JWTs early
-         (payload exp check) so stale sessions land straight on login. -->
-    <script>
-    (function () {
-        try {
-            var token = localStorage.getItem('token');
-            if (token) {
-                var parts = token.split('.');
-                var expired = false;
-                if (parts.length === 3) {
-                    var payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-                    if (payload && payload.exp && payload.exp * 1000 < Date.now()) {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('userId');
-                        localStorage.removeItem('username');
-                        expired = true;
-                    }
-                }
-                if (!expired) {
-                    document.documentElement.setAttribute('data-boot', 'app');
-                }
-            }
-        } catch (e) { /* fall through to the default auth view */ }
-        try {
-            // Theme + lang before first paint: app.js would otherwise flash
-            // the dark :root defaults (and lang="en") on every refresh.
-            // Mirrors getPreferredTheme() in app.js exactly.
-            var theme = localStorage.getItem('theme');
-            if (theme !== 'light' && theme !== 'dark'
-                    && typeof window !== 'undefined' && window.matchMedia
-                    && window.matchMedia('(prefers-color-scheme: light)').matches) {
-                theme = 'light';
-            }
-            if (theme === 'light') {
-                document.documentElement.setAttribute('data-theme', 'light');
-                var meta = document.getElementById('meta-theme-color');
-                if (meta) meta.setAttribute('content', '#EDF0F6');
-            }
-            var lang = localStorage.getItem('lang');
-            if (lang === 'tr' || lang === 'en') {
-                document.documentElement.lang = lang;
-            }
-        } catch (e) { /* defaults stand */ }
-    })();
-    </script>
-    <!-- Critical guard CSS inline: applies the instant data-boot is set, without
-         waiting for style.css (slow disk / 404 / blocked stylesheet). -->
-    <style>html[data-boot="app"] #auth-container{display:none!important}html[data-boot="app"] #app-container{display:flex!important}</style>
+    <!-- External boot script runs before CSS and complies with script-src 'self'. -->
+    <script src="boot.js?v=15"></script>
     <!-- No external fonts/CDN: backend CSP is default-src 'self' (script/style),
          so remote assets would be blocked. System font stacks in style.css. -->
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
 
 <body>
@@ -430,7 +382,7 @@
                             <div class="form-group d-none" id="receiver-manual-group">
                                 <label for="receiver-iban-input" class="form-label" data-i18n="transfer.recipient_iban">Recipient IBAN</label>
                                 <input type="text" class="form-control mono" id="receiver-iban-input" spellcheck="false" autocomplete="off"
-                                    data-i18n="modal.iban_placeholder" placeholder="TR000000000000000000000000" maxlength="26">
+                                    data-i18n="modal.iban_placeholder" placeholder="TR470000000000000000000000" maxlength="26">
                                 <small class="form-help"><span id="iban-counter">0</span>/26 · <span data-i18n="account.iban_hint">TR is filled in for you — just type the 24 digits.</span></small>
                                 <div id="iban-lookup-note" class="lookup-note d-none" aria-live="polite"></div>
                             </div>
@@ -486,7 +438,7 @@
                                 </li>
                                 <li>
                                     <span class="info-icon is-shield" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></span>
-                                    <span data-i18n="transfer.info_cancel">Per our security standards, transfers made within the last <strong>24 hours</strong> can be cancelled.</span>
+                                    <span data-i18n="transfer.info_cancel">A completed transfer can be cancelled within the configured window if the recipient has enough balance for the reversal.</span>
                                 </li>
                                 <li>
                                     <span class="info-icon is-fx" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h13l-3-3M20 15H7l3 3"/></svg></span>
@@ -505,9 +457,9 @@
                         <h1 class="section-title" data-i18n="report.title">Analytics & Account Details</h1>
                         <p class="section-subtitle" data-i18n="report.subtitle">Review your account activity and generate detailed reports for specific date ranges.</p>
                     </div>
-                    <button class="btn btn-secondary" id="btn-print-report" type="button">
+                    <button class="btn btn-secondary" id="btn-print-report" type="button" disabled>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
-                        <span data-i18n="report.print">Print / PDF</span>
+                        <span data-i18n="report.print">Print This Page / PDF</span>
                     </button>
                 </div>
 
@@ -531,7 +483,7 @@
                         </div>
                         <div class="side-note">
                             <strong data-i18n="report.tip_title">Tip</strong>
-                            <p data-i18n="report.tip">Use the generator for audits — results are page-scoped with totals.</p>
+                            <p data-i18n="report.tip">Reports are paginated. The figures and printout cover only the current page.</p>
                         </div>
                     </div>
 
@@ -557,13 +509,14 @@
                                 <div class="form-row">
                                     <div class="form-group col-6">
                                         <label for="report-start-date" class="form-label" data-i18n="report.start_date">Start Date</label>
-                                        <input type="datetime-local" class="form-control" id="report-start-date" required>
+                                        <input type="date" class="form-control" id="report-start-date" required>
                                     </div>
                                     <div class="form-group col-6">
                                         <label for="report-end-date" class="form-label" data-i18n="report.end_date">End Date</label>
-                                        <input type="datetime-local" class="form-control" id="report-end-date" required>
+                                        <input type="date" class="form-control" id="report-end-date" required>
                                     </div>
                                 </div>
+                                <p class="form-help" data-i18n="report.inclusive_dates">Both selected dates are included. The range can be at most 12 months.</p>
                                 <div class="report-actions">
                                     <button type="submit" class="btn btn-secondary" data-i18n="report.generate">Generate Report</button>
                                     <div class="quick-ranges" role="group" data-i18n-aria="a11y.quick_ranges" aria-label="Quick ranges">
@@ -575,20 +528,21 @@
                             </form>
 
                             <div id="report-results" class="report-results d-none">
+                                <p id="report-scope" class="report-scope" aria-live="polite"></p>
                                 <div class="report-stats">
                                     <div class="stat-card">
                                         <span class="stat-ic" aria-hidden="true">◈</span>
-                                        <span class="stat-label" data-i18n="report.stat_count">Total Transactions</span>
+                                        <span class="stat-label" data-i18n="report.stat_count">Transactions on This Page</span>
                                         <span class="stat-value" id="report-stat-count">0</span>
                                     </div>
                                     <div class="stat-card accent">
                                         <span class="stat-ic" aria-hidden="true">⬣</span>
-                                        <span class="stat-label" data-i18n="report.stat_volume">Total Volume</span>
+                                        <span class="stat-label" data-i18n="report.stat_volume">Volume on This Page</span>
                                         <span class="stat-value mono" id="report-stat-volume">0.00 USD</span>
                                     </div>
                                     <div class="stat-card">
                                         <span class="stat-ic" aria-hidden="true">◎</span>
-                                        <span class="stat-label" data-i18n="report.stat_avg">Average</span>
+                                        <span class="stat-label" data-i18n="report.stat_avg">Page Average</span>
                                         <span class="stat-value mono" id="report-stat-avg">—</span>
                                     </div>
                                 </div>
@@ -609,6 +563,11 @@
                                         <tbody id="report-table-body"></tbody>
                                     </table>
                                 </div>
+                                <nav id="report-pagination" class="report-pagination d-none" data-i18n-aria="a11y.report_pages" aria-label="Report pages">
+                                    <button id="report-page-previous" class="btn btn-secondary" type="button" data-i18n="report.previous">Previous page</button>
+                                    <span id="report-page-label" aria-live="polite"></span>
+                                    <button id="report-page-next" class="btn btn-secondary" type="button" data-i18n="report.next">Next page</button>
+                                </nav>
                             </div>
                         </div>
                     </div>
@@ -660,7 +619,7 @@
                     <span class="modal-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
                     <div>
                         <h2 class="modal-title" id="create-modal-title" data-i18n="modal.create_title">Create New Account</h2>
-                        <p class="modal-sub" data-i18n="modal.sub">Takes ~10 seconds. Just type the 24 digits after TR.</p>
+                        <p class="modal-sub" data-i18n="modal.sub">Your new IBAN is generated automatically.</p>
                     </div>
                 </div>
                 <button class="modal-close" id="close-create-modal" data-i18n-aria="modal.dismiss" aria-label="Close">×</button>
@@ -668,18 +627,15 @@
             <form id="create-account-form" novalidate>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="acc-owner-name" class="form-label" data-i18n="modal.owner_name">Account Holder Name</label>
-                        <input type="text" class="form-control" id="acc-owner-name" data-i18n="modal.owner_placeholder" placeholder="e.g. John Doe" autocomplete="name" maxlength="255" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="acc-iban" class="form-label" data-i18n="modal.iban">IBAN Number</label>
-                        <input type="text" class="form-control mono" id="acc-iban" spellcheck="false" autocomplete="off" data-i18n="modal.iban_placeholder" placeholder="TR000000000000000000000000" maxlength="26" required>
-                        <small class="form-help"><span id="acc-iban-counter">0</span>/26 · <span data-i18n="account.iban_hint">TR is filled in for you — just type the 24 digits.</span></small>
+                        <label for="acc-account-name" class="form-label" data-i18n="modal.account_name">Account Name</label>
+                        <input type="text" class="form-control" id="acc-account-name" data-i18n="modal.account_name_placeholder" placeholder="e.g. Everyday Spending" autocomplete="off" maxlength="255" required>
+                        <small class="form-help" data-i18n="modal.account_name_hint">Choose a name to distinguish this account from your other accounts.</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group col-6">
                             <label for="acc-balance" class="form-label" data-i18n="modal.balance">Initial Balance</label>
-                            <input type="number" step="0.01" min="0" max="1000000000" class="form-control text-right mono" id="acc-balance" placeholder="0.00" inputmode="decimal" required>
+                            <input type="number" step="0.01" min="0" max="1000000000" class="form-control text-right mono" id="acc-balance" value="0.00" placeholder="0.00" inputmode="decimal" readonly required>
+                            <small id="acc-funding-hint" class="form-help" aria-live="polite" data-i18n="account.funding_checking">Checking simulation funding mode…</small>
                         </div>
                         <div class="form-group col-6">
                             <label for="acc-currency" class="form-label" data-i18n="modal.currency">Currency</label>
@@ -761,7 +717,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=22"></script>
 </body>
 
 </html>

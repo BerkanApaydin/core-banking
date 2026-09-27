@@ -1,6 +1,7 @@
 package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,5 +35,6 @@ class AuthenticationFailedExceptionTest {
     void shouldReturnCorrectErrorCode() {
         AuthenticationFailedException ex = new AuthenticationFailedException("test");
         assertEquals("AUTHENTICATION_FAILED", ex.getErrorCode());
+        assertEquals(BusinessFailureKind.AUTHENTICATION_FAILED, ex.getFailureKind());
     }
 }

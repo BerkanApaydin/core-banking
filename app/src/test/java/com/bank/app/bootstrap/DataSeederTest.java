@@ -3,6 +3,9 @@ package com.bank.app.bootstrap;
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.application.port.out.LoadAccountPort;
+import com.bank.app.account.domain.Account;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -37,12 +40,14 @@ class DataSeederTest {
     private CreateAccountUseCase createAccountPort;
     @Mock
     private LoadUserPort loadUserPort;
+    @Mock
+    private LoadAccountPort loadAccountPort;
 
     private DataSeeder dataSeeder;
 
     @BeforeEach
     void setUp() {
-        dataSeeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort);
+        dataSeeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort, loadAccountPort);
     }
 
     @Test
@@ -189,5 +194,19 @@ class DataSeederTest {
 
         verify(loadUserPort, atLeastOnce()).findByUsername("ahmet");
         verify(loadUserPort, atLeastOnce()).findByUsername("ayse");
+    }
+
+    @Test
+    void shouldNotCreateASecondFundedAccountForLegacyDemoIban() throws Exception {
+        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
+        when(loadAccountPort.findByIban(new Iban("TR123456789012345678901234")))
+                .thenReturn(Optional.of(mock(Account.class)));
+
+        dataSeeder.seedData().run();
+
+        verify(createAccountPort, times(2)).execute(any(CreateAccountRequest.class));
     }
 }

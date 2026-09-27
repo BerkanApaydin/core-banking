@@ -5,6 +5,7 @@ import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.port.out.IbanGeneratorPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountStatus;
@@ -48,6 +49,8 @@ class CreateAccountUseCaseTest {
     @Mock
     private SaveAccountPort saveAccountPort;
     @Mock
+    private IbanGeneratorPort ibanGeneratorPort;
+    @Mock
     private DomainEventPublisherService domainEventPublisherService;
     @Mock
     private AuditEventPort auditEventPort;
@@ -61,19 +64,87 @@ class CreateAccountUseCaseTest {
 
     private CreateAccountUseCase createAccountUseCase;
 
-    private static final String VALID_IBAN = "TR290006200000000000000123";
+    private static final String VALID_IBAN = "TR440006200000000000000123";
     private static final Long USER_ID = 100L;
     private static final String OWNER = "Ali Veli";
 
     @BeforeEach
     void setUp() {
         createAccountUseCase = new CreateAccountUseCaseImpl(
-                loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider);
+                loadAccountPort, saveAccountPort, ibanGeneratorPort, domainEventPublisherService, auditEventPort,
+                accountAuthorizationService, clockProvider, true);
         lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     private CreateAccountRequest validRequest() {
         return new CreateAccountRequest(USER_ID, VALID_IBAN, OWNER, new BigDecimal("500.00"), Currency.TRY);
+    }
+
+    @Test
+    void generatesIbanWhenClientDoesNotProvideOne() {
+        Iban generated = Iban.fromTurkishBban("0000001234567890123456");
+        when(ibanGeneratorPort.generate()).thenReturn(generated);
+        when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
+            Account opening = invocation.getArgument(0);
+            return new Account(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+                    opening.getBalance(), AccountStatus.ACTIVE);
+        });
+
+        AccountResponse response = createAccountUseCase.execute(
+                new CreateAccountRequest(USER_ID, OWNER, BigDecimal.ZERO, Currency.TRY));
+
+        assertThat(response.iban()).isEqualTo(generated.value());
+        assertThat(new Iban(response.iban()).hasValidChecksum()).isTrue();
+        verify(loadAccountPort).findByIban(generated);
+    }
+
+    @Test
+    void retriesWhenGeneratedIbanAlreadyExists() {
+        Iban first = Iban.fromTurkishBban("0000001234567890123456");
+        Iban second = Iban.fromTurkishBban("0000001234567890123457");
+        Account existing = new Account(7L, new UserId(USER_ID), first, OWNER,
+                new Money(BigDecimal.ZERO, Currency.TRY), AccountStatus.ACTIVE);
+        when(ibanGeneratorPort.generate()).thenReturn(first, second);
+        when(loadAccountPort.findByIban(first)).thenReturn(Optional.of(existing));
+        when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
+            Account opening = invocation.getArgument(0);
+            return new Account(8L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+                    opening.getBalance(), AccountStatus.ACTIVE);
+        });
+
+        AccountResponse response = createAccountUseCase.execute(
+                new CreateAccountRequest(USER_ID, OWNER, BigDecimal.ZERO, Currency.TRY));
+
+        assertThat(response.iban()).isEqualTo(second.value());
+        verify(ibanGeneratorPort, times(2)).generate();
+    }
+
+    @Test
+    void nonDemoOpeningCannotMintBalance() {
+        var productionUseCase = new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, ibanGeneratorPort,
+                domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider, false);
+
+        assertThatThrownBy(() -> productionUseCase.execute(validRequest()))
+                .isInstanceOf(AuthorizationException.class)
+                .hasMessage("Initial funding is available only in demo mode.");
+        verifyNoInteractions(saveAccountPort);
+    }
+
+    @Test
+    void nonDemoOpeningStartsAtZero() {
+        var productionUseCase = new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, ibanGeneratorPort,
+                domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider, false);
+        var request = new CreateAccountRequest(USER_ID, VALID_IBAN, OWNER, BigDecimal.ZERO, Currency.TRY);
+        when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
+            Account opening = invocation.getArgument(0);
+            return new Account(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+                    opening.getBalance(), AccountStatus.ACTIVE);
+        });
+
+        var response = productionUseCase.execute(request);
+
+        assertThat(response.balance()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(saveAccountPort).save(any(Account.class));
     }
 
     @Nested
@@ -197,6 +268,16 @@ class CreateAccountUseCaseTest {
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(InvalidIbanException.class);
             verify(saveAccountPort, never()).save(any(Account.class));
+        }
+
+        @Test
+        void shouldRejectBadCheckDigitsBeforePersistingNewAccount() {
+            CreateAccountRequest request = new CreateAccountRequest(
+                    USER_ID, "TR340006100519786457841326", OWNER, BigDecimal.ZERO, Currency.TRY);
+
+            assertThatThrownBy(() -> createAccountUseCase.execute(request))
+                    .isExactlyInstanceOf(InvalidIbanException.class);
+            verifyNoInteractions(saveAccountPort);
         }
     }
 }

@@ -41,6 +41,10 @@ public class SecurityConfig {
                                                    CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
+            // Bearer API clients are stateless. Cookie-authenticated browser
+            // mutations are checked by JwtAuthenticationFilter using a separate
+            // CSRF cookie/header pair; enabling Spring's session CSRF here would
+            // apply a second incompatible token contract to the bearer API.
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(securityProperties.whitelistPaths().toArray(new String[0]))

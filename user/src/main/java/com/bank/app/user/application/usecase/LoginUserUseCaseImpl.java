@@ -1,6 +1,5 @@
 package com.bank.app.user.application.usecase;
 
-import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -8,17 +7,15 @@ import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-// Read-only: all relational access here is reads (credential check + user
-// lookup); login-attempt state lives in Redis, outside the DB transaction.
-// A read-write transaction would hold a DB connection and row-lock budget
-// for the duration of external auth calls for no benefit.
-@ReadOnlyUseCase
+// Credential lookups use short read-only transactions in their adapters.
+// The Redis-backed login guard must not run inside a relational transaction.
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(LoginUserUseCaseImpl.class);
@@ -64,16 +61,16 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             String token = jwtPort.generateToken(user.getId().value(), user.getUsername(), user.getRole().name());
             if (clientIp != null) loginAttemptPort.reset(clientIp);
             loginAttemptPort.resetByUsername(username);
-            log.info("User logged in: username={}, userId={}", username, user.getId().value());
+            log.info("User logged in: userId={}", user.getId().value());
             return new AuthResponse(token, user.getId().value(), user.getUsername());
         } catch (AuthenticationFailedException | UserNotFoundException e) {
-            log.warn("Failed login attempt: username={}, clientIp={}", username, clientIp);
+            log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
             throw e;
-        } catch (Exception e) {
-            log.warn("Unexpected error during login: username={}, clientIp={}", username, clientIp, e);
-            if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
-            throw new AuthenticationFailedException("Invalid username or password.", e);
+        } catch (LoginAttemptStoreUnavailableException e) {
+            // A successful credential check is not enough if the login guard
+            // cannot reset or record its state. Do not return the generated JWT.
+            throw e;
         }
     }
 }

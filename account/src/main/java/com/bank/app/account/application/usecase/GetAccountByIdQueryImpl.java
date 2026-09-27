@@ -25,7 +25,9 @@ public class GetAccountByIdQueryImpl implements GetAccountByIdQuery {
         Objects.requireNonNull(id, "Account ID must not be null");
         Account account = loadAccountPort.findById(id)
             .orElseThrow(() -> new AccountNotFoundException(id));
-        accountAuthorizationService.authorizeAccountOwner(account, "You do not have access to this account");
+        if (!accountAuthorizationService.isCurrentUserOwner(account)) {
+            throw new AccountNotFoundException(id);
+        }
         return AccountResponse.from(account);
     }
 }

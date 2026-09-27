@@ -25,6 +25,7 @@ class TransferJpaRepositoryQueryTest {
         assertThat(query).isNotNull();
         assertThat(query.value())
                 .contains("businessCreatedAt")
-                .contains("COALESCE");
+                .contains("COALESCE")
+                .contains("t.createdAt DESC, t.id DESC");
     }
 }

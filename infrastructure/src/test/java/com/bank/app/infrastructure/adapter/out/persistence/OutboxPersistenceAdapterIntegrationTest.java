@@ -76,6 +76,18 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
     @Test
     @Transactional
+    void shouldNotRelockProcessedOrDeadLetterEventById() {
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-processed", "Transfer", "1", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), true, LocalDateTime.now(), 0, false, null, 0));
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-dead", "Transfer", "2", "TransferCompletedEvent",
+                "{}", LocalDateTime.now(), false, 5, true, "dead", 0));
+
+        assertTrue(outboxJpaRepository.findByIdForUpdateSkipLocked("evt-processed").isEmpty());
+        assertTrue(outboxJpaRepository.findByIdForUpdateSkipLocked("evt-dead").isEmpty());
+    }
+
+    @Test
+    @Transactional
     void shouldExcludeDeadLetterEvents() {
         outboxJpaRepository.save(new OutboxJpaEntity("evt-1", "Transfer", "1", "TransferCompletedEvent",
                 "{}", LocalDateTime.now(), false, 5, true, "dead", 0));
@@ -118,6 +130,25 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
         assertEquals(1, result.size());
         assertEquals("evt-2", result.getFirst().getId());
+    }
+
+    @Test
+    @Transactional
+    void shouldCountOnlyPendingEventsOutsideConfiguredPartitionRange() {
+        LocalDateTime now = LocalDateTime.now();
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-in-range", "Transfer", "1", "TransferCompletedEvent",
+                "{}", now, false, 0, false, null, 1));
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-old-partition", "Transfer", "2", "TransferCompletedEvent",
+                "{}", now, false, 0, false, null, 3));
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-invalid-partition", "Transfer", "3", "TransferCompletedEvent",
+                "{}", now, false, 0, false, null, -1));
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-processed", "Transfer", "4", "TransferCompletedEvent",
+                "{}", now, true, now, 0, false, null, 4));
+        outboxJpaRepository.save(new OutboxJpaEntity("evt-dead", "Transfer", "5", "TransferCompletedEvent",
+                "{}", now, false, 5, true, "dead", 5));
+
+        assertEquals(2L, outboxJpaRepository.countPendingOutsidePartitionRange(2));
+        assertEquals(1L, outboxJpaRepository.countPendingOutsidePartitionRange(4));
     }
 
     @Test

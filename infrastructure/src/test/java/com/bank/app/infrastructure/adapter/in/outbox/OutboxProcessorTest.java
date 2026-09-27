@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,6 +65,21 @@ class OutboxProcessorTest {
     }
 
     @Test
+    void shouldIgnoreStaleProcessedEventBeforeHandlingOrRecordingFailure() {
+        EventEntry stale = new EventEntry("evt-done", "transfer", "agg-1", "TransferCompletedEvent",
+                "{}", 0, true, false, null, 0, LocalDateTime.now());
+        when(outboxPort.findByIdForUpdateSkipLocked("evt-done")).thenReturn(Optional.of(stale));
+
+        outboxProcessor.processEvent(stale);
+        outboxProcessor.recordFailure(stale, new RuntimeException("stale failure"), 5);
+
+        verifyNoInteractions(handler);
+        verify(outboxPort, never()).markProcessed(any());
+        verify(outboxPort, never()).markFailed(any(), any(), anyInt());
+        verify(outboxPort, never()).markDeadLetter(any(), any(), anyInt());
+    }
+
+    @Test
     void shouldThrowWhenNoHandlerFound() {
         EventEntry event = event("evt-2", "UnknownEventType");
         when(outboxPort.findByIdForUpdateSkipLocked("evt-2")).thenReturn(Optional.of(event));
@@ -95,7 +112,7 @@ class OutboxProcessorTest {
 
         outboxProcessor.recordFailure(event, new RuntimeException("fail"), 5);
 
-        verify(outboxPort).markDeadLetter("evt-4", "fail", 5);
+        verify(outboxPort).markDeadLetter("evt-4", RuntimeException.class.getName(), 5);
     }
 
     @Test
@@ -106,7 +123,7 @@ class OutboxProcessorTest {
 
         outboxProcessor.recordFailure(event, new RuntimeException("transient"), 5);
 
-        verify(outboxPort).markFailed("evt-5", "transient", 2);
+        verify(outboxPort).markFailed("evt-5", RuntimeException.class.getName(), 2);
     }
 
     @Test
@@ -122,7 +139,7 @@ class OutboxProcessorTest {
     }
 
     @Test
-    void shouldTruncateErrorMessageWhenTooLong() {
+    void shouldNeverPersistLongProviderErrorMessage() {
         EventEntry event = new EventEntry("evt-6", "transfer", "agg-1", "TransferCompletedEvent",
                 "{}", 0, false, false, null, 0, LocalDateTime.now());
         when(outboxPort.findByIdForUpdateSkipLocked("evt-6")).thenReturn(Optional.of(event));
@@ -130,7 +147,7 @@ class OutboxProcessorTest {
         String longMsg = "a".repeat(3000);
         outboxProcessor.recordFailure(event, new RuntimeException(longMsg), 5);
 
-        verify(outboxPort).markFailed("evt-6", longMsg.substring(0, 2000), 1);
+        verify(outboxPort).markFailed("evt-6", RuntimeException.class.getName(), 1);
     }
 
     @Test
@@ -141,7 +158,7 @@ class OutboxProcessorTest {
 
         outboxProcessor.recordFailure(event, new RuntimeException(), 5);
 
-        verify(outboxPort).markFailed("evt-7", null, 1);
+        verify(outboxPort).markFailed("evt-7", RuntimeException.class.getName(), 1);
     }
 
     @Test
@@ -167,5 +184,49 @@ class OutboxProcessorTest {
         assertEquals(1.0, registry.get("outbox.event.processed").counter().count());
         assertEquals(1.0, registry.get("outbox.event.failed").counter().count());
         assertEquals(1.0, registry.get("outbox.event.dead_letter").counter().count());
+    }
+
+    @Test
+    void shouldPublishOutcomeCountersOnlyAfterCommit() throws Exception {
+        var registry = new SimpleMeterRegistry();
+        var processor = new OutboxProcessor(outboxPort, List.of(handler), registry);
+        EventEntry event = event("evt-commit", "TransferCompletedEvent");
+        when(outboxPort.findByIdForUpdateSkipLocked(event.id())).thenReturn(Optional.of(event));
+        when(handler.supports(event.eventType())).thenReturn(true);
+
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.processEvent(event);
+            assertEquals(0.0, registry.get("outbox.event.processed").counter().count());
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+            assertEquals(1.0, registry.get("outbox.event.processed").counter().count());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void shouldNotCountDeadLetterWhenTransactionRollsBack() {
+        var registry = new SimpleMeterRegistry();
+        var processor = new OutboxProcessor(outboxPort, List.of(handler), registry);
+        EventEntry event = new EventEntry("evt-rollback", "transfer", "agg-1", "TransferCompletedEvent",
+                "{}", 4, false, false, null, 0, LocalDateTime.now());
+        when(outboxPort.findByIdForUpdateSkipLocked(event.id())).thenReturn(Optional.of(event));
+
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.recordFailure(event, new RuntimeException("transient"), 5);
+            // Rollback does not invoke afterCommit. Clear the synchronization
+            // exactly as the transaction manager does on completion.
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+
+        assertEquals(0.0, registry.get("outbox.event.dead_letter").counter().count());
     }
 }

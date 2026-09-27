@@ -17,12 +17,11 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Compensating observer for the intentional no-FK decision (see
- * {@code V19__document_no_fk_decision.sql}): aggregates reference each other
- * by ID only, so orphaned rows (e.g. an account whose user was removed
- * out-of-band) cannot be prevented by the database. This job only
- * <em>detects and reports</em> — it never deletes. Cleanup stays an explicit,
- * reviewed manual operation, never {@code ON DELETE CASCADE}.
+ * Observes referential integrity after V24 restored and validated database
+ * foreign keys. An orphan would now indicate a broken constraint, disabled
+ * enforcement, or corrupted/partially restored data. This job only reports;
+ * it never repairs or deletes records. The last-success gauge distinguishes
+ * an actual clean scan from the initial zero-valued orphan gauges.
  */
 @Service
 @ConditionalOnBean(JdbcTemplate.class)
@@ -47,6 +46,7 @@ public class OrphanIntegrityReporter {
     private final AtomicLong accountsWithoutUser = new AtomicLong();
     private final AtomicLong transfersWithoutSender = new AtomicLong();
     private final AtomicLong transfersWithoutReceiver = new AtomicLong();
+    private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
     private final Counter alarmCounter;
 
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
@@ -65,6 +65,7 @@ public class OrphanIntegrityReporter {
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", ACCOUNTS_WITHOUT_USER)), accountsWithoutUser);
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", TRANSFERS_WITHOUT_SENDER)), transfersWithoutSender);
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", TRANSFERS_WITHOUT_RECEIVER)), transfersWithoutReceiver);
+            meterRegistry.gauge("db.orphan.last_success_epoch_seconds", lastSuccessfulScanEpochSeconds);
             // Alarm hook for Alertmanager/PagerDuty, e.g.:
             //   sum(increase(db_orphan_alarm_total[1h])) by (type) > 0
             counter = Counter.builder("db.orphan.alarm")
@@ -79,6 +80,7 @@ public class OrphanIntegrityReporter {
         check(ACCOUNTS_WITHOUT_USER, ACCOUNTS_SQL, accountsWithoutUser);
         check(TRANSFERS_WITHOUT_SENDER, SENDERS_SQL, transfersWithoutSender);
         check(TRANSFERS_WITHOUT_RECEIVER, RECEIVERS_SQL, transfersWithoutReceiver);
+        lastSuccessfulScanEpochSeconds.set(java.time.Instant.now().getEpochSecond());
     }
 
     private void check(String type, String sql, AtomicLong gauge) {
@@ -90,7 +92,7 @@ public class OrphanIntegrityReporter {
                 alarmCounter.increment(orphans);
             }
             log.error("ORPHAN ALARM: {} orphan row(s) of type '{}' exceed threshold {}. "
-                            + "Out-of-band deletion suspected — manual review required; automatic cleanup is disabled by design.",
+                            + "Constraint enforcement or restore integrity requires manual review; automatic cleanup is disabled.",
                     orphans, type, alarmThreshold);
         } else if (orphans > 0) {
             log.warn("Orphan integrity: {} orphan row(s) of type '{}' detected (below alarm threshold {}). Manual review required; automatic cleanup is disabled by design.",

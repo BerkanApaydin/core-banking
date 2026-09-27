@@ -4,8 +4,10 @@ import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
+import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -23,14 +25,18 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.sql.SQLException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -67,8 +73,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex, WebRequest request) {
-        HttpStatus status = HttpStatus.resolve(ex.getHttpStatusCode());
-        if (status == null) status = HttpStatus.BAD_REQUEST;
+        HttpStatus status = BusinessErrorHttpMapper.toStatus(ex);
         return ProblemDetailFactory.create(status, ex.getErrorCode(), resolveBusinessMessage(ex), request);
     }
 
@@ -78,6 +83,27 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
         return ProblemDetailFactory.createValidationError(errors, request);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingRequestParameter(
+            MissingServletRequestParameterException ex, WebRequest request) {
+        return ProblemDetailFactory.createValidationError(
+                Map.of(ex.getParameterName(), "Required parameter is missing"), request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException ex, WebRequest request) {
+        return ProblemDetailFactory.createValidationError(
+                Map.of(ex.getName(), "Invalid parameter value"), request);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ProblemDetail> handleMethodValidation(
+            HandlerMethodValidationException ex, WebRequest request) {
+        return ProblemDetailFactory.createValidationError(
+                Map.of("request", "Invalid request parameters"), request);
     }
 
     @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
@@ -98,7 +124,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
         // Never echo raw exception messages: they may carry SQL fragments,
         // paths, or validation internals. Log the detail, return a generic key.
-        log.warn("Illegal argument: {}", ex.getMessage());
+        log.warn("Invalid argument rejected: {}", ex.getClass().getSimpleName());
         String message = resolveMessage("error.invalid_argument");
         if (message == null || message.isEmpty() || message.equals("error.invalid_argument")) {
             message = "Invalid request argument.";
@@ -114,6 +140,42 @@ public class GlobalExceptionHandler {
             message = "Authentication failed.";
         }
         return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
+    }
+
+    @ExceptionHandler(LoginAttemptStoreUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleLoginAttemptStoreUnavailable(
+            LoginAttemptStoreUnavailableException ex, WebRequest request) {
+        log.warn("Failed-login security backend unavailable: {}",
+                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
+        String message = resolveMessage("error.security_backend_unavailable");
+        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
+            message = "Security service temporarily unavailable. Please try again later.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
+    }
+
+    @ExceptionHandler(AuthenticationBackendUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleAuthenticationBackendUnavailable(
+            AuthenticationBackendUnavailableException ex, WebRequest request) {
+        log.warn("Authentication backend unavailable: {}",
+                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
+        String message = resolveMessage("error.security_backend_unavailable");
+        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
+            message = "Security service temporarily unavailable. Please try again later.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
+    }
+
+    @ExceptionHandler(RevocationStoreUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleRevocationStoreUnavailable(
+            RevocationStoreUnavailableException ex, WebRequest request) {
+        log.warn("Token revocation backend unavailable: {}",
+                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
+        String message = resolveMessage("error.security_backend_unavailable");
+        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
+            message = "Security service temporarily unavailable. Please try again later.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -156,7 +218,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleDataIntegrityViolationException(DataIntegrityViolationException ex, WebRequest request) {
         String message;
         ErrorCode code;
-        if (ex.getCause() instanceof ConstraintViolationException) {
+        if (isUniqueViolation(ex)) {
             message = resolveMessage("error.unique_constraint_violation");
             code = ErrorCode.UNIQUE_CONSTRAINT_VIOLATION;
         } else {
@@ -164,6 +226,15 @@ public class GlobalExceptionHandler {
             code = ErrorCode.DB_INTEGRITY_VIOLATION;
         }
         return ProblemDetailFactory.create(code, message, request);
+    }
+
+    private static boolean isUniqueViolation(Throwable failure) {
+        for (Throwable current = failure; current != null && current != current.getCause(); current = current.getCause()) {
+            if (current instanceof SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(ConcurrentRequestException.class)

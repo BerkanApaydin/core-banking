@@ -42,6 +42,8 @@ public class OutboxPoller {
         int maxRetries = outboxProperties.maxRetries();
         long pollDelayMs = outboxProperties.pollDelayMs();
 
+        verifyPendingPartitionsAreCovered(partitionCount);
+
         int threadCount = partitionCount <= 0 ? 1 : partitionCount;
         executor = Executors.newScheduledThreadPool(threadCount, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger();
@@ -90,6 +92,7 @@ public class OutboxPoller {
         int partitionCount = outboxProperties.partitionCount();
         int batchSize = outboxProperties.batchSize();
         int maxRetries = outboxProperties.maxRetries();
+        verifyPendingPartitionsAreCovered(partitionCount);
         if (partitionCount <= 0) {
             processPartition(-1, batchSize, maxRetries);
         } else {
@@ -99,13 +102,27 @@ public class OutboxPoller {
         }
     }
 
+    private void verifyPendingPartitionsAreCovered(int partitionCount) {
+        if (partitionCount <= 0) {
+            // The unpartitioned poller explicitly selects every partition.
+            return;
+        }
+        long pending = outboxPort.countPendingOutsidePartitionRange(partitionCount);
+        if (pending > 0) {
+            throw new IllegalStateException("Outbox partitionCount=" + partitionCount + " leaves " + pending
+                    + " pending event(s) outside the polling range; restore the previous count and drain them "
+                    + "before changing OUTBOX_PARTITION_COUNT");
+        }
+    }
+
     private void processPartitionSafely(int partition, int batchSize, int maxRetries) {
         try {
             processPartition(partition, batchSize, maxRetries);
         } catch (Throwable e) {
             // Catch Throwable (not just Exception): an Error must not silently
             // cancel this partition's future scheduled runs.
-            log.error("Error processing outbox partition {}: {}", partition, e.getMessage(), e);
+            log.error("Error processing outbox partition {}, failureType={}",
+                    partition, e.getClass().getName());
         }
     }
 

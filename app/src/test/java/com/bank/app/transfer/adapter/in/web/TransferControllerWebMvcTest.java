@@ -74,11 +74,11 @@ class TransferControllerWebMvcTest {
                 @DisplayName("should return 201 when request is valid")
                 void shouldReturn201() throws Exception {
                         TransferRequest request = new TransferRequest(
-                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        "TR770006200000000000000111", "TR870006200000000000000222",
                                         new BigDecimal("200.00"), Currency.TRY);
                         TransferResponse response = new TransferResponse(10L, TransferStatus.COMPLETED, new BigDecimal("200.00"),
-                                        "TRY", LocalDateTime.now(), "TR290006200000000000000111",
-                                        "TR290006200000000000000222", 1L, 2L);
+                                        "TRY", LocalDateTime.now(), "TR770006200000000000000111",
+                                        "TR870006200000000000000222", 1L, 2L);
 
                         when(placeTransferPort.execute(any(TransferRequest.class))).thenReturn(response);
 
@@ -107,7 +107,7 @@ class TransferControllerWebMvcTest {
                 @DisplayName("should return 400 when balance is insufficient")
                 void shouldReturn400WhenBalanceInsufficient() throws Exception {
                         TransferRequest request = new TransferRequest(
-                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        "TR770006200000000000000111", "TR870006200000000000000222",
                                         new BigDecimal("2000.00"), Currency.TRY);
 
                         when(placeTransferPort.execute(any(TransferRequest.class)))
@@ -124,11 +124,11 @@ class TransferControllerWebMvcTest {
                 @DisplayName("should return 400 when account is not active")
                 void shouldReturn400WhenAccountNotActive() throws Exception {
                         TransferRequest request = new TransferRequest(
-                                        "TR290006200000000000000333", "TR290006200000000000000222",
+                                        "TR970006200000000000000333", "TR870006200000000000000222",
                                         new BigDecimal("100.00"), Currency.TRY);
 
                         when(placeTransferPort.execute(any(TransferRequest.class)))
-                                        .thenThrow(new AccountNotActiveException("TR290006200000000000000333"));
+                                        .thenThrow(new AccountNotActiveException("TR970006200000000000000333"));
 
                         mockMvc.perform(post("/api/v1/transfers")
                                         .contentType(MediaType.APPLICATION_JSON)
@@ -141,7 +141,7 @@ class TransferControllerWebMvcTest {
                 @DisplayName("should return 409 when idempotency key is pending")
                 void shouldReturn409WhenIdempotencyKeyPending() throws Exception {
                         TransferRequest request = new TransferRequest(
-                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        "TR770006200000000000000111", "TR870006200000000000000222",
                                         new BigDecimal("100.00"), Currency.TRY);
 
                         when(placeTransferPort.execute(any(TransferRequest.class)))
@@ -159,11 +159,11 @@ class TransferControllerWebMvcTest {
                 @DisplayName("should return 201 when idempotency key is blank")
                 void shouldReturn201WhenIdempotencyKeyBlank() throws Exception {
                         TransferRequest request = new TransferRequest(
-                                        "TR290006200000000000000111", "TR290006200000000000000222",
+                                        "TR770006200000000000000111", "TR870006200000000000000222",
                                         new BigDecimal("200.00"), Currency.TRY);
                         TransferResponse response = new TransferResponse(1L, TransferStatus.COMPLETED, new BigDecimal("200.00"),
-                                        "TRY", LocalDateTime.now(), "TR290006200000000000000111",
-                                        "TR290006200000000000000222", 1L, 2L);
+                                        "TRY", LocalDateTime.now(), "TR770006200000000000000111",
+                                        "TR870006200000000000000222", 1L, 2L);
 
                         when(placeTransferPort.execute(any(TransferRequest.class))).thenReturn(response);
 
@@ -279,10 +279,13 @@ class TransferControllerWebMvcTest {
                         mockMvc.perform(get("/api/v1/transfers/report")
                                         .param("accountId", "1")
                                         .param("startDate", "2025-01-01T00:00:00")
-                                        .param("endDate", "2025-01-10T00:00:00"))
+                                        .param("endDate", "2025-01-10T23:59:59.999999"))
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.accountId").value(1L))
                                         .andExpect(jsonPath("$.pageVolume").value(350.00));
+                        verify(generateTransferReportPort).execute(argThat(criteria ->
+                                        criteria.startDate().equals(LocalDateTime.parse("2025-01-01T00:00:00"))
+                                        && criteria.endDate().equals(LocalDateTime.parse("2025-01-10T23:59:59.999999"))));
                 }
 
                 @Test
@@ -301,5 +304,21 @@ class TransferControllerWebMvcTest {
 .andExpect(jsonPath("$.pageTransferCount").value(0))
                                          .andExpect(jsonPath("$.pageVolume").value(0));
                 }
+        }
+
+        @Test
+        void shouldReturnValidationProblemForNonNumericTransferId() throws Exception {
+                mockMvc.perform(get("/api/v1/transfers/not-a-number"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                                .andExpect(jsonPath("$.errors.id").exists());
+        }
+
+        @Test
+        void shouldReturnValidationProblemForMissingReportDates() throws Exception {
+                mockMvc.perform(get("/api/v1/transfers/report").param("accountId", "1"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                                .andExpect(jsonPath("$.errors.startDate").exists());
         }
 }

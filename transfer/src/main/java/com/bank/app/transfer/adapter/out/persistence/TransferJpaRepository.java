@@ -16,7 +16,7 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     @Query("SELECT t FROM TransferJpaEntity t WHERE t.id = :id")
     Optional<TransferJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
-    List<TransferJpaEntity> findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(
+    List<TransferJpaEntity> findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(
             Long senderId, Long receiverId, Pageable pageable);
 
     // Business-time filter: domain createdAt lives in business_created_at
@@ -24,7 +24,8 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     // Filtering auditing createdAt would diverge from the cancellation window
     // and time-travel determinism whenever insert time != domain time.
     @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
-           + "AND COALESCE(t.businessCreatedAt, t.createdAt) BETWEEN :start AND :end ORDER BY t.createdAt DESC")
+           + "AND COALESCE(t.businessCreatedAt, t.createdAt) BETWEEN :start AND :end "
+           + "ORDER BY t.createdAt DESC, t.id DESC")
     List<TransferJpaEntity> findHistoryBetween(
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,

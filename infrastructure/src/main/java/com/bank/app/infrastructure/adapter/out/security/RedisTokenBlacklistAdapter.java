@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 public class RedisTokenBlacklistAdapter implements TokenBlacklistPort {
 
     private static final String KEY_PREFIX = "token_blacklist:";
+    private static final String HASHED_KEY_PREFIX = KEY_PREFIX + "sha256:";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -21,13 +22,30 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklistPort {
 
     @Override
     public void blacklist(String token, long expirationMs) {
-        String key = KEY_PREFIX + token;
+        String key = hashedKey(token);
         redisTemplate.opsForValue().set(key, "blacklisted", expirationMs, TimeUnit.MILLISECONDS);
     }
 
     @Override
     public boolean isBlacklisted(String token) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_PREFIX + token));
+        Boolean hashedPresent = redisTemplate.hasKey(hashedKey(token));
+        if (hashedPresent == null) {
+            throw new IllegalStateException("Redis revocation lookup returned no result");
+        }
+        if (hashedPresent) {
+            return true;
+        }
+        // Older instances wrote the bearer token into the key itself. Read those
+        // keys until their existing Redis TTL expires, but never create new ones.
+        Boolean legacyPresent = redisTemplate.hasKey(KEY_PREFIX + token);
+        if (legacyPresent == null) {
+            throw new IllegalStateException("Redis legacy revocation lookup returned no result");
+        }
+        return legacyPresent;
+    }
+
+    private static String hashedKey(String token) {
+        return HASHED_KEY_PREFIX + TokenDigest.sha256Hex(token);
     }
 
     @Override

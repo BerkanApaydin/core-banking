@@ -5,10 +5,10 @@ import java.math.BigDecimal;
 @SuppressWarnings("null")
 public final class TestConstants {
 
-    public static final String IBAN_SENDER = "TR290006200000000000000111";
-    public static final String IBAN_RECEIVER = "TR290006200000000000000222";
-    public static final String IBAN_PASSIVE = "TR290006200000000000000333";
-    public static final String IBAN_NONEXISTENT = "TR290006200000000000000999";
+    public static final String IBAN_SENDER = "TR770006200000000000000111";
+    public static final String IBAN_RECEIVER = "TR870006200000000000000222";
+    public static final String IBAN_PASSIVE = "TR970006200000000000000333";
+    public static final String IBAN_NONEXISTENT = "TR600006200000000000000999";
     public static final String USERNAME_TEST = "test_user";
     public static final String USERNAME_AHMET = "ahmet";
     public static final String USERNAME_AYSE = "ayse";

@@ -60,6 +60,11 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
             size
         );
 
+        // A full page may still be the last page. Probe the next page using
+        // the same size so PageRequest calculates the correct row offset.
+        boolean hasNext = transfers.size() == size && page < Integer.MAX_VALUE && !loadTransferPort.findHistoryBetween(
+            accountId, startDate, endDate, page + 1, size).isEmpty();
+
         // Batch load account IBANs to avoid N+1 query problem (see TransferViewEnricher)
         List<TransferResponse> responseList = viewEnricher.enrich(transfers);
 
@@ -74,7 +79,8 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
             transfers.size(),
             pageVolume,
             account.currency(),
-            responseList
+            responseList,
+            hasNext
         );
     }
 }

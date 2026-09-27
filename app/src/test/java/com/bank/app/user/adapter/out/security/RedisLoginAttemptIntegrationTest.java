@@ -1,5 +1,9 @@
 package com.bank.app.user.adapter.out.security;
 
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -10,6 +14,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.bank.app.infrastructure.adapter.out.security.RedisLoginAttemptAdapter;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 class RedisLoginAttemptIntegrationTest {
@@ -81,5 +86,42 @@ class RedisLoginAttemptIntegrationTest {
         adapter.recordFailure("10.0.0.7", "reset_by_user");
         adapter.resetByUsername("reset_by_user");
         assertThat(adapter.isUsernameBlocked("reset_by_user")).isFalse();
+    }
+
+    @Test
+    void shouldAtomicallyIncrementAndRefreshTtlForBothCounters() {
+        String ipKey = "login_attempt:ip:10.0.0.8";
+        String userKey = "login_attempt:user:ttl_user";
+        redisTemplate.delete(List.of(ipKey, userKey));
+
+        adapter.recordFailure("10.0.0.8", "ttl_user");
+        assertThat(redisTemplate.opsForValue().get(ipKey)).isEqualTo("1");
+        assertThat(redisTemplate.opsForValue().get(userKey)).isEqualTo("1");
+        assertThat(redisTemplate.getExpire(ipKey, TimeUnit.MILLISECONDS)).isGreaterThan(0L);
+        assertThat(redisTemplate.getExpire(userKey, TimeUnit.MILLISECONDS)).isGreaterThan(0L);
+
+        redisTemplate.expire(ipKey, 1, TimeUnit.SECONDS);
+        redisTemplate.expire(userKey, 1, TimeUnit.SECONDS);
+        adapter.recordFailure("10.0.0.8", "ttl_user");
+
+        assertThat(redisTemplate.opsForValue().get(ipKey)).isEqualTo("2");
+        assertThat(redisTemplate.opsForValue().get(userKey)).isEqualTo("2");
+        assertThat(redisTemplate.getExpire(ipKey, TimeUnit.MILLISECONDS))
+                .isGreaterThan(TimeUnit.MINUTES.toMillis(14));
+        assertThat(redisTemplate.getExpire(userKey, TimeUnit.MILLISECONDS))
+                .isGreaterThan(TimeUnit.MINUTES.toMillis(14));
+    }
+
+    @Test
+    void shouldNotPartiallyUpdateIpCounterWhenUsernameCounterIsCorrupt() {
+        String ipKey = "login_attempt:ip:10.0.0.9";
+        String userKey = "login_attempt:user:corrupt_user";
+        redisTemplate.delete(List.of(ipKey, userKey));
+        redisTemplate.opsForValue().set(userKey, "not-a-counter");
+
+        assertThatThrownBy(() -> adapter.recordFailure("10.0.0.9", "corrupt_user"))
+                .isInstanceOf(LoginAttemptStoreUnavailableException.class);
+        assertThat(redisTemplate.hasKey(ipKey)).isFalse();
+        assertThat(redisTemplate.opsForValue().get(userKey)).isEqualTo("not-a-counter");
     }
 }

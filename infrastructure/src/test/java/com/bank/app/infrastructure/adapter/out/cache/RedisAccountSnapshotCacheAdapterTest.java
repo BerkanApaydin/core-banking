@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.SetOperations;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -34,6 +36,9 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Mock
     private SetOperations<String, String> setOps;
+
+    @Mock
+    private Cursor<String> cursor;
 
     private RedisAccountSnapshotCacheAdapter adapter;
 
@@ -76,9 +81,9 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldPutByIbanAndMaintainDistributedIndex() {
-        adapter.putByIban("tr33 0006 1005 1978 6456 8412 34", SNAPSHOT);
+        adapter.putByIban("tr45 0006 1005 1978 6456 8412 34", SNAPSHOT);
 
-        String ibanKey = AccountSnapshotCache.ibanKey("tr33 0006 1005 1978 6456 8412 34");
+        String ibanKey = AccountSnapshotCache.ibanKey("tr45 0006 1005 1978 6456 8412 34");
         verify(valueOps).set("account-snapshot:iban-" + ibanKey, "1|10|TRY|ACTIVE", 60L, TimeUnit.SECONDS);
         verify(setOps).add("account-snapshot:idx:ibans-by-id:1", ibanKey);
         verify(redisTemplate).expire("account-snapshot:idx:ibans-by-id:1", 60L, TimeUnit.SECONDS);
@@ -134,12 +139,15 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldEvictAllWithKeyScan() {
-        when(redisTemplate.keys("account-snapshot:*"))
-                .thenReturn(Set.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, true, false);
+        when(cursor.next()).thenReturn("account-snapshot:id-1", "account-snapshot:iban-TR1");
 
         adapter.evictAll();
 
-        verify(redisTemplate).delete(Set.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
+        verify(redisTemplate).delete(java.util.List.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
+        verify(redisTemplate, never()).keys(anyString());
+        verify(cursor).close();
     }
 
     @Test

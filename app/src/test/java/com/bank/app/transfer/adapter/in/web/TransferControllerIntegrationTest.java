@@ -7,8 +7,12 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaEntity;
 import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaRepository;
+import com.bank.app.infrastructure.adapter.in.idempotency.IdempotencyFingerprint;
+import com.bank.app.audit.adapter.out.persistence.AuditLogJpaRepository;
+import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.transfer.adapter.out.persistence.TransferJpaRepository;
+import com.bank.app.transfer.adapter.out.persistence.TransferJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
@@ -69,6 +73,9 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         private IdempotencyKeyJpaRepository idempotencyKeyRepo;
 
         @Autowired
+        private AuditLogJpaRepository auditRepo;
+
+        @Autowired
         private PlatformTransactionManager transactionManager;
 
         @Autowired
@@ -112,11 +119,11 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                         UserJpaEntity u3 = userRepository.save(
                                         new UserJpaEntity(null, "u3", "pass", "ROLE_USER", null, null, null));
 
-                        accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR290006200000000000000111", "Ahmet",
+                        accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR770006200000000000000111", "Ahmet",
                                         new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
-                        accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR290006200000000000000222", "Mehmet",
+                        accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR870006200000000000000222", "Mehmet",
                                         new BigDecimal("500.00"), "TRY", "ACTIVE", null));
-                        accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR290006200000000000000333", "Pasif",
+                        accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR970006200000000000000333", "Pasif",
                                         new BigDecimal("500.00"), "TRY", "SUSPENDED", null));
                         u3Id = u3.getId();
                         return new Long[] { u1.getId(), u2.getId(), u3.getId() };
@@ -133,6 +140,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                         entityManager.createQuery("delete from OutboxJpaEntity").executeUpdate();
                         entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
                         idempotencyKeyRepo.deleteAll();
+                        auditRepo.deleteAll();
                         accountRepo.deleteAll();
                         userRepository.deleteAll();
                         return null;
@@ -143,8 +151,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldPerformTransferSuccessfully() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("200.00"),
                                 Currency.TRY);
 
@@ -165,8 +173,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .andExpect(jsonPath("$.status", is("COMPLETED")))
                                 .andExpect(jsonPath("$.amount", is(200.00)))
                                 .andExpect(jsonPath("$.currency", is("TRY")))
-                                .andExpect(jsonPath("$.senderIban", is("TR290006200000000000000111")))
-                                .andExpect(jsonPath("$.receiverIban", is("TR290006200000000000000222")))
+                                .andExpect(jsonPath("$.senderIban", is("TR770006200000000000000111")))
+                                .andExpect(jsonPath("$.receiverIban", is("TR870006200000000000000222")))
                                 .andExpect(jsonPath("$.senderAccountId", notNullValue()))
                                 .andExpect(jsonPath("$.receiverAccountId", notNullValue()));
         }
@@ -174,8 +182,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldReturnBadRequestWhenBalanceIsInsufficient() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("2000.00"),
                                 Currency.TRY);
 
@@ -192,8 +200,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldReturnBadRequestWhenAccountIsPassive() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000333",
-                                "TR290006200000000000000222",
+                                "TR970006200000000000000333",
+                                "TR870006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Currency.TRY);
 
@@ -211,8 +219,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldPerformTransferAndCancelSuccessfully() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("200.00"),
                                 Currency.TRY);
 
@@ -226,8 +234,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 Integer transferId = objectMapper.readTree(responseJson).get("id").asInt();
 
-                BigDecimal balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
-                BigDecimal balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
+                BigDecimal balanceSender = accountRepo.findByIban("TR770006200000000000000111").get().getBalance();
+                BigDecimal balanceReceiver = accountRepo.findByIban("TR870006200000000000000222").get().getBalance();
                 assertEquals(new BigDecimal("800.00"), balanceSender);
                 assertEquals(new BigDecimal("700.00"), balanceReceiver);
 
@@ -236,8 +244,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .header("Idempotency-Key", newIdempotencyKey()))
                                 .andExpect(status().isNoContent());
 
-                balanceSender = accountRepo.findByIban("TR290006200000000000000111").get().getBalance();
-                balanceReceiver = accountRepo.findByIban("TR290006200000000000000222").get().getBalance();
+                balanceSender = accountRepo.findByIban("TR770006200000000000000111").get().getBalance();
+                balanceReceiver = accountRepo.findByIban("TR870006200000000000000222").get().getBalance();
                 assertEquals(new BigDecimal("1000.00"), balanceSender);
                 assertEquals(new BigDecimal("500.00"), balanceReceiver);
         }
@@ -256,7 +264,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         void shouldReturnBadRequestWhenRequestHasValidationErrors() throws Exception {
                 TransferRequest request = new TransferRequest(
                                 "",
-                                "TR290006200000000000000222",
+                                "TR870006200000000000000222",
                                 new BigDecimal("-50.00"),
                                 Currency.TRY);
 
@@ -273,8 +281,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldGenerateReportSuccessfully() throws Exception {
                 TransferRequest req1 = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
@@ -285,8 +293,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .andExpect(status().isCreated());
 
                 TransferRequest req2 = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("150.00"),
                                 Currency.TRY);
                 mockMvc.perform(post("/api/v1/transfers")
@@ -296,7 +304,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .content(objectMapper.writeValueAsString(req2)))
                                 .andExpect(status().isCreated());
 
-                Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
+                Long accountId = accountRepo.findByIban("TR770006200000000000000111").get().getId();
 
                 LocalDateTime start = LocalDateTime.now().minusHours(1);
                 LocalDateTime end = LocalDateTime.now().plusHours(1);
@@ -312,8 +320,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                  .andExpect(jsonPath("$.pageVolume", is(250.00)))
                                 .andExpect(jsonPath("$.currency", is("TRY")))
                                 .andExpect(jsonPath("$.transfers", notNullValue()))
-                                .andExpect(jsonPath("$.transfers[0].senderIban", is("TR290006200000000000000111")))
-                                .andExpect(jsonPath("$.transfers[0].receiverIban", is("TR290006200000000000000222")))
+                                .andExpect(jsonPath("$.transfers[0].senderIban", is("TR770006200000000000000111")))
+                                .andExpect(jsonPath("$.transfers[0].receiverIban", is("TR870006200000000000000222")))
                                 .andExpect(jsonPath("$.transfers[0].senderAccountId", notNullValue()))
                                 .andExpect(jsonPath("$.transfers[0].receiverAccountId", notNullValue()));
         }
@@ -321,8 +329,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldNotDoubleExecuteWithSameIdempotencyKey() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Currency.TRY);
 
@@ -344,8 +352,72 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         }
 
         @Test
+        void shouldRejectSameKeyWithDifferentTransferAmount() throws Exception {
+                TransferRequest first = new TransferRequest(
+                                "TR770006200000000000000111", "TR870006200000000000000222",
+                                new BigDecimal("100.00"), Currency.TRY);
+                TransferRequest changed = new TransferRequest(
+                                "TR770006200000000000000111", "TR870006200000000000000222",
+                                new BigDecimal("200.00"), Currency.TRY);
+                String key = newIdempotencyKey();
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(first)))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(changed)))
+                                .andExpect(status().isConflict());
+
+                assertEquals(1, transferRepo.count());
+        }
+
+        @Test
+        void shouldReserveFailedKeyAgainAndReplaySuccessfulTransfer() throws Exception {
+                TransferRequest request = new TransferRequest(
+                                "TR770006200000000000000111", "TR870006200000000000000222",
+                                new BigDecimal("2000.00"), Currency.TRY);
+                String key = newIdempotencyKey();
+                String json = objectMapper.writeValueAsString(request);
+
+                mockMvc.perform(post("/api/v1/transfers")
+                                .header("Authorization", "Bearer " + jwtToken)
+                                .header("Idempotency-Key", key)
+                                .contentType(MediaType.APPLICATION_JSON).content(json))
+                                .andExpect(status().isBadRequest());
+
+                new TransactionTemplate(transactionManager).execute(status -> {
+                        AccountJpaEntity sender = accountRepo.findByIban(
+                                "TR770006200000000000000111").orElseThrow();
+                        sender.setBalance(new BigDecimal("3000.00"));
+                        accountRepo.save(sender);
+                        return null;
+                });
+
+                for (int i = 0; i < 2; i++) {
+                        mockMvc.perform(post("/api/v1/transfers")
+                                        .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", key)
+                                        .contentType(MediaType.APPLICATION_JSON).content(json))
+                                        .andExpect(status().isCreated());
+                }
+
+                assertEquals(1, transferRepo.count());
+                assertEquals(0, accountRepo.findByIban("TR770006200000000000000111")
+                                .orElseThrow().getBalance().compareTo(new BigDecimal("1000.00")));
+                assertEquals(1, auditRepo.findAll().stream()
+                                .filter(log -> "TRANSFER_EXECUTED".equals(log.getAction())).count());
+        }
+
+        @Test
         void shouldRejectHistorySizeOver100() throws Exception {
-                Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
+                Long accountId = accountRepo.findByIban("TR770006200000000000000111").get().getId();
 
                 mockMvc.perform(get("/api/v1/transfers/history/" + accountId)
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -363,8 +435,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldRequireIdempotencyKeyWhenKeyIsBlank() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("200.00"),
                                 Currency.TRY);
 
@@ -380,8 +452,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldFailRequestAndCleanIdempotencyKeyOnException() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("2000.00"),
                                 Currency.TRY);
 
@@ -402,14 +474,22 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
         @Test
         void shouldReturnConflictWhenIdempotencyKeyIsPending() throws Exception {
-                saveIdempotencyKeyInNewTransaction(new IdempotencyKeyJpaEntity(
-                                "u1_pending-key", "PENDING", null, LocalDateTime.now()));
-
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Currency.TRY);
+
+                String key = IdempotencyFingerprint.operationKey("user",
+                                String.valueOf(userRepository.findByUsername("u1").orElseThrow().getId()),
+                                "POST", "/api/v1/transfers", "pending-key");
+                byte[] args = objectMapper.writeValueAsBytes(new Object[] {
+                                new TransferWebRequest(request.senderIban(), request.receiverIban(),
+                                                request.amount(), request.currency()) });
+                String hash = IdempotencyFingerprint.requestHash("POST", "/api/v1/transfers", null, args);
+                var pending = new IdempotencyKeyJpaEntity(key, "PENDING", null, LocalDateTime.now());
+                pending.setRequestHash(hash);
+                saveIdempotencyKeyInNewTransaction(pending);
 
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -423,8 +503,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldGetTransferDetailSuccessfully() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("200.00"),
                                 Currency.TRY);
 
@@ -461,8 +541,8 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         @Test
         void shouldReturnConflictWhenCancellingAlreadyCancelledTransfer() throws Exception {
                 TransferRequest request = new TransferRequest(
-                                "TR290006200000000000000111",
-                                "TR290006200000000000000222",
+                                "TR770006200000000000000111",
+                                "TR870006200000000000000222",
                                 new BigDecimal("100.00"),
                                 Currency.TRY);
 
@@ -489,8 +569,34 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
         }
 
         @Test
+        void reportPaginationMarksTheLastPageWithoutSkippingRows() throws Exception {
+                Long senderId = accountRepo.findByIban("TR770006200000000000000111").orElseThrow().getId();
+                Long receiverId = accountRepo.findByIban("TR870006200000000000000222").orElseThrow().getId();
+                LocalDateTime now = LocalDateTime.now();
+                for (int amount = 1; amount <= 3; amount++) {
+                        TransferJpaEntity transfer = new TransferJpaEntity(null, senderId, receiverId,
+                                        BigDecimal.valueOf(amount), "TRY", "COMPLETED", null);
+                        transfer.setBusinessCreatedAt(now.minusMinutes(amount));
+                        transferRepo.saveAndFlush(transfer);
+                }
+
+                for (int page = 0; page < 2; page++) {
+                        mockMvc.perform(get("/api/v1/transfers/report")
+                                        .header("Authorization", "Bearer " + jwtToken)
+                                        .param("accountId", senderId.toString())
+                                        .param("startDate", now.minusHours(1).toString())
+                                        .param("endDate", now.plusHours(1).toString())
+                                        .param("page", String.valueOf(page))
+                                        .param("size", "2"))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.pageTransferCount", is(page == 0 ? 2 : 1)))
+                                        .andExpect(jsonPath("$.hasNext", is(page == 0)));
+                }
+        }
+
+        @Test
         void shouldReturnEmptyReportWhenNoTransfersInDateRange() throws Exception {
-                Long accountId = accountRepo.findByIban("TR290006200000000000000111").get().getId();
+                Long accountId = accountRepo.findByIban("TR770006200000000000000111").get().getId();
                 LocalDateTime start = LocalDateTime.now().minusDays(30);
                 LocalDateTime end = LocalDateTime.now().minusDays(29);
 

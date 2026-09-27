@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -39,6 +40,15 @@ class AbstractAccountSnapshotCacheTest {
         @Override
         protected void removeSnapshot(String key) {
             snapshots.remove(key);
+        }
+
+        @Override
+        protected Collection<String> ibanSnapshotKeysForAccount(Long accountId) {
+            return snapshots.entrySet().stream()
+                    .filter(entry -> entry.getKey().startsWith("iban-"))
+                    .filter(entry -> accountId.equals(entry.getValue().id()))
+                    .map(Map.Entry::getKey)
+                    .toList();
         }
 
         @Override
@@ -91,9 +101,9 @@ class AbstractAccountSnapshotCacheTest {
 
     @Test
     void shouldNormalizeIbanKeys() {
-        cache.putByIban("tr33 0006 1005 1978 6456 8412 34", SNAPSHOT_1);
+        cache.putByIban("tr45 0006 1005 1978 6456 8412 34", SNAPSHOT_1);
 
-        assertThat(cache.getByIban("TR330006100519786456841234")).contains(SNAPSHOT_1);
+        assertThat(cache.getByIban("TR450006100519786456841234")).contains(SNAPSHOT_1);
     }
 
     @Test
@@ -129,25 +139,25 @@ class AbstractAccountSnapshotCacheTest {
     @Test
     void shouldEvictIdAndItsIbanEntriesButKeepUnrelated() {
         cache.putById(1L, SNAPSHOT_1);
-        cache.putByIban("TR330006100519786456841234", SNAPSHOT_1);
+        cache.putByIban("TR450006100519786456841234", SNAPSHOT_1);
         cache.putById(2L, SNAPSHOT_2);
 
         cache.evictById(1L);
 
         assertThat(cache.getById(1L)).isEmpty();
-        assertThat(cache.getByIban("TR330006100519786456841234")).isEmpty();
+        assertThat(cache.getByIban("TR450006100519786456841234")).isEmpty();
         assertThat(cache.getById(2L)).contains(SNAPSHOT_2);
     }
 
     @Test
     void shouldEvictSingleIbanEntryAndKeepOthers() {
-        cache.putByIban("TR111111111111111111111111", SNAPSHOT_1);
-        cache.putByIban("TR222222222222222222222222", SNAPSHOT_2);
+        cache.putByIban("TR721111111111111111111111", SNAPSHOT_1);
+        cache.putByIban("TR972222222222222222222222", SNAPSHOT_2);
 
-        cache.evictByIban("TR111111111111111111111111");
+        cache.evictByIban("TR721111111111111111111111");
 
-        assertThat(cache.getByIban("TR111111111111111111111111")).isEmpty();
-        assertThat(cache.getByIban("TR222222222222222222222222")).contains(SNAPSHOT_2);
+        assertThat(cache.getByIban("TR721111111111111111111111")).isEmpty();
+        assertThat(cache.getByIban("TR972222222222222222222222")).contains(SNAPSHOT_2);
     }
 
     @Test

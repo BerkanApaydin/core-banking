@@ -8,6 +8,8 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.domain.User;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
@@ -154,6 +156,31 @@ class LoginUserUseCaseTest {
     class AuthenticationFailure {
 
         @Test
+        void shouldNotAuthenticateWhenAttemptStoreIsUnavailableDuringGuardCheck() {
+            when(loginAttemptPort.isIpBlocked(CLIENT_IP))
+                    .thenThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")));
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD), CLIENT_IP))
+                    .isInstanceOf(LoginAttemptStoreUnavailableException.class);
+            verifyNoInteractions(authenticationPort, jwtPort);
+        }
+
+        @Test
+        void shouldNotReturnTokenWhenAttemptStoreFailsDuringReset() {
+            User user = new User(new UserId(100L), USERNAME, "hashed", Role.ROLE_USER);
+            when(loadUserPort.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+            when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER")).thenReturn("mock-jwt-token");
+            doThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")))
+                    .when(loginAttemptPort).reset(CLIENT_IP);
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD), CLIENT_IP))
+                    .isInstanceOf(LoginAttemptStoreUnavailableException.class);
+            verify(loginAttemptPort).reset(CLIENT_IP);
+            verify(loginAttemptPort, never()).resetByUsername(USERNAME);
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+        }
+
+        @Test
         @DisplayName("should throw when user not found")
         void shouldThrowWhenUserNotFound() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
@@ -212,34 +239,47 @@ class LoginUserUseCaseTest {
         }
 
         @Test
-        @DisplayName("should wrap unexpected exception and record failure with client IP")
-        void shouldWrapUnexpectedExceptionWithIp() {
+        @DisplayName("should not count a backend failure as invalid credentials")
+        void shouldNotCountBackendFailureAsInvalidCredentials() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
             when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
-            doThrow(new RuntimeException("Database connection lost"))
-                    .when(authenticationPort).authenticate(anyString(), anyString());
+            AuthenticationBackendUnavailableException failure = new AuthenticationBackendUnavailableException(
+                    new RuntimeException("Database connection lost"));
+            doThrow(failure).when(authenticationPort).authenticate(anyString(), anyString());
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
-                    .isExactlyInstanceOf(AuthenticationFailedException.class)
-                    .hasMessageContaining("Invalid username or password.");
+                    .isSameAs(failure);
 
-            verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+            verifyNoInteractions(jwtPort);
         }
 
         @Test
-        @DisplayName("should wrap unexpected exception without client IP")
-        void shouldWrapUnexpectedExceptionWithoutIp() {
+        @DisplayName("should propagate unexpected errors rather than turn them into bad credentials")
+        void shouldPropagateUnexpectedExceptionWithoutIp() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
-            doThrow(new RuntimeException("Service unavailable"))
-                    .when(authenticationPort).authenticate(anyString(), anyString());
+            RuntimeException failure = new IllegalStateException("Service unavailable");
+            doThrow(failure).when(authenticationPort).authenticate(anyString(), anyString());
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
-                    .isExactlyInstanceOf(AuthenticationFailedException.class)
-                    .hasMessageContaining("Invalid username or password.");
+                    .isSameAs(failure);
 
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+        }
+
+        @Test
+        void shouldPropagateUserLookupFailureWithoutIssuingTokenOrCountingAttempt() {
+            AuthenticationBackendUnavailableException failure = new AuthenticationBackendUnavailableException(
+                    new RuntimeException("Database unavailable"));
+            when(loadUserPort.findByUsername(USERNAME)).thenThrow(failure);
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD), CLIENT_IP))
+                    .isSameAs(failure);
+
+            verifyNoInteractions(jwtPort);
             verify(loginAttemptPort, never()).recordFailure(any(), any());
         }
     }

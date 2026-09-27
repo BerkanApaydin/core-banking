@@ -34,11 +34,9 @@ public abstract class BusinessException extends RuntimeException {
         return args;
     }
 
-    /**
-     * HTTP status code for this exception. Defaults to 400 (Bad Request).
-     */
-    public int getHttpStatusCode() {
-        return 400;
+    /** Describes the failure without imposing a transport-specific response. */
+    public BusinessFailureKind getFailureKind() {
+        return BusinessFailureKind.RULE_VIOLATION;
     }
 
     public String getErrorCode() {

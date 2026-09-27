@@ -20,7 +20,7 @@ class AccountResponseTest {
         Account account = Account.builder()
                 .id(1L)
                 .userId(new UserId(10L))
-                .iban(new Iban("TR123456789012345678901234"))
+                .iban(new Iban("TR963456789012345678901234"))
                 .ownerName("Ahmet")
                 .balance(new Money(new BigDecimal("1000.00"), Currency.TRY))
                 .status(AccountStatus.ACTIVE)
@@ -30,7 +30,7 @@ class AccountResponseTest {
 
         assertEquals(1L, response.id());
         assertEquals(10L, response.userId());
-        assertEquals("TR123456789012345678901234", response.iban());
+        assertEquals("TR963456789012345678901234", response.iban());
         assertEquals("Ahmet", response.ownerName());
         assertEquals(0, new BigDecimal("1000.00").compareTo(response.balance()));
         assertEquals("TRY", response.currency());
@@ -43,7 +43,7 @@ class AccountResponseTest {
         Account account = Account.builder()
                 .id(2L)
                 .userId(new UserId(20L))
-                .iban(new Iban("TR987654321098765432109876"))
+                .iban(new Iban("TR137654321098765432109876"))
                 .ownerName("Mehmet")
                 .balance(new Money(new BigDecimal("0.00"), Currency.USD))
                 .status(AccountStatus.CLOSED)
@@ -53,7 +53,7 @@ class AccountResponseTest {
 
         assertEquals(2L, response.id());
         assertEquals(20L, response.userId());
-        assertEquals("TR987654321098765432109876", response.iban());
+        assertEquals("TR137654321098765432109876", response.iban());
         assertEquals("Mehmet", response.ownerName());
         assertEquals(0, new BigDecimal("0.00").compareTo(response.balance()));
         assertEquals("USD", response.currency());

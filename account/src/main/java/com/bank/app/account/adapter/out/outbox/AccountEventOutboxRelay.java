@@ -69,7 +69,8 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
             eventPublisher.publishEvent(domainEvent);
             log.debug("Published account event: type={}, id={}", event.eventType(), event.id());
         } catch (Exception e) {
-            log.error("Failed to handle account event: type={}, id={}", event.eventType(), event.id(), e);
+            log.error("Failed to handle account event: type={}, id={}, failureType={}",
+                    event.eventType(), event.id(), e.getClass().getName());
             throw new RuntimeException("AccountEventOutboxRelay failed for " + event.eventType(), e);
         }
     }

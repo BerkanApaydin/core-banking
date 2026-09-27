@@ -31,6 +31,12 @@ class JwtTokenProviderTest {
     void shouldGenerateAndExtractUsername() {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
         assertEquals("testUser", jwtTokenProvider.extractUsername(token));
+        var verified = jwtTokenProvider.verifyAndDecode(token);
+        assertNotNull(verified);
+        assertEquals("testUser", verified.username());
+        assertEquals(1L, verified.userId());
+        assertEquals("ROLE_USER", verified.role());
+        assertNotNull(verified.tokenId());
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 
@@ -34,6 +35,12 @@ public class TransferUseCaseRetryAspect {
 
     @Around("placeTransferMethod() || cancelTransferMethod()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        // The HTTP idempotency boundary retries the entire transaction. Retrying
+        // only this use case inside an existing transaction would reuse a
+        // rollback-only transaction after the first locking failure.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            return joinPoint.proceed();
+        }
         long delay = transferProperties.initialDelayMs();
         Throwable lastException = null;
 

@@ -63,7 +63,8 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
         try {
             return objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize domain event: {}", event.getClass().getSimpleName(), e);
+            log.error("Failed to serialize domain event: {}, failureType={}",
+                    event.getClass().getSimpleName(), e.getClass().getName());
             throw new RuntimeException("Failed to serialize domain event: " + event.getClass().getSimpleName(), e);
         }
     }

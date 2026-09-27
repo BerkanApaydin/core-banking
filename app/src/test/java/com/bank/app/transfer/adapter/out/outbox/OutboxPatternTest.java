@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.context.ApplicationEventPublisher;
+import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,7 +38,7 @@ class OutboxPatternTest {
 
     private OutboxPort outboxPort;
     private ObjectMapper objectMapper;
-    private ApplicationEventPublisher eventPublisher;
+    private TransferEventConsumer notificationConsumer;
     private IdempotencyPort idempotencyPort;
 
     private OutboxPoller outboxPoller;
@@ -94,7 +94,7 @@ class OutboxPatternTest {
         entityMap.clear();
         outboxPort = mock(OutboxPort.class);
         objectMapper = createMapper();
-        eventPublisher = mock(ApplicationEventPublisher.class);
+        notificationConsumer = mock(TransferEventConsumer.class);
         idempotencyPort = mock(IdempotencyPort.class);
 
         when(outboxPort.findByIdForUpdateSkipLocked(anyString())).thenAnswer(invocation -> {
@@ -104,7 +104,7 @@ class OutboxPatternTest {
 
         when(idempotencyPort.tryCreate(anyString(), any())).thenReturn(true);
 
-        handler = new TransferCompletedOutboxRelay(objectMapper, eventPublisher, idempotencyPort);
+        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort);
         OutboxProcessor processor = new OutboxProcessor(outboxPort, List.of(handler));
         outboxPoller = new OutboxPoller(outboxPort, processor, defaultOutboxProperties);
     }
@@ -128,7 +128,7 @@ class OutboxPatternTest {
 
         ArgumentCaptor<AsyncTransferCompletedEvent> eventCaptor = ArgumentCaptor
                 .forClass(AsyncTransferCompletedEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        verify(notificationConsumer).handleTransferCompleted(eventCaptor.capture());
 
         AsyncTransferCompletedEvent asyncEvent = eventCaptor.getValue();
         assertEquals(123L, asyncEvent.transferId());
@@ -145,7 +145,7 @@ class OutboxPatternTest {
 
         outboxPoller.pollAndProcessEvents();
 
-        verifyNoInteractions(eventPublisher);
+        verifyNoInteractions(notificationConsumer);
         verify(outboxPort).markFailed(eq("event-uuid"), anyString(), eq(1));
     }
 
@@ -166,7 +166,7 @@ class OutboxPatternTest {
 
         outboxPoller.pollAndProcessEvents();
 
-        verifyNoInteractions(eventPublisher);
+        verifyNoInteractions(notificationConsumer);
         verify(outboxPort, never()).markProcessed(any());
         verify(outboxPort, never()).markFailed(any(), any(), anyInt());
     }
@@ -178,7 +178,7 @@ class OutboxPatternTest {
 
         outboxPoller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed(eq("event-uuid"), contains("No handler"), eq(1));
+        verify(outboxPort).markFailed(eq("event-uuid"), eq(IllegalStateException.class.getName()), eq(1));
     }
 
     @Test
@@ -195,7 +195,7 @@ class OutboxPatternTest {
         handler.handle(entity);
 
         ArgumentCaptor<AsyncTransferCompletedEvent> captor = ArgumentCaptor.forClass(AsyncTransferCompletedEvent.class);
-        verify(eventPublisher).publishEvent(captor.capture());
+        verify(notificationConsumer).handleTransferCompleted(captor.capture());
 
         AsyncTransferCompletedEvent published = captor.getValue();
         assertEquals(456L, published.transferId());
@@ -238,7 +238,7 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed("id", "handler failed", 1);
+        verify(outboxPort).markFailed("id", RuntimeException.class.getName(), 1);
     }
 
     @Test
@@ -257,11 +257,11 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        verify(outboxPort).markDeadLetter("id", "boom", 5);
+        verify(outboxPort).markDeadLetter("id", RuntimeException.class.getName(), 5);
     }
 
     @Test
-    void shouldTruncateErrorMessageTo2000Characters() throws Exception {
+    void shouldRedactLongErrorMessage() throws Exception {
         String longMessage = "x".repeat(2500);
         OutboxEventPort failingHandler = mock(OutboxEventPort.class);
         when(failingHandler.supports("TransferCompletedEvent")).thenReturn(true);
@@ -276,7 +276,7 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed("id", longMessage.substring(0, 2000), 1);
+        verify(outboxPort).markFailed("id", RuntimeException.class.getName(), 1);
     }
 
     @Test
@@ -294,11 +294,11 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed("id", null, 1);
+        verify(outboxPort).markFailed("id", RuntimeException.class.getName(), 1);
     }
 
     @Test
-    void shouldKeepShortErrorMessageWithoutTruncation() throws Exception {
+    void shouldRedactShortErrorMessage() throws Exception {
         OutboxEventPort failingHandler = mock(OutboxEventPort.class);
         when(failingHandler.supports("TransferCompletedEvent")).thenReturn(true);
         doThrow(new RuntimeException("short message")).when(failingHandler).handle(any());
@@ -312,7 +312,7 @@ class OutboxPatternTest {
 
         poller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed("id", "short message", 1);
+        verify(outboxPort).markFailed("id", RuntimeException.class.getName(), 1);
     }
 
     @Test
@@ -349,7 +349,7 @@ class OutboxPatternTest {
 
         pollerWithCustomRetries.pollAndProcessEvents();
 
-        verify(outboxPort).markDeadLetter("id", "fail", 3);
+        verify(outboxPort).markDeadLetter("id", RuntimeException.class.getName(), 3);
     }
 
     @Test
@@ -380,6 +380,6 @@ class OutboxPatternTest {
 
         emptyPoller.pollAndProcessEvents();
 
-        verify(outboxPort).markFailed(eq("id"), contains("No handler"), eq(1));
+        verify(outboxPort).markFailed(eq("id"), eq(IllegalStateException.class.getName()), eq(1));
     }
 }

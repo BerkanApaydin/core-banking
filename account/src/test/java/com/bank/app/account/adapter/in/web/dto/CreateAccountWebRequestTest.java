@@ -33,44 +33,24 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldCreateWithValidFields() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "Ahmet Yilmaz",
+                "Ahmet Yilmaz",
                 new BigDecimal("1000.00"), Currency.TRY);
-        assertThat(request.userId()).isEqualTo(1L);
-        assertThat(request.iban()).isEqualTo("TR290006200000000000000123");
         assertThat(request.ownerName()).isEqualTo("Ahmet Yilmaz");
         assertThat(request.initialBalance()).isEqualByComparingTo(new BigDecimal("1000.00"));
         assertThat(request.currency()).isEqualTo(Currency.TRY);
     }
 
     @Test
-    void shouldFailValidationWhenUserIdNull() {
-        CreateAccountWebRequest request = new CreateAccountWebRequest(
-                null, "TR290006200000000000000123", "Ahmet",
-                new BigDecimal("1000.00"), Currency.TRY);
-        var violations = validator.validate(request);
-        assertThat(violations).isNotEmpty();
-    }
-
-    @Test
-    void shouldFailValidationWhenIbanBlank() {
-        CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "", "Ahmet", new BigDecimal("1000.00"), Currency.TRY);
-        var violations = validator.validate(request);
-        assertThat(violations).isNotEmpty();
-    }
-
-    @Test
-    void shouldFailValidationWhenIbanInvalid() {
-        CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "invalid", "Ahmet", new BigDecimal("1000.00"), Currency.TRY);
-        var violations = validator.validate(request);
-        assertThat(violations).isNotEmpty();
+    void shouldNotExposeClientSelectedUserIdOrIban() {
+        assertThat(CreateAccountWebRequest.class.getRecordComponents())
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .doesNotContain("userId", "iban");
     }
 
     @Test
     void shouldFailValidationWhenOwnerNameBlank() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "",
+                "",
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
@@ -79,7 +59,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldFailValidationWhenBalanceNull() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "Ahmet", null, Currency.TRY);
+                "Ahmet", null, Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
     }
@@ -87,7 +67,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldFailValidationWhenCurrencyNull() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "Ahmet",
+                "Ahmet",
                 new BigDecimal("1000.00"), null);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
@@ -96,7 +76,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldFailValidationWhenOwnerNameTooLong() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "A".repeat(256),
+                "A".repeat(256),
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
@@ -105,7 +85,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldFailValidationWhenBalanceHasTooManyDecimals() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "Ahmet",
+                "Ahmet",
                 new BigDecimal("100.001"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
@@ -114,7 +94,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldFailValidationWhenBalanceExceedsMax() {
         CreateAccountWebRequest request = new CreateAccountWebRequest(
-                1L, "TR290006200000000000000123", "Ahmet",
+                "Ahmet",
                 new BigDecimal("1000000000.01"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();

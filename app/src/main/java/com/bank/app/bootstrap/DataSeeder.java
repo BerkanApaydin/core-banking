@@ -2,8 +2,10 @@ package com.bank.app.bootstrap;
 
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
+import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -28,7 +30,7 @@ import java.util.List;
  * Seeds sample data through domain use cases — JPA entity bypass removed.
  */
 @Component
-@Profile("!prod")
+@Profile("(dev | demo) & !prod")
 public class DataSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
@@ -36,13 +38,16 @@ public class DataSeeder {
     private final RegisterUserUseCase registerUserUseCase;
     private final CreateAccountUseCase createAccountPort;
     private final LoadUserPort loadUserPort;
+    private final LoadAccountPort loadAccountPort;
 
     public DataSeeder(RegisterUserUseCase registerUserUseCase,
             CreateAccountUseCase createAccountPort,
-            LoadUserPort loadUserPort) {
+            LoadUserPort loadUserPort,
+            LoadAccountPort loadAccountPort) {
         this.registerUserUseCase = registerUserUseCase;
         this.createAccountPort = createAccountPort;
         this.loadUserPort = loadUserPort;
+        this.loadAccountPort = loadAccountPort;
     }
 
     @Bean
@@ -57,14 +62,17 @@ public class DataSeeder {
                     .orElseThrow(() -> new IllegalStateException("User Ayse not found."));
 
             runAsUser(ahmet.getId().value(), ahmet.getUsername(), () -> {
-                seedAccountIfAbsent(ahmet.getId().value(), "TR123456789012345678901234", "Ahmet Yılmaz",
+                seedAccountIfAbsent(ahmet.getId().value(), "TR963456789012345678901234",
+                        "TR123456789012345678901234", "Ahmet Yılmaz",
                         new BigDecimal("1000.00"), Currency.TRY);
-                seedAccountIfAbsent(ahmet.getId().value(), "TR111111111111111111111111", "Ahmet Yılmaz (Dolar Hesabı)",
+                seedAccountIfAbsent(ahmet.getId().value(), "TR721111111111111111111111",
+                        "TR111111111111111111111111", "Ahmet Yılmaz (Dolar Hesabı)",
                         new BigDecimal("2000.00"), Currency.USD);
             });
 
             runAsUser(ayse.getId().value(), ayse.getUsername(),
-                    () -> seedAccountIfAbsent(ayse.getId().value(), "TR987654321098765432109876", "Ayşe Demir",
+                    () -> seedAccountIfAbsent(ayse.getId().value(), "TR137654321098765432109876",
+                            "TR987654321098765432109876", "Ayşe Demir",
                             new BigDecimal("500.00"), Currency.TRY));
 
             log.info("Database seeding completed (use case based).");
@@ -79,8 +87,14 @@ public class DataSeeder {
         registerUserUseCase.execute(new AuthRequest(username, password));
     }
 
-    private void seedAccountIfAbsent(Long userId, String iban, String ownerName,
+    private void seedAccountIfAbsent(Long userId, String iban, String legacyIban, String ownerName,
             BigDecimal balance, Currency currency) {
+        // Earlier demo releases used the same BBAN with invalid check digits.
+        // Do not mint a second opening balance when upgrading an existing DB.
+        if (loadAccountPort.findByIban(new Iban(legacyIban)).isPresent()) {
+            log.warn("Legacy demo account is present; skipping replacement seed account");
+            return;
+        }
         try {
             createAccountPort.execute(new CreateAccountRequest(userId, iban, ownerName, balance, currency));
             log.info("Account created");

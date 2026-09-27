@@ -36,7 +36,7 @@ public class AccountJpaMapper {
                 .userId(new UserId(entity.getUserId()))
                 .iban(new Iban(entity.getIban()))
                 .ownerName(entity.getOwnerName())
-                .balance(Money.of(entity.getBalance(), Currency.valueOf(entity.getCurrency())))
+                .balance(Money.exact(entity.getBalance(), Currency.valueOf(entity.getCurrency())))
                 .status(AccountStatus.valueOf(entity.getStatus()))
                 .version(entity.getVersion())
                 .build();

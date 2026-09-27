@@ -16,6 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.mockito.Mockito.*;
@@ -96,6 +97,30 @@ class OutboxPollerTest {
         outboxPoller.pollAndProcessEvents();
 
         verify(outboxProcessor, times(1)).processEvent(any(EventEntry.class));
+    }
+
+    @Test
+    void shouldRefuseStartupWhenPendingEventsUseUnpolledPartitions() {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000));
+        when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(3L);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, outboxPoller::start);
+
+        assertTrue(failure.getMessage().contains("3 pending event(s)"));
+        assertTrue(failure.getMessage().contains("OUTBOX_PARTITION_COUNT"));
+        verify(outboxPort, never()).findAndLockUnprocessed(anyInt(), anyInt());
+        verifyNoInteractions(outboxProcessor);
+    }
+
+    @Test
+    void shouldRefuseManualPollingWhenPendingEventsUseUnpolledPartitions() {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000));
+        when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(1L);
+
+        assertThrows(IllegalStateException.class, outboxPoller::pollAndProcessEvents);
+
+        verify(outboxPort, never()).findAndLockUnprocessed(anyInt(), anyInt());
+        verifyNoInteractions(outboxProcessor);
     }
 
     @Test

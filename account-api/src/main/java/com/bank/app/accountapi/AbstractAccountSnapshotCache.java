@@ -3,33 +3,24 @@ package com.bank.app.accountapi;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Shared base for {@link AccountSnapshotCache} backends.
  *
- * <p>Owns everything except raw key/value storage: the {@code id ↔ IBAN}
- * reverse index (so {@code evictById} also drops the IBAN entries holding the
- * same mutable-status snapshot), canonical batch keys, and granular
- * invalidation. Subclasses only provide four storage primitives, which keeps
- * the Caffeine (infrastructure) and in-memory (fallback) backends free of
- * copy-pasted invalidation logic.
+ * <p>Owns canonical keys and granular invalidation. Backends identify live
+ * IBAN snapshots for an account from their own storage, so expiration and
+ * size eviction cannot leave an unbounded reverse index behind.
  */
 public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCache {
-
-    // Ephemeral reverse index id -> normalized IBAN keys so evictById can also
-    // drop the IBAN entries holding the same (mutable-status) snapshot.
-    // Rebuilt lazily on putByIban/putIbans; a restart may miss an IBAN evict,
-    // bounded by the backend TTL. Never a source of truth, only invalidation.
-    private final ConcurrentHashMap<Long, Set<String>> idToIbanKeys = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Long> ibanKeyToId = new ConcurrentHashMap<>();
 
     protected abstract Optional<AccountSnapshot> readSnapshot(String key);
 
     protected abstract void writeSnapshot(String key, AccountSnapshot snapshot);
 
     protected abstract void removeSnapshot(String key);
+
+    /** Live IBAN keys only; the backend's own expiration/size policy bounds this scan. */
+    protected abstract Collection<String> ibanSnapshotKeysForAccount(Long accountId);
 
     protected abstract Optional<Map<Long, String>> readBatch(String key);
 
@@ -62,13 +53,12 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public void putByIban(String ibanValue, AccountSnapshot snapshot) {
+    public synchronized void putByIban(String ibanValue, AccountSnapshot snapshot) {
         if (ibanValue == null || snapshot == null) {
             return;
         }
         String key = AccountSnapshotCache.ibanKey(ibanValue);
         writeSnapshot("iban-" + key, snapshot);
-        trackIban(snapshot.id(), key);
     }
 
     @Override
@@ -88,41 +78,26 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public void evictAll() {
+    public synchronized void evictAll() {
         clearStorage();
-        idToIbanKeys.clear();
-        ibanKeyToId.clear();
     }
 
     @Override
-    public void evictById(Long accountId) {
+    public synchronized void evictById(Long accountId) {
         if (accountId == null) {
             return;
         }
         removeSnapshot("id-" + accountId);
-        Set<String> ibanKeys = idToIbanKeys.remove(accountId);
-        if (ibanKeys != null) {
-            ibanKeys.forEach(key -> {
-                removeSnapshot("iban-" + key);
-                ibanKeyToId.remove(key);
-            });
-        }
+        ibanSnapshotKeysForAccount(accountId).forEach(this::removeSnapshot);
     }
 
     @Override
-    public void evictByIban(String ibanValue) {
+    public synchronized void evictByIban(String ibanValue) {
         if (ibanValue == null) {
             return;
         }
         String key = AccountSnapshotCache.ibanKey(ibanValue);
         removeSnapshot("iban-" + key);
-        Long accountId = ibanKeyToId.remove(key);
-        if (accountId != null) {
-            Set<String> keys = idToIbanKeys.get(accountId);
-            if (keys != null) {
-                keys.remove(key);
-            }
-        }
     }
 
     @Override
@@ -132,8 +107,4 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
         // backend TTL bounds any residual staleness from out-of-band changes.
     }
 
-    private void trackIban(Long accountId, String ibanKey) {
-        ibanKeyToId.put(ibanKey, accountId);
-        idToIbanKeys.computeIfAbsent(accountId, k -> ConcurrentHashMap.newKeySet()).add(ibanKey);
-    }
 }

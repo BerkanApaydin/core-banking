@@ -11,20 +11,20 @@ class IbanEdgeCaseTest {
 
     @Test
     void shouldNormalizeIbanWithSpaces() {
-        Iban iban = new Iban("TR29 0006 2000 0000 0000 0001 11");
-        assertEquals("TR290006200000000000000111", iban.value());
+        Iban iban = new Iban("TR77 0006 2000 0000 0000 0001 11");
+        assertEquals("TR770006200000000000000111", iban.value());
     }
 
     @Test
     void shouldNormalizeIbanWithLowercase() {
-        Iban iban = new Iban("tr290006200000000000000111");
-        assertEquals("TR290006200000000000000111", iban.value());
+        Iban iban = new Iban("tr770006200000000000000111");
+        assertEquals("TR770006200000000000000111", iban.value());
     }
 
     @Test
     void shouldNormalizeIbanWithMixedCaseAndSpaces() {
-        Iban iban = new Iban("Tr29 0006 2000 0000 0000 0001 11");
-        assertEquals("TR290006200000000000000111", iban.value());
+        Iban iban = new Iban("Tr77 0006 2000 0000 0000 0001 11");
+        assertEquals("TR770006200000000000000111", iban.value());
     }
 
     @Test

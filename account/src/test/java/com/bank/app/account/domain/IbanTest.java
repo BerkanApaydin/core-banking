@@ -16,20 +16,20 @@ class IbanTest {
 
     @Test
     void shouldCreateIbanWhenFormatIsValid() {
-        String validIbanStr = "TR29 0006 2000 0000 0000 0001 11";
+        String validIbanStr = "TR77 0006 2000 0000 0000 0001 11";
         Iban iban = new Iban(validIbanStr);
-        assertEquals("TR290006200000000000000111", iban.value());
+        assertEquals("TR770006200000000000000111", iban.value());
     }
 
     @Test
     void shouldThrowInvalidIbanExceptionWhenFormatIsInvalid() {
         InvalidIbanException ex1 = assertThrows(InvalidIbanException.class, () -> new Iban("TR29000"));
-        assertEquals("Invalid IBAN format: TR29000", ex1.getMessage());
+        assertEquals("Invalid IBAN format", ex1.getMessage());
         InvalidIbanException ex2 = assertThrows(InvalidIbanException.class,
                 () -> new Iban("US290006200000000000000111"));
-        assertEquals("Invalid IBAN format: US290006200000000000000111", ex2.getMessage());
+        assertEquals("Invalid IBAN format", ex2.getMessage());
         InvalidIbanException ex3 = assertThrows(InvalidIbanException.class,
                 () -> new Iban("TR29000620000000000000011A"));
-        assertEquals("Invalid IBAN format: TR29000620000000000000011A", ex3.getMessage());
+        assertEquals("Invalid IBAN format", ex3.getMessage());
     }
 }

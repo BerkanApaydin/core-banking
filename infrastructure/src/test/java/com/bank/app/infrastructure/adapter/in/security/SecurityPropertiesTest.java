@@ -21,9 +21,10 @@ class SecurityPropertiesTest {
             SecurityProperties props = new SecurityProperties(null);
 
             assertThat(props.whitelistPaths()).containsExactly(
-                    "/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
+                    "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
+                    "/v3/api-docs/**", "/swagger-ui/**",
                     "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/style.css", "/favicon.ico", "/error"
+                    "/app.js", "/boot.js", "/style.css", "/favicon.ico", "/error"
             );
         }
 
@@ -33,9 +34,10 @@ class SecurityPropertiesTest {
             SecurityProperties props = new SecurityProperties(List.of());
 
             assertThat(props.whitelistPaths()).containsExactly(
-                    "/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
+                    "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
+                    "/v3/api-docs/**", "/swagger-ui/**",
                     "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/style.css", "/favicon.ico", "/error"
+                    "/app.js", "/boot.js", "/style.css", "/favicon.ico", "/error"
             );
         }
     }

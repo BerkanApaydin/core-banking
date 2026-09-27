@@ -35,7 +35,7 @@ class TransferAuthorizationServiceTest {
     private static final Long ACCOUNT_ID = 1L;
     private static final Long SENDER_USER_ID = 100L;
     private static final Long RECEIVER_USER_ID = 200L;
-    private static final String IBAN = "TR290006200000000000000111";
+    private static final String IBAN = "TR770006200000000000000111";
     private static final String ERROR_MESSAGE = "You are not authorized.";
     private static final AccountInfo ACCOUNT_INFO = new AccountInfo(ACCOUNT_ID, SENDER_USER_ID, "TRY", "ACTIVE");
 

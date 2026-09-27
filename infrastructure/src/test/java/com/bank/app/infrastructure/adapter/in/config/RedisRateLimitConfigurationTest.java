@@ -76,6 +76,25 @@ class RedisRateLimitConfigurationTest {
     }
 
     @Test
+    void shouldBindAclTlsAndCommandTimeout() {
+        contextRunner.withPropertyValues(
+                "app.security.rate-limit.backend=redis",
+                "spring.data.redis.username=service-user",
+                "spring.data.redis.password=secret",
+                "spring.data.redis.ssl.enabled=true",
+                "spring.data.redis.timeout=2s")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    LettuceConnectionFactory factory = context.getBean(LettuceConnectionFactory.class);
+                    assertThat(factory.getStandaloneConfiguration().getUsername()).isEqualTo("service-user");
+                    assertThat(factory.getPassword()).isEqualTo("secret");
+                    assertThat(factory.getClientConfiguration().isUseSsl()).isTrue();
+                    assertThat(factory.getClientConfiguration().getCommandTimeout())
+                            .isEqualTo(java.time.Duration.ofSeconds(2));
+                });
+    }
+
+    @Test
     void shouldCreateStringRedisTemplateWithConnectionFactory() {
         contextRunner
                 .withPropertyValues(

@@ -10,20 +10,20 @@ class IbanTest {
 
     @Test
     void shouldCreateWithValidIban() {
-        Iban iban = new Iban("TR290006200000000000000123");
-        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
+        Iban iban = new Iban("TR440006200000000000000123");
+        assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
     }
 
     @Test
     void shouldNormalizeIbanWithSpaces() {
-        Iban iban = new Iban("TR29 0006 2000 0000 0000 0001 23");
-        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
+        Iban iban = new Iban("TR44 0006 2000 0000 0000 0001 23");
+        assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
     }
 
     @Test
     void shouldNormalizeIbanToUpperCase() {
-        Iban iban = new Iban("tr290006200000000000000123");
-        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
+        Iban iban = new Iban("tr440006200000000000000123");
+        assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
     }
 
     @Test
@@ -39,6 +39,27 @@ class IbanTest {
     }
 
     @Test
+    void shouldValidatePublishedTurkishCheckDigits() {
+        assertThat(new Iban("TR330006100519786457841326").hasValidChecksum()).isTrue();
+        assertThat(new Iban("TR340006100519786457841326").hasValidChecksum()).isFalse();
+        assertThatThrownBy(() -> new Iban("TR340006100519786457841326").requireValidChecksum())
+                .isExactlyInstanceOf(InvalidIbanException.class);
+    }
+
+    @Test
+    void shouldCalculateCheckDigitsFromTurkishBban() {
+        Iban iban = Iban.fromTurkishBban("0006200000000000000123");
+        assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
+        assertThat(iban.hasValidChecksum()).isTrue();
+    }
+
+    @Test
+    void shouldRejectMalformedTurkishBban() {
+        assertThatThrownBy(() -> Iban.fromTurkishBban("ABC"))
+                .isExactlyInstanceOf(InvalidIbanException.class);
+    }
+
+    @Test
     void shouldThrowWhenTooShort() {
         assertThatThrownBy(() -> new Iban("TR12"))
                 .isExactlyInstanceOf(InvalidIbanException.class);
@@ -46,28 +67,28 @@ class IbanTest {
 
     @Test
     void shouldBeEqualWhenSameIban() {
-        assertThat(new Iban("TR290006200000000000000123"))
-                .isEqualTo(new Iban("TR290006200000000000000123"));
+        assertThat(new Iban("TR440006200000000000000123"))
+                .isEqualTo(new Iban("TR440006200000000000000123"));
     }
 
     @Test
     void shouldNotBeEqualWhenDifferentIban() {
-        assertThat(new Iban("TR290006200000000000000123"))
-                .isNotEqualTo(new Iban("TR290006200000000000000456"));
+        assertThat(new Iban("TR440006200000000000000123"))
+                .isNotEqualTo(new Iban("TR740006200000000000000456"));
     }
 
     @Test
     void toStringShouldMaskMiddleDigits() {
-        Iban iban = new Iban("TR290006200000000000000123");
+        Iban iban = new Iban("TR440006200000000000000123");
         String masked = iban.toString();
         assertThat(masked).contains("*******")
-                .startsWith("TR290006")
+                .startsWith("TR440006")
                 .endsWith("0123");
     }
 
     @Test
     void toStringShouldHandleShortIban() {
-        Iban iban = new Iban("TR123456789012345678901234");
+        Iban iban = new Iban("TR963456789012345678901234");
         assertThat(iban.toString()).contains("*******");
     }
 
@@ -78,7 +99,7 @@ class IbanTest {
 
     @Test
     void shouldNormalizeTabsAndMixedCase() {
-        Iban iban = new Iban("tr29\t0006 2000\n0000 0000 0001 23");
-        assertThat(iban.value()).isEqualTo("TR290006200000000000000123");
+        Iban iban = new Iban("tr44\t0006 2000\n0000 0000 0001 23");
+        assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
     }
 }

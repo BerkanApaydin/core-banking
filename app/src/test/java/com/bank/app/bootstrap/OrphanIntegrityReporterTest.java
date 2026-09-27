@@ -160,6 +160,33 @@ class OrphanIntegrityReporterTest {
     }
 
     @Test
+    void shouldExposeSuccessfulScanTimeOnlyAfterAllQueriesComplete() {
+        var registry = new SimpleMeterRegistry();
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, registry);
+        assertEquals(0.0, registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
+
+        reporter.reportOrphans();
+
+        verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
+        org.junit.jupiter.api.Assertions.assertTrue(
+                registry.get("db.orphan.last_success_epoch_seconds").gauge().value() > 0);
+    }
+
+    @Test
+    void shouldNotReportSuccessWhenAnyQueryFails() {
+        var registry = new SimpleMeterRegistry();
+        when(jdbc.queryForObject(anyString(), eq(Long.class)))
+                .thenReturn(0L, 0L)
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("database unavailable"));
+        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, registry);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.dao.DataAccessResourceFailureException.class, reporter::reportOrphans);
+        assertEquals(0.0, registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
+    }
+
+    @Test
     void shouldNotLogWarnWhenClean() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
         assertNull(findWarnEvent());

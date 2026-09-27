@@ -92,9 +92,9 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         cleanUp();
         user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER", null, null, null));
 
-        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000111", "Sender",
+        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR770006200000000000000111", "Sender",
                 new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
-        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR290006200000000000000222", "Receiver",
+        accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR870006200000000000000222", "Receiver",
                 new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
@@ -119,8 +119,8 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     @Order(1)
     void shouldCreateOutboxEventAndProcessThroughRealPipeline() {
         TransferRequest request = new TransferRequest(
-                "TR290006200000000000000111",
-                "TR290006200000000000000222",
+                "TR770006200000000000000111",
+                "TR870006200000000000000222",
                 new BigDecimal("50.00"),
                 Currency.TRY);
 

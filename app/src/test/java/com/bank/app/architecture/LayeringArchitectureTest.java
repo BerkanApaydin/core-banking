@@ -121,11 +121,10 @@ class LayeringArchitectureTest extends ArchitectureTest {
     }
 
     @Test
-    void loginUseCaseShouldBeTransactional() {
-        // Login's only relational access is reads (credential check + user lookup);
-        // login-attempt state lives in Redis, outside the DB transaction — so it
-        // must run read-only, not in a read-write transaction.
-        ArchRule rule = classes()
+    void loginUseCaseShouldNotHoldTransactionAcrossRedisCalls() {
+        // Each credential lookup owns a short read-only adapter transaction.
+        // The login use case also calls Redis and must not hold a DB transaction.
+        ArchRule rule = noClasses()
                 .that().haveSimpleName("LoginUserUseCaseImpl")
                 .should().beAnnotatedWith(ReadOnlyUseCase.class)
                 .allowEmptyShould(true);

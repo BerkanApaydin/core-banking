@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
+import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,9 +11,11 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ResilientTokenBlacklistAdapterTest {
@@ -38,24 +41,42 @@ class ResilientTokenBlacklistAdapterTest {
     }
 
     @Test
-    void shouldFallBackToLocalBlacklistWhenRedisIsDown() {
+    void shouldRefuseUnknownTokenWhenRedisIsDown() {
         when(redis.isBlacklisted("t")).thenThrow(new RedisConnectionFailureException("down"));
 
-        assertThat(adapter.isBlacklisted("t")).isFalse();
-
-        adapter.blacklist("t2", 60_000L);
-        // Local write succeeds even though the Redis write throws.
-        doThrow(new RedisConnectionFailureException("down")).when(redis).blacklist("t2", 60_000L);
-        assertThatNoException().isThrownBy(() -> adapter.blacklist("t2", 60_000L));
-        assertThat(local.isBlacklisted("t2")).isTrue();
+        assertThatThrownBy(() -> adapter.isBlacklisted("t"))
+                .isInstanceOf(RevocationStoreUnavailableException.class)
+                .hasCauseInstanceOf(RedisConnectionFailureException.class);
     }
 
     @Test
     void shouldHonorLocalRevocationsDuringOutage() {
         local.blacklist("revoked", 60_000L);
-        when(redis.isBlacklisted("revoked")).thenThrow(new RedisConnectionFailureException("down"));
 
         assertThat(adapter.isBlacklisted("revoked")).isTrue();
+        verify(redis, never()).isBlacklisted("revoked");
+    }
+
+    @Test
+    void shouldReportFailedSharedWriteAndAllowLogoutRetry() {
+        doThrow(new RedisConnectionFailureException("down")).doNothing()
+                .when(redis).blacklist("revoked", 60_000L);
+        assertThatThrownBy(() -> adapter.blacklist("revoked", 60_000L))
+                .isInstanceOf(RevocationStoreUnavailableException.class)
+                .hasCauseInstanceOf(RedisConnectionFailureException.class);
+
+        assertThat(local.isBlacklisted("revoked")).isFalse();
+        adapter.blacklist("revoked", 60_000L);
+        assertThat(local.isBlacklisted("revoked")).isTrue();
+        verify(redis, org.mockito.Mockito.times(2)).blacklist("revoked", 60_000L);
+    }
+
+    @Test
+    void shouldKeepConfirmedRevocationAfterRedisLosesEntry() {
+        adapter.blacklist("revoked", 60_000L);
+
+        assertThat(adapter.isBlacklisted("revoked")).isTrue();
+        verify(redis, never()).isBlacklisted("revoked");
     }
 
     @Test

@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Account domain entity")
 class AccountTest {
 
-    private static final Iban IBAN = new Iban("TR290006200000000000000111");
+    private static final Iban IBAN = new Iban("TR770006200000000000000111");
     private static final String OWNER = "Ahmet Yilmaz";
 
     private Account activeAccount(long balance) {
@@ -486,7 +486,7 @@ class AccountTest {
         void equalsWhenSameId() {
             Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(1L, new UserId(2L), new Iban("TR290006200000000000000222"), "Mehmet",
+            Account a2 = new Account(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
                     Money.of("500", Currency.TRY), AccountStatus.SUSPENDED);
             assertThat(a1).isEqualTo(a2);
         }
@@ -524,7 +524,7 @@ class AccountTest {
         void hashCodeConsistentWithEquals() {
             Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(1L, new UserId(2L), new Iban("TR290006200000000000000222"), "Mehmet",
+            Account a2 = new Account(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
                     Money.of("500", Currency.TRY), AccountStatus.SUSPENDED);
             assertThat(a1).hasSameHashCodeAs(a2);
         }

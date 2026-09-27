@@ -54,9 +54,9 @@ class GenerateTransferReportQueryImplTest {
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L, 3L)))).thenReturn(Map.of(
-                1L, "TR290006200000000000000111",
-                2L, "TR290006200000000000000222",
-                3L, "TR290006200000000000000333"));
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222",
+                3L, "TR970006200000000000000333"));
 
         Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED,
                 start.plusDays(1));
@@ -77,7 +77,36 @@ class GenerateTransferReportQueryImplTest {
         assertEquals(2, response.transfers().size());
         assertEquals(10L, response.transfers().get(0).id());
         assertEquals(11L, response.transfers().get(1).id());
+        assertFalse(response.hasNext());
         verify(accountOperationPort).getIbansForAccounts(Set.of(1L, 2L, 3L));
+    }
+
+    @Test
+    void fullPageProbesNextPageAndMarksOnlyTheFirstPageAsHavingMore() {
+        LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
+        LocalDateTime end = start.plusDays(1);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(Set.of(1L, 2L))).thenReturn(Map.of(
+                1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
+        Transfer first = new Transfer(10L, 1L, 2L, Money.of("10.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusHours(1));
+        Transfer second = new Transfer(11L, 1L, 2L, Money.of("20.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusHours(2));
+        Transfer third = new Transfer(12L, 1L, 2L, Money.of("30.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusHours(3));
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2)).thenReturn(List.of(first, second));
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 1, 2)).thenReturn(List.of(third));
+
+        TransferReportResponse pageOne = generateTransferReportUseCase.execute(new ReportCriteria(1L, start, end, 0, 2));
+        TransferReportResponse pageTwo = generateTransferReportUseCase.execute(new ReportCriteria(1L, start, end, 1, 2));
+
+        assertTrue(pageOne.hasNext());
+        assertEquals(2, pageOne.pageTransferCount());
+        assertEquals(new BigDecimal("30.00"), pageOne.pageVolume());
+        assertFalse(pageTwo.hasNext());
+        assertEquals(1, pageTwo.pageTransferCount());
+        assertEquals(new BigDecimal("30.00"), pageTwo.pageVolume());
     }
 
     @Test

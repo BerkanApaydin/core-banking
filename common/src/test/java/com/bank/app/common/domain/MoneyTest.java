@@ -50,10 +50,18 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should round to 2 decimal places on factory method")
-        void shouldRoundOnFactory() {
-            Money money = Money.of("100.456", Currency.TRY);
+        @DisplayName("should round to 2 decimal places only when requested")
+        void shouldRoundOnExplicitFactory() {
+            Money money = Money.rounded("100.456", Currency.TRY);
             assertThat(money.amount()).isEqualByComparingTo("100.46");
+        }
+
+        @Test
+        void shouldRejectImplicitRounding() {
+            assertThatThrownBy(() -> Money.of("100.456", Currency.TRY))
+                    .isInstanceOf(ArithmeticException.class);
+            assertThatThrownBy(() -> Money.exact(new BigDecimal("100.456"), Currency.TRY))
+                    .isInstanceOf(ArithmeticException.class);
         }
 
         @Test
@@ -113,6 +121,16 @@ class MoneyTest {
         void shouldRejectNegativeAmount(String value) {
             assertThatThrownBy(() -> new Money(new BigDecimal(value), Currency.TRY))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Amount must not be negative");
+        }
+
+        @Test
+        void shouldRejectNegativeAmountBeforeRounding() {
+            assertThatThrownBy(() -> Money.rounded("-0.001", Currency.TRY))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Amount must not be negative");
+            assertThatThrownBy(() -> Money.of(new BigDecimal("-0.001"), Currency.TRY))
+                    .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Amount must not be negative");
         }
 

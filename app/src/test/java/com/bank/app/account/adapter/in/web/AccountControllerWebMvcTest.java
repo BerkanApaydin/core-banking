@@ -2,10 +2,12 @@ package com.bank.app.account.adapter.in.web;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
+import com.bank.app.account.adapter.in.web.dto.CreateAccountWebRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
+import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.common.application.dto.PageResponse;
@@ -31,6 +33,8 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -59,6 +63,9 @@ class AccountControllerWebMvcTest {
         @MockitoBean
         private GetAccountsByUserQuery getAccountsByUserQuery;
 
+        @MockitoBean
+        private AccountAuthorizationService accountAuthorizationService;
+
         @Nested
         @DisplayName("POST /api/v1/accounts")
         class CreateAccount {
@@ -66,31 +73,34 @@ class AccountControllerWebMvcTest {
                 @Test
                 @DisplayName("should return 201 when request is valid")
                 void shouldReturn201() throws Exception {
-                        CreateAccountRequest request = new CreateAccountRequest(
-                                        100L, "TR290006200000000000000123", "Ali Veli",
+                        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                                        "Ali Veli",
                                         new BigDecimal("500.00"), Currency.TRY);
-                        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000123",
+                        AccountResponse response = new AccountResponse(1L, 100L, "TR440006200000000000000123",
                                         "Ali Veli", new BigDecimal("500.00"), "TRY", AccountStatus.ACTIVE, true);
 
                         when(createAccountPort.execute(any(CreateAccountRequest.class))).thenReturn(response);
+                        when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
                                         .andExpect(jsonPath("$.id").value(1L))
-                                        .andExpect(jsonPath("$.iban").value("TR290006200000000000000123"))
+                                        .andExpect(jsonPath("$.iban").value("TR440006200000000000000123"))
                                         .andExpect(jsonPath("$.ownerName").value("Ali Veli"))
                                         .andExpect(jsonPath("$.balance").value(500.00))
                                         .andExpect(jsonPath("$.currency").value("TRY"))
                                         .andExpect(jsonPath("$.status").value("ACTIVE"));
+                        verify(createAccountPort).execute(argThat(command -> command.userId().equals(100L)
+                                        && command.iban() == null));
                 }
 
                 @Test
                 @DisplayName("should return 400 with validation errors when request is invalid")
                 void shouldReturn400WhenInvalid() throws Exception {
-                        CreateAccountRequest request = new CreateAccountRequest(
-                                        1L, "invalid-iban", "", new BigDecimal("-1.00"), Currency.TRY);
+                        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                                        "", new BigDecimal("-1.00"), Currency.TRY);
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,12 +121,13 @@ class AccountControllerWebMvcTest {
                 @Test
                 @DisplayName("should propagate business exception from use case")
                 void shouldPropagateBusinessException() throws Exception {
-                        CreateAccountRequest request = new CreateAccountRequest(
-                                        100L, "TR290006200000000000000123", "Ali",
+                        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                                        "Ali",
                                         new BigDecimal("500.00"), Currency.TRY);
 
                         when(createAccountPort.execute(any(CreateAccountRequest.class)))
                                         .thenThrow(new DuplicateIbanException("This IBAN is already in use"));
+                        when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +143,7 @@ class AccountControllerWebMvcTest {
                 @Test
                 @DisplayName("should return 200 with paginated account list")
                 void shouldReturn200() throws Exception {
-                        AccountResponse a1 = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                        AccountResponse a1 = new AccountResponse(1L, 100L, "TR770006200000000000000111",
                                         "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
                         PageResponse<AccountResponse> page = PageResponse.of(List.of(a1), 0, 20, 1);
                         when(getAccountsByUserQuery.execute(anyInt(), anyInt())).thenReturn(page);
@@ -140,7 +151,7 @@ class AccountControllerWebMvcTest {
                         mockMvc.perform(get("/api/v1/accounts"))
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.content[0].id").value(1L))
-                                        .andExpect(jsonPath("$.content[0].iban").value("TR290006200000000000000111"))
+                                        .andExpect(jsonPath("$.content[0].iban").value("TR770006200000000000000111"))
                                         .andExpect(jsonPath("$.content[0].ownerName").value("Ali"))
                                         .andExpect(jsonPath("$.page").value(0))
                                         .andExpect(jsonPath("$.size").value(20))
@@ -158,14 +169,14 @@ class AccountControllerWebMvcTest {
                 @Test
                 @DisplayName("should return 200 when account exists")
                 void shouldReturn200() throws Exception {
-                        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                        AccountResponse response = new AccountResponse(1L, 100L, "TR770006200000000000000111",
                                         "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
                         when(getAccountByIdQuery.execute(1L)).thenReturn(response);
 
                         mockMvc.perform(get("/api/v1/accounts/1"))
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.id").value(1L))
-                                        .andExpect(jsonPath("$.iban").value("TR290006200000000000000111"));
+                                        .andExpect(jsonPath("$.iban").value("TR770006200000000000000111"));
                 }
 
                 @Test
@@ -186,22 +197,22 @@ class AccountControllerWebMvcTest {
                 @Test
                 @DisplayName("should return 200 when account exists")
                 void shouldReturn200() throws Exception {
-                        AccountResponse response = new AccountResponse(1L, 100L, "TR290006200000000000000111",
+                        AccountResponse response = new AccountResponse(1L, 100L, "TR770006200000000000000111",
                                         "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
-                        when(getAccountByIbanQuery.execute("TR290006200000000000000111")).thenReturn(response);
+                        when(getAccountByIbanQuery.execute("TR770006200000000000000111")).thenReturn(response);
 
-                        mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000111"))
+                        mockMvc.perform(get("/api/v1/accounts/iban/TR770006200000000000000111"))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.iban").value("TR290006200000000000000111"));
+                                        .andExpect(jsonPath("$.iban").value("TR770006200000000000000111"));
                 }
 
                 @Test
                 @DisplayName("should return 404 when iban not found")
                 void shouldReturn404() throws Exception {
-                        when(getAccountByIbanQuery.execute("TR290006200000000000000999"))
-                                        .thenThrow(new AccountNotFoundException("TR290006200000000000000999"));
+                        when(getAccountByIbanQuery.execute("TR600006200000000000000999"))
+                                        .thenThrow(new AccountNotFoundException("TR600006200000000000000999"));
 
-                        mockMvc.perform(get("/api/v1/accounts/iban/TR290006200000000000000999"))
+                        mockMvc.perform(get("/api/v1/accounts/iban/TR600006200000000000000999"))
                                         .andExpect(status().isNotFound());
                 }
         }

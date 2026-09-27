@@ -1,5 +1,6 @@
 package com.bank.app.user.domain.exception;
 
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,8 +21,8 @@ class UserNotFoundExceptionTest {
     }
 
     @Test
-    void shouldReturn404HttpStatusCode() {
+    void shouldDescribeMissingUser() {
         UserNotFoundException ex = new UserNotFoundException("test");
-        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals(BusinessFailureKind.NOT_FOUND, ex.getFailureKind());
     }
 }

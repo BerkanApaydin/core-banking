@@ -8,6 +8,7 @@ import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,10 +51,10 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldTranslateIbanLookupToSnapshot() {
-        when(accountQueryUseCase.getAccountInfoForTransfer("TR330006100519786456841234"))
+        when(accountQueryUseCase.getAccountInfoForTransfer("TR450006100519786456841234"))
                 .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
 
-        AccountSnapshot snapshot = adapter.getSnapshotByIban("TR330006100519786456841234");
+        AccountSnapshot snapshot = adapter.getSnapshotByIban("TR450006100519786456841234");
 
         assertEquals(1L, snapshot.id());
         assertEquals(10L, snapshot.userId());
@@ -69,7 +70,7 @@ class AccountApiAdapterTest {
                 () -> adapter.getSnapshotById(999L));
 
         assertEquals("Account not found. ID: 999", ex.getMessage());
-        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals(BusinessFailureKind.NOT_FOUND, ex.getFailureKind());
         assertEquals("ACCOUNT_NOT_FOUND_ID", ex.getErrorCode());
     }
 
@@ -83,16 +84,16 @@ class AccountApiAdapterTest {
                 () -> adapter.getSnapshotByIban("TR000"));
 
         assertEquals("Account not found. IBAN: TR000", ex.getMessage());
-        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals(BusinessFailureKind.NOT_FOUND, ex.getFailureKind());
         assertEquals("ACCOUNT_NOT_FOUND_IBAN", ex.getErrorCode());
     }
 
     @Test
     void shouldDelegateIbanBatchLookup() {
         when(accountQueryUseCase.getIbansForAccounts(Set.of(1L)))
-                .thenReturn(Map.of(1L, "TR330006100519786456841234"));
+                .thenReturn(Map.of(1L, "TR450006100519786456841234"));
 
-        assertEquals("TR330006100519786456841234",
+        assertEquals("TR450006100519786456841234",
                 adapter.getIbansForAccounts(Set.of(1L)).get(1L));
     }
 

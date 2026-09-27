@@ -9,21 +9,21 @@ class SameAccountTransferExceptionTest {
 
     @Test
     void shouldCreateWithIban() {
-        SameAccountTransferException ex = new SameAccountTransferException("TR290006200000000000000111");
+        SameAccountTransferException ex = new SameAccountTransferException("TR770006200000000000000111");
         assertEquals("error.same_account_transfer", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"TR290006200000000000000111"}, ex.getArgs());
-        assertTrue(ex.getMessage().contains("TR290006200000000000000111"));
+        assertArrayEquals(new Object[]{"TR770006200000000000000111"}, ex.getArgs());
+        assertTrue(ex.getMessage().contains("TR770006200000000000000111"));
     }
 
     @Test
     void shouldBeBusinessException() {
-        SameAccountTransferException ex = new SameAccountTransferException("TR290006200000000000000111");
+        SameAccountTransferException ex = new SameAccountTransferException("TR770006200000000000000111");
         assertInstanceOf(BusinessException.class, ex);
     }
 
     @Test
     void shouldReturnCorrectErrorCode() {
-        SameAccountTransferException ex = new SameAccountTransferException("TR290006200000000000000111");
+        SameAccountTransferException ex = new SameAccountTransferException("TR770006200000000000000111");
         assertEquals("SAME_ACCOUNT_TRANSFER", ex.getErrorCode());
     }
 }

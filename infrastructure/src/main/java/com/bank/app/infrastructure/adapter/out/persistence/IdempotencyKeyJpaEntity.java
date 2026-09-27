@@ -26,6 +26,9 @@ public class IdempotencyKeyJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "request_hash", length = 64)
+    private String requestHash;
+
     public IdempotencyKeyJpaEntity() {}
 
     public IdempotencyKeyJpaEntity(String key, String status, String responseBody, LocalDateTime createdAt) {
@@ -79,4 +82,8 @@ public class IdempotencyKeyJpaEntity {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public String getRequestHash() { return requestHash; }
+
+    public void setRequestHash(String requestHash) { this.requestHash = requestHash; }
 }

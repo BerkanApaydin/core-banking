@@ -53,8 +53,8 @@ class AdjustAccountBalancesUseCaseImplTest {
     private Account senderAccount;
     private Account receiverAccount;
 
-    private static final String TEST_IBAN_1 = "TR330006100519786456841234";
-    private static final String TEST_IBAN_2 = "TR660006100519786456841235";
+    private static final String TEST_IBAN_1 = "TR450006100519786456841234";
+    private static final String TEST_IBAN_2 = "TR180006100519786456841235";
 
     @BeforeEach
     void setUp() {

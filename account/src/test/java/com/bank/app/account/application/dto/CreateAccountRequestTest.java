@@ -13,11 +13,11 @@ class CreateAccountRequestTest {
     @Test
     void shouldCreateWithAllFields() {
         CreateAccountRequest request = new CreateAccountRequest(
-                1L, "TR290006200000000000000111", "Ahmet Yilmaz",
+                1L, "TR770006200000000000000111", "Ahmet Yilmaz",
                 new BigDecimal("1000.00"), Currency.TRY);
 
         assertThat(request.userId()).isEqualTo(1L);
-        assertThat(request.iban()).isEqualTo("TR290006200000000000000111");
+        assertThat(request.iban()).isEqualTo("TR770006200000000000000111");
         assertThat(request.ownerName()).isEqualTo("Ahmet Yilmaz");
         assertThat(request.initialBalance()).isEqualByComparingTo("1000.00");
         assertThat(request.currency()).isEqualTo(Currency.TRY);
@@ -26,17 +26,23 @@ class CreateAccountRequestTest {
     @Test
     void shouldHandleZeroBalance() {
         CreateAccountRequest request = new CreateAccountRequest(
-                1L, "TR290006200000000000000111", "Ahmet",
+                1L, "TR770006200000000000000111", "Ahmet",
                 BigDecimal.ZERO, Currency.USD);
 
         assertThat(request.initialBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
+    void shouldLeaveIbanForServerGenerationWhenNotSpecified() {
+        CreateAccountRequest request = new CreateAccountRequest(1L, "Ahmet", BigDecimal.ZERO, Currency.TRY);
+        assertThat(request.iban()).isNull();
+    }
+
+    @Test
     void shouldHandleAllCurrencyTypes() {
         for (Currency currency : Currency.values()) {
             CreateAccountRequest request = new CreateAccountRequest(
-                    1L, "TR290006200000000000000111", "Test",
+                    1L, "TR770006200000000000000111", "Test",
                     new BigDecimal("100.00"), currency);
             assertThat(request.currency()).isEqualTo(currency);
         }

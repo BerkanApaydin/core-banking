@@ -66,15 +66,28 @@ class IdempotencyGuardTest {
         }
 
         @Test
-        @DisplayName("should delete and return NEW when key exists with FAILED status")
-        void shouldDeleteFailedAndReturnNew() {
+        @DisplayName("should atomically reserve a FAILED key before returning NEW")
+        void shouldReserveFailedAndReturnNew() {
             Entry existing = new Entry("key-1", "FAILED", null, null, LocalDateTime.now());
             when(idempotencyPort.findById("key-1")).thenReturn(Optional.of(existing));
+            when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class))).thenReturn(true);
 
             IdempotencyResult result = guard.startRequest("key-1");
 
             assertEquals(IdempotencyResult.Status.NEW, result.status());
-            verify(idempotencyPort).deleteById("key-1");
+            verify(idempotencyPort).tryResetFailed(eq("key-1"), any(LocalDateTime.class));
+            verify(idempotencyPort, never()).deleteById("key-1");
+        }
+
+        @Test
+        void shouldNotRunFailedRetryWhenAnotherRequestClaimsItFirst() {
+            Entry failed = new Entry("key-1", "FAILED", null, null, LocalDateTime.now());
+            Entry pending = new Entry("key-1", "PENDING", null, null, LocalDateTime.now());
+            when(idempotencyPort.findById("key-1"))
+                    .thenReturn(Optional.of(failed), Optional.of(pending));
+            when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class))).thenReturn(false);
+
+            assertEquals(IdempotencyResult.Status.PENDING, guard.startRequest("key-1").status());
         }
 
         @Test

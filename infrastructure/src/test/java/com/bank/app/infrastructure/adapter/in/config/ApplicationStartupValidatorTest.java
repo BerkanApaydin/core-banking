@@ -9,6 +9,7 @@ import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings("null")
@@ -168,7 +169,24 @@ class ApplicationStartupValidatorTest {
         when(environment.getProperty(
                 "spring.datasource.password",
                 "")).thenReturn("very-secure-password");
+        when(environment.getProperty("app.security.token-blacklist.backend", ""))
+                .thenReturn("hybrid");
 
         assertDoesNotThrow(() -> validator.validateProductionConfig());
+    }
+
+    @Test
+    void shouldRejectNonDurableRevocationBackendInProduction() {
+        when(environment.getActiveProfiles()).thenReturn(new String[] { "prod" });
+        when(environment.getProperty("jwt.secret", DEFAULT_JWT_SECRET))
+                .thenReturn("very-secure-secret");
+        when(environment.getProperty("spring.datasource.password", ""))
+                .thenReturn("very-secure-password");
+        when(environment.getProperty("app.security.token-blacklist.backend", ""))
+                .thenReturn("redis");
+
+        assertThatThrownBy(() -> validator.validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("hybrid or database");
     }
 }

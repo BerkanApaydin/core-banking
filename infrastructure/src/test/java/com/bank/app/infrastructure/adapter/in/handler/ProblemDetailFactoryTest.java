@@ -40,17 +40,14 @@ class ProblemDetailFactoryTest {
                     .containsKey("timestamp");
         }
 
-        @SuppressWarnings("unchecked")
         @Test
-        @DisplayName("should use 500 when ErrorCode has unresolvable http status")
-        void shouldUse500WhenErrorCodeHasUnresolvableStatus() {
-            ErrorCode unknownCode = mock(ErrorCode.class);
-            when(unknownCode.getHttpStatus()).thenReturn(999);
-            when(unknownCode.code()).thenReturn("UNKNOWN");
+        @DisplayName("should map internal errors to 500 in the HTTP adapter")
+        void shouldMapInternalErrorTo500() {
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
-                    unknownCode, "Something went wrong", null);
+                    ErrorCode.GENERAL_INTERNAL_ERROR, "Something went wrong", null);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+            assertThat(response.getBody().getProperties()).containsEntry("code", "GENERAL_INTERNAL_ERROR");
         }
 
         @Test

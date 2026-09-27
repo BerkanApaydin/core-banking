@@ -2,8 +2,11 @@ package com.bank.app.user.adapter.out.persistence;
 
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.domain.User;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 @Component
@@ -18,13 +21,17 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<User> findByUsername(String username) {
-        return repository.findByUsername(username)
-                .map(mapper::toDomain);
+        try {
+            return repository.findByUsername(username).map(mapper::toDomain);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override
-    public void save(User user) {
+    public User save(User user) {
         UserJpaEntity entity;
         if (user.getId() == null) {
             entity = mapper.toJpaEntity(user);
@@ -34,6 +41,6 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
                             "User not found with id: " + user.getId().value()));
             mapper.updateJpaEntity(entity, user);
         }
-        repository.save(entity);
+        return mapper.toDomain(repository.save(entity));
     }
 }

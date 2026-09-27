@@ -52,7 +52,7 @@ services:
       JWT_ALLOW_DEFAULT_SECRET: ${JWT_ALLOW_DEFAULT_SECRET:-true}
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
-      TOKEN_BLACKLIST_BACKEND: redis
+      TOKEN_BLACKLIST_BACKEND: ${TOKEN_BLACKLIST_BACKEND:-hybrid}
       CACHE_ACCOUNT_INFO_BACKEND: redis
     depends_on:
       postgres:

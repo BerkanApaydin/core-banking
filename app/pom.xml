@@ -55,6 +55,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>persistence</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -147,6 +152,7 @@
                         </goals>
                         <configuration>
                             <skip>${jacoco.skip}</skip>
+                            <includeCurrentProject>true</includeCurrentProject>
                             <formats>
                                 <format>XML</format>
                                 <format>HTML</format>

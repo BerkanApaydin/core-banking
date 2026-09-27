@@ -190,24 +190,24 @@ class TransferPersistenceAdapterTest {
         TransferJpaEntity entity2 = createEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY",
                 "COMPLETED", null, now);
 
-        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(eq(100L), eq(100L), any()))
+        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(100L), eq(100L), any()))
                 .thenReturn(List.of(entity1, entity2));
 
         var result = repository.findHistory(100L, 0, 10);
 
         assertEquals(2, result.size());
-        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(eq(100L), eq(100L), any());
+        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(100L), eq(100L), any());
     }
 
     @Test
     void shouldReturnEmptyListWhenFindHistoryNotFound() {
-        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(eq(999L), eq(999L), any()))
+        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(999L), eq(999L), any()))
                 .thenReturn(List.of());
 
         var result = repository.findHistory(999L, 0, 10);
 
         assertTrue(result.isEmpty());
-        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDesc(eq(999L), eq(999L), any());
+        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(999L), eq(999L), any());
     }
 
     @Test

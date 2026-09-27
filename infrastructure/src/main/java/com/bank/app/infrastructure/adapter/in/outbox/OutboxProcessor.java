@@ -12,10 +12,11 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 @Component
 public class OutboxProcessor {
@@ -57,7 +58,7 @@ public class OutboxProcessor {
     public void processEvent(EventEntry fallbackEvent) {
         EventEntry event = outboxPort.findByIdForUpdateSkipLocked(fallbackEvent.id()).orElse(null);
 
-        if (event == null) {
+        if (event == null || event.processed() || event.deadLetter()) {
             return;
         }
 
@@ -70,10 +71,14 @@ public class OutboxProcessor {
             handler.handle(event);
 
             outboxPort.markProcessed(event.id());
-            count(processedCounter);
-            log.info("Successfully processed outbox event id: {}", event.id());
+            afterCommit(() -> {
+                count(processedCounter);
+                log.info("Successfully processed outbox event id: {}", event.id());
+            });
         } catch (Exception e) {
-            log.warn("Failed to process outbox event id: {}. Error: {}", event.id(), e.getMessage(), e);
+            // Handler messages can contain provider payloads or personal data.
+            log.warn("Failed to process outbox event id: {}, failureType={}",
+                    event.id(), e.getClass().getName());
             throw new RuntimeException("Outbox event processing failed", e);
         }
     }
@@ -82,23 +87,44 @@ public class OutboxProcessor {
     public void recordFailure(EventEntry fallbackEvent, Throwable t, int maxRetries) {
         EventEntry event = outboxPort.findByIdForUpdateSkipLocked(fallbackEvent.id()).orElse(null);
 
-        if (event == null) {
+        if (event == null || event.processed() || event.deadLetter()) {
             return;
         }
 
         int nextRetry = event.retryCount() + 1;
-        String error = Optional.ofNullable(t.getMessage())
-                .map(msg -> truncate(msg, 2000))
-                .orElse(null);
+        // Persist a stable diagnostic type, never an untrusted exception message.
+        String error = t.getClass().getName();
 
         if (nextRetry >= maxRetries) {
             outboxPort.markDeadLetter(Objects.requireNonNull(event.id()), error, nextRetry);
-            count(deadLetterCounter);
-            log.warn("Outbox event moved to dead letter after {} retries. id: {}", maxRetries, event.id(), t);
+            afterCommit(() -> {
+                count(deadLetterCounter);
+                log.warn("Outbox event moved to dead letter after {} retries. id: {}, failureType={}",
+                        maxRetries, event.id(), error);
+            });
         } else {
             outboxPort.markFailed(Objects.requireNonNull(event.id()), error, nextRetry);
-            count(failedCounter);
-            log.warn("Failed to process outbox event id: {} (retry {}/{})", event.id(), nextRetry, maxRetries, t);
+            afterCommit(() -> {
+                count(failedCounter);
+                log.warn("Failed to process outbox event id: {} (retry {}/{}), failureType={}",
+                        event.id(), nextRetry, maxRetries, error);
+            });
+        }
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            // Direct invocations in tests and non-proxied callers have no commit
+            // callback. Production processing enters through REQUIRES_NEW.
+            action.run();
         }
     }
 
@@ -108,10 +134,4 @@ public class OutboxProcessor {
         }
     }
 
-    private static String truncate(String message, int maxLength) {
-        if (message == null) {
-            return null;
-        }
-        return message.length() <= maxLength ? message : message.substring(0, maxLength);
-    }
 }

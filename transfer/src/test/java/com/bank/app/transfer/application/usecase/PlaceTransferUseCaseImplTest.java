@@ -5,6 +5,8 @@ import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -58,12 +60,15 @@ class PlaceTransferUseCaseImplTest {
     @Mock
     private ClockProviderPort clockProvider;
 
+    @Mock
+    private AuditEventPort auditEventPort;
+
     private TransferDomainService transferDomainService;
 
     private PlaceTransferUseCase placeTransferUseCase;
 
-    private static final String SENDER_IBAN = "TR290006200000000000000111";
-    private static final String RECEIVER_IBAN = "TR290006200000000000000222";
+    private static final String SENDER_IBAN = "TR770006200000000000000111";
+    private static final String RECEIVER_IBAN = "TR870006200000000000000222";
     private static final Long SENDER_ACCOUNT_ID = 1L;
     private static final Long RECEIVER_ACCOUNT_ID = 2L;
     private static final Long SENDER_USER_ID = 100L;
@@ -81,7 +86,7 @@ class PlaceTransferUseCaseImplTest {
                 accountAclPort, userContextService);
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
                 accountAclPort, saveTransferPort,
-                transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider);
+                transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider, auditEventPort);
     }
 
     private AccountInfo senderInfo() {
@@ -145,6 +150,8 @@ class PlaceTransferUseCaseImplTest {
             // Account publishes its own events; transfer publishes only its own.
             verify(domainEventPublisherService, never()).publish(any());
             verify(domainEventPublisherService).publishEvents(any());
+            verify(auditEventPort).publish(argThat(event ->
+                    "TRANSFER_EXECUTED".equals(event.action()) && event.details().contains("42")));
         }
 
         @Test
@@ -264,6 +271,7 @@ class PlaceTransferUseCaseImplTest {
             verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
             verify(domainEventPublisherService, never()).publish(any());
             verify(domainEventPublisherService, never()).publishEvents(any());
+            verifyNoInteractions(auditEventPort);
         }
 
         @Test

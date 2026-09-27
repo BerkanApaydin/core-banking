@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.*;
@@ -18,6 +19,10 @@ import static org.mockito.Mockito.*;
 @DisplayName("RedisTokenBlacklistAdapter")
 @ExtendWith(MockitoExtension.class)
 class RedisTokenBlacklistAdapterTest {
+
+    private static final String HASHED_TOKEN_1_KEY =
+            "token_blacklist:sha256:3f08aace122ee2368432c1ca23a049bc640bafbf00fdf33a52429f38ba12dbf9";
+    private static final String LEGACY_TOKEN_1_KEY = "token_blacklist:token-1";
 
     @Mock
     private StringRedisTemplate redisTemplate;
@@ -37,13 +42,14 @@ class RedisTokenBlacklistAdapterTest {
     class Blacklist {
 
         @Test
-        @DisplayName("should store token with prefix and TTL")
-        void shouldStoreTokenWithPrefix() {
+        @DisplayName("should store only the token hash with the original TTL")
+        void shouldStoreOnlyTokenHash() {
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
             adapter.blacklist("token-1", 60000L);
 
-            verify(valueOperations).set("token_blacklist:token-1", "blacklisted", 60000L, TimeUnit.MILLISECONDS);
+            verify(valueOperations).set(HASHED_TOKEN_1_KEY, "blacklisted", 60000L, TimeUnit.MILLISECONDS);
+            verifyNoMoreInteractions(valueOperations);
         }
     }
 
@@ -52,9 +58,19 @@ class RedisTokenBlacklistAdapterTest {
     class IsBlacklisted {
 
         @Test
-        @DisplayName("should return true when key exists")
-        void shouldReturnTrueWhenKeyExists() {
-            when(redisTemplate.hasKey("token_blacklist:token-1")).thenReturn(true);
+        @DisplayName("should return true for a hashed key without checking the legacy key")
+        void shouldReturnTrueWhenHashedKeyExists() {
+            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(true);
+
+            assertThat(adapter.isBlacklisted("token-1")).isTrue();
+            verify(redisTemplate, never()).hasKey(LEGACY_TOKEN_1_KEY);
+        }
+
+        @Test
+        @DisplayName("should recognize a legacy raw-token key during migration")
+        void shouldReturnTrueWhenLegacyKeyExists() {
+            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
+            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(true);
 
             assertThat(adapter.isBlacklisted("token-1")).isTrue();
         }
@@ -62,17 +78,29 @@ class RedisTokenBlacklistAdapterTest {
         @Test
         @DisplayName("should return false when key does not exist")
         void shouldReturnFalseWhenKeyDoesNotExist() {
-            when(redisTemplate.hasKey("token_blacklist:token-1")).thenReturn(false);
+            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
+            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(false);
 
             assertThat(adapter.isBlacklisted("token-1")).isFalse();
         }
 
         @Test
-        @DisplayName("should return false when hasKey returns null")
-        void shouldReturnFalseWhenHasKeyReturnsNull() {
-            when(redisTemplate.hasKey("token_blacklist:token-1")).thenReturn(null);
+        @DisplayName("should refuse an indeterminate hashed-key lookup")
+        void shouldRefuseNullHashedKeyResult() {
+            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(null);
 
-            assertThat(adapter.isBlacklisted("token-1")).isFalse();
+            assertThatThrownBy(() -> adapter.isBlacklisted("token-1"))
+                    .isInstanceOf(IllegalStateException.class);
+            verify(redisTemplate, never()).hasKey(LEGACY_TOKEN_1_KEY);
+        }
+
+        @Test
+        void shouldRefuseNullLegacyKeyResult() {
+            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
+            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(null);
+
+            assertThatThrownBy(() -> adapter.isBlacklisted("token-1"))
+                    .isInstanceOf(IllegalStateException.class);
         }
     }
 

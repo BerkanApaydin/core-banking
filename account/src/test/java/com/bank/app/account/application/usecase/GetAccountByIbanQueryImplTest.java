@@ -11,7 +11,6 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.UserId;
-import com.bank.app.common.domain.exception.AuthorizationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,7 +38,7 @@ class GetAccountByIbanQueryImplTest {
 
     private GetAccountByIbanQuery query;
 
-    private static final String VALID_IBAN = "TR290006200000000000000123";
+    private static final String VALID_IBAN = "TR440006200000000000000123";
 
     @BeforeEach
     void setUp() {
@@ -57,7 +56,7 @@ class GetAccountByIbanQueryImplTest {
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             Iban iban = new Iban(VALID_IBAN);
             when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
-            doNothing().when(accountAuthorizationService).authorizeAccountOwner(any(), anyString());
+            when(accountAuthorizationService.isCurrentUserOwner(account)).thenReturn(true);
 
             AccountResponse response = query.execute(VALID_IBAN);
 
@@ -74,21 +73,20 @@ class GetAccountByIbanQueryImplTest {
         void shouldThrowAccountNotFoundExceptionWhenIbanNotFound() {
             when(loadAccountPort.findByIban(any())).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> query.execute("TR290006200000000000000999"))
+            assertThatThrownBy(() -> query.execute("TR600006200000000000000999"))
                     .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test
-        @DisplayName("should throw AuthorizationException when not authorized")
-        void shouldThrowAuthorizationExceptionWhenNotAuthorized() {
+        @DisplayName("should hide another user's IBAN with not found")
+        void shouldHideAnotherUsersIban() {
             Account account = new Account(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             when(loadAccountPort.findByIban(any())).thenReturn(Optional.of(account));
-            doThrow(new AuthorizationException("Yetki yok")).when(accountAuthorizationService)
-                    .authorizeAccountOwner(any(), anyString());
+            when(accountAuthorizationService.isCurrentUserOwner(account)).thenReturn(false);
 
             assertThatThrownBy(() -> query.execute(VALID_IBAN))
-                    .isExactlyInstanceOf(AuthorizationException.class);
+                    .isExactlyInstanceOf(AccountNotFoundException.class);
         }
 
         @Test

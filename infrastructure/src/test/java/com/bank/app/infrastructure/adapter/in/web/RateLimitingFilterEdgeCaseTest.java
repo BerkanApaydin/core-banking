@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -78,6 +79,26 @@ class RateLimitingFilterEdgeCaseTest {
         verify(response).setStatus(429);
         verify(chain, never()).doFilter(request, response);
         assertTrue(stringWriter.toString().contains("Too many requests sent"));
+    }
+
+    @Test
+    void shouldFailClosedWithProblemDetailWhenRedisLimiterIsUnavailable() throws Exception {
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
+        when(request.getRemoteAddr()).thenReturn("192.168.1.1");
+        when(rateLimiter.tryAcquire("192.168.1.1"))
+                .thenThrow(new RedisConnectionFailureException("Redis connection failed"));
+        when(messageSource.getMessage(anyString(), any(), anyString(), any()))
+                .thenReturn("Security service temporarily unavailable.");
+        StringWriter body = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(body));
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setStatus(503);
+        verify(chain, never()).doFilter(request, response);
+        assertTrue(body.toString().contains("SECURITY_BACKEND_UNAVAILABLE"));
+        assertTrue(body.toString().contains("Security service temporarily unavailable."));
+        assertFalse(body.toString().contains("Redis connection failed"));
     }
 
     @Test

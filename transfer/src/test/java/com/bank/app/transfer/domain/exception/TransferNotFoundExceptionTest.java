@@ -1,6 +1,7 @@
 package com.bank.app.transfer.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,6 +27,6 @@ class TransferNotFoundExceptionTest {
     void shouldReturnCorrectErrorCode() {
         TransferNotFoundException ex = new TransferNotFoundException(1L);
         assertEquals("TRANSFER_NOT_FOUND", ex.getErrorCode());
-        assertEquals(404, ex.getHttpStatusCode());
+        assertEquals(BusinessFailureKind.NOT_FOUND, ex.getFailureKind());
     }
 }

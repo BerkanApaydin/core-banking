@@ -21,29 +21,49 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     public Optional<Entry> findById(@NonNull String key) {
         return repository.findById(key)
                 .map(e -> new Entry(e.getKey(), e.getStatus(), e.getResponseBody(), e.getResponseStatus(),
-                        e.getCreatedAt()));
+                        e.getCreatedAt(), e.getRequestHash()));
     }
 
     @Override
     public boolean tryCreate(String key, LocalDateTime now) {
-        return repository.tryInsert(key, now) > 0;
+        return tryCreate(key, null, now);
+    }
+
+    @Override
+    public boolean tryCreate(String key, String requestHash, LocalDateTime now) {
+        return repository.tryInsert(key, requestHash, now) > 0;
+    }
+
+    @Override
+    public boolean tryResetFailed(String key, LocalDateTime now) {
+        return tryResetFailed(key, null, now);
+    }
+
+    @Override
+    public boolean tryResetFailed(String key, String requestHash, LocalDateTime now) {
+        return repository.resetFailed(key, requestHash, now) == 1;
     }
 
     @Override
     public void markCompleted(String key, String responseBody, int responseStatus) {
-        repository.findById(key).ifPresent(entity -> {
-            entity.setStatus("COMPLETED");
-            entity.setResponseBody(responseBody);
-            entity.setResponseStatus(responseStatus);
-            repository.save(entity);
-        });
+        var entity = repository.findById(key)
+                .orElseThrow(() -> new IllegalStateException("Idempotency reservation is missing"));
+        if (!"PENDING".equals(entity.getStatus())) {
+            throw new IllegalStateException("Idempotency reservation is not pending");
+        }
+        entity.setStatus("COMPLETED");
+        entity.setResponseBody(responseBody);
+        entity.setResponseStatus(responseStatus);
+        repository.save(entity);
     }
 
     @Override
     public void markFailed(String key) {
         repository.findById(key).ifPresent(entity -> {
-            entity.setStatus("FAILED");
-            repository.save(entity);
+            if ("PENDING".equals(entity.getStatus())) {
+                entity.setStatus("FAILED");
+                repository.save(entity);
+            }
         });
     }
 
@@ -54,6 +74,6 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
 
     @Override
     public int deleteExpired(LocalDateTime threshold) {
-        return repository.deleteByCreatedAtBefore(threshold);
+        return repository.deleteExpiredTerminalRequests(threshold);
     }
 }

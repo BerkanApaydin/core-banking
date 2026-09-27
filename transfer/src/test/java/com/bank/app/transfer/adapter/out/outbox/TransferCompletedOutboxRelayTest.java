@@ -19,7 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 class TransferCompletedOutboxRelayTest {
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private TransferEventConsumer notificationConsumer;
 
     @Mock
     private IdempotencyPort idempotencyPort;
@@ -50,7 +50,7 @@ class TransferCompletedOutboxRelayTest {
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         objectMapper.findAndRegisterModules();
-        handler = new TransferCompletedOutboxRelay(objectMapper, eventPublisher, idempotencyPort);
+        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort);
     }
 
     @Nested
@@ -96,7 +96,7 @@ class TransferCompletedOutboxRelayTest {
             mockDedupSuccess("evt-1");
             handler.handle(event);
 
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            verify(notificationConsumer).handleTransferCompleted(eventCaptor.capture());
             AsyncTransferCompletedEvent captured = eventCaptor.getValue();
             assertEquals(42L, captured.transferId());
             assertEquals(1L, captured.senderAccountId());
@@ -114,7 +114,7 @@ class TransferCompletedOutboxRelayTest {
             mockDedupSuccess("evt-2");
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("TransferCompletedOutboxRelay failed"));
-            verify(eventPublisher, never()).publishEvent(any());
+            verify(notificationConsumer, never()).handleTransferCompleted(any());
         }
 
         @Test
@@ -126,7 +126,7 @@ class TransferCompletedOutboxRelayTest {
             mockDedupSuccess("evt-3");
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("TransferCompletedOutboxRelay failed"));
-            verify(eventPublisher, never()).publishEvent(any());
+            verify(notificationConsumer, never()).handleTransferCompleted(any());
         }
 
         @Test
@@ -140,7 +140,7 @@ class TransferCompletedOutboxRelayTest {
                     "99", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
             mockDedupSuccess("evt-4");
-            doThrow(new RuntimeException("publisher error")).when(eventPublisher).publishEvent(any());
+            doThrow(new RuntimeException("publisher error")).when(notificationConsumer).handleTransferCompleted(any());
 
             RuntimeException ex = assertThrows(RuntimeException.class, () -> handler.handle(event));
             assertTrue(ex.getMessage().contains("TransferCompletedOutboxRelay failed"));
@@ -161,7 +161,7 @@ class TransferCompletedOutboxRelayTest {
 
             handler.handle(event);
 
-            verify(eventPublisher, never()).publishEvent(any());
+            verify(notificationConsumer, never()).handleTransferCompleted(any());
         }
 
         @Test
@@ -179,7 +179,7 @@ class TransferCompletedOutboxRelayTest {
 
             handler.handle(event);
 
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            verify(notificationConsumer).handleTransferCompleted(eventCaptor.capture());
             assertEquals(42L, eventCaptor.getValue().transferId());
         }
     }

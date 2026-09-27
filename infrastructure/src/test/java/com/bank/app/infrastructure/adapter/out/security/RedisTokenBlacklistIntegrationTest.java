@@ -7,6 +7,8 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RedisTokenBlacklistIntegrationTest {
@@ -16,13 +18,14 @@ class RedisTokenBlacklistIntegrationTest {
             .withExposedPorts(6379);
 
     private static RedisTokenBlacklistAdapter adapter;
+    private static StringRedisTemplate redisTemplate;
 
     @BeforeAll
     static void setup() {
         redis.start();
         var factory = new LettuceConnectionFactory(redis.getHost(), redis.getMappedPort(6379));
         factory.afterPropertiesSet();
-        var redisTemplate = new StringRedisTemplate(factory);
+        redisTemplate = new StringRedisTemplate(factory);
         redisTemplate.afterPropertiesSet();
         adapter = new RedisTokenBlacklistAdapter(redisTemplate);
     }
@@ -36,6 +39,18 @@ class RedisTokenBlacklistIntegrationTest {
     void shouldBlacklistToken() {
         adapter.blacklist("test-token", 60000);
         assertThat(adapter.isBlacklisted("test-token")).isTrue();
+        assertThat(redisTemplate.hasKey("token_blacklist:test-token")).isFalse();
+    }
+
+    @Test
+    void shouldRecognizeLegacyRawKeyUntilItsTtlExpires() throws InterruptedException {
+        redisTemplate.opsForValue().set("token_blacklist:legacy-token", "blacklisted", 500, TimeUnit.MILLISECONDS);
+
+        assertThat(adapter.isBlacklisted("legacy-token")).isTrue();
+
+        Thread.sleep(650);
+
+        assertThat(adapter.isBlacklisted("legacy-token")).isFalse();
     }
 
     @Test

@@ -1,6 +1,6 @@
 # Core Banking & Transfer System
 
-A modular core banking and money transfer system built with **Spring Boot 3.5.x** and **Java 21**, strictly adhering to **Hexagonal Architecture (Ports and Adapters)** and **Clean Architecture** principles.
+A modular simulation of selected core banking workflows—account management and account-to-account transfers—built with **Spring Boot 3.5.16** and **Java 21**. It uses ports and adapters with architecture tests, PostgreSQL transactions, idempotency, and a browser UI. No real funds move, and this project is not a complete banking ledger or payment provider.
 
 ---
 
@@ -10,15 +10,15 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 
 - **Java 21:** Utilizes modern LTS features (e.g., Records, Pattern Matching).
 - **Spring Boot 3.5.16:** Application backbone (Spring Web, AOP, Scheduling, Actuator).
-- **Spring Security & JWT:** Stateless authentication and token blacklisting.
+- **Spring Security & JWT:** Bearer tokens for API clients; the same signed token is carried in an `HttpOnly` browser cookie with CSRF protection for the bundled UI. Logout revokes the token.
 
 ### Data & Caching
 
 - **PostgreSQL 15:** Relational database with optimistic locking.
 - **Flyway:** Automated database migration and schema version control. Migrations run on startup (`spring.jpa.hibernate.ddl-auto=validate`) to guarantee schema consistency with JPA entities.
 - **Redis 7:** Shared account-snapshot cache in production, login attempts storage, and sliding window rate limiting (via Lua scripts).
-- **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production switches snapshots, rate limiting, login attempts, and token blacklist to Redis.
-- **Micrometer + Prometheus:** Custom business metrics (outbox, orphan alarms) scraped via Actuator.
+- **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production uses Redis for snapshots, rate limiting and login attempts, and PostgreSQL+Redis hybrid token revocation during migration.
+- **Micrometer + Prometheus:** Custom outbox, idempotency-backlog and orphan-integrity metrics exposed via Actuator. A scraper and alert destination must be installed separately.
 - **springdoc-openapi:** Swagger UI for API exploration (disabled in production).
 
 ### Quality Assurance & Testing
@@ -35,7 +35,7 @@ A modular core banking and money transfer system built with **Spring Boot 3.5.x*
 - **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and PostgreSQL/Redis deployments are not included.
 - **Maven 3.9.x:** Recommended build system (Maven 3.9.16 wrapper configuration is pre-configured).
 - **Prerequisites:** Java 21 JDK, Docker installed.
-- **Environment:** All variables documented in `.env.example`.
+- **Environment:** Common local variables are shown in `.env.example`; profile-specific settings and deployment checks are in [operations](docs/operations.md).
 
 ---
 
@@ -49,15 +49,16 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 **bounded contexts** (hexagonal slices, independently understandable), and **bootstrap** —
 plus one supporting module (`audit`).
 
-- **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled job (read-only No-FK compensating observer).
+- **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled integrity observer.
 - **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
-- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports, with local fallback when Redis is down), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production, fail-open when Redis is down), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
-- **`user`** [BC]: User registration, authentication, token lifecycle. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login runs as `@ReadOnlyUseCase` (DB reads only; login-attempt state lives outside the DB transaction — Redis backend in production, Caffeine locally).
+- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports; production revocations are stored durably in PostgreSQL and checked alongside legacy Redis records), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
+- **`user`** [BC]: User registration, authentication, token lifecycle. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login uses short read-only transactions for credential/user lookup; login-attempt state is handled outside those DB transactions (Redis in production, Caffeine locally).
 - **`account`** [BC]: Bank account lifecycle, balance mutations, and details. Implements `account-api`. Publishes its own domain events; callers only see the opaque `AccountAdjustmentResult`.
-- **`transfer`** [BC]: Fund transfers, cancellations (24-hour window), and reporting. Talks to `account` only via the `account-api` published language; money-movement endpoints require `Idempotency-Key`.
-- **`audit`** [Supporting]: Transactional audit logging triggered by commit-phase domain events via `@TransactionalEventListener(AFTER_COMMIT)`.
+- New account creation derives the owning user from the authenticated principal and generates a checksum-valid, simulation-only Turkish IBAN. Earlier format-only records remain readable; see [IBAN rollout](docs/iban-checksum-rollout.md) before using an existing database.
+- **`transfer`** [BC]: Simulated transfers, conditional cancellations (a configurable window and sufficient recipient balance), and paginated reporting. Talks to `account` only via the `account-api` published language; transfer and cancellation endpoints require `Idempotency-Key`.
+- **`audit`** [Supporting]: Mandatory audit persistence for money movements participates in the use-case transaction; a failed write rolls the movement back.
 
 **Module dependencies** (arrow = compile-time dependency direction; dashed arrow = port implementation or composition-root wiring):
 
@@ -101,7 +102,7 @@ graph LR
 | :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `transfer` → `account` **forbidden**        | Transfer must never touch the account module at compile time — `account-api` only                                                                            |
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
-| No-FK                                     | `accounts.user_id`, `transfers.*_account_id` are not FKs; integrity lives in the application layer + `OrphanIntegrityReporter` |
+| Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
 
 > The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary and naming rules); the above are the only three rules you need to know.
 
@@ -112,80 +113,84 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Endpoints below require a JWT bearer token except registration and login. Rate limiting applies to `/auth/*`, `/accounts` and `/transfers`.
+All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration and both login endpoints are public. The auth, account-create and transfer paths have rate limits.
 
-| Module       | Endpoint                         | Method | Description                                                                      | Special Headers / Notes         |
-| :----------- | :------------------------------- | :----- | :------------------------------------------------------------------------------- | :------------------------------ |
-| **User**     | `/auth/register`                 | `POST` | Register a new user                                                              | `Idempotency-Key` (Recommended) |
-| **User**     | `/auth/login`                    | `POST` | Log in and obtain JWT                                                            | Brute-force & Rate-limited      |
-| **User**     | `/auth/logout`                   | `POST` | Log out and blacklist token                                                      | `Authorization: Bearer <token>` |
-| **Account**  | `/accounts`                      | `POST` | Create a new bank account                                                        | `Authorization: Bearer <token>`, `Idempotency-Key` (Recommended) |
-| **Account**  | `/accounts`                      | `GET`  | List current user's accounts (Paged)                                             | `Authorization: Bearer <token>` |
-| **Account**  | `/accounts/{id}`                 | `GET`  | Query account details by ID                                                      | `Authorization: Bearer <token>` |
-| **Account**  | `/accounts/iban/{iban}`          | `GET`  | Query account details by IBAN                                                    | `Authorization: Bearer <token>` |
-| **Transfer** | `/transfers`                     | `POST` | Execute a money transfer                                                         | `Idempotency-Key` (Required)    |
-| **Transfer** | `/transfers/{id}`                | `GET`  | Query transfer details by ID                                                     | `Authorization: Bearer <token>` |
-| **Transfer** | `/transfers/{id}/cancel`         | `POST` | Cancel a transfer (< 24 hours)                                                   | `Idempotency-Key` (Required)    |
-| **Transfer** | `/transfers/history/{accountId}` | `GET`  | Fetch transfer history (Paged)                                                   | `Authorization: Bearer <token>` |
-| **Transfer** | `/transfers/report`              | `GET`  | Export date-range report (page-scoped totals: `pageTransferCount`, `pageVolume`) | `Authorization: Bearer <token>` |
+| Module | Endpoint | Method | Description / notes |
+| :--- | :--- | :--- | :--- |
+| User | `/auth/register` | `POST` | Register; `Idempotency-Key` recommended. |
+| User | `/auth/login` | `POST` | Obtain a bearer JWT for API clients. |
+| User | `/auth/logout` | `POST` | Revoke the bearer JWT. |
+| User | `/auth/browser/login` | `POST` | Set `HttpOnly` session and readable CSRF cookies; no token in JSON. |
+| User | `/auth/browser/session` | `GET` | Restore the browser session. |
+| User | `/auth/browser/logout` | `POST` | Revoke the cookie session; requires CSRF header. |
+| Account | `/accounts/capabilities` | `GET` | Report whether simulated opening funds are enabled. |
+| Account | `/accounts` | `POST` | Open an account for the authenticated user; the server generates a simulation-only Turkish IBAN. `Idempotency-Key` recommended. |
+| Account | `/accounts` | `GET` | List the authenticated user's accounts (paged). |
+| Account | `/accounts/{id}`, `/accounts/iban/{iban}` | `GET` | Return only an account owned by the caller. |
+| Transfer | `/transfers` | `POST` | Execute a simulated transfer; `Idempotency-Key` required. |
+| Transfer | `/transfers/{id}` | `GET` | Query transfer details. |
+| Transfer | `/transfers/{id}/cancel` | `POST` | Conditionally reverse a completed transfer; `Idempotency-Key` required. |
+| Transfer | `/transfers/history/{accountId}` | `GET` | Paged transfer history. |
+| Transfer | `/transfers/report` | `GET` | Paged date-range report with `pageTransferCount`, `pageVolume` and `hasNext`; not a full-range export. |
 
 ---
 
 ## Key Features & Design Decisions
 
 - **Hexagonal Architecture (Ports & Adapters):** Bounded contexts (`account`, `transfer`, `user`, `audit`) never depend on `infrastructure`; infrastructure implements context-owned ports, and each port lives in its owning module.
-- **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Audit events are published via `ApplicationEventPublisher` within the transaction boundary and consumed by `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`, ensuring audit logging is only persisted on successful commit.
-- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, concurrent-safe claiming (`SKIP LOCKED`), and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter).
+- **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Mandatory audit records are saved through `AuditEventPublisherAdapter` in the caller's transaction, so an audit write failure rolls back the associated money movement.
+- **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, `SKIP LOCKED` row selection, and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter). The initial batch lock ends after selection; processing reacquires each event lock in a separate transaction. Partition changes, dead letters, and retention are covered in [outbox operations](docs/outbox-operations.md).
 - **Optimistic Concurrency Control (OCC):** Prevents lost updates and double-spending on `Account` and `Transfer` entities via Hibernate `@Version`.
 - **Sorted Resource Locking (Deadlock Prevention):** Acquires pessimistic write locks (`SELECT ... FOR UPDATE`) in a consistent, sorted order of account IDs (via `OrderedPair`) during debit/credit operations to prevent deadlocks under high-concurrency transfers.
 - **Bounded Context Decoupling (Anti-Corruption Layer - ACL):** The `transfer` and `account` modules communicate only through the `account-api` published language (Open Host Service), consumed via transfer's `AccountAclPort` contract and implemented via `AccountAclAdapter` (in `transfer.adapter.out.account`) delegating to `AccountApi`. This protects the transfer domain from database or structure changes inside the account module, and account domain events never leak across the boundary.
-- **AOP Idempotency Guard:** Write endpoints are protected against duplicate submissions via `Idempotency-Key` headers stored in the `idempotency_keys` table.
-- **Resilience:** Token blacklist degrades to a local per-token-TTL cache when Redis is unreachable (auth stays up); rate-limited responses carry `Retry-After`; login runs read-only against the DB.
-- **Observability:** JSON logs in production (plain text locally), always with correlation IDs; Micrometer counters (outbox, orphan alarms), Redis health indicator, Prometheus-ready Actuator endpoints.
-- **Configuration:** All tunables are externalized with env overrides documented in `.env.example` (timeouts, TTL bounds, retry/backoff, cron schedules, alarm thresholds).
+- **AOP Idempotency Guard:** Annotated account and transfer commands use `Idempotency-Key` records in the `idempotency_keys` table. Transfer and cancellation keys are required; account creation and registration keys are recommended.
+- **Resilience:** Revocation lookup fails closed with 503 when a required store is unavailable; production starts in hybrid DB+Redis mode to preserve Redis-only revocations during rollout. See [token revocation migration](docs/token-revocation-migration.md) and the [operations runbook](docs/operations.md). Rate-limited responses carry `Retry-After`.
+- **Observability:** JSON logs in production (plain text locally) with request correlation IDs; outbox/backlog and orphan-integrity metrics, Redis health indicator and Prometheus-ready Actuator endpoint. Scraping, alert routing and restore drills remain deployment tasks.
+- **Simulation funding:** Local dev/test profiles allow simulated opening balances. A hosted simulation uses `prod,simulation` to keep production security settings; `prod` alone allows zero opening balance. The UI reads `/accounts/capabilities` and mirrors that policy. See [simulation mode](docs/simulation-mode.md).
+- **Notifications:** Current email and SMS adapters log simulated notifications; no external delivery provider is connected.
 
 ---
 
 ## Getting Started
 
-You can run the entire system (databases, cache, and the application itself) with a single command, or build and run it locally.
+You can run PostgreSQL, Redis and the application together, or run Java on the host against Compose dependencies. The Compose defaults are for local development, not a public deployment.
 
 ### Option A: Run Everything via Docker Compose (Recommended)
 
 To build and spin up PostgreSQL, Redis, and the Spring Boot application together:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
-### Option B: Build & Run Locally
+Open the bundled UI at `http://localhost:8080/`. The default `dev` profile permits **simulated** opening balances. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 
-1. Start PostgreSQL and Redis containers:
-   ```bash
-   docker-compose up -d postgres redis
-   ```
-2. Compile and run the application using the Maven Wrapper:
-   - **Linux/macOS:**
-     ```bash
-     ./mvnw clean package
-     ./mvnw spring-boot:run -pl app
-     ```
-   - **Windows (PowerShell):**
-     ```powershell
-     .\mvnw.cmd clean package
-     .\mvnw.cmd spring-boot:run -pl app
-     ```
-     _(Note: Testcontainers will spin up a PostgreSQL instance automatically during the test lifecycle)_
+### Option B: Run Java on Your Computer
 
-- **Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+From the repository root, use one command (Java 21, Docker and Docker Compose required):
+
+```powershell
+# Windows PowerShell or Command Prompt
+.\dev.cmd
+```
+
+```bash
+# Linux/macOS
+bash scripts/dev.sh
+```
+
+The launcher stops the Compose app container if it is running, waits for PostgreSQL and Redis, builds the app with tests skipped, then serves the UI at `http://localhost:8080/`. It supplies the Compose database credentials and host Redis port (`6389`) and generates a fresh JWT secret automatically. No `.env` file or manual environment setup is needed. A fresh secret logs out existing browser sessions on each restart. Press Ctrl+C to stop Java; `docker compose down` stops the dependency containers. Run `./mvnw clean verify` separately for the full test suite.
+
+- **Swagger UI (local profiles):** `http://localhost:8080/swagger-ui/index.html` (disabled in `prod`)
 - **Actuator Health:** `http://localhost:8080/actuator/health`
 
 ---
 
 ## Testing & Quality Gates
 
-- **Test Suite (1500+ tests):** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in the `app` module, with adapter-level integration tests colocated in `infrastructure`.
+- **Test Suite:** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in `app`, with adapter-level integration tests also in `infrastructure`. The last full verification on 24 September 2026 passed 1,740 Java tests.
 - **Verify Architecture Boundaries (ArchUnit):** Boundary rules from the table above, verified automatically on every build.
 - **Integration Testing with Testcontainers & Flyway:** Integration tests run against a real PostgreSQL via Testcontainers with Flyway migrations and `ddl-auto=validate` for schema consistency.
-- **Generate Coverage Report (JaCoCo):** `./mvnw jacoco:report` (or `.\mvnw.cmd jacoco:report`)
+- **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-module report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
+- **Browser contract checks:** `node app/src/test/js/idempotency.test.js` and `node app/src/test/js/frontend_contract.test.js` exercise session/idempotency, report pagination and funding-capability behavior. CI runs both; a real browser/TLS acceptance test is not yet included.
 - **Run Mutation Testing (Pitest):** `./mvnw pitest:mutationCoverage` (or `.\mvnw.cmd pitest:mutationCoverage`)

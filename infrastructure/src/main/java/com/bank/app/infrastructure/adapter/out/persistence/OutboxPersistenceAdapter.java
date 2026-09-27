@@ -38,6 +38,12 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public long countPendingOutsidePartitionRange(int partitionCount) {
+        return repository.countPendingOutsidePartitionRange(partitionCount);
+    }
+
+    @Override
     @Transactional
     public Optional<EventEntry> findByIdForUpdateSkipLocked(String id) {
         return repository.findByIdForUpdateSkipLocked(id).map(this::toDomain);

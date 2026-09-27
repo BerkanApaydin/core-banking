@@ -34,14 +34,14 @@ class ConcurrentRequestExceptionTest {
     }
 
     @Nested
-    @DisplayName("HTTP status code")
-    class HttpStatusCode {
+    @DisplayName("failure meaning")
+    class FailureMeaning {
 
         @Test
-        @DisplayName("should return 409 Conflict")
-        void shouldReturn409() {
+        @DisplayName("should describe a conflict")
+        void shouldDescribeConflict() {
             ConcurrentRequestException ex = new ConcurrentRequestException("concurrent");
-            assertThat(ex.getHttpStatusCode()).isEqualTo(409);
+            assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.CONFLICT);
         }
     }
 }

@@ -86,6 +86,7 @@ app:
       time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
       paths:
         - /api/v1/auth/login
+        - /api/v1/auth/browser/login
         - /api/v1/auth/register
         - /api/v1/accounts
         - /api/v1/transfers
@@ -100,6 +101,10 @@ app:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
     orphan-alarm-threshold: ${ORPHAN_ALARM_THRESHOLD:0}
+  observability:
+    backlog:
+      enabled: ${BACKLOG_METRICS_ENABLED:true}
+      scan-delay-ms: ${BACKLOG_METRICS_SCAN_DELAY_MS:60000}
   transfer:
     cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
   transaction:

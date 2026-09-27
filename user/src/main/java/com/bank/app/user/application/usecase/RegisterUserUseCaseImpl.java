@@ -55,9 +55,10 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         EmailAddress email = request.email() != null ? new EmailAddress(request.email()) : null;
         PhoneNumber phone = request.phone() != null ? new PhoneNumber(request.phone()) : null;
         User user = User.create(request.username(), encodedPassword, email, phone, clockProvider.clock());
-        saveUserPort.save(user);
-        domainEventPublisherService.publishEvents(user);
+        User savedUser = saveUserPort.save(user);
+        savedUser.recordRegistration(clockProvider.clock());
+        domainEventPublisherService.publishEvents(savedUser);
 
-        log.info("User registered: username={}", request.username());
+        log.info("User registration completed");
     }
 }

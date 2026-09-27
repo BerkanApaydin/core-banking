@@ -50,10 +50,15 @@ public class User extends BaseAggregateRoot {
 
     public static User create(String username, String password, EmailAddress email, PhoneNumber phone, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
-        User user = new User(null, username, password, Role.ROLE_USER, email, phone);
-        user.registerEvent(new UserRegisteredEvent(
-                null, username, Role.ROLE_USER.name(), LocalDateTime.now(clock)));
-        return user;
+        return new User(null, username, password, Role.ROLE_USER, email, phone);
+    }
+
+    public void recordRegistration(Clock clock) {
+        if (id == null) {
+            throw new IllegalStateException("Registration event requires a persisted user ID");
+        }
+        registerEvent(new UserRegisteredEvent(
+                id.value().toString(), username, role.name(), LocalDateTime.now(clock)));
     }
 
     private static String validateUsername(String username) {

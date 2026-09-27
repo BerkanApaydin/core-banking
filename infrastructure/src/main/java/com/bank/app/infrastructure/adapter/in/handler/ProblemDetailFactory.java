@@ -26,8 +26,7 @@ public final class ProblemDetailFactory {
     private ProblemDetailFactory() {}
 
     public static ResponseEntity<ProblemDetail> create(ErrorCode code, String message, WebRequest request) {
-        HttpStatus status = HttpStatus.resolve(code.getHttpStatus());
-        if (status == null) status = HttpStatus.INTERNAL_SERVER_ERROR;
+        HttpStatus status = BusinessErrorHttpMapper.toStatus(code);
         return createResponse(status, code.code(), message, request);
     }
 
@@ -75,7 +74,8 @@ public final class ProblemDetailFactory {
         objectMapper.writeValue(response.getWriter(), problemDetail);
     }
 
-    private static ResponseEntity<ProblemDetail> createResponse(HttpStatus status, String code, String message, WebRequest request) {        if (status == null) {
+    private static ResponseEntity<ProblemDetail> createResponse(HttpStatus status, String code, String message, WebRequest request) {
+        if (status == null) {
             throw new IllegalArgumentException("HttpStatus must not be null");
         }
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, message);

@@ -9,6 +9,7 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
+import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,6 +193,21 @@ class AuthControllerWebMvcTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isTooManyRequests());
+        }
+
+        @Test
+        void shouldReturn503WhenLoginAttemptStoreIsUnavailable() throws Exception {
+            AuthRequest request = new AuthRequest("testuser", "password");
+            when(loginUserPort.execute(any(AuthRequest.class), anyString()))
+                    .thenThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")));
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("SECURITY_BACKEND_UNAVAILABLE"))
+                    .andExpect(jsonPath("$.detail").value("Security service temporarily unavailable. Please try again later."));
         }
 
         @Test

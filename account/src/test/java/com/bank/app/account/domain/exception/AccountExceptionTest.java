@@ -31,10 +31,10 @@ class AccountExceptionTest {
 
     @Test
     void shouldCreateAccountNotFoundExceptionWithIban() {
-        AccountNotFoundException ex = new AccountNotFoundException("TR290006200000000000000111");
+        AccountNotFoundException ex = new AccountNotFoundException("TR770006200000000000000111");
         assertEquals("error.account_not_found_iban", ex.getMessageKey());
-        assertArrayEquals(new Object[] { "TR290006200000000000000111" }, ex.getArgs());
-        assertEquals("Account not found. IBAN: TR290006200000000000000111", ex.getMessage());
+        assertArrayEquals(new Object[] { "TR770006200000000000000111" }, ex.getArgs());
+        assertEquals("Account not found. IBAN: TR770006200000000000000111", ex.getMessage());
         assertEquals("ACCOUNT_NOT_FOUND_IBAN", ex.getErrorCode());
     }
 

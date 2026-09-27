@@ -23,7 +23,7 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
     @Query("SELECT a FROM AccountJpaEntity a WHERE a.id = :id")
     Optional<AccountJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
-    Page<AccountJpaEntity> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    Page<AccountJpaEntity> findByUserIdOrderByCreatedAtDescIdDesc(Long userId, Pageable pageable);
 
     long countByUserId(Long userId);
 

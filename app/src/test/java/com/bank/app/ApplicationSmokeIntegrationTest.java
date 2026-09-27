@@ -2,6 +2,8 @@ package com.bank.app;
 
 import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
+import com.bank.app.common.domain.Iban;
+import com.bank.app.infrastructure.adapter.out.metrics.BacklogMetricsReporter;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.user.application.dto.AuthRequest;
@@ -30,9 +32,13 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     @Autowired
     private TestRestTemplate restTemplate;
 
+    @Autowired
+    private BacklogMetricsReporter backlogMetricsReporter;
+
     @Test
     void contextLoads() {
         assertThat(restTemplate).isNotNull();
+        assertThat(backlogMetricsReporter).isNotNull();
     }
 
     @Test
@@ -72,8 +78,6 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                 "/api/v1/accounts",
                 HttpMethod.POST,
                 new HttpEntity<>(Map.of(
-                        "userId", loginResponse.getBody().userId(),
-                        "iban", "TR330006200000000000000001",
                         "ownerName", "Flow Test",
                         "initialBalance", new BigDecimal("1000.00"),
                         "currency", "TRY"
@@ -81,7 +85,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                 AccountResponse.class);
         assertThat(accountResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(accountResponse.getBody()).isNotNull();
-        assertThat(accountResponse.getBody().iban()).isEqualTo("TR330006200000000000000001");
+        assertThat(accountResponse.getBody().iban()).matches("TR[0-9]{24}");
+        assertThat(new Iban(accountResponse.getBody().iban()).hasValidChecksum()).isTrue();
         assertThat(accountResponse.getBody().balance()).isEqualByComparingTo("1000.00");
     }
 
@@ -106,9 +111,6 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                 new AuthRequest(userB, "Receiver1234"), AuthResponse.class);
         assertThat(loginB.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        Long userIdA = loginA.getBody().userId();
-        Long userIdB = loginB.getBody().userId();
-
         HttpHeaders headersA = new HttpHeaders();
         headersA.setBearerAuth(loginA.getBody().token());
 
@@ -117,8 +119,6 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<AccountResponse> accountA = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", userIdA,
-                        "iban", "TR330006200000000000000003",
                         "ownerName", "Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
@@ -127,8 +127,6 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<AccountResponse> accountB = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", userIdB,
-                        "iban", "TR330006200000000000000004",
                         "ownerName", "Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
@@ -200,17 +198,13 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         HttpHeaders headersReceiver = new HttpHeaders();
         headersReceiver.setBearerAuth(loginReceiver.getBody().token());
 
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(
-                "userId", loginSender.getBody().userId(),
-                "iban", "TR330006200000000000000005",
+        ResponseEntity<AccountResponse> poorAccount = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(
                 "ownerName", "Poor",
                 "initialBalance", new BigDecimal("100.00"),
                 "currency", "TRY"
         ), headersSender), AccountResponse.class);
 
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(
-                "userId", loginReceiver.getBody().userId(),
-                "iban", "TR330006200000000000000006",
+        ResponseEntity<AccountResponse> richAccount = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(
                 "ownerName", "Rich",
                 "initialBalance", new BigDecimal("99999.00"),
                 "currency", "TRY"
@@ -218,8 +212,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "senderIban", "TR330006200000000000000005",
-                        "receiverIban", "TR330006200000000000000006",
+                         "senderIban", poorAccount.getBody().iban(),
+                         "receiverIban", richAccount.getBody().iban(),
                         "amount", new BigDecimal("99999.00"),
                         "currency", "TRY"
                 ), transferHeaders(headersSender)), ProblemDetail.class);
@@ -240,10 +234,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(login.getBody().token());
 
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
+        ResponseEntity<AccountResponse> account = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
                 new HttpEntity<>(Map.of(
-                        "userId", login.getBody().userId(),
-                        "iban", "TR330006200000000000000007",
                         "ownerName", "HasAccount",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
@@ -251,8 +243,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "senderIban", "TR330006200000000000000007",
-                        "receiverIban", "TR990006200000000000000999",
+                         "senderIban", account.getBody().iban(),
+                        "receiverIban", "TR600006200000000000000999",
                         "amount", new BigDecimal("100.00"),
                         "currency", "TRY"
                 ), transferHeaders(headers)), ProblemDetail.class);
@@ -269,16 +261,12 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
                 new AuthRequest(user, "Test1234"), AuthResponse.class);
         assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Long userId = login.getBody().userId();
-
         HttpHeaders auth = new HttpHeaders();
         auth.setBearerAuth(login.getBody().token());
 
         ResponseEntity<AccountResponse> sender = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", userId,
-                        "iban", "TR330006200000000000000008",
-                        "ownerName", "Journey Sender",
+                         "ownerName", "Journey Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
                 ), auth), AccountResponse.class);
@@ -286,9 +274,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<AccountResponse> receiver = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", userId,
-                        "iban", "TR330006200000000000000009",
-                        "ownerName", "Journey Receiver",
+                         "ownerName", "Journey Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
                 ), auth), AccountResponse.class);
@@ -297,8 +283,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<TransferResponse> transfer = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "senderIban", "TR330006200000000000000008",
-                        "receiverIban", "TR330006200000000000000009",
+                         "senderIban", sender.getBody().iban(),
+                         "receiverIban", receiver.getBody().iban(),
                         "amount", new BigDecimal("500.00"),
                         "currency", "TRY"
                 ), transferHeaders(auth)), TransferResponse.class);
@@ -330,6 +316,10 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                 HttpMethod.POST, new HttpEntity<>(auth), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
+        ResponseEntity<Void> repeatedLogout = restTemplate.exchange("/api/v1/auth/logout",
+                HttpMethod.POST, new HttpEntity<>(auth), Void.class);
+        assertThat(repeatedLogout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
         ResponseEntity<ProblemDetail> afterLogout = restTemplate.exchange(
                 "/api/v1/accounts/" + senderId,
                 HttpMethod.GET, new HttpEntity<>(auth), ProblemDetail.class);
@@ -356,19 +346,15 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<AccountResponse> accountSender = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", loginSender.getBody().userId(),
-                        "iban", "TR330006200000000000000011",
-                        "ownerName", "Replay Sender",
+                         "ownerName", "Replay Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
                 ), headersSender), AccountResponse.class);
         assertThat(accountSender.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        restTemplate.exchange("/api/v1/accounts",
+        ResponseEntity<AccountResponse> accountReceiver = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "userId", loginReceiver.getBody().userId(),
-                        "iban", "TR330006200000000000000012",
-                        "ownerName", "Replay Receiver",
+                         "ownerName", "Replay Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
                 ), headersReceiver), AccountResponse.class);
@@ -377,8 +363,8 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         transferHeaders.setBearerAuth(loginSender.getBody().token());
         transferHeaders.set("Idempotency-Key", "replay-" + UUID.randomUUID());
         HttpEntity<Map<String, Object>> transferEntity = new HttpEntity<>(Map.of(
-                "senderIban", "TR330006200000000000000011",
-                "receiverIban", "TR330006200000000000000012",
+                 "senderIban", accountSender.getBody().iban(),
+                 "receiverIban", accountReceiver.getBody().iban(),
                 "amount", new BigDecimal("250.00"),
                 "currency", "TRY"
         ), transferHeaders);
@@ -421,19 +407,17 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(login.getBody().token());
 
-        restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
+        ResponseEntity<AccountResponse> account = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
                 new HttpEntity<>(Map.of(
-                        "userId", login.getBody().userId(),
-                        "iban", "TR330006200000000000000013",
-                        "ownerName", "Same",
+                         "ownerName", "Same",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
                 ), headers), AccountResponse.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
-                        "senderIban", "TR330006200000000000000013",
-                        "receiverIban", "TR330006200000000000000013",
+                         "senderIban", account.getBody().iban(),
+                         "receiverIban", account.getBody().iban(),
                         "amount", new BigDecimal("100.00"),
                         "currency", "TRY"
                 ), transferHeaders(headers)), ProblemDetail.class);

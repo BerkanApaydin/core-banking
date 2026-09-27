@@ -16,6 +16,11 @@ public class AccountAuthorizationService {
         userContextService.checkUserAuthorization(account.getUserId().value(), errorMessage);
     }
 
+    /** Queries hide the existence of accounts owned by another user. */
+    public boolean isCurrentUserOwner(Account account) {
+        return account.getUserId().value().equals(getCurrentUserId());
+    }
+
     public void authorizeUserAction(Long expectedUserId, String errorMessage) {
         userContextService.checkUserAuthorization(expectedUserId, errorMessage);
     }

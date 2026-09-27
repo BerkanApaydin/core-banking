@@ -47,6 +47,11 @@ class RegisterUserUseCaseTest {
     @BeforeEach
     void setUp() {
         lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        lenient().when(saveUserPort.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            return new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole(),
+                    user.getEmail(), user.getPhone());
+        });
         registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort,
                 PasswordPolicy.DEFAULT, domainEventPublisherService, clockProvider);
     }
@@ -71,6 +76,10 @@ class RegisterUserUseCaseTest {
                     "hashedpassword".equals(user.getPassword()) &&
                     user.getRole() == Role.ROLE_USER));
             verify(domainEventPublisherService).publishEvents(any(User.class));
+            verify(domainEventPublisherService).publishEvents(argThat(user ->
+                    user.getDomainEvents().stream().anyMatch(event -> event instanceof
+                            com.bank.app.user.domain.UserRegisteredEvent registration
+                            && "42".equals(registration.userId()))));
         }
 
         @Test

@@ -10,10 +10,10 @@ class DuplicateIbanExceptionTest {
 
     @Test
     void shouldCreateWithMessage() {
-        DuplicateIbanException ex = new DuplicateIbanException("TR290006200000000000000123");
-        assertEquals("An account already exists with this IBAN: TR290006200000000000000123", ex.getMessage());
+        DuplicateIbanException ex = new DuplicateIbanException("TR440006200000000000000123");
+        assertEquals("An account already exists with this IBAN: TR440006200000000000000123", ex.getMessage());
         assertEquals("error.duplicate_iban", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"TR290006200000000000000123"}, ex.getArgs());
+        assertArrayEquals(new Object[]{"TR440006200000000000000123"}, ex.getArgs());
     }
 
     @Test

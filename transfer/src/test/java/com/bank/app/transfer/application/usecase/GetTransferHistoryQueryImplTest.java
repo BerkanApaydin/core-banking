@@ -51,8 +51,8 @@ class GetTransferHistoryQueryImplTest {
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
-                1L, "TR290006200000000000000111",
-                2L, "TR290006200000000000000222"));
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
         when(loadTransferPort.countHistory(1L)).thenReturn(1L);
 
@@ -61,8 +61,8 @@ class GetTransferHistoryQueryImplTest {
         assertNotNull(history);
         assertEquals(1, history.content().size());
         assertEquals(10L, history.content().get(0).id());
-        assertEquals("TR290006200000000000000111", history.content().get(0).senderIban());
-        assertEquals("TR290006200000000000000222", history.content().get(0).receiverIban());
+        assertEquals("TR770006200000000000000111", history.content().get(0).senderIban());
+        assertEquals("TR870006200000000000000222", history.content().get(0).receiverIban());
         assertEquals(1, history.totalElements());
         assertEquals(0, history.page());
         assertEquals(20, history.size());
@@ -85,8 +85,8 @@ class GetTransferHistoryQueryImplTest {
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
-                1L, "TR290006200000000000000111",
-                2L, "TR290006200000000000000222"));
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
@@ -101,8 +101,8 @@ class GetTransferHistoryQueryImplTest {
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
-                1L, "TR290006200000000000000111",
-                2L, "TR290006200000000000000222"));
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222"));
         when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20))).thenReturn(Collections.emptyList());
         when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 

@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.JwtPort;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,8 @@ public class JwtTokenProvider implements JwtPort {
     private String secretKey;
     private long jwtExpiration;
     private final boolean allowDefaultSecret;
+    private volatile SecretKey signingKey;
+    private volatile JwtParser verifiedParser;
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey,
                             @Value("${jwt.expiration:86400000}") long jwtExpiration,
@@ -52,6 +55,28 @@ public class JwtTokenProvider implements JwtPort {
                 "JWT secret must be at least 256 bits (32 bytes) when base64-decoded. " +
                 "Current key length: " + (keyBytes.length * 8) + " bits. " +
                 "Generate a secure key with: openssl rand -base64 32");
+        }
+        signingKey = Keys.hmacShaKeyFor(keyBytes);
+        verifiedParser = Jwts.parser().verifyWith(signingKey).build();
+    }
+
+    @Override
+    public VerifiedToken verifyAndDecode(String token) {
+        if (token == null || token.isBlank()) return null;
+        try {
+            Claims claims = extractAllClaims(token);
+            Number userId = claims.get("userId", Number.class);
+            String username = claims.getSubject();
+            String role = claims.get("role", String.class);
+            Date expiration = claims.getExpiration();
+            if (username == null || username.isBlank() || userId == null || role == null
+                    || role.isBlank() || expiration == null || !expiration.after(new Date())) {
+                return null;
+            }
+            return new VerifiedToken(username, userId.longValue(), role,
+                    claims.getId(), expiration.getTime());
+        } catch (Exception invalid) {
+            return null;
         }
     }
 
@@ -116,16 +141,7 @@ public class JwtTokenProvider implements JwtPort {
 
     @Override
     public boolean isTokenValid(String token) {
-        try {
-            final String username = extractUsername(token);
-            return username != null && !isTokenExpired(token);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        return verifyAndDecode(token) != null;
     }
 
     private Date extractExpiration(String token) {
@@ -133,15 +149,21 @@ public class JwtTokenProvider implements JwtPort {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSignInKey())
-                .build()
-                .parseSignedClaims(token)
+        JwtParser parser = verifiedParser;
+        if (parser == null) {
+            validateSecret();
+            parser = verifiedParser;
+        }
+        return parser.parseSignedClaims(token)
                 .getPayload();
     }
 
     private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key = signingKey;
+        if (key == null) {
+            validateSecret();
+            key = signingKey;
+        }
+        return key;
     }
 }

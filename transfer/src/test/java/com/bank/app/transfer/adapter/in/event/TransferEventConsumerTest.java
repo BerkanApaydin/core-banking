@@ -18,6 +18,7 @@ import java.util.List;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -61,7 +62,7 @@ class TransferEventConsumerTest {
         AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
         doThrow(new RuntimeException("smtp down")).when(failingPort).notifyTransferCompleted(event);
 
-        listener.handleTransferCompleted(event);
+        assertThrows(RuntimeException.class, () -> listener.handleTransferCompleted(event));
 
         verify(notificationPort).notifyTransferCompleted(event);
     }
@@ -74,7 +75,7 @@ class TransferEventConsumerTest {
                 1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
         doThrow(new RuntimeException("sms down")).when(failingPort).notifyTransferCancelled(event);
 
-        listener.handleTransferCancelled(event);
+        assertThrows(RuntimeException.class, () -> listener.handleTransferCancelled(event));
 
         verify(notificationPort).notifyTransferCancelled(event);
     }

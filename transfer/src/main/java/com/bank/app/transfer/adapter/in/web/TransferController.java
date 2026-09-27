@@ -94,7 +94,8 @@ public class TransferController {
     }
 
     @GetMapping("/report")
-    @Operation(summary = "Generates a transfer report by date range")
+    @Operation(summary = "Generates a paginated transfer report by date range",
+            description = "Page totals cover only returned transfers; hasNext indicates another page at query time. Separate pages are not a snapshot.")
     public ResponseEntity<TransferReportResponse> getReport(
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,

@@ -72,8 +72,9 @@ public class TransferBeanConfig {
                                                        TransferDomainService transferDomainService,
                                                        TransferAuthorizationService transferAuthorizationService,
                                                        DomainEventPublisherService domainEventPublisherService,
-                                                       ClockProviderPort clockProvider) {
-        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider);
+                                                       ClockProviderPort clockProvider,
+                                                       AuditEventPort auditEventPort) {
+        return new PlaceTransferUseCaseImpl(accountAclPort, saveTransferPort, transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider, auditEventPort);
     }
 
     @Bean

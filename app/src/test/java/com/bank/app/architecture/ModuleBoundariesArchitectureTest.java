@@ -124,9 +124,9 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
 
     @Test
     void jpaEntitiesShouldNotReferenceOtherModuleEntities() {
-        // Intentional no-FK decision for BC autonomy (see V19): aggregates reference
-        // each other by ID only. JPA associations across BCs would re-couple modules
-        // through the persistence layer. The shared AuditableJpaEntity base is allowed.
+        // Aggregates reference each other by scalar ID in Java, while V24 restores
+        // PostgreSQL foreign keys for integrity in this single-database monolith.
+        // JPA associations across BCs would still couple the Java modules.
         ArchRule rule = noClasses()
                 .that().haveSimpleNameEndingWith("JpaEntity")
                 .and().resideOutsideOfPackage("com.bank.app.persistence..")

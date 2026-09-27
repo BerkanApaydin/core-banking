@@ -17,6 +17,9 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      group:
+        readiness:
+          include: readinessState,db,redisBackends
   # NOTE: no micrometer-tracing/OTel SDK on the classpath yet, so there is
   # intentionally no management.tracing block here. Correlation/trace IDs in
   # logs are generated locally by CorrelationIdFilter until real distributed
@@ -28,9 +31,11 @@ app:
       account-info:
         backend: redis
   security:
+    browser-session:
+      secure: true
     rate-limit:
       backend: redis
     failed-login:
       backend: redis
     token-blacklist:
-      backend: redis
+      backend: ${TOKEN_BLACKLIST_BACKEND:hybrid}

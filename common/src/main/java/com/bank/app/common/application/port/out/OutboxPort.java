@@ -7,6 +7,7 @@ import java.util.Optional;
 public interface OutboxPort {
     void save(EventEntry entry);
     List<EventEntry> findAndLockUnprocessed(int limit, int partition);
+    long countPendingOutsidePartitionRange(int partitionCount);
     Optional<EventEntry> findByIdForUpdateSkipLocked(String id);
     void markProcessed(String id);
     void markFailed(String id, String error, int retryCount);

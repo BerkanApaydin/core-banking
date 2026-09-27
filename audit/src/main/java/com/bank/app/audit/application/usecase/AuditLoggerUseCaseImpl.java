@@ -30,14 +30,14 @@ public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
         String username = getCurrentUsername();
         AuditLog auditLog = AuditLog.create(username, action, details, clockProvider.clock());
         saveAuditLogPort.save(auditLog);
-        log.info("Audit log: user={}, action={}, details={}", username, action, details);
+        log.info("Audit log persisted: action={}", action);
     }
 
     @Override
     public void log(String username, AuditAction action, String details) {
         AuditLog auditLog = AuditLog.create(username, action, details, clockProvider.clock());
         saveAuditLogPort.save(auditLog);
-        log.info("Audit log: user={}, action={}, details={}", username, action, details);
+        log.info("Audit log persisted: action={}", action);
     }
 
     private String getCurrentUsername() {

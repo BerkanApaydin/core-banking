@@ -7,9 +7,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
+    private static final int EVICTION_BATCH_SIZE = 500;
 
     static final String KEY_PREFIX = "account-snapshot:";
     static final String ID_PREFIX = "id-";
@@ -102,7 +106,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
                     + AccountSnapshotCache.ibansBatchKey(accountIds));
             return Optional.ofNullable(decodeBatch(raw));
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot batch read failed, falling back to DB: {}", e.getMessage());
+            log.warn("Redis snapshot batch read failed, falling back to DB: {}", e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -117,19 +121,30 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
                     KEY_PREFIX + BATCH_PREFIX + AccountSnapshotCache.ibansBatchKey(accountIds),
                     encodeBatch(ibans), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot batch write failed: {}", e.getMessage());
+            log.warn("Redis snapshot batch write failed: {}", e.getClass().getSimpleName());
         }
     }
 
     @Override
     public void evictAll() {
-        try {
-            Set<String> keys = redisTemplate.keys(KEY_PREFIX + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(KEY_PREFIX + "*")
+                .count(EVICTION_BATCH_SIZE)
+                .build();
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            Collection<String> batch = new ArrayList<>(EVICTION_BATCH_SIZE);
+            while (cursor.hasNext()) {
+                batch.add(cursor.next());
+                if (batch.size() == EVICTION_BATCH_SIZE) {
+                    redisTemplate.delete(batch);
+                    batch.clear();
+                }
+            }
+            if (!batch.isEmpty()) {
+                redisTemplate.delete(batch);
             }
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot evict-all failed: {}", e.getMessage());
+            log.warn("Redis snapshot evict-all failed: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -150,7 +165,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             }
             redisTemplate.delete(idxKey);
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot evict-by-id failed: {}", e.getMessage());
+            log.warn("Redis snapshot evict-by-id failed: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -169,7 +184,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             }
             redisTemplate.delete(reverseKey);
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot evict-by-iban failed: {}", e.getMessage());
+            log.warn("Redis snapshot evict-by-iban failed: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -184,7 +199,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         try {
             return Optional.ofNullable(decodeSnapshot(redisTemplate.opsForValue().get(key)));
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot read failed, falling back to DB: {}", e.getMessage());
+            log.warn("Redis snapshot read failed, falling back to DB: {}", e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -193,7 +208,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         try {
             redisTemplate.opsForValue().set(key, encodeSnapshot(snapshot), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot write failed: {}", e.getMessage());
+            log.warn("Redis snapshot write failed: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -206,7 +221,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
                     KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX + ibanKey,
                     String.valueOf(accountId), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
-            log.warn("Redis snapshot index write failed: {}", e.getMessage());
+            log.warn("Redis snapshot index write failed: {}", e.getClass().getSimpleName());
         }
     }
 
