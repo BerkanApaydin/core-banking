@@ -33,7 +33,10 @@ public class Transfer extends BaseAggregateRoot {
         }
         this.amount = Objects.requireNonNull(amount, "Transfer amount must not be null");
         this.status = Objects.requireNonNull(status, "Status must not be null");
-        if (status == TransferStatus.PENDING && amount.isZero()) {
+        // Zero is rejected for every status, not just PENDING: the factory
+        // already enforces this, and the constructor must be equally strict so
+        // rehydrated/legacy rows can never materialize a zero transfer.
+        if (amount.isZero()) {
             throw new IllegalArgumentException("Transfer amount must not be zero");
         }
         this.createdAt = Objects.requireNonNull(createdAt, "Created date must not be null");

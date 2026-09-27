@@ -97,6 +97,10 @@ app:
   idempotency:
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
+    # Retry policy for the generic @Idempotent guard (all annotated endpoints).
+    # Separate from app.transfer.* (transfer's own use-case retry aspect).
+    max-attempts: ${IDEMPOTENCY_MAX_ATTEMPTS:3}
+    initial-delay-ms: ${IDEMPOTENCY_INITIAL_DELAY_MS:500}
   integrity:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}

@@ -52,4 +52,31 @@ class RoleTest {
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
     }
+
+    @Nested
+    @DisplayName("require (fail-closed)")
+    class Require {
+
+        @Test
+        @DisplayName("should return role for valid value")
+        void shouldReturnForValidValue() {
+            assertThat(Role.require("ROLE_ADMIN")).isEqualTo(Role.ROLE_ADMIN);
+        }
+
+        @ParameterizedTest(name = "should throw for blank input: \"{0}\"")
+        @NullAndEmptySource
+        @ValueSource(strings = {" ", "  "})
+        void shouldThrowForBlank(String value) {
+            assertThatThrownBy(() -> Role.require(value))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should throw for unknown role")
+        void shouldThrowForUnknown() {
+            assertThatThrownBy(() -> Role.require("ROLE_SUPERADMIN"))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid role");
+        }
+    }
 }

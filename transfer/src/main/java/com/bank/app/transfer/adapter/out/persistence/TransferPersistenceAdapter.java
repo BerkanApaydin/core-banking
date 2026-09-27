@@ -41,9 +41,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
             mapper.updateJpaEntity(entity, transfer);
         }
         TransferJpaEntity saved = repository.save(entity);
-        if (saved == null) {
-            throw new IllegalArgumentException("Saved entity must not be null");
-        }
         return mapper.toDomain(saved);
     }
 

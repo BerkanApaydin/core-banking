@@ -38,10 +38,10 @@ public class TransferJpaEntity extends AuditableJpaEntity {
      * Business creation instant assigned by the domain ({@code Transfer.create}).
      * Kept separate from the auditing {@code created_at} populated at insert time,
      * so the cancellation window and time-travel tests stay deterministic across
-     * save→reload round trips. Null for rows written before V20 (mapper falls back
-     * to the auditing timestamp).
+     * save→reload round trips. NOT NULL since V28 (V20 backfilled legacy rows);
+     * report queries filter this column directly so the business-time index applies.
      */
-    @Column(name = "business_created_at")
+    @Column(name = "business_created_at", nullable = false)
     private LocalDateTime businessCreatedAt;
 
     @Version

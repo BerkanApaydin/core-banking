@@ -23,7 +23,7 @@ class IdempotencyCleanupSchedulerEdgeCaseTest {
 
     private IdempotencyCleanupScheduler scheduler;
 
-    private final IdempotencyProperties idempotencyProperties = new IdempotencyProperties(24, "0 0 * * * *");
+    private final IdempotencyProperties idempotencyProperties = new IdempotencyProperties(24, "0 0 * * * *", 3, 500);
 
     @BeforeEach
     void setUp() {
@@ -59,7 +59,7 @@ class IdempotencyCleanupSchedulerEdgeCaseTest {
 
     @Test
     void shouldCalculateCorrectThreshold() {
-        IdempotencyCleanupScheduler shortScheduler = new IdempotencyCleanupScheduler(idempotencyPort, new IdempotencyProperties(1, "0 0 * * * *"));
+        IdempotencyCleanupScheduler shortScheduler = new IdempotencyCleanupScheduler(idempotencyPort, new IdempotencyProperties(1, "0 0 * * * *", 3, 500));
 
         when(idempotencyPort.deleteExpired(any(LocalDateTime.class))).thenReturn(1);
 

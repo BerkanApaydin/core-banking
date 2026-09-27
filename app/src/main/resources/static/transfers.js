@@ -151,6 +151,13 @@ function initTransferForm() {
             return;
         }
 
+        // Client-side balance guard: avoids a doomed backend round-trip.
+        // The server re-checks authoritatively (race-safe); this is UX only.
+        if (amount > Number(senderAcc.balance)) {
+            showAlert(__('transfer.insufficient_balance'), 'danger');
+            return;
+        }
+
         let receiverIban = '';
         if (receiverType === 'registered') {
             const receiverId = receiverSelect.value;
@@ -170,7 +177,9 @@ function initTransferForm() {
             receiverIban = receiverAcc.iban;
         } else {
             receiverIban = manualIbanInput.value.trim();
-            if (!isValidIban(receiverIban)) {
+            // Regex + MOD97 checksum (same ISO 13616 check the backend applies):
+            // catches transposed digits before the backend 400 round-trip.
+            if (!isValidIban(receiverIban) || !hasValidIbanChecksum(receiverIban)) {
                 showAlert(__('transfer.valid_iban'), 'danger');
                 return;
             }

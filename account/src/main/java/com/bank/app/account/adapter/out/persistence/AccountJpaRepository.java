@@ -25,7 +25,5 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
 
     Page<AccountJpaEntity> findByUserIdOrderByCreatedAtDescIdDesc(Long userId, Pageable pageable);
 
-    long countByUserId(Long userId);
-
     List<AccountJpaEntity> findByIdIn(Collection<Long> ids);
 }

@@ -37,8 +37,8 @@ public class IdempotencyAspect {
             ClientIpResolverPort clientIpResolver,
             PlatformTransactionManager transactionManager,
             TransactionProperties transactionProperties,
-            @Value("${app.transfer.max-attempts:3}") int maxAttempts,
-            @Value("${app.transfer.initial-delay-ms:500}") long initialDelayMs) {
+            @Value("${app.idempotency.max-attempts:3}") int maxAttempts,
+            @Value("${app.idempotency.initial-delay-ms:500}") long initialDelayMs) {
         this.idempotencyGuard = idempotencyGuard;
         this.requestResolver = new IdempotencyRequestResolver(userContextService, clientIpResolver, objectMapper);
         this.responseCodec = new IdempotencyResponseCodec(objectMapper);

@@ -19,12 +19,14 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     List<TransferJpaEntity> findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(
             Long senderId, Long receiverId, Pageable pageable);
 
-    // Business-time filter: domain createdAt lives in business_created_at
-    // (V20; mapper falls back to auditing created_at for pre-V20 rows).
-    // Filtering auditing createdAt would diverge from the cancellation window
-    // and time-travel determinism whenever insert time != domain time.
+    // Business-time filter on business_created_at (V20, NOT NULL since V28).
+    // The previous COALESCE(business_created_at, created_at) fallback defeated
+    // the V21 business-time index (a function over the column cannot use a plain
+    // btree range scan). Legacy rows were backfilled in V20/V28, so the direct
+    // column predicate keeps the index usable. Ordering stays on the auditing
+    // created_at (insert order) by design.
     @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
-           + "AND COALESCE(t.businessCreatedAt, t.createdAt) BETWEEN :start AND :end "
+           + "AND t.businessCreatedAt BETWEEN :start AND :end "
            + "ORDER BY t.createdAt DESC, t.id DESC")
     List<TransferJpaEntity> findHistoryBetween(
             @Param("accountId") Long accountId,

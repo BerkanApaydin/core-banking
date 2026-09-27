@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -8,10 +9,10 @@ import java.util.List;
 public class RateLimitProperties {
 
     private List<String> paths = List.of(
-            "/api/v1/auth/login",
-            "/api/v1/auth/register",
-            "/api/v1/accounts",
-            "/api/v1/transfers"
+            PublicApiPaths.LOGIN,
+            PublicApiPaths.REGISTER,
+            PublicApiPaths.ACCOUNTS,
+            PublicApiPaths.TRANSFERS
     );
 
     private String backend = "caffeine";

@@ -194,21 +194,21 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Test
     void shouldReturn400WhenUsernameIsBlank() throws Exception {
-        AuthRequest request = new AuthRequest("", "ValidPass1");
+        String body = "{\"username\": \"\", \"password\": \"ValidPass1\"}";
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(body))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldReturn400WhenPasswordIsBlank() throws Exception {
-        AuthRequest request = new AuthRequest("validuser", "");
+        String body = "{\"username\": \"validuser\", \"password\": \"\"}";
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(body))
                 .andExpect(status().isBadRequest());
     }
 
@@ -232,11 +232,11 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Test
     void shouldReturn400WhenLoginWithBlankUsername() throws Exception {
-        AuthRequest request = new AuthRequest("", "password");
+        String body = "{\"username\": \"\", \"password\": \"password\"}";
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(body))
                 .andExpect(status().isBadRequest());
     }
 

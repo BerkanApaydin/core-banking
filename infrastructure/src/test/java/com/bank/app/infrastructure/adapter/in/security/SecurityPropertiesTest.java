@@ -24,7 +24,9 @@ class SecurityPropertiesTest {
                     "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
                     "/v3/api-docs/**", "/swagger-ui/**",
                     "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/boot.js", "/style.css", "/favicon.ico", "/error"
+                    "/app.js", "/boot.js", "/accounts.js", "/transfers.js",
+                    "/idempotency.js", "/i18n.js",
+                    "/style.css", "/favicon.ico", "/error"
             );
         }
 
@@ -37,7 +39,9 @@ class SecurityPropertiesTest {
                     "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
                     "/v3/api-docs/**", "/swagger-ui/**",
                     "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/boot.js", "/style.css", "/favicon.ico", "/error"
+                    "/app.js", "/boot.js", "/accounts.js", "/transfers.js",
+                    "/idempotency.js", "/i18n.js",
+                    "/style.css", "/favicon.ico", "/error"
             );
         }
     }

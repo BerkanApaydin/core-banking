@@ -32,7 +32,9 @@ public class AuthenticationAdapter implements AuthenticationPort {
                 throw new AuthenticationServiceException("Authentication provider returned an invalid identity");
             }
             try {
-                Role role = Role.valueOf(authenticated.getAuthorities().iterator().next().getAuthority());
+                // Fail-closed parse: unknown/blank authority strings throw with
+                // a standard message instead of bypassing Role validation.
+                Role role = Role.require(authenticated.getAuthorities().iterator().next().getAuthority());
                 return new AuthenticatedUser(new UserId(principal.getId()), principal.getUsername(), role);
             } catch (IllegalArgumentException | NullPointerException invalidIdentity) {
                 throw new AuthenticationServiceException("Authentication provider returned an invalid identity", invalidIdentity);

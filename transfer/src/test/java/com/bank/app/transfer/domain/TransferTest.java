@@ -118,6 +118,16 @@ class TransferTest {
                     TransferStatus.PENDING, now()))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
+
+        @ParameterizedTest(name = "should reject zero amount for {0} transfer in constructor")
+        @ValueSource(strings = { "COMPLETED", "FAILED", "CANCELLED" })
+        @DisplayName("should reject zero amount regardless of status in constructor")
+        void shouldRejectZeroAmountForAnyStatusInConstructor(String status) {
+            assertThatThrownBy(() -> new Transfer(1L, 1L, 2L, Money.of("0.00", Currency.TRY),
+                    TransferStatus.valueOf(status), now()))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must not be zero");
+        }
     }
 
     @Nested

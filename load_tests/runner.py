@@ -150,16 +150,24 @@ def _account_payload(owner_name, initial_balance):
 
 
 def _create_account(token, owner_name, initial_balance):
-    response = requests.post(
-        f"{BASE_URL}/api/v1/accounts",
-        json=_account_payload(owner_name, initial_balance),
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                 "Idempotency-Key": str(uuid.uuid4())},
-        timeout=(3, 10),
-    )
-    if response.status_code != 201:
-        raise RuntimeError(f"Account bootstrap failed: HTTP {response.status_code} {response.text[:120]}")
-    return response.json()
+    # Retry on 429 with the same pacing as registration: account creation is
+    # rate-limited, and a single unlucky window must not abort the bootstrap.
+    last_status, last_body = None, ""
+    for _ in range(3):
+        response = requests.post(
+            f"{BASE_URL}/api/v1/accounts",
+            json=_account_payload(owner_name, initial_balance),
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
+                     "Idempotency-Key": str(uuid.uuid4())},
+            timeout=(3, 10),
+        )
+        if response.status_code == 201:
+            return response.json()
+        last_status, last_body = response.status_code, response.text[:120]
+        if response.status_code != 429:
+            break
+        time.sleep(12)
+    raise RuntimeError(f"Account bootstrap failed: HTTP {last_status} {last_body}")
 
 
 def _require_workload_target(token):
@@ -211,7 +219,10 @@ def _status_line(statuses, total=None):
 
 
 def _print_phase_result(phase_label, dur, rps, avg, lat_p50, error_cnt, statuses, total_req, ep_stats, lat_p95=None):
-    line = f"  {phase_label}  {dur:.2f}s  {rps:.0f} rps  avg={avg:.0f}ms  p50={lat_p50:.0f}ms"
+    # NOTE: rps counts SUCCESSFUL requests only (len(latencies)); errors are
+    # reported separately via err= and the per-endpoint table. Labelled
+    # ok-rps so a 429-heavy run is never misread as offered load.
+    line = f"  {phase_label}  {dur:.2f}s  {rps:.0f} ok-rps  avg={avg:.0f}ms  p50={lat_p50:.0f}ms"
     if lat_p95 is not None:
         line += f"  p95={lat_p95:.0f}ms"
     line += f"  err={error_cnt}"
@@ -286,6 +297,9 @@ def _create_single_user(i, verify_target=False):
                 continue
             if r.status_code == 409:
                 return None
+            # Diagnose anything unexpected (400/500): silent None starves the
+            # user pool and hides the root cause from the phase summary.
+            print(f"  [{i}] Register HTTP {r.status_code}: {r.text[:200]}")
             return None
         except Exception as e:
             print(f"  [{i}] Register error: {e}")
@@ -623,6 +637,15 @@ def make_worker(pool, think_time=None):
                 }
                 r = _req("GET", f"{BASE_URL}/api/v1/transfers/report", params=params,
                                 headers={"Authorization": f"Bearer {token}"})
+                if r.status_code == 200:
+                    data = r.json()
+                    _validate_response(ep, r.status_code, data,
+                                       expected_fields=["accountId", "pageTransferCount",
+                                                        "pageVolume", "transfers", "hasNext"])
+                    if isinstance(data, dict) and isinstance(data.get("transfers"), list):
+                        if data.get("pageTransferCount") != len(data["transfers"]):
+                            key = f"{ep}: pageTransferCount != len(transfers)"
+                            _validation_errors[key] = _validation_errors.get(key, 0) + 1
 
             elif roll < THRESHOLDS[7]:
                 ep = "POST /auth/register"

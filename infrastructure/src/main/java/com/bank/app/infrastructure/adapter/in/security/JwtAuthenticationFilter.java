@@ -5,6 +5,7 @@ import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
+import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -175,8 +176,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static boolean isPublicLogin(HttpServletRequest request, String path) {
         if (!"POST".equals(request.getMethod())) return false;
-        return "/api/v1/auth/login".equals(path)
-                || "/api/v1/auth/browser/login".equals(path);
+        return PublicApiPaths.LOGIN.equals(path)
+                || PublicApiPaths.BROWSER_LOGIN.equals(path);
     }
 
     private static String requestPath(HttpServletRequest request) {

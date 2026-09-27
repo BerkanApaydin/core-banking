@@ -781,7 +781,7 @@ async function lookupManualIban(iban) {
     const note = document.getElementById('iban-lookup-note');
     if (!note || !authenticated) return;
     const v = String(iban || '').trim();
-    if (!isValidIban(v)) {
+    if (!isValidIban(v) || !hasValidIbanChecksum(v)) {
         note.classList.add('d-none');
         note.innerHTML = '';
         lastIbanLookup = '';
@@ -954,7 +954,11 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 function formatMoney(amount) {
-    return new Intl.NumberFormat(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    // Defensive: backend always sends non-null numerics, but a null/NaN must
+    // never render as "NaN" in a banking UI.
+    const n = Number(amount);
+    if (!Number.isFinite(n)) return '—';
+    return new Intl.NumberFormat(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 function sanitizeIban(value) {
@@ -1011,8 +1015,23 @@ function buildReportDateRange(startDay, endDay) {
     if (startDay > endDay) {
         throw new Error(__('report.invalid_date_range'));
     }
+    // Backend rule (GenerateTransferReportQueryImpl): start.plusMonths(12)
+    // must not be before end. End-of-day is 23:59:59.999999, so endDay must
+    // be strictly before start-plus-12-months (ISO strings compare
+    // chronologically). Mirrors LocalDate.plusMonths incl. month-end clamp.
+    if (endDay >= plusMonths12(startDay)) {
+        throw new Error(__('report.range_too_long'));
+    }
     // PostgreSQL stores transfer time as TIMESTAMP(6); BETWEEN is inclusive.
     return { startDate: `${startDay}T00:00:00`, endDate: `${endDay}T23:59:59.999999` };
+}
+
+function plusMonths12(day) {
+    const [y, m, d] = day.split('-').map(Number);
+    const target = new Date(y, m - 1 + 12, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(Math.min(d, lastDay))}`;
 }
 
 // --- Authentication Operations ---
@@ -1070,6 +1089,10 @@ function initAuth() {
         e.preventDefault();
         const usernameVal = document.getElementById('login-username').value.trim();
         const passwordVal = document.getElementById('login-password').value;
+        if (!usernameVal) {
+            showAlert(__('auth.username.required'), 'warning');
+            return;
+        }
 
         loginSpinner.classList.remove('d-none');
         btnLoginSubmit.disabled = true;
@@ -1102,6 +1125,10 @@ function initAuth() {
         if (btnRegisterSubmit.disabled) return;
         const usernameVal = document.getElementById('register-username').value.trim();
         const passwordVal = document.getElementById('register-password').value;
+        if (!usernameVal) {
+            showAlert(__('auth.username.required'), 'warning');
+            return;
+        }
 
         // Client mirror of backend PasswordPolicy defaults (min 8, upper,
         // lower, digit): instant feedback instead of a round-trip 400.
@@ -1156,13 +1183,15 @@ function initAuth() {
                 for (let attempt = 0; attempt < 2; attempt++) {
                     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
                     const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+                    // Omit the CSRF header entirely when there is no cookie:
+                    // an empty-but-present header is a mismatch on some filters.
+                    const csrf = browserCsrfToken();
+                    const logoutHeaders = { 'Content-Type': 'application/json' };
+                    if (csrf) logoutHeaders['X-CSRF-Token'] = csrf;
                     try {
                         const response = await fetch(`${API_BASE}/auth/browser/logout`, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-Token': browserCsrfToken() || ''
-                            },
+                            headers: logoutHeaders,
                             credentials: 'same-origin',
                             ...(controller ? { signal: controller.signal } : {})
                         });
@@ -1537,7 +1566,7 @@ function initUxEnhancements() {
         try {
             const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
             const t = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
-            const res = await fetch('actuator/health', {
+            const res = await fetch('/actuator/health', {
                 headers: { 'Accept': 'application/json' },
                 ...(ctrl ? { signal: ctrl.signal } : {})
             });

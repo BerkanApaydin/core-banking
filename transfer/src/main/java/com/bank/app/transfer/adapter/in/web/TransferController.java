@@ -17,7 +17,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,10 +28,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 
 @RestController
 @ApiVersion("v1")
@@ -62,17 +64,21 @@ public class TransferController {
     @PostMapping
     @Idempotent(required = true)
     @Operation(summary = "Executes a money transfer", description = "Initiates and records a money transfer with sender and receiver IBAN information. Idempotency-Key header is required.")
+    @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
+            description = "Required de-duplication key; missing header is rejected with 409.")
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferWebRequest webRequest) {
         TransferRequest request = new TransferRequest(
                 webRequest.senderIban(), webRequest.receiverIban(),
                 webRequest.amount(), webRequest.currency());
         TransferResponse response = placeTransferUseCase.execute(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.created(URI.create("/api/v1/transfers/" + response.id())).body(response);
     }
 
     @PostMapping("/{id}/cancel")
     @Idempotent(required = true)
     @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within 24 hours by transfer ID and refunds balances. Idempotency-Key header is required.")
+    @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
+            description = "Required de-duplication key; missing header is rejected with 409.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
         cancelTransferUseCase.execute(id);
         return ResponseEntity.noContent().build();

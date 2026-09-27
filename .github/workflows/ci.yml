@@ -77,6 +77,9 @@ jobs:
         DB_PASSWORD: bank_password
         REDIS_HOST: localhost
         REDIS_PORT: 6379
+        # CI-only fallback: deliberately NOT the dev default (...5970). The
+        # last-character difference is intentional — it keeps CI runs off the
+        # publicly-known dev secret while remaining a valid 256-bit key.
         JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
 
     - name: Generate aggregate CycloneDX SBOM
@@ -111,7 +114,10 @@ jobs:
         node app/src/test/js/frontend_contract.test.js
 
     - name: Architecture Tests
-      run: mvn test -pl app -am -Dtest="DomainPurityArchitectureTest,LayeringArchitectureTest,ModuleBoundariesArchitectureTest,PortsAndNamingArchitectureTest,PersistenceScanPackagesTest" -Dsurefire.failIfNoSpecifiedTests=false -q
+      # Wildcard (not an explicit class list): a new *ArchitectureTest must
+      # run in CI without editing this file. Verified pattern covers all
+      # architecture rules including future additions.
+      run: mvn test -pl app -am -Dtest="*ArchitectureTest,PersistenceScanPackagesTest" -Dsurefire.failIfNoSpecifiedTests=false -q
 
     - name: Dependency Analysis (advisory — starter aggregation causes false positives)
       run: mvn dependency:analyze -q

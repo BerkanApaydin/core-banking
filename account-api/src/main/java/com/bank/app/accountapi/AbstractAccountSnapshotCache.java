@@ -10,6 +10,12 @@ import java.util.Optional;
  * <p>Owns canonical keys and granular invalidation. Backends identify live
  * IBAN snapshots for an account from their own storage, so expiration and
  * size eviction cannot leave an unbounded reverse index behind.
+ *
+ * <p>All public methods are {@code synchronized}: the storage itself is a
+ * {@code ConcurrentHashMap}/Spring {@code Cache} (thread-safe for single
+ * keys), but invalidation is compound (read-then-remove across the id and
+ * IBAN namespaces) and must be atomic with concurrent reads/writes on the
+ * same singleton instance.
  */
 public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCache {
 
@@ -29,7 +35,7 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     protected abstract void clearStorage();
 
     @Override
-    public Optional<AccountSnapshot> getById(Long accountId) {
+    public synchronized Optional<AccountSnapshot> getById(Long accountId) {
         if (accountId == null) {
             return Optional.empty();
         }
@@ -37,7 +43,7 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public void putById(Long accountId, AccountSnapshot snapshot) {
+    public synchronized void putById(Long accountId, AccountSnapshot snapshot) {
         if (accountId == null || snapshot == null) {
             return;
         }
@@ -45,7 +51,7 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public Optional<AccountSnapshot> getByIban(String ibanValue) {
+    public synchronized Optional<AccountSnapshot> getByIban(String ibanValue) {
         if (ibanValue == null) {
             return Optional.empty();
         }
@@ -62,7 +68,7 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public Optional<Map<Long, String>> getIbans(Collection<Long> accountIds) {
+    public synchronized Optional<Map<Long, String>> getIbans(Collection<Long> accountIds) {
         if (accountIds == null) {
             return Optional.empty();
         }
@@ -70,7 +76,7 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public void putIbans(Collection<Long> accountIds, Map<Long, String> ibans) {
+    public synchronized void putIbans(Collection<Long> accountIds, Map<Long, String> ibans) {
         if (accountIds == null || ibans == null || ibans.isEmpty()) {
             return;
         }

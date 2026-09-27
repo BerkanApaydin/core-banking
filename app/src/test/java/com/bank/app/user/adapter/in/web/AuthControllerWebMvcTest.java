@@ -80,11 +80,13 @@ class AuthControllerWebMvcTest {
         @Test
         @DisplayName("should return 400 when request is invalid")
         void shouldReturn400WhenInvalid() throws Exception {
-            AuthRequest request = new AuthRequest("", "");
+            // Raw JSON: the application AuthRequest now rejects blanks at
+            // construction, so an invalid wire payload must bypass it.
+            String body = "{\"username\": \"\", \"password\": \"\"}";
 
             mockMvc.perform(post("/api/v1/auth/register")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+                    .content(body))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errors").exists());
         }
@@ -135,6 +137,20 @@ class AuthControllerWebMvcTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("should return 400 when password is shorter than policy minimum")
+        void shouldReturn400WhenPasswordTooShort() throws Exception {
+            String body = "{\"username\": \"newuser\", \"password\": \"Short1\"}";
+
+            mockMvc.perform(post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors").exists());
+
+            verifyNoInteractions(registerUserPort);
         }
 
         @Test
@@ -222,11 +238,11 @@ class AuthControllerWebMvcTest {
         @Test
         @DisplayName("should return 400 when login with blank username")
         void shouldReturn400WhenLoginWithBlankUsername() throws Exception {
-            AuthRequest request = new AuthRequest("", "password");
+            String body = "{\"username\": \"\", \"password\": \"password\"}";
 
             mockMvc.perform(post("/api/v1/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+                    .content(body))
                     .andExpect(status().isBadRequest());
         }
 
@@ -259,6 +275,18 @@ class AuthControllerWebMvcTest {
                     .andExpect(status().isNoContent());
 
             verify(logoutUseCase).execute("Bearer some-jwt-token");
+        }
+
+        @Test
+        @DisplayName("should return 401 when Authorization header is missing")
+        void shouldReturn401WhenHeaderMissing() throws Exception {
+            // MissingRequestHeaderException used to fall through to the 500
+            // fallback; it now maps to 401 AUTHENTICATION_FAILED.
+            mockMvc.perform(post("/api/v1/auth/logout"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
+
+            verifyNoInteractions(logoutUseCase);
         }
     }
 }

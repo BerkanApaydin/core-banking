@@ -5,6 +5,7 @@ import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
+import com.bank.app.user.adapter.in.web.dto.RegisterWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
@@ -45,7 +46,7 @@ public class AuthController {
     @PostMapping("/register")
     @Operation(summary = "Creates a new user registration", description = "Registers a new user with username and password.")
     @Idempotent(publicEndpoint = true)
-    public ResponseEntity<Void> register(@Valid @RequestBody AuthWebRequest webRequest) {
+    public ResponseEntity<Void> register(@Valid @RequestBody RegisterWebRequest webRequest) {
         AuthRequest request = new AuthRequest(
                 webRequest.username(), webRequest.password(),
                 webRequest.email(), webRequest.phone());

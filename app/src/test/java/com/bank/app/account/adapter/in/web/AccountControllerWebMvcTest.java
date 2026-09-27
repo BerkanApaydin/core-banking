@@ -86,6 +86,7 @@ class AccountControllerWebMvcTest {
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
+                                        .andExpect(header().string("Location", "/api/v1/accounts/1"))
                                         .andExpect(jsonPath("$.id").value(1L))
                                         .andExpect(jsonPath("$.iban").value("TR440006200000000000000123"))
                                         .andExpect(jsonPath("$.ownerName").value("Ali Veli"))

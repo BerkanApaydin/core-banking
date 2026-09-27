@@ -14,7 +14,6 @@ import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +25,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+
+import java.net.URI;
 
 @RestController
 @ApiVersion("v1")
@@ -55,11 +58,16 @@ public class AccountController {
     @PostMapping
     @Idempotent
     @Operation(summary = "Creates a new account", description = "Opens a new account with a server-generated simulation IBAN. Duplicate requests can be prevented with the Idempotency-Key header.")
+    @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = false,
+            description = "Optional de-duplication key; reuse returns the original response.")
     public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountWebRequest webRequest) {
         CreateAccountRequest request = new CreateAccountRequest(
                 accountAuthorizationService.getCurrentUserId(), webRequest.ownerName(),
                 webRequest.initialBalance(), webRequest.currency());
-        return ResponseEntity.status(HttpStatus.CREATED).body(createAccountUseCase.execute(request));
+        AccountResponse created = createAccountUseCase.execute(request);
+        // Relative Location keeps this unit-testable without a request context
+        // and resolves against /api/v1 on the wire.
+        return ResponseEntity.created(URI.create("/api/v1/accounts/" + created.id())).body(created);
     }
 
     @GetMapping

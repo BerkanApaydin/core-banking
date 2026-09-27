@@ -59,6 +59,13 @@ test('report date selection covers both complete calendar days', () => {
     assert.equal(range.endDate, '2026-09-24T23:59:59.999999');
     assert.throws(() => vm.runInContext("buildReportDateRange('2026-09-25', '2026-09-24')", context),
         /report.invalid_date_range/);
+    // Backend rule mirror: start.plusMonths(12) must not be before end.
+    const justInside = vm.runInContext("buildReportDateRange('2025-09-24', '2026-09-23')", context);
+    assert.equal(justInside.endDate, '2026-09-23T23:59:59.999999');
+    assert.throws(() => vm.runInContext("buildReportDateRange('2025-09-24', '2026-09-24')", context),
+        /report.range_too_long/);
+    assert.throws(() => vm.runInContext("buildReportDateRange('2025-01-01', '2026-06-01')", context),
+        /report.range_too_long/);
 });
 
 test('account creation sends no IBAN and displays the server-generated value', async () => {

@@ -18,6 +18,13 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      probes:
+        # REQUIRED for Kubernetes: without this flag Spring Boot does not
+        # expose /actuator/health/liveness and /actuator/health/readiness,
+        # so the k8s probes (liveness/readiness/startup) return 404 and pods
+        # never become Ready. Enabled here (not only in k8s env) so every
+        # prod deployment gets the probe groups.
+        enabled: true
       group:
         readiness:
           include: readinessState,db,redisBackends

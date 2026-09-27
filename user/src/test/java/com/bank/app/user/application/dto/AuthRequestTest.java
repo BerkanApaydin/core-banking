@@ -38,10 +38,14 @@ class AuthRequestTest {
     }
 
     @Test
-    void shouldHandleBlankFields() {
-        AuthRequest request = new AuthRequest("", "", "", "");
+    void shouldRejectBlankUsername() {
+        assertThrows(IllegalArgumentException.class, () -> new AuthRequest("", "Password1!"));
+        assertThrows(IllegalArgumentException.class, () -> new AuthRequest("   ", "Password1!"));
+    }
 
-        assertEquals("", request.username());
-        assertEquals("", request.password());
+    @Test
+    void shouldRejectBlankPassword() {
+        assertThrows(IllegalArgumentException.class, () -> new AuthRequest("user", ""));
+        assertThrows(IllegalArgumentException.class, () -> new AuthRequest("user", "   "));
     }
 }

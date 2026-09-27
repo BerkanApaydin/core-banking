@@ -25,7 +25,7 @@ class IdempotencyTest {
     private IdempotencyCleanupScheduler scheduler;
     private IdempotencyGuard manager;
 
-    private final IdempotencyProperties idempotencyProperties = new IdempotencyProperties(24, "0 0 * * * *");
+    private final IdempotencyProperties idempotencyProperties = new IdempotencyProperties(24, "0 0 * * * *", 3, 500);
 
     @BeforeEach
     void setUp() {

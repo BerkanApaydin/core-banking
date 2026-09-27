@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,8 +76,14 @@ public class BrowserAuthController {
 
     @GetMapping("/session")
     public ResponseEntity<BrowserUser> session() {
-        Long userId = userContextService.getCurrentUserId().orElseThrow();
-        String username = userContextService.getCurrentUsername().orElseThrow();
+        // No orElseThrow(): an absent principal means "not logged in" (401),
+        // not a server bug. Throwing NoSuchElementException here used to fall
+        // through to the 500 fallback because no handler maps it.
+        Long userId = userContextService.getCurrentUserId().orElse(null);
+        String username = userContextService.getCurrentUsername().orElse(null);
+        if (userId == null || username == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok()
                 .cacheControl(org.springframework.http.CacheControl.noStore())
                 .body(new BrowserUser(userId, username));

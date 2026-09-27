@@ -20,7 +20,14 @@ import java.util.function.Function;
 @Service
 public class JwtTokenProvider implements JwtPort {
 
-    private static final String DEFAULT_JWT_SECRET =
+    /**
+     * Local-development fallback secret. Single owner of this value: startup
+     * validation references this constant instead of duplicating the literal,
+     * so the two can never silently diverge. Never use in production
+     * ({@code jwt.allow-default-secret=false} fails fast; rotate immediately
+     * if this value ever leaks — it lives in git history and images).
+     */
+    public static final String DEFAULT_JWT_SECRET =
             "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
     private String secretKey;

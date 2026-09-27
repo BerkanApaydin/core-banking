@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY runner.py .
+COPY runner.py test_runner.py ./
 
 ENTRYPOINT ["python", "runner.py"]
 CMD ["--help"]

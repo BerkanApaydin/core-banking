@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
+import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
@@ -9,8 +10,8 @@ public class ApplicationStartupValidator {
 
     private static final Logger log = LoggerFactory.getLogger(ApplicationStartupValidator.class);
 
-    private static final String DEFAULT_JWT_SECRET =
-            "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+    // Single-sourced from JwtTokenProvider: one literal, no silent divergence.
+    private static final String DEFAULT_JWT_SECRET = JwtTokenProvider.DEFAULT_JWT_SECRET;
 
     private final Environment environment;
 

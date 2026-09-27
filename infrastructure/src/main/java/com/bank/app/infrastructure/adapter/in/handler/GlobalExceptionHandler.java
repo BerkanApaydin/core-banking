@@ -25,6 +25,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -83,6 +84,20 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
         return ProblemDetailFactory.createValidationError(errors, request);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ProblemDetail> handleMissingRequestHeader(
+            MissingRequestHeaderException ex, WebRequest request) {
+        // Missing auth material (e.g. Authorization on logout) means the caller
+        // is unauthenticated — 401, never the 500 fallback. The header name is
+        // returned; the header value is never echoed.
+        log.warn("Missing required header: {}", ex.getHeaderName());
+        String message = resolveMessage("error.authentication_failed");
+        if (message == null || message.isEmpty() || message.equals("error.authentication_failed")) {
+            message = "Authentication failed.";
+        }
+        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

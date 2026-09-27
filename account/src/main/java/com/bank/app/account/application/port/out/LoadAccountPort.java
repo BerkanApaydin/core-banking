@@ -15,13 +15,14 @@ public interface LoadAccountPort {
 
     Optional<Account> findByIdForUpdate(Long id);
 
-    List<Account> findByUserId(Long userId, int page, int size);
-
     record AccountPage(List<Account> content, long total) {}
 
+    /**
+     * Single paged listing (content + total from one repository page).
+     * Replaces the former findByUserId/countByUserId pair, which duplicated
+     * this query and forced a second round-trip for the total.
+     */
     AccountPage findPageByUserId(Long userId, int page, int size);
-
-    long countByUserId(Long userId);
 
     List<Account> findByIds(Collection<Long> ids);
 }

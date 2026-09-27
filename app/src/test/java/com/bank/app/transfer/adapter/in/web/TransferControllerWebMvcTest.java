@@ -86,6 +86,7 @@ class TransferControllerWebMvcTest {
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
+                                        .andExpect(header().string("Location", "/api/v1/transfers/10"))
                                         .andExpect(jsonPath("$.id").value(10L))
                                         .andExpect(jsonPath("$.status").value("COMPLETED"))
                                         .andExpect(jsonPath("$.amount").value(200.00));

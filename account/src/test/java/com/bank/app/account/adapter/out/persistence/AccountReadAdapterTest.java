@@ -150,43 +150,6 @@ class AccountReadAdapterTest {
     }
 
     @Test
-    void shouldFindByUserIdSuccessfully() {
-        AccountJpaEntity entity1 = createEntity(1L, "TR770006200000000000000111", "Ahmet", new BigDecimal("1000.00"),
-                100L);
-        AccountJpaEntity entity2 = createEntity(2L, "TR870006200000000000000222", "Mehmet", new BigDecimal("500.00"),
-                100L);
-
-        when(springDataRepo.findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20)))
-                .thenReturn(new PageImpl<>(List.of(entity1, entity2)));
-
-        var result = adapter.findByUserId(100L, 0, 20);
-
-        assertEquals(2, result.size());
-        assertEquals("Ahmet", result.get(0).getOwnerName());
-        assertEquals("Mehmet", result.get(1).getOwnerName());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20));
-    }
-
-    @Test
-    void shouldReturnEmptyPageWhenFindByUserIdReturnsEmpty() {
-        when(springDataRepo.findByUserIdOrderByCreatedAtDescIdDesc(999L, PageRequest.of(0, 20)))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        var result = adapter.findByUserId(999L, 0, 20);
-
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findByUserIdOrderByCreatedAtDescIdDesc(999L, PageRequest.of(0, 20));
-    }
-
-    @Test
-    void shouldCountByUserId() {
-        when(springDataRepo.countByUserId(100L)).thenReturn(2L);
-
-        assertEquals(2L, adapter.countByUserId(100L));
-        verify(springDataRepo).countByUserId(100L);
-    }
-
-    @Test
     void shouldReturnContentAndTotalFromOneRepositoryPage() {
         AccountJpaEntity entity = createEntity(1L, "TR770006200000000000000111", "Ahmet",
                 new BigDecimal("1000.00"), 100L);
@@ -197,7 +160,7 @@ class AccountReadAdapterTest {
 
         assertEquals(1, page.content().size());
         assertEquals(37, page.total());
-        verify(springDataRepo, never()).countByUserId(anyLong());
+        verify(springDataRepo).findByUserIdOrderByCreatedAtDescIdDesc(100L, PageRequest.of(0, 20));
     }
 
     @Test
