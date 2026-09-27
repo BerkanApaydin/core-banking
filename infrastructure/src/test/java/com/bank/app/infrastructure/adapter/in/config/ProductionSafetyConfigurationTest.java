@@ -14,7 +14,9 @@ class ProductionSafetyConfigurationTest {
         AtomicBoolean singletonStarted = new AtomicBoolean();
         new ApplicationContextRunner()
                 .withUserConfiguration(ProductionSafetyConfiguration.class)
-                .withPropertyValues("spring.profiles.active=prod")
+                // Override any JWT_SECRET exported by CI so this test always checks
+                // the JWT guard, not the next production configuration guard.
+                .withPropertyValues("spring.profiles.active=prod", "jwt.secret=")
                 .withBean("applicationWorker", Object.class, () -> {
                     singletonStarted.set(true);
                     return new Object();
@@ -31,7 +33,7 @@ class ProductionSafetyConfigurationTest {
         AtomicBoolean singletonStarted = new AtomicBoolean();
         new ApplicationContextRunner()
                 .withUserConfiguration(ProductionSafetyConfiguration.class)
-                .withPropertyValues("spring.profiles.default=prod",
+                .withPropertyValues("spring.profiles.active=prod",
                         "jwt.secret=non-default-secret", "spring.datasource.password=non-default-password",
                         "app.security.token-blacklist.backend=database",
                         "app.security.browser-session.secure=true",
