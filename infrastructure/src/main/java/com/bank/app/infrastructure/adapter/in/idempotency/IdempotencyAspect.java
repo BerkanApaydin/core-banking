@@ -140,6 +140,8 @@ public class IdempotencyAspect {
     private record ExecutionResult(Object response, boolean successful) {}
 
     private static final class InvocationFailure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         private InvocationFailure(Throwable cause) { super(cause); }
     }
 

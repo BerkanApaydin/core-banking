@@ -6,6 +6,8 @@ package com.bank.app.user.application.port.out;
  */
 public final class RevocationStoreUnavailableException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     public RevocationStoreUnavailableException(Throwable cause) {
         super("Token revocation state is unavailable", cause);
     }

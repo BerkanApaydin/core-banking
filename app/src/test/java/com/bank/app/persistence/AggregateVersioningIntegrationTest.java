@@ -44,8 +44,8 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
                        (202, 101, 'TR870006200000000000000222', 'Receiver', 100, 'TRY', 'ACTIVE', 0, NOW())
                 """).executeUpdate();
         entityManager.createNativeQuery("""
-                INSERT INTO transfers (id, sender_account_id, receiver_account_id, amount, currency, status, version, created_at)
-                VALUES (301, 201, 202, 10, 'TRY', 'PENDING', 0, NOW())
+                INSERT INTO transfers (id, sender_account_id, receiver_account_id, amount, currency, status, version, created_at, business_created_at)
+                VALUES (301, 201, 202, 10, 'TRY', 'PENDING', 0, NOW(), NOW())
                 """).executeUpdate();
     }
 

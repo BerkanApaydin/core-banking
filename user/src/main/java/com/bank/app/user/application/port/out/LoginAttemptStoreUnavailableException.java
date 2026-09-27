@@ -6,6 +6,8 @@ package com.bank.app.user.application.port.out;
  */
 public final class LoginAttemptStoreUnavailableException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     public LoginAttemptStoreUnavailableException(Throwable cause) {
         super("Failed-login state is unavailable", cause);
     }
