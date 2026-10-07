@@ -9,6 +9,9 @@ public class TransferNotFoundException extends BusinessException {
     @Override
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.NOT_FOUND; }
 
+    @Override
+    public String getErrorCode() { return "TRANSFER_NOT_FOUND"; }
+
     public TransferNotFoundException(Long id) {
         super("error.transfer_not_found", new Object[]{id}, "Transfer not found. ID: " + id);
     }

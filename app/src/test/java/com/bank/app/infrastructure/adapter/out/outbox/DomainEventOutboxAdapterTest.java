@@ -46,7 +46,7 @@ class DomainEventOutboxAdapterTest {
     @BeforeEach
     void setUp() {
         adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
-                new OutboxProperties(5, 50, 0, 2000));
+                new OutboxProperties(5, 50, 0, 2000, 30));
     }
 
     @Test

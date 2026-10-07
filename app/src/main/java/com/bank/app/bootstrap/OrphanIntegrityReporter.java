@@ -1,5 +1,6 @@
 package com.bank.app.bootstrap;
 
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
@@ -42,6 +43,7 @@ public class OrphanIntegrityReporter {
             "SELECT COUNT(*) FROM transfers t LEFT JOIN accounts r ON r.id = t.receiver_account_id WHERE r.id IS NULL";
 
     private final JdbcTemplate jdbc;
+    private final AdvisorySchedulerLock schedulerLock;
     private final long alarmThreshold;
     private final AtomicLong accountsWithoutUser = new AtomicLong();
     private final AtomicLong transfersWithoutSender = new AtomicLong();
@@ -51,14 +53,23 @@ public class OrphanIntegrityReporter {
 
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry) {
-        this(jdbc, meterRegistry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0));
+        this(jdbc, meterRegistry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0),
+                AdvisorySchedulerLock.alwaysRun());
+    }
+
+    public OrphanIntegrityReporter(JdbcTemplate jdbc,
+            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
+            OrphanIntegrityProperties properties) {
+        this(jdbc, meterRegistry, properties, AdvisorySchedulerLock.alwaysRun());
     }
 
     @Autowired
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
-            OrphanIntegrityProperties properties) {
+            OrphanIntegrityProperties properties,
+            AdvisorySchedulerLock schedulerLock) {
         this.jdbc = jdbc;
+        this.schedulerLock = schedulerLock;
         this.alarmThreshold = properties != null ? properties.orphanAlarmThreshold() : 0;
         Counter counter = null;
         if (meterRegistry != null) {
@@ -77,10 +88,16 @@ public class OrphanIntegrityReporter {
 
     @Scheduled(cron = "${app.integrity.orphan-check-cron:0 0 3 * * *}")
     public void reportOrphans() {
-        check(ACCOUNTS_WITHOUT_USER, ACCOUNTS_SQL, accountsWithoutUser);
-        check(TRANSFERS_WITHOUT_SENDER, SENDERS_SQL, transfersWithoutSender);
-        check(TRANSFERS_WITHOUT_RECEIVER, RECEIVERS_SQL, transfersWithoutReceiver);
-        lastSuccessfulScanEpochSeconds.set(java.time.Instant.now().getEpochSecond());
+        // K12/D5: single-flight across replicas; only the leader's gauges and
+        // alarm counter move, so db_orphan_alarm_total is no longer multiplied
+        // by the replica count. Staleness alerts must aggregate with max()
+        // across instances (see k8s/prometheus-rules.yaml).
+        schedulerLock.runIfLeader("orphan-integrity-scan", () -> {
+            check(ACCOUNTS_WITHOUT_USER, ACCOUNTS_SQL, accountsWithoutUser);
+            check(TRANSFERS_WITHOUT_SENDER, SENDERS_SQL, transfersWithoutSender);
+            check(TRANSFERS_WITHOUT_RECEIVER, RECEIVERS_SQL, transfersWithoutReceiver);
+            lastSuccessfulScanEpochSeconds.set(java.time.Instant.now().getEpochSecond());
+        });
     }
 
     private void check(String type, String sql, AtomicLong gauge) {

@@ -14,10 +14,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /** Verifies the SQLSTATE classifier against PostgreSQL rather than a fabricated exception tree. */
 class DatabaseIntegrityErrorIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private JdbcTemplate jdbc;
+    private final JdbcTemplate jdbc;
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(new StaticMessageSource());
+    @Autowired
+    DatabaseIntegrityErrorIntegrationTest(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    private final GlobalExceptionHandler handler =
+            new GlobalExceptionHandler(new ProblemMessageResolver(new StaticMessageSource()));
 
     @Test
     void duplicateKeyUsesUniqueProblemCode() {

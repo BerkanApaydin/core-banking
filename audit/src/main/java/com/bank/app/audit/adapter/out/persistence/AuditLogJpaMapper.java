@@ -1,6 +1,5 @@
 package com.bank.app.audit.adapter.out.persistence;
 
-import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 import org.springframework.stereotype.Component;
 
@@ -14,9 +13,10 @@ public class AuditLogJpaMapper {
         return new AuditLogJpaEntity(
                 auditLog.getId(),
                 auditLog.getUsername(),
-                auditLog.getAction().name(),
+                auditLog.getAction(),
                 auditLog.getDetails(),
-                auditLog.getTimestamp()
+                auditLog.getTimestamp(),
+                auditLog.getActorUserId()
         );
     }
 
@@ -27,9 +27,10 @@ public class AuditLogJpaMapper {
         return new AuditLog(
                 entity.getId(),
                 entity.getUsername(),
-                AuditAction.valueOf(entity.getAction()),
+                entity.getAction(),
                 entity.getDetails(),
-                entity.getTimestamp()
+                entity.getTimestamp(),
+                entity.getActorUserId()
         );
     }
 }

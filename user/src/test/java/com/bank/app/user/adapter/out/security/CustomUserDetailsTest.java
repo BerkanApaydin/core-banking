@@ -48,4 +48,12 @@ class CustomUserDetailsTest {
         assertEquals(42L, principal.getAuthenticatedUserId());
         assertEquals("testuser", principal.getAuthenticatedUsername());
     }
+
+    @Test
+    void shouldDefaultTokenVersionToZeroAndAcceptExplicitVersion() {
+        var authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+
+        assertEquals(0L, new CustomUserDetails(42L, "testuser", "password", authorities).getTokenVersion());
+        assertEquals(9L, new CustomUserDetails(42L, "testuser", "password", authorities, 9L).getTokenVersion());
+    }
 }

@@ -14,8 +14,17 @@ public abstract class AbstractSpringBootIntegrationTest {
 
     private static final String[] ACCOUNT_CACHES = {"accountAclInfo"};
 
+    private final ObjectProvider<CacheManager> cacheManagers;
+
+    /**
+     * Visible for subclass constructors: field injection in tests is banned
+     * (see scripts/check_test_injection.py), and a lifecycle-method parameter
+     * is not resolved here, so the provider travels through constructors.
+     */
     @Autowired
-    private ObjectProvider<CacheManager> cacheManagers;
+    protected AbstractSpringBootIntegrationTest(ObjectProvider<CacheManager> cacheManagers) {
+        this.cacheManagers = cacheManagers;
+    }
 
     /**
      * Integration fixtures wipe and reseed the same natural keys (IBANs) with new row IDs

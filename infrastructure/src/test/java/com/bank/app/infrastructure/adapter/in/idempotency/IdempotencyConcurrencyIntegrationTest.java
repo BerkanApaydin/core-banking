@@ -3,7 +3,9 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.TestApplication;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -11,6 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -18,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,11 +32,18 @@ class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegratio
     @MockitoBean
     private UserDetailsService userDetailsService;
 
-    @Autowired
-    private IdempotencyGuard idempotencyGuard;
+    private final IdempotencyGuard idempotencyGuard;
+
+    private final PlatformTransactionManager transactionManager;
 
     @Autowired
-    private PlatformTransactionManager transactionManager;
+    IdempotencyConcurrencyIntegrationTest(IdempotencyGuard idempotencyGuard,
+            PlatformTransactionManager transactionManager,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.idempotencyGuard = idempotencyGuard;
+        this.transactionManager = transactionManager;
+    }
 
     void runInNewTx(Runnable action) {
         var template = new TransactionTemplate(transactionManager);
@@ -74,7 +85,12 @@ class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegratio
 
         assertEquals(1, newCount.get(), "Exactly one thread should get NEW status");
 
-        Thread.sleep(500);
+        // D19: the assertion is about the state AFTER the race window — a racing
+        // completion would flip PENDING to COMPLETED. pollDelay defers the first
+        // observation past the window instead of sleeping a fixed 500ms.
+        await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5))
+                .until(() -> idempotencyGuard.startRequest(key).status()
+                        == IdempotencyGuard.IdempotencyResult.Status.PENDING);
 
         IdempotencyGuard.IdempotencyResult result = idempotencyGuard.startRequest(key);
         assertEquals(IdempotencyGuard.IdempotencyResult.Status.PENDING, result.status(),
@@ -118,7 +134,11 @@ class IdempotencyConcurrencyIntegrationTest extends AbstractSpringBootIntegratio
 
         assertEquals(1, newCount.get(), "Only one thread should start the request");
 
-        Thread.sleep(1000);
+        // D19: bounded await instead of a fixed 1000ms sleep — returns as soon
+        // as COMPLETED is visible instead of always paying the full window.
+        await().atMost(Duration.ofSeconds(5)).until(() ->
+                idempotencyGuard.startRequest(key).status()
+                        == IdempotencyGuard.IdempotencyResult.Status.COMPLETED);
 
         IdempotencyGuard.IdempotencyResult finalResult = idempotencyGuard.startRequest(key);
         assertEquals(IdempotencyGuard.IdempotencyResult.Status.COMPLETED, finalResult.status(),

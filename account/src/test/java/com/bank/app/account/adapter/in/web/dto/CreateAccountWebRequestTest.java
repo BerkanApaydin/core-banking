@@ -99,4 +99,12 @@ class CreateAccountWebRequestTest {
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
     }
+
+    @Test
+    void decimalMaxShouldMirrorSharedBalanceCeiling() throws Exception {
+        var annotation = CreateAccountWebRequest.class.getDeclaredField("initialBalance")
+                .getAnnotation(jakarta.validation.constraints.DecimalMax.class);
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.value()).isEqualTo(com.bank.app.common.domain.BalanceLimits.MAX_BALANCE);
+    }
 }

@@ -32,7 +32,7 @@ class AuditPersistenceAdapterTest {
     void shouldSaveAuditLogSuccessfully() {
         LocalDateTime timestamp = LocalDateTime.now();
         AuditLog domainLog = new AuditLog(null, "user123", AuditAction.TRANSFER_EXECUTED, "Details here", timestamp);
-        AuditLogJpaEntity savedEntity = new AuditLogJpaEntity(1L, "user123", "TRANSFER_EXECUTED", "Details here", timestamp);
+        AuditLogJpaEntity savedEntity = new AuditLogJpaEntity(1L, "user123", AuditAction.TRANSFER_EXECUTED, "Details here", timestamp);
 
         when(springDataRepo.save(any())).thenReturn(savedEntity);
 
@@ -50,7 +50,7 @@ class AuditPersistenceAdapterTest {
 
         AuditLogJpaEntity captured = captor.getValue();
         assertEquals("user123", captured.getUsername());
-        assertEquals("TRANSFER_EXECUTED", captured.getAction());
+        assertEquals(AuditAction.TRANSFER_EXECUTED, captured.getAction());
         assertEquals("Details here", captured.getDetails());
         assertEquals(timestamp, captured.getTimestamp());
     }

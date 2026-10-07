@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferCurrencyMismatchException;
@@ -11,6 +12,14 @@ public final class TransferDomainService {
     public Transfer validateAndCreateTransfer(TransferParticipants participants, Money amount, Clock clock) {
         Objects.requireNonNull(participants, "Transfer participants must not be null");
         Objects.requireNonNull(amount, "Transfer amount must not be null");
+
+        // MOD 97-10 checksum is mandatory on transfer input, not just format:
+        // Iban itself stays format-lenient so legacy format-only rows remain
+        // readable (see docs/iban-checksum-rollout.md); the boundary that
+        // creates spendable transfers enforces the checksum explicitly, same
+        // as account creation does (CreateAccountUseCaseImpl.selectIban).
+        new Iban(participants.senderIban()).requireValidChecksum();
+        new Iban(participants.receiverIban()).requireValidChecksum();
 
         if (participants.senderIban().equalsIgnoreCase(participants.receiverIban())
                 || Objects.equals(participants.senderId(), participants.receiverId())) {

@@ -15,6 +15,10 @@ import com.bank.app.common.domain.exception.BusinessFailureKind;
 public class AccountNotFoundException extends BusinessException {
     private static final long serialVersionUID = 1L;
 
+    // Deliberately no getErrorCode override: the code is instance-variant by
+    // design (ACCOUNT_NOT_FOUND_ID vs ACCOUNT_NOT_FOUND_IBAN), mirroring the
+    // account domain contract across the context boundary.
+
     @Override
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.NOT_FOUND; }
 

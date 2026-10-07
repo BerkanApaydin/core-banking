@@ -8,6 +8,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
@@ -42,10 +43,15 @@ public class UseCaseTransactionAspect {
     @Pointcut("within(com.bank.app.audit.application.usecase..*)")
     void auditUseCaseMethod() {}
 
+    // Isolation is explicit READ_COMMITTED (PostgreSQL default): the locking
+    // strategy is pessimistic (SELECT ... FOR UPDATE in stable ID order), not
+    // optimistic, so REPEATABLE_READ/SERIALIZABLE would only add 40001/40003
+    // retries without benefit (9.2). Declared here — not a coincidence.
     @Around("transactionalUseCaseMethod() && !readOnlyUseCaseMethod() && !auditUseCaseMethod()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
+        def.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }
@@ -55,6 +61,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setReadOnly(true);
+        def.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }
@@ -64,6 +71,7 @@ public class UseCaseTransactionAspect {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        def.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);
     }

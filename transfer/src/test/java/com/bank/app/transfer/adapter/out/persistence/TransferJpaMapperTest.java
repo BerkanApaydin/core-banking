@@ -55,8 +55,8 @@ class TransferJpaMapperTest {
             assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
             assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);
             assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
-            assertThat(entity.getCurrency()).isEqualTo(CURRENCY.name());
-            assertThat(entity.getStatus()).isEqualTo(STATUS.name());
+            assertThat(entity.getCurrency()).isEqualTo(CURRENCY);
+            assertThat(entity.getStatus()).isEqualTo(STATUS);
             assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);
             assertThat(entity.getVersion()).isEqualTo(VERSION);
         }
@@ -78,7 +78,7 @@ class TransferJpaMapperTest {
         @DisplayName("should map TransferJpaEntity to Transfer")
         void shouldMapToDomain() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
-                    AMOUNT_VALUE, CURRENCY.name(), STATUS.name(), VERSION);
+                    AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
             entity.setBusinessCreatedAt(CREATED_AT);
             entity.setCreatedAt(CREATED_AT.plusHours(1));
 
@@ -98,7 +98,7 @@ class TransferJpaMapperTest {
         @DisplayName("should fall back to auditing timestamp for pre-V20 rows")
         void shouldFallBackToAuditingTimestamp() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
-                    AMOUNT_VALUE, CURRENCY.name(), STATUS.name(), VERSION);
+                    AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
             entity.setCreatedAt(CREATED_AT);
 
             Transfer transfer = mapper.toDomain(entity);
@@ -123,13 +123,13 @@ class TransferJpaMapperTest {
         @DisplayName("should update entity fields from transfer")
         void shouldUpdateEntity() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
-                    AMOUNT_VALUE, CURRENCY.name(), "COMPLETED", 1L);
+                    AMOUNT_VALUE, CURRENCY, TransferStatus.COMPLETED, 1L);
             Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
                     TransferStatus.CANCELLED, CREATED_AT, 5L);
 
             mapper.updateJpaEntity(entity, transfer);
 
-            assertThat(entity.getStatus()).isEqualTo("CANCELLED");
+            assertThat(entity.getStatus()).isEqualTo(TransferStatus.CANCELLED);
             assertThat(entity.getVersion()).isEqualTo(1L);
         }
 
@@ -147,7 +147,7 @@ class TransferJpaMapperTest {
         @DisplayName("should throw when transfer is null")
         void shouldThrowOnNullTransfer() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
-                    AMOUNT_VALUE, CURRENCY.name(), STATUS.name(), VERSION);
+                    AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
 
             assertThatThrownBy(() -> mapper.updateJpaEntity(entity, null))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
@@ -194,13 +194,13 @@ class TransferJpaMapperTest {
 
             mapper.updateJpaEntity(entity, completed);
 
-            assertThat(entity.getStatus()).isEqualTo("COMPLETED");
+            assertThat(entity.getStatus()).isEqualTo(TransferStatus.COMPLETED);
             assertThat(entity.getVersion()).isEqualTo(1L);
             assertThat(entity.getId()).isEqualTo(ID);
             assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
             assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);
             assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
-            assertThat(entity.getCurrency()).isEqualTo(CURRENCY.name());
+            assertThat(entity.getCurrency()).isEqualTo(CURRENCY);
             assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);
         }
 

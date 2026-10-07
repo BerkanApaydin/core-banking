@@ -15,7 +15,10 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 2)
+// Runs before every other filter (including the rate limiter): a rejected
+// request (e.g. 429) must still carry a correlation ID, otherwise the
+// responses operators need to trace most have the least observability.
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter implements Filter {
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     private static final String TRACE_ID_HEADER = "X-Trace-ID";

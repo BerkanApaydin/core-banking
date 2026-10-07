@@ -13,14 +13,17 @@ The two modes require different server settings and therefore run separately:
    then checks that a request succeeds after the window expires. It creates
    test users. Avoid other traffic from the same address during this check.
 2. On an **isolated** `dev` or `prod,simulation` deployment, raise
-   `RATE_LIMIT_MAX_REQUESTS` to a value above the expected test traffic, then
-   restart the app. For example, for a local Compose deployment in PowerShell:
+   `RATE_LIMIT_RESOURCE_MAX_REQUESTS` (the tier for `/api/v1/accounts`,
+   `/api/v1/transfers` and `/api/v1/admin`) to a value above the expected
+   test traffic, then restart the app. Keep the auth tier
+   (`RATE_LIMIT_MAX_REQUESTS`) tight. For example, for a local Compose
+   deployment in PowerShell:
 
    ```powershell
-   $env:RATE_LIMIT_MAX_REQUESTS = '100000'
+   $env:RATE_LIMIT_RESOURCE_MAX_REQUESTS = '100000'
    docker compose up -d --force-recreate app
    python load_tests/runner.py --mode workload
-   Remove-Item Env:RATE_LIMIT_MAX_REQUESTS
+   Remove-Item Env:RATE_LIMIT_RESOURCE_MAX_REQUESTS
    docker compose up -d --force-recreate app
    ```
 
@@ -42,5 +45,10 @@ header.
 
 The offline checks are `python -m unittest load_tests.test_runner -v`.
 They verify the client contract and result classification, but do not measure
-a running deployment. The read-only deployment check is
+a running deployment. `load_tests/acceptance.yml` pins the enforced
+thresholds (rate-limit: 15 requests → ≥1× 429, window reset 201 after 11s;
+capacity: p95 ≤ 200ms with ≥99% success; concurrency: single idempotent
+effect, reconciled non-negative balances); `python
+scripts/check_load_acceptance.py` (CI-gated) fails when the runner drifts
+from that file. The read-only deployment check is
 `python ops/health_smoke.py http://localhost:8080`.

@@ -9,7 +9,9 @@ import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
+import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
+import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.domain.PasswordPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,8 +29,11 @@ class UserBeanConfigTest {
     @Mock private AuthenticationPort authenticationPort;
     @Mock private JwtPort jwtPort;
     @Mock private LoginAttemptPort loginAttemptPort;
+    @Mock private RefreshTokenPort refreshTokenPort;
+    @Mock private TokenBlacklistPort tokenBlacklistPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private ClockProviderPort clockProvider;
+    @Mock private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
 
     @Test
     void shouldCreateRegisterUserUseCaseBean() {
@@ -40,7 +45,21 @@ class UserBeanConfigTest {
     @Test
     void shouldCreateLoginUserUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
-        LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort, loginAttemptPort);
+        LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort,
+                loginAttemptPort, refreshTokenPort, clockProvider, auditEventPort);
         assertNotNull(useCase);
+    }
+
+    @Test
+    void shouldCreateRefreshSessionUseCaseBean() {
+        UserBeanConfig config = new UserBeanConfig();
+        assertNotNull(config.refreshSessionUseCase(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort));
+    }
+
+    @Test
+    void shouldCreateLogoutUseCaseBean() {
+        UserBeanConfig config = new UserBeanConfig();
+        assertNotNull(config.logoutUseCase(tokenBlacklistPort, jwtPort, refreshTokenPort,
+                clockProvider, auditEventPort));
     }
 }

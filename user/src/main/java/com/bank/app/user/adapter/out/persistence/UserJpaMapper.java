@@ -14,22 +14,25 @@ public class UserJpaMapper {
         if (user == null) {
             throw new IllegalArgumentException("User must not be null");
         }
-        return new UserJpaEntity(
+        UserJpaEntity entity = new UserJpaEntity(
                 user.getId() != null ? user.getId().value() : null,
                 user.getUsername(),
                 user.getPassword(),
-                user.getRole().name(),
+                user.getRole(),
                 user.getEmail() != null ? user.getEmail().value() : null,
                 user.getPhone() != null ? user.getPhone().value() : null,
                 user.getVersion()
         );
+        entity.setTokenVersion(user.getTokenVersion());
+        return entity;
     }
 
     public User toDomain(UserJpaEntity entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
-        Role role = Role.fromString(entity.getRole());
+        // Native PG ENUM + NOT NULL: null/blank legacy rows cannot exist.
+        Role role = entity.getRole();
         EmailAddress email = entity.getEmail() != null ? new EmailAddress(entity.getEmail()) : null;
         PhoneNumber phone = entity.getPhone() != null ? new PhoneNumber(entity.getPhone()) : null;
         return new User(
@@ -39,7 +42,8 @@ public class UserJpaMapper {
                 role,
                 email,
                 phone,
-                entity.getVersion()
+                entity.getVersion(),
+                entity.getTokenVersion()
         );
     }
 
@@ -49,9 +53,10 @@ public class UserJpaMapper {
         }
         entity.setUsername(user.getUsername());
         entity.setPassword(user.getPassword());
-        entity.setRole(user.getRole().name());
+        entity.setRole(user.getRole());
         entity.setEmail(user.getEmail() != null ? user.getEmail().value() : null);
         entity.setPhone(user.getPhone() != null ? user.getPhone().value() : null);
+        entity.setTokenVersion(user.getTokenVersion());
         // The managed version belongs to Hibernate; the adapter checks the expected version.
     }
 }

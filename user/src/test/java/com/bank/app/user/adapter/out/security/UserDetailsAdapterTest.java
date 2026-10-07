@@ -45,6 +45,19 @@ class UserDetailsAdapterTest {
     }
 
     @Test
+    void shouldCarryTokenVersionFromUser() {
+        service = new UserDetailsAdapter(loadUserPort);
+        User user = new User(new UserId(100L), "john", "pass", Role.ROLE_USER,
+                null, null, null, 6L);
+
+        when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));
+
+        CustomUserDetails details = (CustomUserDetails) service.loadUserByUsername("john");
+
+        assertEquals(6L, details.getTokenVersion());
+    }
+
+    @Test
     void shouldThrowUsernameNotFoundExceptionWhenUserNotFound() {
         service = new UserDetailsAdapter(loadUserPort);
 

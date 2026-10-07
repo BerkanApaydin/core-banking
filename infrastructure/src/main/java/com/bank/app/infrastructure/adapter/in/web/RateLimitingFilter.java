@@ -21,7 +21,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.List;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -31,8 +30,7 @@ public class RateLimitingFilter implements Filter {
 
     private final RateLimiter rateLimiter;
     private final MessageSource messageSource;
-    private final List<String> rateLimitedPaths;
-    private final long retryAfterSeconds;
+    private final RateLimitProperties rateLimitProperties;
     private final ObjectMapper objectMapper;
     private final ClientIpResolverPort clientIpResolver;
 
@@ -43,10 +41,7 @@ public class RateLimitingFilter implements Filter {
                               ClientIpResolverPort clientIpResolver) {
         this.rateLimiter = rateLimiter;
         this.messageSource = messageSource;
-        this.rateLimitedPaths = rateLimitProperties.getPaths();
-        // RFC 9110 Retry-After for 429 responses, derived from the same window
-        // the limiter enforces so clients back off exactly long enough.
-        this.retryAfterSeconds = Math.max(1, rateLimitProperties.getTimeWindowMs() / 1000);
+        this.rateLimitProperties = rateLimitProperties;
         this.objectMapper = objectMapper;
         this.clientIpResolver = clientIpResolver;
     }
@@ -59,10 +54,19 @@ public class RateLimitingFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
         String method = httpRequest.getMethod();
-        String path = httpRequest.getRequestURI();
+        // Decoded, context-path-free path: the same string Spring MVC matches
+        // handlers against, so percent-encoded aliases (e.g. /api/v1/%61ccounts)
+        // and non-root deployments cannot slip past the prefix list.
+        String path = RequestPathResolver.resolve(httpRequest);
 
-        boolean matchesRateLimitedPath = rateLimitedPaths.stream().anyMatch(path::startsWith);
-        if (!matchesRateLimitedPath) {
+        String matchedPrefix = null;
+        for (String prefix : rateLimitProperties.paths()) {
+            if (RequestPathResolver.matchesPrefix(path, prefix)) {
+                matchedPrefix = prefix;
+                break;
+            }
+        }
+        if (matchedPrefix == null) {
             chain.doFilter(request, response);
             return;
         }
@@ -70,8 +74,10 @@ public class RateLimitingFilter implements Filter {
         boolean isWriteOperation = "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method);
         // Single-resource GETs (by id/IBAN) enable enumeration if unlimited;
         // list/report/history reads are expensive. Limit all GETs under the
-        // protected prefixes, not just report/history.
-        boolean isProtectedRead = "GET".equals(method);
+        // protected prefixes, not just report/history. HEAD can fetch the same
+        // metadata without a body, so it shares the read budget; OPTIONS stays
+        // unlimited for CORS preflight.
+        boolean isProtectedRead = "GET".equals(method) || "HEAD".equals(method);
 
         if (!isWriteOperation && !isProtectedRead) {
             chain.doFilter(request, response);
@@ -80,9 +86,25 @@ public class RateLimitingFilter implements Filter {
         String ip = clientIpResolver.resolveClientIp(
                 httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
 
+        // Per-endpoint bucket per client ("ip|prefix"): login abuse must not
+        // eat the transfer budget and vice versa. A single global per-IP bucket
+        // also punishes everyone behind one NAT address for one endpoint's
+        // traffic; "|" is unambiguous here (it appears in neither IPs nor
+        // matched prefixes).
+        //
+        // Tiered budgets: auth endpoints (/api/v1/auth/*) keep the tight
+        // brute-force budget, authenticated resource reads get the looser one.
+        // Buckets stay IP-keyed on purpose: this filter runs before
+        // authentication (HIGHEST_PRECEDENCE + 1), so no principal exists yet —
+        // and the auth endpoints that need protection most have no principal
+        // by definition. Spoofing is contained by trust-forwarded-headers=false
+        // unless a trusted proxy overwrites X-Forwarded-For.
+        final int tierMaxRequests = rateLimitProperties.maxRequestsFor(matchedPrefix);
+        final long tierWindowMs = rateLimitProperties.timeWindowMsFor(matchedPrefix);
+        final String bucketKey = ip + "|" + matchedPrefix;
         final boolean acquired;
         try {
-            acquired = rateLimiter.tryAcquire(ip);
+            acquired = rateLimiter.tryAcquire(bucketKey, tierMaxRequests, tierWindowMs);
         } catch (DataAccessException ex) {
             // A Redis-backed limiter cannot make a trustworthy allow/deny decision.
             // Filters run before MVC exception advice, so write the response here.
@@ -99,7 +121,9 @@ public class RateLimitingFilter implements Filter {
                     "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
             // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
             // not depend on the domain.exception package (see ArchitectureTest).
-            httpResponse.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
+            // RFC 9110 Retry-After, derived from the same tier window the
+            // limiter enforces so clients back off exactly long enough.
+            httpResponse.setHeader("Retry-After", String.valueOf(Math.max(1, tierWindowMs / 1000)));
             ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
                     "RATE_LIMIT_EXCEEDED", message, path);
             return;

@@ -1,4 +1,4 @@
-package com.bank.app.account.adapter.in.api;
+package com.bank.app.account.adapter.out.api;
 
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
@@ -7,6 +7,7 @@ import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.domain.Money;
 import org.springframework.stereotype.Component;
 
@@ -15,21 +16,32 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Inbound API adapter: implements the {@code account-api} published language
- * (Open Host Service) by delegating to the account application ports.
- * This is the only bridge downstream contexts use — they program against
- * {@link AccountApi}, never against account use-cases or domain types.
+ * Outbound API adapter (D14/S12): implements the {@code account-api} published
+ * language (Open Host Service) by delegating to the account application ports.
+ * It lives in {@code adapter.out} because the Account context <em>serves</em>
+ * this contract outward — downstream contexts program against {@link AccountApi},
+ * never against account use-cases or domain types.
+ *
+ * <p>Cache-invalidation ownership: every balance/status mutation performed here
+ * evicts the involved snapshots through {@link AccountSnapshotCache} before
+ * returning, so downstream read-through caches can never serve pre-transaction
+ * values (including a stale ACTIVE status after suspend/close). Callers must
+ * never evict on this adapter's behalf — and future mutating methods must
+ * evict the same way (enforced by CacheInvalidationArchitectureTest).
  */
 @Component
 public class AccountApiAdapter implements AccountApi {
 
     private final AccountQueryUseCase accountQueryUseCase;
     private final AdjustAccountBalancesUseCase adjustAccountBalancesUseCase;
+    private final AccountSnapshotCache snapshotCache;
 
     public AccountApiAdapter(AccountQueryUseCase accountQueryUseCase,
-            AdjustAccountBalancesUseCase adjustAccountBalancesUseCase) {
+            AdjustAccountBalancesUseCase adjustAccountBalancesUseCase,
+            AccountSnapshotCache snapshotCache) {
         this.accountQueryUseCase = accountQueryUseCase;
         this.adjustAccountBalancesUseCase = adjustAccountBalancesUseCase;
+        this.snapshotCache = Objects.requireNonNull(snapshotCache, "AccountSnapshotCache must not be null");
     }
 
     @Override
@@ -60,13 +72,22 @@ public class AccountApiAdapter implements AccountApi {
     @Override
     public AccountAdjustmentResult adjustBalances(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        return adjustAccountBalancesUseCase.debitAndCredit(senderId, receiverId, amount);
+        AccountAdjustmentResult result = adjustAccountBalancesUseCase.debitAndCredit(senderId, receiverId, amount);
+        // Granular invalidation, inline (not via a helper): only the two
+        // mutated accounts, only after the use case succeeds — and inline so
+        // CacheInvalidationArchitectureTest can see the eviction directly.
+        snapshotCache.evictById(senderId);
+        snapshotCache.evictById(receiverId);
+        return result;
     }
 
     @Override
     public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        return adjustAccountBalancesUseCase.reverseForCancellation(senderId, receiverId, amount);
+        AccountAdjustmentResult result = adjustAccountBalancesUseCase.reverseForCancellation(senderId, receiverId, amount);
+        snapshotCache.evictById(senderId);
+        snapshotCache.evictById(receiverId);
+        return result;
     }
 
     private static AccountSnapshot toSnapshot(AccountInfo info) {

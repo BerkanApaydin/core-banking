@@ -110,4 +110,12 @@ class TransferWebRequestTest {
         var violations = validator.validate(request);
         assertFalse(violations.isEmpty());
     }
+
+    @Test
+    void decimalMaxShouldMirrorSharedBalanceCeiling() throws Exception {
+        var annotation = TransferWebRequest.class.getDeclaredField("amount")
+                .getAnnotation(jakarta.validation.constraints.DecimalMax.class);
+        assertNotNull(annotation);
+        assertEquals(com.bank.app.common.domain.BalanceLimits.MAX_BALANCE, annotation.value());
+    }
 }

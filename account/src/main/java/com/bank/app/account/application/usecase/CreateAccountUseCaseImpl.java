@@ -85,7 +85,8 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
             String.format("New account created. ID: %d",
                 savedAccount.getId()),
             LocalDateTime.now(clockProvider.clock()),
-            accountAuthorizationService.getCurrentUsername()));
+            accountAuthorizationService.getCurrentUsername(),
+            savedAccount.getUserId().value()));
 
         log.info("Account created: id={}", savedAccount.getId());
 

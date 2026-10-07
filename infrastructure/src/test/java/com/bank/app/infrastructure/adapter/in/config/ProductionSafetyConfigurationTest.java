@@ -37,6 +37,7 @@ class ProductionSafetyConfigurationTest {
                         "jwt.secret=non-default-secret", "spring.datasource.password=non-default-password",
                         "app.security.token-blacklist.backend=database",
                         "app.security.browser-session.secure=true",
+                        "app.security.cors.allowed-origins=https://bank.example.com",
                         "app.security.failed-login.backend=redis", "app.security.rate-limit.backend=redis")
                 .withBean("applicationWorker", Object.class, () -> {
                     singletonStarted.set(true);

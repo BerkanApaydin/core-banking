@@ -24,7 +24,7 @@ class JwtTokenProviderTest {
 
     @BeforeEach
     void setUp() {
-        jwtTokenProvider = new JwtTokenProvider(SECRET, 86400000L, true);
+        jwtTokenProvider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
     }
 
     @Test
@@ -40,15 +40,15 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void shouldGenerateAndExtractUserId() {
+    void shouldGenerateAndExposeUserIdViaVerifiedToken() {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
-        assertEquals(1L, jwtTokenProvider.extractUserId(token));
+        assertEquals(1L, jwtTokenProvider.verifyAndDecode(token).userId());
     }
 
     @Test
-    void shouldGenerateAndExtractRole() {
+    void shouldGenerateAndExposeRoleViaVerifiedToken() {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
-        assertEquals("ROLE_USER", jwtTokenProvider.extractRole(token));
+        assertEquals("ROLE_USER", jwtTokenProvider.verifyAndDecode(token).role());
     }
 
     @Test
@@ -56,8 +56,10 @@ class JwtTokenProviderTest {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
         assertNotNull(token);
         assertEquals("testUser", jwtTokenProvider.extractUsername(token));
-        assertEquals(1L, jwtTokenProvider.extractUserId(token));
-        assertEquals("ROLE_USER", jwtTokenProvider.extractRole(token));
+        var verified = jwtTokenProvider.verifyAndDecode(token);
+        assertNotNull(verified);
+        assertEquals(1L, verified.userId());
+        assertEquals("ROLE_USER", verified.role());
     }
 
     @Test
@@ -65,24 +67,26 @@ class JwtTokenProviderTest {
         String token = jwtTokenProvider.generateToken(1L, "testUser", "ROLE_ADMIN");
         assertNotNull(token);
         assertEquals("testUser", jwtTokenProvider.extractUsername(token));
-        assertEquals(1L, jwtTokenProvider.extractUserId(token));
-        assertEquals("ROLE_ADMIN", jwtTokenProvider.extractRole(token));
+        var verified = jwtTokenProvider.verifyAndDecode(token);
+        assertNotNull(verified);
+        assertEquals(1L, verified.userId());
+        assertEquals("ROLE_ADMIN", verified.role());
     }
 
     @Test
-    void shouldReturnFalseForMalformedToken() {
-        assertFalse(jwtTokenProvider.isTokenValid("invalid-token"));
+    void shouldRejectMalformedToken() {
+        assertNull(jwtTokenProvider.verifyAndDecode("invalid-token"));
     }
 
     @Test
-    void shouldReturnFalseForNullToken() {
-        assertFalse(jwtTokenProvider.isTokenValid(null));
+    void shouldRejectNullToken() {
+        assertNull(jwtTokenProvider.verifyAndDecode(null));
     }
 
     @Test
-    void shouldValidateGeneratedToken() {
+    void shouldVerifyGeneratedToken() {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
-        assertTrue(jwtTokenProvider.isTokenValid(token));
+        assertNotNull(jwtTokenProvider.verifyAndDecode(token));
     }
 
     @Test
@@ -96,23 +100,22 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldNotThrowWithCustomSecret() {
-        JwtTokenProvider provider = new JwtTokenProvider(
-                "FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L, false);
+        JwtTokenProvider provider = new JwtTokenProvider("FalyIFIC5f2T7fcqZ4A6j1DlCc7CdS/lnxdiReKx1bw=", 86400000L, 604800000L, false);
         assertDoesNotThrow(provider::validateSecret);
         assertNotNull(provider.generateToken(1L, "admin"));
     }
 
     @Test
-    void shouldReturnFalseForExpiredToken() {
+    void shouldRejectExpiredToken() {
         // Negative expiration ensures the token is always expired
-        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, true);
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, 604800000L, true);
         String token = shortLived.generateToken(1L, "testUser");
-        assertFalse(shortLived.isTokenValid(token));
+        assertNull(shortLived.verifyAndDecode(token));
     }
 
     @Test
     void shouldThrowWhenSecretIsTooShort() {
-        JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L, true);
+        JwtTokenProvider provider = new JwtTokenProvider("c2hvcnQ=", 86400000L, 604800000L, true);
         IllegalStateException ex = assertThrows(IllegalStateException.class, provider::validateSecret);
         // Verify the bit-length calculation to kill MathMutator on keyBytes.length * 8
         assertTrue(ex.getMessage().contains("40 bits"));
@@ -120,33 +123,33 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldThrowWhenSecretIsBlank() {
-        JwtTokenProvider blankProvider = new JwtTokenProvider("   ", 86400000L, true);
+        JwtTokenProvider blankProvider = new JwtTokenProvider("   ", 86400000L, 604800000L, true);
         IllegalStateException ex = assertThrows(IllegalStateException.class, blankProvider::validateSecret);
         assertTrue(ex.getMessage().contains("must not be blank"));
     }
 
     @Test
     void shouldThrowWhenDefaultSecretWithoutExplicitConsent() {
-        JwtTokenProvider defaultProvider = new JwtTokenProvider(SECRET, 86400000L, false);
+        JwtTokenProvider defaultProvider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, false);
         assertThrows(IllegalStateException.class, defaultProvider::validateSecret);
     }
 
     @Test
     void shouldThrowWhenSecretIsNull() {
-        JwtTokenProvider nullProvider = new JwtTokenProvider(null, 86400000L, false);
+        JwtTokenProvider nullProvider = new JwtTokenProvider(null, 86400000L, 604800000L, false);
         IllegalStateException ex = assertThrows(IllegalStateException.class, nullProvider::validateSecret);
         assertTrue(ex.getMessage().contains("must not be blank"));
     }
 
     @Test
     void shouldAllowDefaultSecretWithExplicitConsent() {
-        JwtTokenProvider consentingProvider = new JwtTokenProvider(SECRET, 86400000L, true);
+        JwtTokenProvider consentingProvider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
         assertDoesNotThrow(consentingProvider::validateSecret);
     }
 
     @Test
-    void shouldReturnFalseForTokenWithoutSubject() {
-        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, true);
+    void shouldRejectTokenWithoutSubject() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
         SecretKey key = Keys.hmacShaKeyFor(
                 Decoders.BASE64.decode(SECRET));
         String token = Jwts.builder()
@@ -155,12 +158,12 @@ class JwtTokenProviderTest {
                 .signWith(key)
                 .compact();
 
-        assertFalse(provider.isTokenValid(token));
+        assertNull(provider.verifyAndDecode(token));
     }
 
     @Test
-    void shouldReturnNullExtractUserIdWhenNoUserIdClaim() {
-        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, true);
+    void shouldRejectTokenWithoutUserIdClaim() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
         SecretKey key = Keys.hmacShaKeyFor(
                 Decoders.BASE64.decode(SECRET));
         String token = Jwts.builder()
@@ -169,7 +172,7 @@ class JwtTokenProviderTest {
                 .expiration(new Date(System.currentTimeMillis() + 86400000L))
                 .signWith(key)
                 .compact();
-        assertNull(provider.extractUserId(token));
+        assertNull(provider.verifyAndDecode(token));
     }
 
     @Test
@@ -188,7 +191,7 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldReturnZeroRemainingMsForExpiredToken() {
-        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, true);
+        JwtTokenProvider shortLived = new JwtTokenProvider(SECRET, -86400000L, 604800000L, true);
         String token = shortLived.generateToken(1L, "testUser");
 
         assertEquals(0L, shortLived.getRemainingMs(token));
@@ -197,5 +200,63 @@ class JwtTokenProviderTest {
     @Test
     void shouldReturnZeroRemainingMsForMalformedToken() {
         assertEquals(0L, jwtTokenProvider.getRemainingMs("not-a-token"));
+    }
+
+    @Test
+    void shouldTagAccessAndRefreshTokens() {
+        String access = jwtTokenProvider.generateToken(1L, "testUser");
+        String refresh = jwtTokenProvider.generateRefreshToken(1L, "testUser", "ROLE_USER");
+
+        assertEquals("access", jwtTokenProvider.extractTokenType(access));
+        assertEquals("refresh", jwtTokenProvider.extractTokenType(refresh));
+        assertNotEquals(access, refresh);
+    }
+
+    @Test
+    void shouldDefaultLegacyTokensWithoutTypeToAccess() {
+        // Tokens issued before typing carry no "typ" claim (missing => access).
+        String legacy = Jwts.builder()
+                .subject("testUser")
+                .expiration(new Date(System.currentTimeMillis() + 86400000L))
+                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .compact();
+
+        assertEquals("access", jwtTokenProvider.extractTokenType(legacy));
+    }
+
+    @Test
+    void shouldRoundTripTokenVersionClaim() {
+        String access = jwtTokenProvider.generateToken(1L, "testUser", "ROLE_USER", 7L);
+        assertEquals(7L, jwtTokenProvider.extractTokenVersion(access));
+
+        String refresh = jwtTokenProvider.generateRefreshToken(1L, "testUser", "ROLE_USER", 7L);
+        assertEquals(7L, jwtTokenProvider.extractTokenVersion(refresh));
+    }
+
+    @Test
+    void shouldDefaultMissingVersionClaimToZero() {
+        // Pre-versioning tokens carry no "ver" claim (missing => generation 0),
+        // so rolling deploys never lock users out.
+        String legacy = Jwts.builder()
+                .subject("testUser")
+                .expiration(new Date(System.currentTimeMillis() + 86400000L))
+                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .compact();
+
+        assertEquals(0L, jwtTokenProvider.extractTokenVersion(legacy));
+        assertEquals(0L, jwtTokenProvider.extractTokenVersion(jwtTokenProvider.generateToken(1L, "testUser")));
+    }
+
+    @Test
+    void shouldUseSeparateRefreshLifetime() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 900000L, 604800000L, true);
+
+        assertEquals(900000L, provider.getExpirationMs());
+        assertEquals(604800000L, provider.getRefreshExpirationMs());
+
+        long accessRemaining = provider.getRemainingMs(provider.generateToken(1L, "testUser"));
+        long refreshRemaining = provider.getRemainingMs(
+                provider.generateRefreshToken(1L, "testUser", "ROLE_USER"));
+        assertTrue(refreshRemaining - accessRemaining > 600_000_000L);
     }
 }

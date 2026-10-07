@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -204,7 +205,7 @@ class TransferTest {
         @DisplayName("should cancel within 24-hour window and register event")
         void shouldCancelWithinWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
-            transfer.cancel(Clock.systemDefaultZone(), 24);
+            transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
             assertThat(transfer.getDomainEvents())
                     .hasSize(1)
@@ -217,7 +218,7 @@ class TransferTest {
         @DisplayName("should cancel at exactly 24-hour window boundary")
         void shouldCancelAtBoundary() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now());
-            transfer.cancel(Clock.systemDefaultZone(), 24);
+            transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
@@ -227,7 +228,7 @@ class TransferTest {
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, fixedNow);
-            transfer.cancel(clock, 0);
+            transfer.cancel(clock, Duration.ZERO);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
@@ -235,7 +236,7 @@ class TransferTest {
         @DisplayName("should throw when transfer is older than 24 hours")
         void shouldThrowAfterWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(25));
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
         }
@@ -245,7 +246,7 @@ class TransferTest {
         void shouldThrowJustAfterBoundary() {
             LocalDateTime createdAt = now().minusHours(24).minusMinutes(1);
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
         }
@@ -254,7 +255,7 @@ class TransferTest {
         @DisplayName("should throw when window is zero and transfer is old")
         void shouldThrowWithZeroWindowAndOldTransfer() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusMinutes(1));
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 0))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ZERO))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
         }
@@ -263,7 +264,7 @@ class TransferTest {
         @DisplayName("should throw when already cancelled")
         void shouldThrowWhenAlreadyCancelled() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.CANCELLED, now());
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferAlreadyCancelledException.class)
                     .hasMessage("Transfer already cancelled. ID: 1");
         }
@@ -272,7 +273,7 @@ class TransferTest {
         @DisplayName("should throw when status is FAILED")
         void shouldThrowOnFailedStatus() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.FAILED, now());
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("already failed");
         }
@@ -281,7 +282,7 @@ class TransferTest {
         @DisplayName("should throw when status is PENDING")
         void shouldThrowOnPendingStatus() {
             Transfer transfer = Transfer.create(1L, 2L, AMOUNT, Clock.systemDefaultZone());
-            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), 24))
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("still pending");
         }
@@ -294,7 +295,7 @@ class TransferTest {
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(1), ZoneId.systemDefault());
 
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            transfer.cancel(clock, 24);
+            transfer.cancel(clock, Duration.ofHours(24));
 
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
@@ -307,7 +308,7 @@ class TransferTest {
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(25 * 3600 + 6), ZoneId.systemDefault());
 
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, createdAt);
-            assertThatThrownBy(() -> transfer.cancel(clock, 24))
+            assertThatThrownBy(() -> transfer.cancel(clock, Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class);
         }
     }
@@ -378,7 +379,7 @@ class TransferTest {
         @DisplayName("should cancel using default 24-hour window")
         void shouldCancelWithDefaultWindow() {
             Transfer transfer = new Transfer(1L, 1L, 2L, AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
-            transfer.cancel(Clock.systemDefaultZone(), 24);
+            transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
     }

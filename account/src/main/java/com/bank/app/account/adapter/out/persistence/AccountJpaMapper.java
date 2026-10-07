@@ -1,8 +1,6 @@
 package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
@@ -21,10 +19,26 @@ public class AccountJpaMapper {
                 Iban.normalize(account.getIban().value()),
                 account.getOwnerName(),
                 account.getBalance().amount(),
-                account.getBalance().currency().name(),
-                account.getStatus().name(),
+                account.getBalance().currency(),
+                account.getStatus(),
                 account.getVersion()
         );
+    }
+
+    /**
+     * Mutates a managed entity in place (7.1): same pattern as
+     * {@code TransferPersistenceAdapter} — no detached merge, hence no
+     * implicit pre-update SELECT. Identity fields (id, userId, iban) and the
+     * managed version are never overwritten; Hibernate owns the version.
+     */
+    public void updateJpaEntity(AccountJpaEntity entity, Account account) {
+        if (entity == null || account == null) {
+            throw new IllegalArgumentException("Entity and account must not be null");
+        }
+        entity.setOwnerName(account.getOwnerName());
+        entity.setBalance(account.getBalance().amount());
+        entity.setCurrency(account.getBalance().currency());
+        entity.setStatus(account.getStatus());
     }
 
     public Account toDomain(AccountJpaEntity entity) {
@@ -36,8 +50,8 @@ public class AccountJpaMapper {
                 .userId(new UserId(entity.getUserId()))
                 .iban(new Iban(entity.getIban()))
                 .ownerName(entity.getOwnerName())
-                .balance(Money.exact(entity.getBalance(), Currency.valueOf(entity.getCurrency())))
-                .status(AccountStatus.valueOf(entity.getStatus()))
+                .balance(Money.exact(entity.getBalance(), entity.getCurrency()))
+                .status(entity.getStatus())
                 .version(entity.getVersion())
                 .build();
     }

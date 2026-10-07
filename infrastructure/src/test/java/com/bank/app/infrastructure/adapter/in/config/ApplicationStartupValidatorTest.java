@@ -54,12 +54,26 @@ class ApplicationStartupValidatorTest {
             "app.security.failed-login.max-attempts | 0 | positive value",
             "app.security.failed-login.window-minutes | -1 | positive value",
             "app.security.rate-limit.max-requests | 0 | positive value",
-            "app.security.rate-limit.time-window-ms | -1 | positive value"
+            "app.security.rate-limit.time-window-ms | -1 | positive value",
+            "app.security.rate-limit.resource-max-requests | 0 | positive value",
+            "app.security.rate-limit.resource-time-window-ms | -1 | positive value",
+            "app.outbox.max-retries | 0 | positive value",
+            "app.outbox.batch-size | -1 | positive value",
+            "app.outbox.poll-delay-ms | 0 | positive value",
+            "app.outbox.retention-days | 0 | positive value",
+            "app.outbox.partition-count | -1 | non-negative value"
     })
     void rejectsUnsafeProductionOverrides(String property, String value, String reason) {
         var environment = validProductionEnvironment().withProperty(property, value);
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining(reason);
+    }
+
+    @Test
+    void acceptsZeroPartitionCountAsUnpartitionedMode() {
+        var environment = validProductionEnvironment().withProperty("app.outbox.partition-count", "0");
+        assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .doesNotThrowAnyException();
     }
 
     @ParameterizedTest

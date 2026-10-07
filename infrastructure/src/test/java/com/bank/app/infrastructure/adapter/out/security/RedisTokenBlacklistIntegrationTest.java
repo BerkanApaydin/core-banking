@@ -7,9 +7,11 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 class RedisTokenBlacklistIntegrationTest {
 
@@ -43,12 +45,14 @@ class RedisTokenBlacklistIntegrationTest {
     }
 
     @Test
-    void shouldRecognizeLegacyRawKeyUntilItsTtlExpires() throws InterruptedException {
+    void shouldRecognizeLegacyRawKeyUntilItsTtlExpires() {
         redisTemplate.opsForValue().set("token_blacklist:legacy-token", "blacklisted", 500, TimeUnit.MILLISECONDS);
 
         assertThat(adapter.isBlacklisted("legacy-token")).isTrue();
 
-        Thread.sleep(650);
+        // D19: bounded await instead of a fixed 650ms sleep — immune to slow CI.
+        await().atMost(Duration.ofSeconds(10))
+                .until(() -> !adapter.isBlacklisted("legacy-token"));
 
         assertThat(adapter.isBlacklisted("legacy-token")).isFalse();
     }
@@ -59,10 +63,12 @@ class RedisTokenBlacklistIntegrationTest {
     }
 
     @Test
-    void shouldExpireTokenAfterTtl() throws InterruptedException {
+    void shouldExpireTokenAfterTtl() {
         adapter.blacklist("expiring-token", 100);
         assertThat(adapter.isBlacklisted("expiring-token")).isTrue();
-        Thread.sleep(200);
+        // D19: bounded await instead of a fixed 200ms sleep.
+        await().atMost(Duration.ofSeconds(10))
+                .until(() -> !adapter.isBlacklisted("expiring-token"));
         assertThat(adapter.isBlacklisted("expiring-token")).isFalse();
     }
 

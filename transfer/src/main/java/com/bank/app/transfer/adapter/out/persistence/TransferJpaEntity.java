@@ -1,18 +1,44 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
+import com.bank.app.common.domain.Currency;
 import com.bank.app.persistence.AuditableJpaEntity;
+import com.bank.app.transfer.domain.TransferStatus;
 import jakarta.persistence.Column;
+import jakarta.persistence.ColumnResult;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityResult;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.NamedNativeQuery;
+import jakarta.persistence.SqlResultSetMapping;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "transfers")
+@SqlResultSetMapping(
+        name = "TransferHistoryPageMapping",
+        entities = @EntityResult(entityClass = TransferJpaEntity.class),
+        columns = @ColumnResult(name = "total_count", type = Long.class)
+)
+@NamedNativeQuery(
+        name = "TransferJpaEntity.findHistoryPage",
+        query = """
+                SELECT t.*, COUNT(*) OVER() AS total_count
+                FROM transfers t
+                WHERE t.sender_account_id = :accountId OR t.receiver_account_id = :accountId
+                ORDER BY t.created_at DESC, t.id DESC
+                LIMIT :limit OFFSET :offset
+                """,
+        resultSetMapping = "TransferHistoryPageMapping"
+)
 public class TransferJpaEntity extends AuditableJpaEntity {
 
     @Id
@@ -28,11 +54,15 @@ public class TransferJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false, precision = 38, scale = 2)
     private BigDecimal amount;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
-    private String currency;
+    private Currency currency;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
-    private String status;
+    private TransferStatus status;
 
     /**
      * Business creation instant assigned by the domain ({@code Transfer.create}).
@@ -45,13 +75,14 @@ public class TransferJpaEntity extends AuditableJpaEntity {
     private LocalDateTime businessCreatedAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     public TransferJpaEntity() {
     }
 
     public TransferJpaEntity(Long id, Long senderAccountId, Long receiverAccountId, BigDecimal amount,
-                             String currency, String status, Long version) {
+                             Currency currency, TransferStatus status, Long version) {
         this.id = id;
         this.senderAccountId = senderAccountId;
         this.receiverAccountId = receiverAccountId;
@@ -93,19 +124,19 @@ public class TransferJpaEntity extends AuditableJpaEntity {
         this.amount = amount;
     }
 
-    public String getCurrency() {
+    public Currency getCurrency() {
         return currency;
     }
 
-    public void setCurrency(String currency) {
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
-    public String getStatus() {
+    public TransferStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(TransferStatus status) {
         this.status = status;
     }
 

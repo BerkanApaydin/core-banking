@@ -22,9 +22,25 @@ class ClientIpResolverTest {
         }
 
         @Test
-        @DisplayName("should return first IP from X-Forwarded-For list")
-        void shouldReturnFirstIpFromList() {
+        @DisplayName("should return last IP from X-Forwarded-For list")
+        void shouldReturnLastIpFromList() {
+            // Append-semantics: the edge proxy appends the peer it saw, so the
+            // last entry is the trustworthy one; leading entries are spoofable.
             assertThat(resolver.resolveClientIp("198.51.100.1, 10.0.0.1, 192.168.1.1", "10.0.0.9"))
+                    .isEqualTo("192.168.1.1");
+        }
+
+        @Test
+        @DisplayName("should ignore spoofed leading entries and resolve the edge-appended IP")
+        void shouldIgnoreSpoofedLeadingEntries() {
+            assertThat(resolver.resolveClientIp("203.0.113.99, 198.51.100.7", "10.0.0.9"))
+                    .isEqualTo("198.51.100.7");
+        }
+
+        @Test
+        @DisplayName("should skip unknown hops from the right")
+        void shouldSkipUnknownHopsFromRight() {
+            assertThat(resolver.resolveClientIp("198.51.100.1, unknown", "10.0.0.9"))
                     .isEqualTo("198.51.100.1");
         }
 

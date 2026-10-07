@@ -41,6 +41,8 @@ class BacklogMetricsReporterTest {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(1, LocalDateTime.now().minusMinutes(2)),
                         new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
+                .thenReturn(0L, 0L);
 
         reporter.scan();
 
@@ -48,6 +50,7 @@ class BacklogMetricsReporterTest {
         assertTrue(gauge("outbox.oldest_pending.age_seconds") >= 299);
         assertEquals(1, gauge("idempotency.http.pending.current"));
         assertTrue(gauge("idempotency.http.oldest_pending.age_seconds") >= 119);
+        assertEquals(0, gauge("ledger.nonzero_transaction_refs"));
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
 
         reporter.scan();
@@ -56,6 +59,22 @@ class BacklogMetricsReporterTest {
         assertEquals(0, gauge("outbox.oldest_pending.age_seconds"));
         assertEquals(0, gauge("idempotency.http.pending.current"));
         assertEquals(0, gauge("idempotency.http.oldest_pending.age_seconds"));
+        assertEquals(0, gauge("ledger.nonzero_transaction_refs"));
+    }
+
+    @Test
+    void publishesNonzeroLedgerGroupsForAlerting() {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
+                .thenReturn(3L);
+
+        reporter.scan();
+
+        assertEquals(3, gauge("ledger.nonzero_transaction_refs"));
+        assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
     }
 
     @Test
@@ -66,6 +85,8 @@ class BacklogMetricsReporterTest {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(1, LocalDateTime.now().minusMinutes(2)))
                 .thenThrow(new IllegalStateException("database unavailable"));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
+                .thenReturn(0L);
 
         reporter.scan();
         double previousSuccess = gauge("backlog.last_success_epoch_seconds");

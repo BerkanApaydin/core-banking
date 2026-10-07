@@ -64,7 +64,10 @@ public class SecurityConfig {
                 .referrerPolicy(referrer -> referrer
                     .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                 .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'")));
+                    .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                            + "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"))
+                .permissionsPolicy(permissions -> permissions
+                    .policy("camera=(), microphone=(), geolocation=(), payment=(), usb=()")));
 
         return http.build();
     }

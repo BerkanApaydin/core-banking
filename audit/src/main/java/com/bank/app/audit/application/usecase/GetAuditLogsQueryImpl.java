@@ -18,7 +18,8 @@ import java.util.List;
  * compile against the user module's {@code Role} enum (module-boundary rule),
  * and the value is pinned by {@code chk_users_role} plus the JWT role claim.
  * Provisioning stays out-of-band (ops creates the first admin directly;
- * {@code User.assignRole} remains banned until token versioning exists).
+ * {@code User.assignRole} has no production callers yet — token versioning
+ * (V39, {@code ver} claim) now makes such wiring safe, enforced refresh-side).
  */
 @ReadOnlyUseCase
 public class GetAuditLogsQueryImpl implements GetAuditLogsQuery {

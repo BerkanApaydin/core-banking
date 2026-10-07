@@ -45,9 +45,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         void shouldReturnEmptyListWhenNoTransfersFound() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt()))
-                                .thenReturn(Collections.emptyList());
-                when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+                when(loadTransferPort.findHistoryPage(eq(1L), anyInt(), anyInt()))
+                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
                 PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
 
@@ -59,9 +58,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         void shouldReturnEmptyListWithPaginationWhenNoTransfersFound() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistory(eq(1L), eq(0), eq(10)))
-                                .thenReturn(Collections.emptyList());
-                when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+                when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(10)))
+                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
                 PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 10);
 
@@ -107,28 +105,26 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         void shouldCallFindHistoryWithCorrectPagination() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
-                                .thenReturn(Collections.emptyList());
+                when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
+                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-                when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
                 getTransferHistoryUseCase.execute(1L, 0, 20);
 
-                verify(loadTransferPort).findHistory(1L, 0, 20);
+                verify(loadTransferPort).findHistoryPage(1L, 0, 20);
         }
 
         @Test
         void shouldDefaultToPage0AndSize20() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20)))
-                                .thenReturn(Collections.emptyList());
+                when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
+                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-                when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
                 getTransferHistoryUseCase.execute(1L);
 
-                verify(loadTransferPort).findHistory(1L, 0, 20);
+                verify(loadTransferPort).findHistoryPage(1L, 0, 20);
         }
 
         @Test
@@ -147,13 +143,12 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                                 transferAuthorizationService, 5);
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistory(eq(1L), eq(0), eq(5)))
-                                .thenReturn(Collections.emptyList());
+                when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(5)))
+                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-                when(loadTransferPort.countHistory(1L)).thenReturn(0L);
 
                 capped.execute(1L, 0, 500);
 
-                verify(loadTransferPort).findHistory(1L, 0, 5);
+                verify(loadTransferPort).findHistoryPage(1L, 0, 5);
         }
 }

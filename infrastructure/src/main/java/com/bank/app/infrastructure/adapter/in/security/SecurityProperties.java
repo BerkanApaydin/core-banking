@@ -9,16 +9,30 @@ import java.util.List;
 public record SecurityProperties(
     List<String> whitelistPaths
 ) {
+    /**
+     * Default public paths, used ONLY when {@code app.security.whitelist-paths}
+     * is unset (null). An explicitly empty list means "nothing is public" and
+     * stays empty (fail-closed) — see K2/D2.
+     */
+    public static final List<String> DEFAULT_WHITELIST = List.of(
+        PublicApiPaths.LOGIN, PublicApiPaths.BROWSER_LOGIN, PublicApiPaths.REGISTER,
+        // Refresh endpoints authenticate with the refresh token itself
+        // (like login with a password), so they never require a session.
+        PublicApiPaths.REFRESH, PublicApiPaths.BROWSER_REFRESH,
+        "/v3/api-docs/**", "/swagger-ui/**",
+        "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
+        // Static UI assets as patterns (not an enumerated file list): a new
+        // frontend file must not silently break the login UI (see 6.3).
+        // Root-level bundles served from static/ plus any future /assets/**.
+        "/*.js", "/*.css", "/assets/**",
+        "/style.css", "/favicon.ico", "/error"
+    );
+
     public SecurityProperties {
-        if (whitelistPaths == null || whitelistPaths.isEmpty()) {
-            whitelistPaths = List.of(
-                PublicApiPaths.LOGIN, PublicApiPaths.BROWSER_LOGIN, PublicApiPaths.REGISTER,
-                "/v3/api-docs/**", "/swagger-ui/**",
-                "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                "/app.js", "/boot.js", "/accounts.js", "/transfers.js",
-                "/idempotency.js", "/i18n.js",
-                "/style.css", "/favicon.ico", "/error"
-            );
+        if (whitelistPaths == null) {
+            whitelistPaths = DEFAULT_WHITELIST;
         }
+        // Empty list = operator explicitly closed all public paths.
+        // Fail-closed: do NOT fall back to defaults (K2/D2).
     }
 }

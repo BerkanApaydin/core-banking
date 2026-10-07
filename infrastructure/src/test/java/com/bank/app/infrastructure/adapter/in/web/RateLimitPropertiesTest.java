@@ -11,61 +11,68 @@ class RateLimitPropertiesTest {
 
     @Test
     void shouldUseDefaultValues() {
-        RateLimitProperties props = new RateLimitProperties();
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
 
-        assertEquals(4, props.getPaths().size());
-        assertTrue(props.getPaths().contains("/api/v1/auth/login"));
-        assertEquals("caffeine", props.getBackend());
-        assertEquals(10, props.getMaxRequests());
-        assertEquals(10000, props.getTimeWindowMs());
+        assertEquals(11, props.paths().size());
+        assertTrue(props.paths().contains("/api/v1/auth/login"));
+        assertTrue(props.paths().contains("/api/v1/auth/browser/login"));
+        assertTrue(props.paths().contains("/api/v1/auth/refresh"));
+        assertTrue(props.paths().contains("/api/v1/auth/browser/refresh"));
+        assertTrue(props.paths().contains("/api/v1/auth/logout"));
+        assertTrue(props.paths().contains("/api/v1/auth/browser/logout"));
+        assertTrue(props.paths().contains("/api/v1/auth/browser/session"));
+        assertTrue(props.paths().contains("/api/v1/admin"));
+        assertEquals("caffeine", props.backend());
+        assertEquals(10, props.maxRequests());
+        assertEquals(10000, props.timeWindowMs());
+        assertEquals(RateLimitProperties.DEFAULT_RESOURCE_MAX_REQUESTS, props.resourceMaxRequests());
+        assertEquals(RateLimitProperties.DEFAULT_RESOURCE_TIME_WINDOW_MS, props.resourceTimeWindowMs());
     }
 
     @Test
-    void shouldSetAndGetPaths() {
-        RateLimitProperties props = new RateLimitProperties();
-        List<String> customPaths = List.of("/api/v1/custom");
-        props.setPaths(customPaths);
+    void shouldFallBackToDefaultsOnNull() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
 
-        assertEquals(customPaths, props.getPaths());
+        assertEquals(11, props.paths().size());
+        assertEquals("caffeine", props.backend());
     }
 
     @Test
-    void shouldSetAndGetBackend() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setBackend("redis");
+    void shouldKeepCustomValues() {
+        RateLimitProperties props = new RateLimitProperties(List.of("/api/v1/custom"), "redis", 100, 60000, 120, 60000);
 
-        assertEquals("redis", props.getBackend());
+        assertEquals(List.of("/api/v1/custom"), props.paths());
+        assertEquals("redis", props.backend());
+        assertEquals(100, props.maxRequests());
+        assertEquals(60000, props.timeWindowMs());
     }
 
     @Test
-    void shouldSetAndGetMaxRequests() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setMaxRequests(100);
+    void shouldKeepExplicitEmptyPathsAsKillSwitch() {
+        RateLimitProperties props = new RateLimitProperties(List.of(), "caffeine", 10, 10000, 120, 60000);
 
-        assertEquals(100, props.getMaxRequests());
+        assertTrue(props.paths().isEmpty());
     }
 
     @Test
-    void shouldSetAndGetTimeWindowMs() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setTimeWindowMs(60000);
+    void shouldApplyTightAuthTierAndLooseResourceTier() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
 
-        assertEquals(60000, props.getTimeWindowMs());
+        assertTrue(props.isAuthTier("/api/v1/auth/login"));
+        assertTrue(props.isAuthTier("/api/v1/auth/browser/session"));
+        assertFalse(props.isAuthTier("/api/v1/accounts"));
+        assertFalse(props.isAuthTier("/api/v1/transfers"));
+        assertFalse(props.isAuthTier("/api/v1/admin"));
+        assertEquals(10, props.maxRequestsFor("/api/v1/auth/register"));
+        assertEquals(10000, props.timeWindowMsFor("/api/v1/auth/register"));
+        assertEquals(120, props.maxRequestsFor("/api/v1/transfers"));
+        assertEquals(60000, props.timeWindowMsFor("/api/v1/accounts"));
     }
 
     @Test
-    void shouldHandleEmptyPaths() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setPaths(List.of());
+    void shouldKeepExplicitZeroMaxRequests() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 0, 10000, 120, 60000);
 
-        assertTrue(props.getPaths().isEmpty());
-    }
-
-    @Test
-    void shouldHandleZeroMaxRequests() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setMaxRequests(0);
-
-        assertEquals(0, props.getMaxRequests());
+        assertEquals(0, props.maxRequests());
     }
 }

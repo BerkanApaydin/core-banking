@@ -3,17 +3,21 @@ package com.bank.app.infrastructure.adapter.in.outbox;
 import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,7 +37,7 @@ class OutboxPollerTest {
 
     private OutboxPoller outboxPoller;
 
-    private final OutboxProperties outboxProperties = new OutboxProperties(5, 50, 0, 2000);
+    private final OutboxProperties outboxProperties = new OutboxProperties(5, 50, 0, 2000, 30);
 
     @BeforeEach
     void setUp() {
@@ -78,7 +82,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldProcessEachPartitionWhenPartitionCountIsPositive() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30));
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(event("e0")));
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
         when(outboxPort.findAndLockUnprocessed(50, 2)).thenReturn(List.of(event("e2")));
@@ -90,7 +94,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldSkipEmptyPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of());
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
 
@@ -101,7 +105,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldRefuseStartupWhenPendingEventsUseUnpolledPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(3L);
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, outboxPoller::start);
@@ -114,7 +118,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldRefuseManualPollingWhenPendingEventsUseUnpolledPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(1L);
 
         assertThrows(IllegalStateException.class, outboxPoller::pollAndProcessEvents);
@@ -158,5 +162,24 @@ class OutboxPollerTest {
     @Test
     void shouldTolerateStopWithoutStart() {
         assertDoesNotThrow(outboxPoller::stop);
+    }
+
+    @Test
+    void shouldCountAbortedPollCyclesPerPartition() {
+        var registry = new SimpleMeterRegistry();
+        var meteredPoller = new OutboxPoller(outboxPort, outboxProcessor, outboxProperties, registry);
+        when(outboxPort.findAndLockUnprocessed(anyInt(), anyInt()))
+                .thenThrow(new RuntimeException("database unavailable"));
+
+        meteredPoller.start();
+        try {
+            // At-least-once: later cycles may increment further before the
+            // assertion runs, so assert presence, not exact count.
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertTrue(registry
+                            .counter("outbox.poll.partition_error", "partition", "-1").count() >= 1.0));
+        } finally {
+            meteredPoller.stop();
+        }
     }
 }

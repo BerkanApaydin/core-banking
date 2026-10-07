@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.out.security;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.common.domain.TokenDigest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;

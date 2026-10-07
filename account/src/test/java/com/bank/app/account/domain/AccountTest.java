@@ -1,5 +1,6 @@
 package com.bank.app.account.domain;
 
+import com.bank.app.account.domain.exception.AccountBalanceLimitExceededException;
 import com.bank.app.account.domain.exception.AccountClosedException;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
@@ -63,6 +64,24 @@ class AccountTest {
             assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should reject balance above the domain ceiling")
+        void shouldRejectExcessiveBalance() {
+            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER,
+                    Money.of("1000000000.01", Currency.TRY), AccountStatus.ACTIVE))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must not exceed");
+        }
+
+        @Test
+        @DisplayName("should accept balance exactly at the domain ceiling")
+        void shouldAcceptCeilingBalance() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+                    Money.of("1000000000.00", Currency.TRY), AccountStatus.ACTIVE);
+
+            assertThat(account.getBalance()).isEqualTo(Money.of("1000000000.00", Currency.TRY));
         }
 
         @Test
@@ -304,6 +323,28 @@ class AccountTest {
             assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY), Clock.systemDefaultZone()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Credit amount must not be zero");
+        }
+
+        @Test
+        @DisplayName("should reject credit that would exceed MAX_BALANCE (K3/D3)")
+        void shouldRejectCreditAboveMaxBalance() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+                    Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
+            assertThatThrownBy(() -> account.credit(Money.of("2.00", Currency.TRY), Clock.systemDefaultZone()))
+                    .isExactlyInstanceOf(AccountBalanceLimitExceededException.class)
+                    .hasMessageContaining("maximum balance");
+            // Failed credit must not mutate balance or publish events.
+            assertThat(account.getBalance().amount()).isEqualByComparingTo("999999999.00");
+            assertThat(account.getDomainEvents()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should allow credit landing exactly on MAX_BALANCE (K3/D3)")
+        void shouldAllowCreditLandingExactlyOnMaxBalance() {
+            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+                    Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
+            account.credit(Money.of("1.00", Currency.TRY), Clock.systemDefaultZone());
+            assertThat(account.getBalance().amount()).isEqualByComparingTo("1000000000.00");
         }
 
         @Test

@@ -44,6 +44,14 @@ class AuthRequestTest {
     }
 
     @Test
+    void shouldRejectNullUsernameAndPassword() {
+        // Application-boundary guarantee: the login use-case can never see
+        // a null username, so its guard reset cannot hit the NPE path (L5).
+        assertThrows(NullPointerException.class, () -> new AuthRequest(null, "Password1!"));
+        assertThrows(NullPointerException.class, () -> new AuthRequest("user", null));
+    }
+
+    @Test
     void shouldRejectBlankPassword() {
         assertThrows(IllegalArgumentException.class, () -> new AuthRequest("user", ""));
         assertThrows(IllegalArgumentException.class, () -> new AuthRequest("user", "   "));

@@ -1,5 +1,9 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
+
+
+import com.bank.app.user.domain.Role;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
@@ -31,7 +35,9 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -45,29 +51,37 @@ import static org.mockito.Mockito.when;
 @TestMethodOrder(OrderAnnotation.class)
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
-    @Autowired
-    private PlaceTransferUseCase placeTransferPort;
+    private final PlaceTransferUseCase placeTransferPort;
+
+    private final OutboxJpaRepository outboxRepo;
+
+    private final AccountJpaRepository accountRepo;
+
+    private final UserJpaRepository userRepository;
+
+    private final ObjectMapper objectMapper;
+
+    private final OutboxProcessor outboxProcessor;
+
+    private final PlatformTransactionManager txManager;
+
+    private final EntityManager entityManager;
 
     @Autowired
-    private OutboxJpaRepository outboxRepo;
-
-    @Autowired
-    private AccountJpaRepository accountRepo;
-
-    @Autowired
-    private UserJpaRepository userRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private OutboxProcessor outboxProcessor;
-
-    @Autowired
-    private PlatformTransactionManager txManager;
-
-    @Autowired
-    private EntityManager entityManager;
+    OutboxIntegrationTest(PlaceTransferUseCase placeTransferPort, OutboxJpaRepository outboxRepo,
+            AccountJpaRepository accountRepo, UserJpaRepository userRepository, ObjectMapper objectMapper,
+            OutboxProcessor outboxProcessor, PlatformTransactionManager txManager, EntityManager entityManager,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.placeTransferPort = placeTransferPort;
+        this.outboxRepo = outboxRepo;
+        this.accountRepo = accountRepo;
+        this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
+        this.outboxProcessor = outboxProcessor;
+        this.txManager = txManager;
+        this.entityManager = entityManager;
+    }
 
     @MockitoBean
     private SecurityContextAdapter securityUtils;
@@ -90,12 +104,12 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
     @BeforeEach
     void setUp() {
         cleanUp();
-        user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER", null, null, null));
+        user = userRepository.save(new UserJpaEntity(null, "user1", "password", Role.ROLE_USER, null, null, null));
 
         accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR770006200000000000000111", "Sender",
-                new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
         accountRepo.save(new AccountJpaEntity(null, user.getId(), "TR870006200000000000000222", "Receiver",
-                new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
         when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
@@ -107,6 +121,9 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         new TransactionTemplate(txManager).execute(status -> {
             entityManager.createQuery("delete from OutboxJpaEntity").executeUpdate();
             entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
+            // Ledger legs reference accounts (V29 FK): child-first, so cleanup
+            // never depends on test execution order.
+            entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
             entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
             entityManager.createQuery("delete from UserJpaEntity").executeUpdate();
             entityManager.flush();

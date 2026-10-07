@@ -19,8 +19,10 @@ import java.util.Objects;
  *
  * <p>Caching goes through {@link AccountSnapshotCache} (infrastructure owns the
  * backend) instead of Spring-Cache annotations, so this adapter stays
- * framework-free. Reads populate the cache; balance mutations evict only the two
- * involved accounts (granular) so unrelated entries never stampede.
+ * framework-free. Reads populate the cache; invalidation is owned by the
+ * Account boundary itself ({@code AccountApiAdapter} evicts mutated snapshots
+ * before returning), so this adapter must not evict — a second eviction here
+ * would only double the mutation-path Redis round trips.
  */
 public class AccountAclAdapter implements AccountAclPort {
 
@@ -68,7 +70,6 @@ public class AccountAclAdapter implements AccountAclPort {
     public AccountAclPort.MutationResult debitAndCredit(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         AccountAdjustmentResult result = accountApi.adjustBalances(senderId, receiverId, amount);
-        evictMutatedAccounts(senderId, receiverId);
         return toMutationResult(result);
     }
 
@@ -76,17 +77,7 @@ public class AccountAclAdapter implements AccountAclPort {
     public AccountAclPort.MutationResult reverseBalancesForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         AccountAdjustmentResult result = accountApi.reverseForCancellation(senderId, receiverId, amount);
-        evictMutatedAccounts(senderId, receiverId);
         return toMutationResult(result);
-    }
-
-    private void evictMutatedAccounts(Long senderId, Long receiverId) {
-        // Granular invalidation: only the two mutated accounts + batch lookups that may
-        // reference them. Cached AccountInfo carries no balance (id/userId/currency/status),
-        // and IBAN mappings are immutable, so unrelated entries stay valid.
-        cache.evictById(senderId);
-        cache.evictById(receiverId);
-        cache.evictIbansBatch();
     }
 
     private static AccountAclPort.AccountInfo toAccountInfo(AccountSnapshot snapshot) {

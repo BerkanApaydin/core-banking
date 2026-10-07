@@ -16,7 +16,8 @@ public enum ErrorCode {
     DB_INTEGRITY_VIOLATION,
     CONCURRENT_REQUEST,
     RATE_LIMIT_EXCEEDED,
-    UNSUPPORTED_MEDIA_TYPE;
+    UNSUPPORTED_MEDIA_TYPE,
+    API_VERSION_MISMATCH;
 
     public String code() {
         return name();

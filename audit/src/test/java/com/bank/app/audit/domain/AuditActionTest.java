@@ -9,7 +9,17 @@ class AuditActionTest {
 
     @Test
     void shouldHaveAllExpectedEnumValues() {
-        assertEquals(7, AuditAction.values().length);
+        // 7 money-movement actions + 5 authentication-lifecycle actions (K11/D4).
+        assertEquals(12, AuditAction.values().length);
+    }
+
+    @Test
+    void shouldResolveAuthLifecycleActions() {
+        assertEquals(AuditAction.LOGIN_SUCCEEDED, AuditAction.fromString("LOGIN_SUCCEEDED"));
+        assertEquals(AuditAction.LOGIN_FAILED, AuditAction.fromString("LOGIN_FAILED"));
+        assertEquals(AuditAction.LOGOUT, AuditAction.fromString("LOGOUT"));
+        assertEquals(AuditAction.PASSWORD_CHANGED, AuditAction.fromString("PASSWORD_CHANGED"));
+        assertEquals(AuditAction.TOKEN_REVOKED, AuditAction.fromString("TOKEN_REVOKED"));
     }
 
     @Test
@@ -93,5 +103,16 @@ class AuditActionTest {
     @Test
     void shouldThrowWhenFromStringIsNull() {
         assertThrows(IllegalArgumentException.class, () -> AuditAction.fromString(null));
+    }
+
+    @Test
+    void shouldThrowUnknownAuditActionExceptionForUnmappedValue() {
+        // A typo'd action name is a server wiring mistake, not a client error:
+        // it must surface as IllegalStateException (generic 500 handler),
+        // never as IllegalArgumentException (400 invalid-argument handler).
+        UnknownAuditActionException failure = assertThrows(UnknownAuditActionException.class,
+                () -> AuditAction.fromString("TRANSFER_EXECUTD"));
+        assertTrue(failure instanceof IllegalStateException);
+        assertTrue(failure.getMessage().contains("TRANSFER_EXECUTD"));
     }
 }

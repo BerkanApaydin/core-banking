@@ -39,10 +39,23 @@ class UserJpaMapperTest {
             assertThat(entity.getId()).isEqualTo(42L);
             assertThat(entity.getUsername()).isEqualTo("johndoe");
             assertThat(entity.getPassword()).isEqualTo("secret");
-            assertThat(entity.getRole()).isEqualTo("ROLE_ADMIN");
+            assertThat(entity.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(entity.getEmail()).isEqualTo("john@example.com");
             assertThat(entity.getPhone()).isEqualTo("555-0100");
             assertThat(entity.getVersion()).isEqualTo(1L);
+            assertThat(entity.getTokenVersion()).isZero();
+        }
+
+        @Test
+        @DisplayName("should round-trip a bumped token version")
+        void shouldRoundTripTokenVersion() {
+            User user = new User(new UserId(42L), "johndoe", "secret", Role.ROLE_USER,
+                    null, null, 3L, 9L);
+
+            UserJpaEntity entity = mapper.toJpaEntity(user);
+
+            assertThat(entity.getTokenVersion()).isEqualTo(9L);
+            assertThat(mapper.toDomain(entity).getTokenVersion()).isEqualTo(9L);
         }
 
         @Test
@@ -84,7 +97,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map full entity with all fields")
         void shouldMapFullEntity() {
-            UserJpaEntity entity = new UserJpaEntity(42L, "johndoe", "secret", "ROLE_ADMIN",
+            UserJpaEntity entity = new UserJpaEntity(42L, "johndoe", "secret", Role.ROLE_ADMIN,
                     "john@example.com", "555-0100", 1L);
 
             User user = mapper.toDomain(entity);
@@ -101,7 +114,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map entity with null email and phone")
         void shouldMapEntityWithNullEmailAndPhone() {
-            UserJpaEntity entity = new UserJpaEntity(1L, "janedoe", "pass", "ROLE_USER",
+            UserJpaEntity entity = new UserJpaEntity(1L, "janedoe", "pass", Role.ROLE_USER,
                     null, null, null);
 
             User user = mapper.toDomain(entity);
@@ -126,7 +139,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should update entity with full user")
         void shouldUpdateEntity() {
-            UserJpaEntity entity = new UserJpaEntity(1L, "oldname", "oldpass", "ROLE_USER",
+            UserJpaEntity entity = new UserJpaEntity(1L, "oldname", "oldpass", Role.ROLE_USER,
                     "old@example.com", "555-0000", 0L);
             User user = new User(new UserId(1L), "newname", "newpass", Role.ROLE_ADMIN,
                     new EmailAddress("new@example.com"), new PhoneNumber("555-9999"), 2L);
@@ -135,7 +148,7 @@ class UserJpaMapperTest {
 
             assertThat(entity.getUsername()).isEqualTo("newname");
             assertThat(entity.getPassword()).isEqualTo("newpass");
-            assertThat(entity.getRole()).isEqualTo("ROLE_ADMIN");
+            assertThat(entity.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(entity.getEmail()).isEqualTo("new@example.com");
             assertThat(entity.getPhone()).isEqualTo("555-9999");
             assertThat(entity.getVersion()).isEqualTo(0L);
@@ -144,7 +157,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should update entity with null email and phone")
         void shouldUpdateEntityWithNullEmailAndPhone() {
-            UserJpaEntity entity = new UserJpaEntity(1L, "name", "pass", "ROLE_USER",
+            UserJpaEntity entity = new UserJpaEntity(1L, "name", "pass", Role.ROLE_USER,
                     "old@example.com", "555-0000", null);
             User user = new User(new UserId(1L), "name", "pass", Role.ROLE_USER, null, null);
 

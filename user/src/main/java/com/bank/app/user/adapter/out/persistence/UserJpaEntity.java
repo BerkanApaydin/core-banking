@@ -1,13 +1,18 @@
 package com.bank.app.user.adapter.out.persistence;
 
 import com.bank.app.persistence.AuditableJpaEntity;
+import com.bank.app.user.domain.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users")
@@ -23,8 +28,10 @@ public class UserJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false)
     private String password;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
-    private String role;
+    private Role role;
 
     @Column
     private String email;
@@ -33,12 +40,21 @@ public class UserJpaEntity extends AuditableJpaEntity {
     private String phone;
 
     @Version
+    @Column(nullable = false)
     private Long version;
+
+    /**
+     * Token generation counter (V39): bumped on role/password changes.
+     * Primitive with field default so legacy constructors stay valid; the
+     * column default covers raw SQL writers.
+     */
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion = 0L;
 
     public UserJpaEntity() {
     }
 
-    public UserJpaEntity(Long id, String username, String password, String role, String email, String phone, Long version) {
+    public UserJpaEntity(Long id, String username, String password, Role role, String email, String phone, Long version) {
         this.id = id;
         this.username = username;
         this.password = password;
@@ -72,11 +88,11 @@ public class UserJpaEntity extends AuditableJpaEntity {
         this.password = password;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 
@@ -102,5 +118,13 @@ public class UserJpaEntity extends AuditableJpaEntity {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(long tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 }

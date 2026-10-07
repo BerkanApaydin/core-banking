@@ -79,7 +79,7 @@ class OutboxPatternTest {
                 LocalDateTime.now(), false, null, 0, false, null);
     }
 
-    private final OutboxProperties defaultOutboxProperties = new OutboxProperties(5, 50, 0, 2000);
+    private final OutboxProperties defaultOutboxProperties = new OutboxProperties(5, 50, 0, 2000, 30);
 
     private static ObjectMapper createMapper() {
         ObjectMapper mapper = new ObjectMapper();
@@ -341,7 +341,7 @@ class OutboxPatternTest {
 
         OutboxProcessor customProcessor = new OutboxProcessor(outboxPort, List.of(failingHandler));
         OutboxPoller pollerWithCustomRetries = new OutboxPoller(outboxPort, customProcessor,
-                new OutboxProperties(3, 50, 0, 2000));
+                new OutboxProperties(3, 50, 0, 2000, 30));
 
         EventEntry entity = new EventEntry("id", "Transfer", "123", "TransferCompletedEvent",
                 "{}", 2, false, false, null, 0, LocalDateTime.now());
@@ -356,7 +356,7 @@ class OutboxPatternTest {
     void shouldPollMultiplePartitionsWhenPartitionCountSet() throws Exception {
         OutboxProcessor partitionedProcessor = new OutboxProcessor(outboxPort, List.of(handler));
         OutboxPoller partitionedPoller = new OutboxPoller(outboxPort, partitionedProcessor,
-                new OutboxProperties(5, 10, 3, 2000));
+                new OutboxProperties(5, 10, 3, 2000, 30));
 
         String validPayload = transferCompletedJson(123L, 1L, 2L, new BigDecimal("100.00"), "TRY");
         EventEntry event = eventEntry("id", "TransferCompletedEvent", validPayload);

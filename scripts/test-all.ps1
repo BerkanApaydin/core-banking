@@ -28,7 +28,9 @@ try {
     Invoke-Checked 'Docker daemon for Testcontainers' 'docker' @('info', '--format', '{{.ServerVersion}}')
     Invoke-Checked 'Java unit and integration tests with JaCoCo' (Join-Path $repoRoot 'mvnw.cmd') @('-B', '-ntp', 'clean', 'verify')
     Invoke-Checked 'Aggregate coverage gate' $python ($pythonPrefix + @('scripts/check_aggregate_coverage.py', 'app/target/site/jacoco-aggregate/jacoco.xml'))
+    Invoke-Checked 'No Spring field injection in tests' $python ($pythonPrefix + @('scripts/check_test_injection.py'))
     Invoke-Checked 'Load-test runner unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'load_tests.test_runner', '-v'))
+    Invoke-Checked 'Load acceptance thresholds pinned' $python ($pythonPrefix + @('scripts/check_load_acceptance.py'))
     Invoke-Checked 'Health-smoke unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'ops.test_health_smoke', '-v'))
 
     foreach ($script in @('i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js')) {

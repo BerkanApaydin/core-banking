@@ -65,6 +65,7 @@ class GenerateTransferReportQueryImplTest {
 
         List<Transfer> transfers = Arrays.asList(t1, t2);
 
+        // The port over-fetches one row internally; the stub returns the page.
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100)).thenReturn(transfers);
 
         TransferReportResponse response = generateTransferReportUseCase.execute(criteria);
@@ -82,7 +83,7 @@ class GenerateTransferReportQueryImplTest {
     }
 
     @Test
-    void fullPageProbesNextPageAndMarksOnlyTheFirstPageAsHavingMore() {
+    void fullPageDetectsNextPageFromOverfetchWithASingleQuery() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
         AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
@@ -95,8 +96,12 @@ class GenerateTransferReportQueryImplTest {
                 TransferStatus.COMPLETED, start.plusHours(2));
         Transfer third = new Transfer(12L, 1L, 2L, Money.of("30.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(3));
-        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2)).thenReturn(List.of(first, second));
-        when(loadTransferPort.findHistoryBetween(1L, start, end, 1, 2)).thenReturn(List.of(third));
+        // The port returns the over-fetch row; the use case trims it and needs
+        // no second query for hasNext.
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2))
+                .thenReturn(List.of(first, second, third));
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 1, 2))
+                .thenReturn(List.of(third));
 
         TransferReportResponse pageOne = generateTransferReportUseCase.execute(new ReportCriteria(1L, start, end, 0, 2));
         TransferReportResponse pageTwo = generateTransferReportUseCase.execute(new ReportCriteria(1L, start, end, 1, 2));
@@ -107,6 +112,9 @@ class GenerateTransferReportQueryImplTest {
         assertFalse(pageTwo.hasNext());
         assertEquals(1, pageTwo.pageTransferCount());
         assertEquals(new BigDecimal("30.00"), pageTwo.pageVolume());
+        verify(loadTransferPort, times(1)).findHistoryBetween(1L, start, end, 0, 2);
+        verify(loadTransferPort, times(1)).findHistoryBetween(1L, start, end, 1, 2);
+        verifyNoMoreInteractions(loadTransferPort);
     }
 
     @Test

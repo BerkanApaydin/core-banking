@@ -4,7 +4,9 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.infrastructure.adapter.out.security.ResilientTokenBlacklistAdapter;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -36,8 +38,14 @@ class ResilientBlacklistContextIT extends AbstractSpringBootIntegrationTest {
         registry.add("spring.data.redis.port", redis::getFirstMappedPort);
     }
 
+    private final TokenBlacklistPort blacklistPort;
+
     @Autowired
-    private TokenBlacklistPort blacklistPort;
+    ResilientBlacklistContextIT(TokenBlacklistPort blacklistPort,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.blacklistPort = blacklistPort;
+    }
 
     @Test
     void shouldResolveResilientDecoratorInRedisMode() {

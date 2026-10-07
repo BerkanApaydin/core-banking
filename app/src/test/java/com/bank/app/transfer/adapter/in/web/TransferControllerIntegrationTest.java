@@ -1,5 +1,11 @@
 package com.bank.app.transfer.adapter.in.web;
 
+
+
+
+import com.bank.app.user.domain.Role;
+import com.bank.app.transfer.domain.TransferStatus;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
@@ -9,6 +15,7 @@ import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaEnti
 import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaRepository;
 import com.bank.app.infrastructure.adapter.in.idempotency.IdempotencyFingerprint;
 import com.bank.app.audit.adapter.out.persistence.AuditLogJpaRepository;
+import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.transfer.adapter.out.persistence.TransferJpaRepository;
@@ -25,7 +32,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -33,6 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -54,38 +64,48 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @DisplayName("TransferController Integration")
 class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
-        @Autowired
-        private MockMvc mockMvc;
+        private final MockMvc mockMvc;
 
-        @Autowired
-        private AccountJpaRepository accountRepo;
+        private final AccountJpaRepository accountRepo;
 
-        @Autowired
-        private UserJpaRepository userRepository;
+        private final UserJpaRepository userRepository;
 
-        @Autowired
-        private ObjectMapper objectMapper;
+        private final ObjectMapper objectMapper;
 
         @MockitoBean
         private EventPublisherPort eventPublisherPort;
 
-        @Autowired
-        private IdempotencyKeyJpaRepository idempotencyKeyRepo;
+        private final IdempotencyKeyJpaRepository idempotencyKeyRepo;
+
+        private final AuditLogJpaRepository auditRepo;
+
+        private final PlatformTransactionManager transactionManager;
+
+        private final JwtTokenProvider jwtTokenProvider;
+
+        private final EntityManager entityManager;
+
+        private final TransferJpaRepository transferRepo;
 
         @Autowired
-        private AuditLogJpaRepository auditRepo;
-
-        @Autowired
-        private PlatformTransactionManager transactionManager;
-
-        @Autowired
-        private JwtTokenProvider jwtTokenProvider;
-
-        @Autowired
-        private EntityManager entityManager;
-
-        @Autowired
-        private TransferJpaRepository transferRepo;
+        TransferControllerIntegrationTest(MockMvc mockMvc, AccountJpaRepository accountRepo,
+                        UserJpaRepository userRepository, ObjectMapper objectMapper,
+                        IdempotencyKeyJpaRepository idempotencyKeyRepo, AuditLogJpaRepository auditRepo,
+                        PlatformTransactionManager transactionManager, JwtTokenProvider jwtTokenProvider,
+                        EntityManager entityManager, TransferJpaRepository transferRepo,
+                        ObjectProvider<CacheManager> cacheManagers) {
+                super(cacheManagers);
+                this.mockMvc = mockMvc;
+                this.accountRepo = accountRepo;
+                this.userRepository = userRepository;
+                this.objectMapper = objectMapper;
+                this.idempotencyKeyRepo = idempotencyKeyRepo;
+                this.auditRepo = auditRepo;
+                this.transactionManager = transactionManager;
+                this.jwtTokenProvider = jwtTokenProvider;
+                this.entityManager = entityManager;
+                this.transferRepo = transferRepo;
+        }
 
         private String jwtToken;
         private Long u3Id;
@@ -113,18 +133,18 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 Long[] userIds = template.execute(status -> {
                         UserJpaEntity u1 = userRepository.save(
-                                        new UserJpaEntity(null, "u1", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "u1", "pass", Role.ROLE_USER, null, null, null));
                         UserJpaEntity u2 = userRepository.save(
-                                        new UserJpaEntity(null, "u2", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "u2", "pass", Role.ROLE_USER, null, null, null));
                         UserJpaEntity u3 = userRepository.save(
-                                        new UserJpaEntity(null, "u3", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "u3", "pass", Role.ROLE_USER, null, null, null));
 
                         accountRepo.save(new AccountJpaEntity(null, u1.getId(), "TR770006200000000000000111", "Ahmet",
-                                        new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                                        new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
                         accountRepo.save(new AccountJpaEntity(null, u2.getId(), "TR870006200000000000000222", "Mehmet",
-                                        new BigDecimal("500.00"), "TRY", "ACTIVE", null));
+                                        new BigDecimal("500.00"), Currency.TRY, AccountStatus.ACTIVE, null));
                         accountRepo.save(new AccountJpaEntity(null, u3.getId(), "TR970006200000000000000333", "Pasif",
-                                        new BigDecimal("500.00"), "TRY", "SUSPENDED", null));
+                                        new BigDecimal("500.00"), Currency.TRY, AccountStatus.SUSPENDED, null));
                         u3Id = u3.getId();
                         return new Long[] { u1.getId(), u2.getId(), u3.getId() };
                 });
@@ -141,6 +161,9 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                         entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
                         idempotencyKeyRepo.deleteAll();
                         auditRepo.deleteAll();
+                        // Ledger legs reference accounts (V29 FK): child-first,
+                        // so cleanup never depends on test execution order.
+                        entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
                         accountRepo.deleteAll();
                         userRepository.deleteAll();
                         return null;
@@ -306,8 +329,11 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
 
                 Long accountId = accountRepo.findByIban("TR770006200000000000000111").get().getId();
 
-                LocalDateTime start = LocalDateTime.now().minusHours(1);
-                LocalDateTime end = LocalDateTime.now().plusHours(1);
+                // UTC frame, not the machine zone: the application stamps
+                // business time from Clock.systemUTC(), so a local "now" window
+                // would silently exclude fresh transfers on off-UTC machines.
+                LocalDateTime start = LocalDateTime.now(ZoneOffset.UTC).minusHours(1);
+                LocalDateTime end = LocalDateTime.now(ZoneOffset.UTC).plusHours(1);
 
                 mockMvc.perform(get("/api/v1/transfers/report")
                                 .header("Authorization", "Bearer " + jwtToken)
@@ -412,7 +438,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 assertEquals(0, accountRepo.findByIban("TR770006200000000000000111")
                                 .orElseThrow().getBalance().compareTo(new BigDecimal("1000.00")));
                 assertEquals(1, auditRepo.findAll().stream()
-                                .filter(log -> "TRANSFER_EXECUTED".equals(log.getAction())).count());
+                                .filter(log -> AuditAction.TRANSFER_EXECUTED.equals(log.getAction())).count());
         }
 
         @Test
@@ -575,7 +601,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                 LocalDateTime now = LocalDateTime.now();
                 for (int amount = 1; amount <= 3; amount++) {
                         TransferJpaEntity transfer = new TransferJpaEntity(null, senderId, receiverId,
-                                        BigDecimal.valueOf(amount), "TRY", "COMPLETED", null);
+                                        BigDecimal.valueOf(amount), Currency.TRY, TransferStatus.COMPLETED, null);
                         transfer.setBusinessCreatedAt(now.minusMinutes(amount));
                         transferRepo.saveAndFlush(transfer);
                 }

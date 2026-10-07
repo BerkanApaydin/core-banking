@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -96,6 +97,37 @@ class JwtAuthenticationFilterTest {
 
         assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldRejectRefreshTokenOnApiPath() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer refreshtoken");
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(JwtTokenProvider.verifyAndDecode("refreshtoken")).thenReturn(validToken());
+        when(JwtTokenProvider.extractTokenType("refreshtoken")).thenReturn("refresh");
+
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
+
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoMoreInteractions(filterChain);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldStepAsideOnRefreshEndpoints() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/browser/refresh");
+        when(request.getContextPath()).thenReturn("");
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(JwtTokenProvider, tokenBlacklistPort);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
@@ -281,7 +313,9 @@ class JwtAuthenticationFilterTest {
     @Test
     void secureBrowserModeIgnoresDevelopmentCookieName() throws Exception {
         filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort,
-                new ObjectMapper(), true);
+                new ObjectMapper(),
+                new JwtAuthenticationFilter.PlainDoubleSubmitCsrfBinding(),
+                new BrowserSessionCookieProperties(true));
         when(request.getHeader("Authorization")).thenReturn(null);
         when(request.getServletPath()).thenReturn("/api/v1/accounts");
         when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "old-token") });
@@ -362,6 +396,85 @@ class JwtAuthenticationFilterTest {
         assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Nested
+    @DisplayName("session-bound CSRF (K7/D8)")
+    class BoundCsrf {
+
+        private com.bank.app.user.application.port.out.CsrfBindingPort binding;
+        private jakarta.servlet.http.Cookie csrfCookie;
+
+        @BeforeEach
+        void setUpBound() {
+            binding = new com.bank.app.infrastructure.adapter.out.security.HmacCsrfBindingAdapter(
+                    "test-only-csrf-mac-key-32bytes!!".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort,
+                    new ObjectMapper(), binding, new BrowserSessionCookieProperties(false));
+            // validToken() carries userId 42: mint the cookie for that identity.
+            String bound = binding.issueCsrfToken("42");
+            csrfCookie = new jakarta.servlet.http.Cookie("BANK_CSRF", bound);
+        }
+
+        @Test
+        @DisplayName("should accept a bound token minted for the token identity")
+        void shouldAcceptBoundToken() throws Exception {
+            when(request.getHeader("Authorization")).thenReturn(null);
+            when(request.getServletPath()).thenReturn("/api/v1/accounts");
+            when(request.getHeader("X-CSRF-Token")).thenReturn(csrfCookie.getValue());
+            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
+                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"), csrfCookie
+            });
+            when(request.getMethod()).thenReturn("POST");
+            when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(filterChain).doFilter(request, response);
+            assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        }
+
+        @Test
+        @DisplayName("should reject a transplanted token minted for another user")
+        void shouldRejectTransplantedToken() throws Exception {
+            String foreign = binding.issueCsrfToken("777");
+            when(request.getHeader("Authorization")).thenReturn(null);
+            when(request.getServletPath()).thenReturn("/api/v1/accounts");
+            when(request.getHeader("X-CSRF-Token")).thenReturn(foreign);
+            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
+                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"),
+                    new jakarta.servlet.http.Cookie("BANK_CSRF", foreign)
+            });
+            when(request.getMethod()).thenReturn("POST");
+            when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 403, "ACCESS_DENIED", "Invalid browser CSRF token");
+            verifyNoInteractions(filterChain);
+        }
+
+        @Test
+        @DisplayName("should reject a forged equal pair without a valid MAC")
+        void shouldRejectForgedEqualPair() throws Exception {
+            String forged = "c".repeat(87);
+            when(request.getHeader("Authorization")).thenReturn(null);
+            when(request.getServletPath()).thenReturn("/api/v1/accounts");
+            when(request.getHeader("X-CSRF-Token")).thenReturn(forged);
+            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
+                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"),
+                    new jakarta.servlet.http.Cookie("BANK_CSRF", forged)
+            });
+            when(request.getMethod()).thenReturn("POST");
+            when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 403, "ACCESS_DENIED", "Invalid browser CSRF token");
+            verifyNoInteractions(filterChain);
+        }
     }
 
     private static void assertProblemResponse(MockHttpServletResponse errorResponse, int status,

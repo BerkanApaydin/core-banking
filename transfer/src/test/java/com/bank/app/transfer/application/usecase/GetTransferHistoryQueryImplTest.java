@@ -53,8 +53,8 @@ class GetTransferHistoryQueryImplTest {
         when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
-        when(loadTransferPort.findHistory(eq(1L), anyInt(), anyInt())).thenReturn(Arrays.asList(t1));
-        when(loadTransferPort.countHistory(1L)).thenReturn(1L);
+        when(loadTransferPort.findHistoryPage(eq(1L), anyInt(), anyInt()))
+                .thenReturn(new LoadTransferPort.HistoryPage(Arrays.asList(t1), 1L));
 
         PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
 
@@ -87,12 +87,12 @@ class GetTransferHistoryQueryImplTest {
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
-        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
-        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+        when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(100)))
+                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
         getTransferHistoryUseCase.execute(1L, 0, Integer.MAX_VALUE);
 
-        verify(loadTransferPort).findHistory(1L, 0, 100);
+        verify(loadTransferPort).findHistoryPage(1L, 0, 100);
     }
 
     @Test
@@ -103,12 +103,38 @@ class GetTransferHistoryQueryImplTest {
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
-        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(20))).thenReturn(Collections.emptyList());
-        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+        when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
+                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
         getTransferHistoryUseCase.execute(1L, -5, 20);
 
-        verify(loadTransferPort).findHistory(1L, 0, 20);
+        verify(loadTransferPort).findHistoryPage(1L, 0, 20);
+    }
+
+    @Test
+    void shouldServePageAndTotalFromASinglePortCall() {
+        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+                LocalDateTime.now());
+        Transfer t2 = new Transfer(11L, 1L, 2L, Money.of("50.00", Currency.TRY), TransferStatus.COMPLETED,
+                LocalDateTime.now());
+
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222"));
+        // One port call carries both rows and the exact total: no second COUNT query.
+        when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(2)))
+                .thenReturn(new LoadTransferPort.HistoryPage(Arrays.asList(t1, t2), 5L));
+
+        PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 2);
+
+        assertEquals(2, history.content().size());
+        assertEquals(5, history.totalElements());
+        assertEquals(3, history.totalPages());
+        assertFalse(history.last());
+        verify(loadTransferPort, times(1)).findHistoryPage(1L, 0, 2);
+        verifyNoMoreInteractions(loadTransferPort);
     }
 
     @Test
@@ -125,11 +151,11 @@ class GetTransferHistoryQueryImplTest {
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
-        when(loadTransferPort.findHistory(eq(1L), eq(0), eq(100))).thenReturn(Collections.emptyList());
-        when(loadTransferPort.countHistory(1L)).thenReturn(0L);
+        when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(100)))
+                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
         misconfigured.execute(1L, 0, Integer.MAX_VALUE);
 
-        verify(loadTransferPort).findHistory(1L, 0, 100);
+        verify(loadTransferPort).findHistoryPage(1L, 0, 100);
     }
 }

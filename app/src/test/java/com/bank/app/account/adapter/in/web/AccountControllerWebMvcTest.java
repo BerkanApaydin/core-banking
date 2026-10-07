@@ -15,6 +15,10 @@ import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
+import com.bank.app.infrastructure.adapter.in.handler.BusinessProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.SecurityProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.RequestProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.ProblemMessageResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,17 +43,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AccountController.class)
-@Import({ ApiVersionConfig.class, GlobalExceptionHandler.class })
+@Import({ ApiVersionConfig.class, GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class })
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("AccountController Web MVC")
 @SuppressWarnings("null")
 class AccountControllerWebMvcTest {
 
-        @Autowired
-        private MockMvc mockMvc;
+        private final MockMvc mockMvc;
+
+        private final ObjectMapper objectMapper;
 
         @Autowired
-        private ObjectMapper objectMapper;
+        AccountControllerWebMvcTest(MockMvc mockMvc, ObjectMapper objectMapper) {
+                this.mockMvc = mockMvc;
+                this.objectMapper = objectMapper;
+        }
 
         @MockitoBean
         private CreateAccountUseCase createAccountPort;

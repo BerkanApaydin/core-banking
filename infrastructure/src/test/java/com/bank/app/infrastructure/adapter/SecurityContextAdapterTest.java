@@ -230,4 +230,31 @@ class SecurityContextAdapterTest {
             securityUtils.checkUserAuthorization(42L, "Forbidden access");
         });
     }
+
+    @Test
+    void shouldMatchGrantedRoleExactly() {
+        var principal = new SimpleAuthenticatedPrincipal(1L, "alice",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        assertTrue(securityUtils.hasRole("ROLE_ADMIN"));
+        assertFalse(securityUtils.hasRole("ROLE_USER"));
+        assertFalse(securityUtils.hasRole("ADMIN"));
+    }
+
+    @Test
+    void shouldReturnFalseForHasRoleWithoutAuthentication() {
+        SecurityContextHolder.getContext().setAuthentication(null);
+        assertFalse(securityUtils.hasRole("ROLE_ADMIN"));
+
+        AnonymousAuthenticationToken anonymous = new AnonymousAuthenticationToken(
+                "key", "anonymousUser", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+        SecurityContextHolder.getContext().setAuthentication(anonymous);
+        assertFalse(securityUtils.hasRole("ROLE_ANONYMOUS"));
+
+        assertFalse(securityUtils.hasRole(null));
+        assertFalse(securityUtils.hasRole("  "));
+    }
 }

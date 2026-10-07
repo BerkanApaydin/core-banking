@@ -42,6 +42,19 @@ class AuthenticationAdapterTest {
     }
 
     @Test
+    void shouldPropagateTokenVersionFromPrincipal() {
+        AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
+        var principal = new CustomUserDetails(42L, "user", "encoded",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")), 11L);
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+
+        var authenticated = adapter.authenticate("user", "pass");
+
+        assertEquals(11L, authenticated.tokenVersion());
+    }
+
+    @Test
     void shouldRejectMissingProviderResult() {
         assertThrows(AuthenticationBackendUnavailableException.class,
                 () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
@@ -84,6 +97,19 @@ class AuthenticationAdapterTest {
 
         assertThrows(AuthenticationFailedException.class,
                 () -> adapter.authenticate("user", "wrong"));
+    }
+
+    @Test
+    void shouldNeverForwardFrameworkMessageOutward() {
+        // D11/K13: the provider message (e.g. "User not found: admin") must not
+        // reach the client-facing exception — latent user-enumeration guard.
+        AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
+        doThrow(new BadCredentialsException("User not found: admin"))
+                .when(authenticationManager).authenticate(any());
+
+        var thrown = assertThrows(AuthenticationFailedException.class,
+                () -> adapter.authenticate("user", "wrong"));
+        org.junit.jupiter.api.Assertions.assertFalse(thrown.getMessage().contains("admin"));
     }
 
     @Test

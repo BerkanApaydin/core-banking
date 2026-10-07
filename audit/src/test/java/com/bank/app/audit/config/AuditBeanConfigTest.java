@@ -1,6 +1,7 @@
 package com.bank.app.audit.config;
 
 import com.bank.app.audit.application.port.in.AuditLoggerUseCase;
+import com.bank.app.audit.application.port.out.LoadAuditLogPort;
 import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.UserContextService;
@@ -18,6 +19,9 @@ class AuditBeanConfigTest {
     private SaveAuditLogPort saveAuditLogPort;
 
     @Mock
+    private LoadAuditLogPort loadAuditLogPort;
+
+    @Mock
     private UserContextService userContextService;
 
     @Mock
@@ -28,5 +32,12 @@ class AuditBeanConfigTest {
         AuditBeanConfig config = new AuditBeanConfig();
         AuditLoggerUseCase useCase = config.auditLogger(saveAuditLogPort, userContextService, clockProvider);
         assertNotNull(useCase);
+    }
+
+    @Test
+    void shouldCreateGetAuditLogsQueryBean() {
+        AuditBeanConfig config = new AuditBeanConfig();
+        assertNotNull(config.getAuditLogsQuery(loadAuditLogPort, userContextService,
+                new AuditProperties(500)));
     }
 }

@@ -25,12 +25,23 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import({TransferPersistenceAdapter.class, TransferJpaMapper.class,
         UserPersistenceAdapter.class, UserJpaMapper.class})
 class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
-    @Autowired EntityManager entityManager;
-    @Autowired TransferPersistenceAdapter transfers;
-    @Autowired UserPersistenceAdapter users;
+    private final EntityManager entityManager;
+    private final TransferPersistenceAdapter transfers;
+    private final UserPersistenceAdapter users;
+
+    @Autowired
+    AggregateVersioningIntegrationTest(EntityManager entityManager, TransferPersistenceAdapter transfers,
+            UserPersistenceAdapter users) {
+        this.entityManager = entityManager;
+        this.transfers = transfers;
+        this.users = users;
+    }
 
     @BeforeEach
     void seed() {
+        // Child-first incl. ledger_entries (V29 FK): cleanup order must never
+        // depend on test execution order.
+        entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM users").executeUpdate();

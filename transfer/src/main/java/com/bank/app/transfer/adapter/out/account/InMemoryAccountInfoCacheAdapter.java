@@ -3,8 +3,6 @@ package com.bank.app.transfer.adapter.out.account;
 import com.bank.app.accountapi.AbstractAccountSnapshotCache;
 import com.bank.app.accountapi.AccountSnapshot;
 
-import java.util.Map;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryAccountInfoCacheAdapter extends AbstractAccountSnapshotCache {
 
     private final ConcurrentHashMap<String, AccountSnapshot> snapshots = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Map<Long, String>> batches = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, String> ibanMappings = new ConcurrentHashMap<>();
 
     @Override
     protected Optional<AccountSnapshot> readSnapshot(String key) {
@@ -37,27 +35,23 @@ public class InMemoryAccountInfoCacheAdapter extends AbstractAccountSnapshotCach
     }
 
     @Override
-    protected Collection<String> ibanSnapshotKeysForAccount(Long accountId) {
-        return snapshots.entrySet().stream()
-                .filter(entry -> entry.getKey().startsWith("iban-"))
-                .filter(entry -> accountId.equals(entry.getValue().id()))
-                .map(Map.Entry::getKey)
-                .toList();
+    protected Optional<String> readIbanMapping(Long accountId) {
+        return Optional.ofNullable(ibanMappings.get(accountId));
     }
 
     @Override
-    protected Optional<Map<Long, String>> readBatch(String key) {
-        return Optional.ofNullable(batches.get(key));
+    protected void writeIbanMapping(Long accountId, String iban) {
+        ibanMappings.put(accountId, iban);
     }
 
     @Override
-    protected void writeBatch(String key, Map<Long, String> batch) {
-        batches.put(key, batch);
+    protected void removeIbanMapping(Long accountId) {
+        ibanMappings.remove(accountId);
     }
 
     @Override
     protected void clearStorage() {
         snapshots.clear();
-        batches.clear();
+        ibanMappings.clear();
     }
 }

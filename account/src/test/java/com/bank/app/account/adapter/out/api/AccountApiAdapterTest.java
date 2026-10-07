@@ -1,4 +1,4 @@
-package com.bank.app.account.adapter.in.api;
+package com.bank.app.account.adapter.out.api;
 
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
@@ -6,6 +6,7 @@ import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
@@ -32,11 +33,14 @@ class AccountApiAdapterTest {
     @Mock
     private AdjustAccountBalancesUseCase adjustAccountBalancesUseCase;
 
+    @Mock
+    private AccountSnapshotCache snapshotCache;
+
     private AccountApiAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountApiAdapter(accountQueryUseCase, adjustAccountBalancesUseCase);
+        adapter = new AccountApiAdapter(accountQueryUseCase, adjustAccountBalancesUseCase, snapshotCache);
     }
 
     @Test
@@ -115,5 +119,44 @@ class AccountApiAdapterTest {
         when(adjustAccountBalancesUseCase.reverseForCancellation(1L, 2L, amount)).thenReturn(expected);
 
         assertSame(expected, adapter.reverseForCancellation(1L, 2L, amount));
+    }
+
+    @Test
+    void shouldEvictMutatedSnapshotsOnBalanceAdjustment() {
+        Money amount = Money.of("50.00", Currency.TRY);
+        AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
+                Money.of("950.00", Currency.TRY), Money.of("550.00", Currency.TRY));
+        when(adjustAccountBalancesUseCase.debitAndCredit(1L, 2L, amount)).thenReturn(expected);
+
+        adapter.adjustBalances(1L, 2L, amount);
+
+        verify(snapshotCache).evictById(1L);
+        verify(snapshotCache).evictById(2L);
+        verify(snapshotCache, never()).evictAll();
+    }
+
+    @Test
+    void shouldEvictMutatedSnapshotsOnCancellationReversal() {
+        Money amount = Money.of("50.00", Currency.TRY);
+        AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
+                Money.of("1000.00", Currency.TRY), Money.of("500.00", Currency.TRY));
+        when(adjustAccountBalancesUseCase.reverseForCancellation(1L, 2L, amount)).thenReturn(expected);
+
+        adapter.reverseForCancellation(1L, 2L, amount);
+
+        verify(snapshotCache).evictById(1L);
+        verify(snapshotCache).evictById(2L);
+        verify(snapshotCache, never()).evictAll();
+    }
+
+    @Test
+    void shouldNotEvictOnReadPaths() {
+        when(accountQueryUseCase.getAccountInfo(1L))
+                .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+
+        adapter.getSnapshotById(1L);
+        adapter.getIbansForAccounts(Set.of(1L));
+
+        verifyNoInteractions(snapshotCache);
     }
 }

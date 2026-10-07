@@ -41,12 +41,17 @@ public class RedisRateLimiter implements RateLimiter {
             RateLimitProperties rateLimitProperties) {
         this.redisTemplate = redisTemplate;
         this.slidingWindowScript = new DefaultRedisScript<>(LUA_SLIDING_WINDOW, Long.class);
-        this.maxRequests = rateLimitProperties.getMaxRequests();
-        this.timeWindowMs = rateLimitProperties.getTimeWindowMs();
+        this.maxRequests = rateLimitProperties.maxRequests();
+        this.timeWindowMs = rateLimitProperties.timeWindowMs();
     }
 
     @Override
     public boolean tryAcquire(String clientKey) {
+        return tryAcquire(clientKey, maxRequests, timeWindowMs);
+    }
+
+    @Override
+    public boolean tryAcquire(String clientKey, int maxRequests, long timeWindowMs) {
         if (clientKey == null) {
             throw new IllegalArgumentException("clientKey must not be null");
         }

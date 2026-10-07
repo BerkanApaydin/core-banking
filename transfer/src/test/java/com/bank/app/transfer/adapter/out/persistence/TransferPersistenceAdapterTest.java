@@ -36,7 +36,7 @@ class TransferPersistenceAdapterTest {
     }
 
     private TransferJpaEntity createEntity(Long id, Long senderAccountId, Long receiverAccountId, BigDecimal amount,
-            String currency, String status, Long version, LocalDateTime createdAt) {
+            Currency currency, TransferStatus status, Long version, LocalDateTime createdAt) {
         TransferJpaEntity entity = new TransferJpaEntity(id, senderAccountId, receiverAccountId, amount, currency,
                 status, version);
         entity.setCreatedAt(createdAt);
@@ -46,8 +46,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldFindByIdSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
+        TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
         when(springDataRepo.findById(10L)).thenReturn(Optional.of(jpaEntity));
 
@@ -70,8 +69,7 @@ class TransferPersistenceAdapterTest {
         LocalDateTime now = LocalDateTime.now();
         Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 now);
-        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
+        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
 
@@ -109,10 +107,8 @@ class TransferPersistenceAdapterTest {
         LocalDateTime now = LocalDateTime.now();
         // The domain carries the version it read; only Hibernate advances it at flush.
         Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
-        TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", 1L, now);
-        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", 2L, now);
+        TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, 1L, now);
+        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, 2L, now);
 
         when(springDataRepo.findById(10L)).thenReturn(Optional.of(existingEntity));
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
@@ -149,8 +145,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldFindByIdForUpdateSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
+        TransferJpaEntity jpaEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
         when(springDataRepo.findByIdForUpdate(10L)).thenReturn(Optional.of(jpaEntity));
 
@@ -182,31 +177,30 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindHistorySuccessfully() {
+    void shouldFindHistoryPageWithTotalFromSingleQuery() {
         LocalDateTime now = LocalDateTime.now();
-        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY",
-                "COMPLETED", null, now);
-        TransferJpaEntity entity2 = createEntity(2L, 300L, 100L, new BigDecimal("200.00"), "TRY",
-                "COMPLETED", null, now);
+        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
+        TransferJpaEntity entity2 = createEntity(2L, 300L, 100L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
-        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(100L), eq(100L), any()))
-                .thenReturn(List.of(entity1, entity2));
+        when(springDataRepo.findHistoryPage(eq(100L), eq(10), eq(0L)))
+                .thenReturn(List.<Object[]>of(new Object[]{entity1, 5L}, new Object[]{entity2, 5L}));
 
-        var result = repository.findHistory(100L, 0, 10);
+        var result = repository.findHistoryPage(100L, 0, 10);
 
-        assertEquals(2, result.size());
-        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(100L), eq(100L), any());
+        assertEquals(2, result.items().size());
+        assertEquals(5L, result.totalElements());
+        assertEquals(100L, result.items().getFirst().getSenderAccountId());
+        verify(springDataRepo).findHistoryPage(eq(100L), eq(10), eq(0L));
     }
 
     @Test
-    void shouldReturnEmptyListWhenFindHistoryNotFound() {
-        when(springDataRepo.findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(999L), eq(999L), any()))
-                .thenReturn(List.of());
+    void shouldReturnEmptyHistoryPageWhenNotFound() {
+        when(springDataRepo.findHistoryPage(eq(999L), eq(10), eq(0L))).thenReturn(List.of());
 
-        var result = repository.findHistory(999L, 0, 10);
+        var result = repository.findHistoryPage(999L, 0, 10);
 
-        assertTrue(result.isEmpty());
-        verify(springDataRepo).findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(eq(999L), eq(999L), any());
+        assertTrue(result.items().isEmpty());
+        assertEquals(0L, result.totalElements());
     }
 
     @Test
@@ -214,8 +208,7 @@ class TransferPersistenceAdapterTest {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.minusDays(1);
         LocalDateTime end = now.plusDays(1);
-        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), "TRY",
-                "COMPLETED", null, now);
+        TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
         when(springDataRepo.findHistoryBetween(eq(100L), eq(start), eq(end), any())).thenReturn(List.of(entity1));
 
@@ -224,6 +217,25 @@ class TransferPersistenceAdapterTest {
         assertEquals(1, result.size());
         assertEquals(100L, result.getFirst().getSenderAccountId());
         verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), any());
+    }
+
+    @Test
+    void shouldOverfetchOneRowWithLogicalOffset() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime end = now.plusDays(1);
+
+        when(springDataRepo.findHistoryBetween(eq(100L), eq(start), eq(end), any())).thenReturn(List.of());
+
+        repository.findHistoryBetween(100L, start, end, 2, 10);
+
+        // Offset stays page * size (2 * 10), limit grows by one for hasNext:
+        // PageRequest.of(page, size + 1) would wrongly offset by page * (size + 1).
+        ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), pageableCaptor.capture());
+        assertEquals(20L, pageableCaptor.getValue().getOffset());
+        assertEquals(11, pageableCaptor.getValue().getPageSize());
     }
 
     @Test
@@ -241,23 +253,40 @@ class TransferPersistenceAdapterTest {
     }
 
     @Test
-    void shouldCountHistorySuccessfully() {
-        when(springDataRepo.countBySenderAccountIdOrReceiverAccountId(100L, 100L)).thenReturn(5L);
+    void shouldComputeOffsetFromPageAndSize() {
+        when(springDataRepo.findHistoryPage(eq(100L), eq(10), eq(20L))).thenReturn(List.of());
 
-        long count = repository.countHistory(100L);
+        repository.findHistoryPage(100L, 2, 10);
 
-        assertEquals(5L, count);
-        verify(springDataRepo).countBySenderAccountIdOrReceiverAccountId(100L, 100L);
+        // Offset is page * size (not page * (size + 1)); limit is the page size.
+        verify(springDataRepo).findHistoryPage(eq(100L), eq(10), eq(20L));
     }
 
     @Test
-    void shouldReturnZeroWhenCountHistoryNotFound() {
-        when(springDataRepo.countBySenderAccountIdOrReceiverAccountId(999L, 999L)).thenReturn(0L);
+    void shouldSummarizeRangeFromSingleAggregateRow() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.<Object[]>of(new Object[]{3L, new BigDecimal("300.00")}));
 
-        long count = repository.countHistory(999L);
+        var totals = repository.summarizeRange(1L, start, end);
 
-        assertEquals(0L, count);
-        verify(springDataRepo).countBySenderAccountIdOrReceiverAccountId(999L, 999L);
+        assertEquals(3L, totals.count());
+        assertEquals(new BigDecimal("300.00"), totals.volume());
+        verify(springDataRepo).summarizeRange(eq(1L), eq(start), eq(end));
+    }
+
+    @Test
+    void shouldSummarizeEmptyRangeAsZero() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.<Object[]>of(new Object[]{0L, new BigDecimal("0")}));
+
+        var totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(0L, totals.count());
+        assertEquals(0, totals.volume().compareTo(BigDecimal.ZERO));
     }
 
 }

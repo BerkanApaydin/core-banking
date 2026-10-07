@@ -20,12 +20,12 @@ public class IdempotencyGuard {
         this.idempotencyPort = idempotencyPort;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
     public IdempotencyResult startRequest(String key) {
         return startRequest(key, null);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
     public IdempotencyResult startRequest(String key, String requestHash) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         Optional<Entry> existing = idempotencyPort.findById(key);
@@ -74,13 +74,13 @@ public class IdempotencyGuard {
 
     // The successful outcome must commit with the business mutation. The
     // controller aspect opens that transaction before invoking the use case.
-    @Transactional(propagation = Propagation.REQUIRED)
+    @Transactional(propagation = Propagation.REQUIRED, timeout = 30)
     public void completeRequest(String key, String responseBody, int responseStatus) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markCompleted(key, responseBody, responseStatus);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
     public void failRequest(String key) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markFailed(key);

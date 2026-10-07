@@ -1,7 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
 import com.bank.app.accountapi.AccountSnapshot;
-import com.bank.app.accountapi.AccountSnapshotCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +67,7 @@ class CaffeineAccountInfoCacheAdapterTest {
         verify(cache).put("iban-TR1", snapshot);
 
         adapter.putIbans(Set.of(1L), Map.of(1L, "TR1"));
-        verify(cache).put(AccountSnapshotCache.ibansBatchKey(Set.of(1L)), Map.of(1L, "TR1"));
+        verify(cache).put("iban-of-1", "TR1");
 
         adapter.evictAll();
         verify(cache).clear();
@@ -84,6 +83,27 @@ class CaffeineAccountInfoCacheAdapterTest {
         assertTrue(adapter.getById(null).isEmpty());
         assertTrue(adapter.getByIban(null).isEmpty());
         assertTrue(adapter.getIbans(null).isEmpty());
+    }
+
+    @Test
+    void shouldReadBulkMappingsPerId() {
+        var realCache = useRealCache();
+        adapter.putIbans(Set.of(1L, 2L), Map.of(1L, "TR1", 2L, "TR2"));
+
+        assertEquals(Map.of(1L, "TR1", 2L, "TR2"), adapter.getIbans(Set.of(2L, 1L)).orElseThrow());
+        // Partial hits are misses: no half-populated maps leak to callers.
+        assertTrue(adapter.getIbans(Set.of(1L, 3L)).isEmpty());
+        assertEquals(2, realCache.getNativeCache().estimatedSize());
+    }
+
+    @Test
+    void shouldDropMappingOnEvictById() {
+        useRealCache();
+        adapter.putIbans(Set.of(1L), Map.of(1L, "TR1"));
+
+        adapter.evictById(1L);
+
+        assertTrue(adapter.getIbans(Set.of(1L)).isEmpty());
     }
 
     @Test
@@ -125,22 +145,9 @@ class CaffeineAccountInfoCacheAdapterTest {
     }
 
     @Test
-    void shouldEvictSingleIbanEntry() {
-        var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
-        adapter.putByIban("TR450006100519786456841234", snapshot);
-
-        adapter.evictByIban("TR450006100519786456841234");
-
-        verify(cache).evict("iban-TR450006100519786456841234");
-        verify(cache, never()).evict("id-1");
-        verify(cache, never()).clear();
-    }
-
-    @Test
     void shouldIgnoreNullIdOnGranularEvict() {
         assertDoesNotThrow(() -> {
             adapter.evictById(null);
-            adapter.evictByIban(null);
         });
 
         verify(cache, never()).evict(anyString());

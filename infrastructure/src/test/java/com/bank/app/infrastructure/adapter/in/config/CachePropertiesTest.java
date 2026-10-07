@@ -8,32 +8,29 @@ class CachePropertiesTest {
 
     @Test
     void shouldHaveDefaultValues() {
-        CacheProperties props = new CacheProperties();
-        CacheProperties.AccountInfoCache cache = props.getAccountInfo();
+        CacheProperties props = new CacheProperties(null);
+        CacheProperties.AccountInfoCache cache = props.accountInfo();
 
-        assertEquals("caffeine", cache.getBackend());
-        assertEquals(1000, cache.getMaximumSize());
-        assertEquals(60, cache.getExpireAfterWrite());
+        assertEquals("caffeine", cache.backend());
+        assertEquals(1000, cache.maximumSize());
+        assertEquals(60, cache.expireAfterWrite());
     }
 
     @Test
-    void shouldSetAndGetBackend() {
-        CacheProperties.AccountInfoCache cache = new CacheProperties.AccountInfoCache();
-        cache.setBackend("redis");
-        assertEquals("redis", cache.getBackend());
+    void shouldKeepCustomValues() {
+        CacheProperties.AccountInfoCache cache =
+                new CacheProperties.AccountInfoCache("redis", 5000, 120);
+
+        assertEquals("redis", cache.backend());
+        assertEquals(5000, cache.maximumSize());
+        assertEquals(120, cache.expireAfterWrite());
     }
 
     @Test
-    void shouldSetAndGetMaximumSize() {
-        CacheProperties.AccountInfoCache cache = new CacheProperties.AccountInfoCache();
-        cache.setMaximumSize(5000);
-        assertEquals(5000, cache.getMaximumSize());
-    }
+    void shouldFallBackToCaffeineOnBlankBackend() {
+        CacheProperties.AccountInfoCache cache =
+                new CacheProperties.AccountInfoCache("  ", 5000, 120);
 
-    @Test
-    void shouldSetAndGetExpireAfterWrite() {
-        CacheProperties.AccountInfoCache cache = new CacheProperties.AccountInfoCache();
-        cache.setExpireAfterWrite(120);
-        assertEquals(120, cache.getExpireAfterWrite());
+        assertEquals("caffeine", cache.backend());
     }
 }

@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
-import org.springframework.beans.factory.annotation.Value;
+import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -10,6 +10,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -41,14 +42,10 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     public RedisLoginAttemptAdapter(
             StringRedisTemplate redisTemplate,
-            @Value("${app.security.failed-login.max-attempts:5}") int maxAttempts,
-            @Value("${app.security.failed-login.window-minutes:15}") long windowMinutes) {
-        if (windowMinutes <= 0 || windowMinutes > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Failed-login window must be a positive number of minutes");
-        }
+            LoginAttemptProperties properties) {
         this.redisTemplate = redisTemplate;
-        this.maxAttempts = maxAttempts;
-        this.windowMinutes = windowMinutes;
+        this.maxAttempts = properties.maxAttempts();
+        this.windowMinutes = properties.windowMinutes();
         this.recordFailureScript = new DefaultRedisScript<>(RECORD_FAILURE_SCRIPT, Long.class);
     }
 
@@ -64,20 +61,23 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     public boolean isUsernameBlocked(String username) {
-        if (maxAttempts < 0)
+        if (maxAttempts < 0 || username == null)
             return false;
         return withRedis(() -> {
-            String count = redisTemplate.opsForValue().get(USERNAME_PREFIX + username);
+            String count = redisTemplate.opsForValue().get(USERNAME_PREFIX + normalizeUsername(username));
             return count != null && Long.parseLong(count) >= maxAttempts;
         });
     }
 
     @Override
     public void recordFailure(String ip, String username) {
-        String ipKey = IP_PREFIX + ip;
-        String userKey = USERNAME_PREFIX + username;
+        // A null username must not create a junk "user:null" counter: only
+        // the IP bucket is incremented, mirroring the Caffeine no-op.
+        List<String> keys = username == null
+                ? List.of(IP_PREFIX + ip)
+                : List.of(IP_PREFIX + ip, USERNAME_PREFIX + normalizeUsername(username));
         Long result = withRedis(() -> redisTemplate.execute(
-                recordFailureScript, List.of(ipKey, userKey),
+                recordFailureScript, keys,
                 String.valueOf(TimeUnit.MINUTES.toMillis(windowMinutes))));
         if (!Long.valueOf(1L).equals(result)) {
             throw new LoginAttemptStoreUnavailableException(
@@ -92,16 +92,13 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     public void resetByUsername(String username) {
-        withRedis(() -> redisTemplate.delete(USERNAME_PREFIX + username));
+        if (username == null) return;
+        withRedis(() -> redisTemplate.delete(USERNAME_PREFIX + normalizeUsername(username)));
     }
 
     @Override
     public int getWindowMinutes() {
         return (int) windowMinutes;
-    }
-
-    public int getMaxAttempts() {
-        return maxAttempts;
     }
 
     private <T> T withRedis(Supplier<T> operation) {
@@ -110,5 +107,14 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
         } catch (DataAccessException | NumberFormatException ex) {
             throw new LoginAttemptStoreUnavailableException(ex);
         }
+    }
+
+    /**
+     * Case-fold brute-force keys: if authentication folds case and the guard
+     * does not, an attacker rotates username casing to get a fresh budget per
+     * variant. Null-safe: callers pass the raw request value through.
+     */
+    static String normalizeUsername(String username) {
+        return username == null ? null : username.toLowerCase(Locale.ROOT);
     }
 }

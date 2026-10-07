@@ -11,6 +11,8 @@ import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
+import com.bank.app.user.domain.exception.WeakPasswordException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -138,8 +140,8 @@ class RegisterUserUseCaseTest {
             when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Username already in use.");
+                    .isExactlyInstanceOf(UsernameAlreadyTakenException.class)
+                    .hasMessage("Username is already in use: existinguser");
 
             verify(loadUserPort).findByUsername("existinguser");
             verifyNoInteractions(passwordEncoderPort);
@@ -152,7 +154,7 @@ class RegisterUserUseCaseTest {
             AuthRequest request = new AuthRequest("newuser", "weak");
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .isExactlyInstanceOf(WeakPasswordException.class)
                     .hasMessageContaining("at least");
 
             verify(loadUserPort).findByUsername("newuser");
@@ -168,9 +170,9 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should propagate save exception")
         void shouldPropagateSaveException() {
-            AuthRequest request = new AuthRequest("newuser", "Mypasswor1");
+            AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-            when(passwordEncoderPort.encode("Mypasswor1")).thenReturn("encodedPassword");
+            when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("encodedPassword");
             doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))

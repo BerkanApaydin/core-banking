@@ -1,9 +1,11 @@
 package com.bank.app.account.domain;
 
+import com.bank.app.account.domain.exception.AccountBalanceLimitExceededException;
 import com.bank.app.account.domain.exception.AccountClosedException;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.common.domain.BaseAggregateRoot;
+import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
@@ -12,6 +14,13 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class Account extends BaseAggregateRoot {
+    /**
+     * Hard ceiling enforced in the domain (not only in web DTO validation),
+     * so no entry path — present or future — can materialize a larger balance.
+     * Canonical value: {@link BalanceLimits#MAX_BALANCE} (single literal in
+     * the codebase); mirrors {@code validation.balance.max}.
+     */
+
     private final Long id;
     private final UserId userId;
     private final Iban iban;
@@ -39,6 +48,10 @@ public class Account extends BaseAggregateRoot {
         }
         this.ownerName = trimmedOwnerName;
         this.balance = Objects.requireNonNull(balance, "Balance must not be null");
+        if (balance.amount().compareTo(BalanceLimits.MAX_BALANCE_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                    "Balance must not exceed " + BalanceLimits.MAX_BALANCE + ": " + balance.amount());
+        }
         this.status = Objects.requireNonNull(status, "Account status must not be null");
         if (status == AccountStatus.CLOSED && !balance.isZero()) {
             throw new InsufficientBalanceException(
@@ -132,7 +145,18 @@ public class Account extends BaseAggregateRoot {
         if (!isActive()) {
             throw new AccountNotActiveException(this.iban.value());
         }
-        this.balance = this.balance.add(amount);
+        // K3/D3: the BalanceLimits ceiling holds on mutation paths too, not just
+        // construction — otherwise repeated credits could materialize a balance
+        // above the documented hard ceiling.
+        Money updated = this.balance.add(amount);
+        if (updated.amount().compareTo(BalanceLimits.MAX_BALANCE_AMOUNT) > 0) {
+            throw new AccountBalanceLimitExceededException(
+                "error.account_balance_limit_exceeded",
+                new Object[]{BalanceLimits.MAX_BALANCE_AMOUNT, updated.amount()},
+                "Crediting would exceed the maximum balance of " + BalanceLimits.MAX_BALANCE
+                    + ": " + updated.amount() + " " + updated.currency());
+        }
+        this.balance = updated;
         registerEvent(new AccountCreditedEvent(this.id, amount, this.balance, LocalDateTime.now(clock)));
     }
 

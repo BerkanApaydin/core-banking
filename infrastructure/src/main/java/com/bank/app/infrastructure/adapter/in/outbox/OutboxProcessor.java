@@ -54,7 +54,9 @@ public class OutboxProcessor {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    // timeout=30 mirrors the use-case tx timeout: a stuck handler must not
+    // hold a partition row lock forever (K4/D6).
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
     public void processEvent(EventEntry fallbackEvent) {
         EventEntry event = outboxPort.findByIdForUpdateSkipLocked(fallbackEvent.id()).orElse(null);
 
@@ -83,7 +85,7 @@ public class OutboxProcessor {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
     public void recordFailure(EventEntry fallbackEvent, Throwable t, int maxRetries) {
         EventEntry event = outboxPort.findByIdForUpdateSkipLocked(fallbackEvent.id()).orElse(null);
 

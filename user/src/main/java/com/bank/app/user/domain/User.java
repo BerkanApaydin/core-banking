@@ -15,6 +15,12 @@ public class User extends BaseAggregateRoot {
     private EmailAddress email;
     private PhoneNumber phone;
     private final Long version;
+    /**
+     * Token generation counter (V39): embedded in issued JWTs as the
+     * {@code ver} claim. Role/password changes bump it, which retires every
+     * outstanding session at its next refresh (see RefreshSessionUseCaseImpl).
+     */
+    private long tokenVersion;
 
     public User(UserId id, String username, String password, Role role) {
         this(id, username, password, role, null, null);
@@ -31,6 +37,11 @@ public class User extends BaseAggregateRoot {
      *                        validate policy rules against a hash.
      */
     public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email, PhoneNumber phone, Long version) {
+        this(id, username, encodedPassword, role, email, phone, version, 0L);
+    }
+
+    public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
+                PhoneNumber phone, Long version, long tokenVersion) {
         this.id = id;
         this.username = validateUsername(username);
         this.password = Objects.requireNonNull(encodedPassword, "Password must not be null");
@@ -38,6 +49,10 @@ public class User extends BaseAggregateRoot {
         this.email = email;
         this.phone = phone;
         this.version = version;
+        if (tokenVersion < 0) {
+            throw new IllegalArgumentException("Token version must not be negative");
+        }
+        this.tokenVersion = tokenVersion;
     }
 
     public static User create(String username, String password) {
@@ -78,6 +93,8 @@ public class User extends BaseAggregateRoot {
             throw new IllegalArgumentException("Password must not be empty");
         }
         this.password = newEncodedPassword;
+        // A new secret retires every outstanding session at its next refresh.
+        this.tokenVersion++;
     }
 
     public void updateEmail(EmailAddress newEmail) {
@@ -89,14 +106,16 @@ public class User extends BaseAggregateRoot {
     }
 
     /**
-     * Changes the role. WARNING: role is embedded in issued JWTs, so wiring this
-     * method into any production flow (admin endpoint, seeder, migration) silently
-     * leaves outstanding tokens with the old role until they expire. Such wiring
-     * requires token versioning first — enforced by the
-     * {@code roleChangesRequireTokenVersioning} architecture rule.
+     * Changes the role and retires outstanding sessions: the bumped
+     * {@code tokenVersion} is persisted with the user, and refresh tokens
+     * minted before the bump are rejected at rotation time. Wiring this
+     * method into a production flow is now safe (token versioning exists);
+     * the architecture rule still bans callers outside this class until an
+     * admin role-management endpoint lands.
      */
     public void assignRole(Role newRole) {
         this.role = Objects.requireNonNull(newRole, "Role must not be null");
+        this.tokenVersion++;
     }
 
     public boolean hasRole(Role requiredRole) {
@@ -129,6 +148,10 @@ public class User extends BaseAggregateRoot {
 
     public Long getVersion() {
         return version;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
     }
 
     @Override

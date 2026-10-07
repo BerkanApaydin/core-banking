@@ -3,11 +3,10 @@ package com.bank.app.accountapi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,8 +23,8 @@ class AbstractAccountSnapshotCacheTest {
     private TestCache cache;
 
     static class TestCache extends AbstractAccountSnapshotCache {
-        final Map<String, AccountSnapshot> snapshots = new HashMap<>();
-        final Map<String, Map<Long, String>> batches = new HashMap<>();
+        final Map<String, AccountSnapshot> snapshots = new ConcurrentHashMap<>();
+        final Map<Long, String> mappings = new ConcurrentHashMap<>();
 
         @Override
         protected Optional<AccountSnapshot> readSnapshot(String key) {
@@ -43,28 +42,24 @@ class AbstractAccountSnapshotCacheTest {
         }
 
         @Override
-        protected Collection<String> ibanSnapshotKeysForAccount(Long accountId) {
-            return snapshots.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith("iban-"))
-                    .filter(entry -> accountId.equals(entry.getValue().id()))
-                    .map(Map.Entry::getKey)
-                    .toList();
+        protected Optional<String> readIbanMapping(Long accountId) {
+            return Optional.ofNullable(mappings.get(accountId));
         }
 
         @Override
-        protected Optional<Map<Long, String>> readBatch(String key) {
-            return Optional.ofNullable(batches.get(key));
+        protected void writeIbanMapping(Long accountId, String iban) {
+            mappings.put(accountId, iban);
         }
 
         @Override
-        protected void writeBatch(String key, Map<Long, String> batch) {
-            batches.put(key, batch);
+        protected void removeIbanMapping(Long accountId) {
+            mappings.remove(accountId);
         }
 
         @Override
         protected void clearStorage() {
             snapshots.clear();
-            batches.clear();
+            mappings.clear();
         }
     }
 
@@ -123,12 +118,29 @@ class AbstractAccountSnapshotCacheTest {
     }
 
     @Test
+    void shouldShareMappingsAcrossDifferentIdSets() {
+        // One mapping per id (not one key per id-set): a different combination
+        // over the same accounts is a hit, not a new cache entry.
+        cache.putIbans(Set.of(1L, 2L), Map.of(1L, "TR1", 2L, "TR2"));
+
+        assertThat(cache.getIbans(Set.of(2L, 1L))).contains(Map.of(1L, "TR1", 2L, "TR2"));
+        assertThat(cache.getIbans(Set.of(2L))).contains(Map.of(2L, "TR2"));
+    }
+
+    @Test
+    void shouldMissBulkReadOnPartialHit() {
+        cache.putIbans(Set.of(1L), Map.of(1L, "TR1"));
+
+        assertThat(cache.getIbans(Set.of(1L, 2L))).isEmpty();
+    }
+
+    @Test
     void shouldIgnoreNullOrEmptyBatchPuts() {
         cache.putIbans(null, Map.of(1L, "TR1"));
         cache.putIbans(Set.of(1L), null);
         cache.putIbans(Set.of(1L), Map.of());
 
-        assertThat(cache.batches).isEmpty();
+        assertThat(cache.mappings).isEmpty();
     }
 
     @Test
@@ -150,14 +162,13 @@ class AbstractAccountSnapshotCacheTest {
     }
 
     @Test
-    void shouldEvictSingleIbanEntryAndKeepOthers() {
-        cache.putByIban("TR721111111111111111111111", SNAPSHOT_1);
-        cache.putByIban("TR972222222222222222222222", SNAPSHOT_2);
+    void shouldDropIbanMappingOnEvictById() {
+        cache.putIbans(Set.of(1L, 2L), Map.of(1L, "TR1", 2L, "TR2"));
 
-        cache.evictByIban("TR721111111111111111111111");
+        cache.evictById(1L);
 
-        assertThat(cache.getByIban("TR721111111111111111111111")).isEmpty();
-        assertThat(cache.getByIban("TR972222222222222222222222")).contains(SNAPSHOT_2);
+        assertThat(cache.getIbans(Set.of(1L))).isEmpty();
+        assertThat(cache.getIbans(Set.of(2L))).contains(Map.of(2L, "TR2"));
     }
 
     @Test
@@ -165,7 +176,6 @@ class AbstractAccountSnapshotCacheTest {
         cache.putById(1L, SNAPSHOT_1);
 
         cache.evictById(null);
-        cache.evictByIban(null);
 
         assertThat(cache.getById(1L)).contains(SNAPSHOT_1);
     }
@@ -193,14 +203,5 @@ class AbstractAccountSnapshotCacheTest {
         assertThat(cache.getById(1L)).isEmpty();
         assertThat(cache.getByIban("TR1")).isEmpty();
         assertThat(cache.getIbans(Set.of(1L))).isEmpty();
-    }
-
-    @Test
-    void shouldLeaveBatchEntriesOnGranularEvictByDesign() {
-        cache.putIbans(Set.of(1L, 2L), Map.of(1L, "TR1", 2L, "TR2"));
-
-        cache.evictIbansBatch();
-
-        assertThat(cache.getIbans(Set.of(1L, 2L))).contains(Map.of(1L, "TR1", 2L, "TR2"));
     }
 }

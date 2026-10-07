@@ -32,15 +32,15 @@ class AccountMapperTest {
         assertThat(entity.getIban()).isEqualTo("TR770006200000000000000111");
         assertThat(entity.getOwnerName()).isEqualTo("Ahmet");
         assertThat(entity.getBalance()).isEqualByComparingTo(new BigDecimal("1000.00"));
-        assertThat(entity.getCurrency()).isEqualTo("TRY");
-        assertThat(entity.getStatus()).isEqualTo("ACTIVE");
+        assertThat(entity.getCurrency()).isEqualTo(Currency.TRY);
+        assertThat(entity.getStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(entity.getVersion()).isEqualTo(3L);
     }
 
     @Test
     void shouldMapJpaEntityToDomain() {
         AccountJpaEntity entity = new AccountJpaEntity(2L, 200L, "TR870006200000000000000222",
-                "Mehmet", new BigDecimal("500.00"), "USD", "SUSPENDED", 5L);
+                "Mehmet", new BigDecimal("500.00"), Currency.USD, AccountStatus.SUSPENDED, 5L);
 
         Account domain = mapper.toDomain(entity);
 
@@ -82,7 +82,7 @@ class AccountMapperTest {
     @Test
     void shouldMapEntityWithoutVersion() {
         AccountJpaEntity entity = new AccountJpaEntity(4L, 400L, "TR100006200000000000000444",
-                "Veli", new BigDecimal("300.00"), "TRY", "ACTIVE", null);
+                "Veli", new BigDecimal("300.00"), Currency.TRY, AccountStatus.ACTIVE, null);
 
         Account domain = mapper.toDomain(entity);
 
@@ -97,13 +97,13 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertThat(entity.getCurrency()).isEqualTo("EUR");
+        assertThat(entity.getCurrency()).isEqualTo(Currency.EUR);
     }
 
     @Test
     void shouldMapJpaEntityWithEurToDomain() {
         AccountJpaEntity entity = new AccountJpaEntity(6L, 600L, "TR300006200000000000000666",
-                "Fatma", new BigDecimal("1500.00"), "EUR", "ACTIVE", null);
+                "Fatma", new BigDecimal("1500.00"), Currency.EUR, AccountStatus.ACTIVE, null);
 
         Account domain = mapper.toDomain(entity);
 
@@ -113,7 +113,7 @@ class AccountMapperTest {
     @Test
     void shouldMapJpaEntityWithClosedStatusToDomain() {
         AccountJpaEntity entity = new AccountJpaEntity(7L, 700L, "TR400006200000000000000777",
-                "Zeynep", new BigDecimal("0.00"), "TRY", "CLOSED", null);
+                "Zeynep", new BigDecimal("0.00"), Currency.TRY, AccountStatus.CLOSED, null);
 
         Account domain = mapper.toDomain(entity);
 
@@ -129,15 +129,15 @@ class AccountMapperTest {
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
 
-        assertThat(entity.getStatus()).isEqualTo("CLOSED");
+        assertThat(entity.getStatus()).isEqualTo(AccountStatus.CLOSED);
     }
 
     @Test
-    void shouldThrowWhenEntityHasInvalidEnumValue() {
-        AccountJpaEntity entity = new AccountJpaEntity(9L, 900L, "TR600006200000000000000999",
-                "Invalid", new BigDecimal("100.00"), "INVALID", "ACTIVE", null);
-
-        assertThatThrownBy(() -> mapper.toDomain(entity))
+    void shouldFailFastOnUnknownCurrencyCode() {
+        // With native PG ENUMs, unknown codes cannot even be constructed on
+        // the entity (the type system rejects them); corrupt database values
+        // fail at JDBC read time instead of inside the mapper.
+        assertThatThrownBy(() -> Currency.valueOf("INVALID"))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 }

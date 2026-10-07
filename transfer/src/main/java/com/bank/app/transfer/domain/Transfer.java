@@ -7,6 +7,7 @@ import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import com.bank.app.transfer.domain.exception.TransferNotPendingException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -109,6 +110,15 @@ public class Transfer extends BaseAggregateRoot {
                 + ", amount=" + amount + ", status=" + status + "}";
     }
 
+    /**
+     * Marks a pending transfer as failed. Currently no production flow calls
+     * this: the synchronous placement path rolls the transaction back instead
+     * of persisting a FAILED row (see PlaceTransferUseCaseImpl), so a failure
+     * never leaves a half-written transfer behind. Kept for asynchronous
+     * placement flows, where the PENDING row must survive the worker crash and
+     * be reconcilable afterwards — together with {@code TransferStatus.FAILED}
+     * and the report UI that already renders it.
+     */
     public void markFailed(Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         if (this.status != TransferStatus.PENDING) {
@@ -119,7 +129,7 @@ public class Transfer extends BaseAggregateRoot {
                 this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
     }
 
-    public void cancel(Clock clock, int cancellationWindowHours) {
+    public void cancel(Clock clock, Duration cancellationWindow) {
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);
         }
@@ -135,12 +145,13 @@ public class Transfer extends BaseAggregateRoot {
                 detail
             );
         }
+        Objects.requireNonNull(cancellationWindow, "Cancellation window must not be null");
         LocalDateTime now = LocalDateTime.now(clock);
-        if (this.createdAt.plusHours(cancellationWindowHours).isBefore(now)) {
+        if (this.createdAt.plus(cancellationWindow).isBefore(now)) {
             throw new TransferNotCancellableException(
                 "error.transfer_cancellation_window_expired",
-                new Object[]{this.createdAt, cancellationWindowHours},
-                "Transfer was created " + cancellationWindowHours + " hours ago, cancellation window has passed. Created at: " + this.createdAt
+                new Object[]{this.createdAt, cancellationWindow.toHours()},
+                "Transfer was created " + cancellationWindow.toHours() + " hours ago, cancellation window has passed. Created at: " + this.createdAt
             );
         }
         this.status = TransferStatus.CANCELLED;

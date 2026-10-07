@@ -29,7 +29,7 @@ class CorsConfigTest {
         assertThat(config.getAllowedMethods()).containsExactly("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
         assertThat(config.getAllowedHeaders()).containsExactly("Authorization", "Content-Type", "Idempotency-Key",
                 "X-Requested-With", "X-CSRF-Token");
-        assertThat(config.getExposedHeaders()).containsExactly("X-Correlation-ID");
+        assertThat(config.getExposedHeaders()).containsExactly("X-Correlation-ID", "X-Trace-ID");
         assertThat(config.getAllowCredentials()).isTrue();
     }
 

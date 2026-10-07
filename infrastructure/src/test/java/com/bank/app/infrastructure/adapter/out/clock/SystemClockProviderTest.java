@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,11 +23,11 @@ class SystemClockProviderTest {
     }
 
     @Test
-    @DisplayName("should use system default clock when null is passed")
-    void shouldUseSystemDefaultWhenNull() {
+    @DisplayName("should default to UTC, not the machine zone, when null is passed")
+    void shouldDefaultToUtcWhenNull() {
         SystemClockProvider provider = new SystemClockProvider(null);
 
         assertNotNull(provider.clock());
-        assertEquals(Clock.systemDefaultZone().getZone(), provider.clock().getZone());
+        assertEquals(ZoneOffset.UTC, provider.clock().getZone());
     }
 }

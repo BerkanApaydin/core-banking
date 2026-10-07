@@ -24,9 +24,7 @@ class RedisRateLimiterEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setMaxRequests(5);
-        props.setTimeWindowMs(10_000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000);
         rateLimiter = new RedisRateLimiter(
                 redisTemplate,
                 props);

@@ -136,57 +136,21 @@ class AccountAclAdapterTest {
     }
 
     @Nested
-    @DisplayName("granular cache invalidation")
-    class GranularInvalidation {
+    @DisplayName("cache invalidation ownership")
+    class InvalidationOwnership {
         @Test
-        void shouldEvictOnlyMutatedAccountsOnDebitAndCredit() {
+        void shouldNotEvictOnMutationBecauseAccountBoundaryOwnsInvalidation() {
+            // Granular eviction lives in AccountApiAdapter (account boundary):
+            // this adapter must not double-evict on the mutation hot path.
             Money amount = Money.of("200.00", Currency.TRY);
             AccountAdjustmentResult apiResult = new AccountAdjustmentResult(1L, 2L,
                     Money.of("800.00", Currency.TRY), Money.of("1200.00", Currency.TRY));
             when(accountApi.adjustBalances(1L, 2L, amount)).thenReturn(apiResult);
 
-            // unrelated cached entry must survive the mutation
-            cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
-            cache.putById(1L, new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
-
             adapter.debitAndCredit(1L, 2L, amount);
 
-            assertTrue(cache.getById(1L).isEmpty(), "mutated sender must be evicted");
-            assertTrue(cache.getById(99L).isPresent(), "unrelated account must stay cached");
-        }
-
-        @Test
-        void shouldEvictOnlyMutatedAccountsOnReverse() {
-            Money amount = Money.of("200.00", Currency.TRY);
-            AccountAdjustmentResult apiResult = new AccountAdjustmentResult(1L, 2L,
-                    Money.of("1000.00", Currency.TRY), Money.of("1000.00", Currency.TRY));
-            when(accountApi.reverseForCancellation(1L, 2L, amount)).thenReturn(apiResult);
-
-            cache.putById(99L, new AccountSnapshot(99L, 30L, "TRY", "ACTIVE"));
-
-            adapter.reverseBalancesForCancellation(1L, 2L, amount);
-
-            assertTrue(cache.getById(99L).isPresent(), "unrelated account must stay cached");
-        }
-
-        @Test
-        void shouldEvictIbanEntryOnDebitAndCredit() {
-            String senderIban = "TR450006100519786456841234";
-            Money amount = Money.of("200.00", Currency.TRY);
-            AccountAdjustmentResult apiResult = new AccountAdjustmentResult(1L, 2L,
-                    Money.of("800.00", Currency.TRY), Money.of("1200.00", Currency.TRY));
-            when(accountApi.getSnapshotByIban(senderIban))
-                    .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
-            when(accountApi.adjustBalances(1L, 2L, amount)).thenReturn(apiResult);
-
-            adapter.getAccountInfoForTransfer(senderIban);
-
-            adapter.debitAndCredit(1L, 2L, amount);
-
-            // IBAN entry must be re-fetched (stale status like ACTIVE-after-suspend
-            // must never be served); second read hits the AccountApi again.
-            adapter.getAccountInfoForTransfer(senderIban);
-            verify(accountApi, times(2)).getSnapshotByIban(senderIban);
+            assertTrue(cache.getById(99L).isEmpty());
+            verifyNoMoreInteractions(accountApi);
         }
     }
 }

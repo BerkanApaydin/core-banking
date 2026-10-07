@@ -1,232 +1,38 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
-import com.bank.app.common.domain.exception.AuthorizationException;
-import com.bank.app.common.domain.exception.BusinessException;
-import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.domain.exception.ErrorCode;
-import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
-import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
-import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.MessageSource;
-import org.springframework.context.NoSuchMessageException;
-import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.lang.Nullable;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.HttpMediaTypeNotSupportedException;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.method.annotation.HandlerMethodValidationException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.sql.SQLException;
 
+/**
+ * Last-resort problems: persistence integrity violations and the uncaught
+ * {@code Exception} fallback. Domain, security and malformed-request failures
+ * live in {@link BusinessProblemHandler}, {@link SecurityProblemHandler} and
+ * {@link RequestProblemHandler} — this class stays small on purpose so the
+ * 500 path is trivially auditable. Ordered last: the {@code Exception}
+ * fallback must never shadow the specific handlers above, and advice
+ * resolution consults matching advices in order.
+ */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    private final MessageSource messageSource;
+    private final ProblemMessageResolver messages;
 
-    public GlobalExceptionHandler(MessageSource messageSource) {
-        this.messageSource = messageSource;
-    }
-
-    private String resolveMessage(String messageKey, @Nullable Object[] args) {
-        if (messageKey == null) return "";
-        try {
-            return messageSource.getMessage(messageKey, args, LocaleContextHolder.getLocale());
-        } catch (NoSuchMessageException e) {
-            log.trace("Message not found for key: {}", messageKey, e);
-            return messageKey;
-        }
-    }
-
-    private String resolveMessage(String messageKey) {
-        return resolveMessage(messageKey, null);
-    }
-
-    private String resolveBusinessMessage(BusinessException ex) {
-        String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
-        if (message.isEmpty() || message.equals(ex.getMessageKey())) {
-            message = ex.getMessage() != null ? ex.getMessage() : "";
-        }
-        return message;
-    }
-
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException ex, WebRequest request) {
-        HttpStatus status = BusinessErrorHttpMapper.toStatus(ex);
-        return ProblemDetailFactory.create(status, ex.getErrorCode(), resolveBusinessMessage(ex), request);
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ProblemDetail> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors()
-                .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-        return ProblemDetailFactory.createValidationError(errors, request);
-    }
-
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<ProblemDetail> handleMissingRequestHeader(
-            MissingRequestHeaderException ex, WebRequest request) {
-        // Missing auth material (e.g. Authorization on logout) means the caller
-        // is unauthenticated — 401, never the 500 fallback. The header name is
-        // returned; the header value is never echoed.
-        log.warn("Missing required header: {}", ex.getHeaderName());
-        String message = resolveMessage("error.authentication_failed");
-        if (message == null || message.isEmpty() || message.equals("error.authentication_failed")) {
-            message = "Authentication failed.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ProblemDetail> handleMissingRequestParameter(
-            MissingServletRequestParameterException ex, WebRequest request) {
-        return ProblemDetailFactory.createValidationError(
-                Map.of(ex.getParameterName(), "Required parameter is missing"), request);
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ProblemDetail> handleArgumentTypeMismatch(
-            MethodArgumentTypeMismatchException ex, WebRequest request) {
-        return ProblemDetailFactory.createValidationError(
-                Map.of(ex.getName(), "Invalid parameter value"), request);
-    }
-
-    @ExceptionHandler(HandlerMethodValidationException.class)
-    public ResponseEntity<ProblemDetail> handleMethodValidation(
-            HandlerMethodValidationException ex, WebRequest request) {
-        return ProblemDetailFactory.createValidationError(
-                Map.of("request", "Invalid request parameters"), request);
-    }
-
-    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
-    public ResponseEntity<ProblemDetail> handleConstraintViolationException(
-            jakarta.validation.ConstraintViolationException ex, WebRequest request) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getConstraintViolations()
-                .forEach(violation -> {
-                    String path = violation.getPropertyPath() != null
-                            ? violation.getPropertyPath().toString() : "parameter";
-                    String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
-                    errors.put(field, violation.getMessage());
-                });
-        return ProblemDetailFactory.createValidationError(errors, request);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ProblemDetail> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
-        // Never echo raw exception messages: they may carry SQL fragments,
-        // paths, or validation internals. Log the detail, return a generic key.
-        log.warn("Invalid argument rejected: {}", ex.getClass().getSimpleName());
-        String message = resolveMessage("error.invalid_argument");
-        if (message == null || message.isEmpty() || message.equals("error.invalid_argument")) {
-            message = "Invalid request argument.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
-    }
-
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ProblemDetail> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
-        log.warn("Authentication failed: {}", ex.getClass().getSimpleName());
-        String message = resolveMessage("error.authentication_failed");
-        if (message == null || message.isEmpty() || message.equals("error.authentication_failed")) {
-            message = "Authentication failed.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
-    }
-
-    @ExceptionHandler(LoginAttemptStoreUnavailableException.class)
-    public ResponseEntity<ProblemDetail> handleLoginAttemptStoreUnavailable(
-            LoginAttemptStoreUnavailableException ex, WebRequest request) {
-        log.warn("Failed-login security backend unavailable: {}",
-                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = resolveMessage("error.security_backend_unavailable");
-        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
-            message = "Security service temporarily unavailable. Please try again later.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
-    }
-
-    @ExceptionHandler(AuthenticationBackendUnavailableException.class)
-    public ResponseEntity<ProblemDetail> handleAuthenticationBackendUnavailable(
-            AuthenticationBackendUnavailableException ex, WebRequest request) {
-        log.warn("Authentication backend unavailable: {}",
-                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = resolveMessage("error.security_backend_unavailable");
-        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
-            message = "Security service temporarily unavailable. Please try again later.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
-    }
-
-    @ExceptionHandler(RevocationStoreUnavailableException.class)
-    public ResponseEntity<ProblemDetail> handleRevocationStoreUnavailable(
-            RevocationStoreUnavailableException ex, WebRequest request) {
-        log.warn("Token revocation backend unavailable: {}",
-                ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = resolveMessage("error.security_backend_unavailable");
-        if (message == null || message.isEmpty() || message.equals("error.security_backend_unavailable")) {
-            message = "Security service temporarily unavailable. Please try again later.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
-        log.warn("Access denied: {}", ex.getClass().getSimpleName());
-        String message = resolveMessage("error.access_denied");
-        if (message == null || message.isEmpty() || message.equals("error.access_denied")) {
-            message = "Access denied.";
-        }
-        return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, message, request);
-    }
-
-    @ExceptionHandler(AuthorizationException.class)
-    public ResponseEntity<ProblemDetail> handleAuthorizationException(AuthorizationException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, resolveBusinessMessage(ex), request);
-    }
-
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<ProblemDetail> handleOptimisticLockingFailureException(OptimisticLockingFailureException ex, WebRequest request) {
-        String message = resolveMessage("error.optimistic_lock_conflict");
-        return ProblemDetailFactory.create(ErrorCode.OPTIMISTIC_LOCK_CONFLICT, message, request);
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ProblemDetail> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex, WebRequest request) {
-        String message = resolveMessage("error.invalid_format");
-        ErrorCode code = ErrorCode.INVALID_FORMAT;
-        if (ex.getCause() instanceof InvalidFormatException invalidFormatException) {
-            if (invalidFormatException.getTargetType() != null && invalidFormatException.getTargetType().isEnum()) {
-                message = resolveMessage("error.invalid_enum_value",
-                        new Object[]{invalidFormatException.getValue(),
-                                Arrays.toString(invalidFormatException.getTargetType().getEnumConstants())});
-                code = ErrorCode.INVALID_ENUM_VALUE;
-            }
-        }
-        return ProblemDetailFactory.create(code, message, request);
+    public GlobalExceptionHandler(ProblemMessageResolver messages) {
+        this.messages = messages;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -234,10 +40,10 @@ public class GlobalExceptionHandler {
         String message;
         ErrorCode code;
         if (isUniqueViolation(ex)) {
-            message = resolveMessage("error.unique_constraint_violation");
+            message = messages.resolveMessage("error.unique_constraint_violation");
             code = ErrorCode.UNIQUE_CONSTRAINT_VIOLATION;
         } else {
-            message = resolveMessage("error.db_integrity_violation");
+            message = messages.resolveMessage("error.db_integrity_violation");
             code = ErrorCode.DB_INTEGRITY_VIOLATION;
         }
         return ProblemDetailFactory.create(code, message, request);
@@ -252,32 +58,10 @@ public class GlobalExceptionHandler {
         return false;
     }
 
-    @ExceptionHandler(ConcurrentRequestException.class)
-    public ResponseEntity<ProblemDetail> handleConcurrentRequestException(ConcurrentRequestException ex, WebRequest request) {
-        return ProblemDetailFactory.create(HttpStatus.CONFLICT, ex.getErrorCode(), resolveBusinessMessage(ex), request);
-    }
-
-    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ProblemDetail> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex, WebRequest request) {
-        String message = resolveMessage("error.unsupported_media_type",
-                new Object[]{ex.getContentType()});
-        return ProblemDetailFactory.create(ErrorCode.UNSUPPORTED_MEDIA_TYPE, message, request);
-    }
-
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ProblemDetail> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ProblemDetail> handleNoResourceFoundException(NoResourceFoundException ex, WebRequest request) {
-        return ProblemDetailFactory.create(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage(), request);
-    }
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGeneralException(Exception ex, WebRequest request) {
         log.error("Unexpected error occurred: ", ex);
-        String message = resolveMessage("error.general_internal_error");
+        String message = messages.resolveMessage("error.general_internal_error");
         return ProblemDetailFactory.create(ErrorCode.GENERAL_INTERNAL_ERROR, message, request);
     }
 }

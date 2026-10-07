@@ -30,8 +30,18 @@ WHERE dead_letter = true
 ORDER BY created_at, id;
 ```
 
-Handler deduplication uses `idempotency_keys` entries with an `outbox_handler_` prefix. The generic HTTP idempotency cleanup preserves these entries, including `PENDING` entries; outbox rows also remain. A manual replay of an already processed event will therefore normally skip its handler. However, dedup entries deleted before this protection was deployed cannot be reconstructed from an outbox row, and a provider-facing side effect may have succeeded before a crash even when the outbox transaction rolled back. Confirm downstream state and dedup history before any manual replay. A durable consumer inbox and explicit replay state machine are needed before general replay can be automated.
+Handler deduplication uses `idempotency_keys` entries with an `outbox_handler_` prefix (classified by the `key_kind` discriminator since V38, not by string matching). The generic HTTP idempotency cleanup preserves these entries, including `PENDING` entries; outbox rows also remain. A manual replay of an already processed event will therefore normally skip its handler. However, dedup entries deleted before this protection was deployed cannot be reconstructed from an outbox row, and a provider-facing side effect may have succeeded before a crash even when the outbox transaction rolled back. Confirm downstream state and dedup history before any manual replay. A durable consumer inbox and explicit replay state machine are needed before general replay can be automated.
 
 ## Retention
 
-There is no automatic outbox row or handler dedup deletion or archive job. `processed` and `dead_letter` rows and their dedup entries should remain intact until a retention period, archive destination, backup/restore test, and replay/dedup policy are agreed. This preserves replay protection at the cost of unbounded growth until a coupled retention policy is implemented. Audit records have a separate purpose and retention policy. In particular, do not use the HTTP idempotency cleanup interval as an outbox retention period.
+Processed, non-dead-letter outbox rows older than `app.outbox.retention-days`
+(default 30) are deleted by `OutboxRetentionScheduler` (weekly by default,
+`app.outbox.retention-cron`), followed by `outbox_handler_*` dedup keys older
+than the same cutoff — in that order, so a dedup key never disappears while
+its event row may still exist. Unprocessed rows (redelivery source),
+dead-letter rows (investigation evidence) and `PENDING` keys (stuck
+reservations stay visible) are never auto-deleted. `refresh_tokens` expiry
+hygiene runs separately (`RefreshTokenCleanupJob`, daily); `audit_logs` and
+`ledger_entries` have no retention — they are the legal/audit trail, not a
+queue. In particular, do not use the HTTP idempotency cleanup interval
+(24h) as an outbox retention period.

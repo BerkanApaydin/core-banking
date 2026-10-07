@@ -46,7 +46,7 @@ class DomainEventOutboxAdapterTest {
         @BeforeEach
         void setUp() throws Exception {
             adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
-                    new OutboxProperties(5, 50, 0, 2000));
+                    new OutboxProperties(5, 50, 0, 2000, 30));
             lenient().when(objectMapper.writeValueAsString(any())).thenReturn(TEST_PAYLOAD);
         }
 
@@ -142,7 +142,7 @@ class DomainEventOutboxAdapterTest {
         void shouldSerializeWithObjectMapper() throws Exception {
             ObjectMapper realMapper = new ObjectMapper();
             adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> Clock.systemUTC(),
-                    new OutboxProperties(5, 50, 0, 2000));
+                    new OutboxProperties(5, 50, 0, 2000, 30));
             DomainEvent event = new DomainEvent() {
                 @Override public LocalDateTime occurredAt() { return LocalDateTime.of(2024, 1, 15, 10, 30); }
                 @Override public String aggregateType() { return "TestAggregate"; }

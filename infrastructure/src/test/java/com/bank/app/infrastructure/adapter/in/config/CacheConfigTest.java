@@ -8,7 +8,7 @@ class CacheConfigTest {
 
     @Test
     void shouldRegisterAccountAclCache() {
-        CacheProperties properties = new CacheProperties();
+        CacheProperties properties = new CacheProperties(null);
         CacheConfig config = new CacheConfig(properties);
 
         assertNotNull(config.cacheManager().getCache("accountAclInfo"));

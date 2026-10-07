@@ -3,7 +3,6 @@ package com.bank.app.accountapi;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -48,26 +47,11 @@ class AccountSnapshotCacheDefaultsTest {
     }
 
     @Test
-    void shouldDelegateGranularEvictionsToEvictAllByDefault() {
+    void shouldDelegateGranularEvictionToEvictAllByDefault() {
         CountingCache cache = new CountingCache();
 
         cache.evictById(1L);
-        cache.evictByIban("TR111");
-        cache.evictIbansBatch();
 
-        assertEquals(3, cache.evictAllCalls);
-    }
-
-    @Test
-    void shouldBuildOrderInsensitiveBatchKeys() {
-        assertEquals(
-                AccountSnapshotCache.ibansBatchKey(List.of(2L, 1L)),
-                AccountSnapshotCache.ibansBatchKey(List.of(1L, 2L)));
-    }
-
-    @Test
-    void shouldBuildCanonicalBatchKey() {
-        // Literal assertion: an empty-string mutant must die here.
-        assertEquals("[1, 2]", AccountSnapshotCache.ibansBatchKey(List.of(2L, 1L)));
+        assertEquals(1, cache.evictAllCalls);
     }
 }

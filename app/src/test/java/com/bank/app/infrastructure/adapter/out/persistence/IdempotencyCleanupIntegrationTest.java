@@ -13,11 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /** Exercises the actual cleanup SQL against PostgreSQL and the migrated schema. */
 class IdempotencyCleanupIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private IdempotencyKeyJpaRepository repository;
+    private final IdempotencyKeyJpaRepository repository;
+
+    private final JdbcTemplate jdbc;
 
     @Autowired
-    private JdbcTemplate jdbc;
+    IdempotencyCleanupIntegrationTest(IdempotencyKeyJpaRepository repository, JdbcTemplate jdbc) {
+        this.repository = repository;
+        this.jdbc = jdbc;
+    }
 
     @Test
     void removesOnlyExpiredTerminalRequestsAndPreservesOutboxDedup() {
@@ -53,9 +57,48 @@ class IdempotencyCleanupIntegrationTest extends AbstractIntegrationTest {
         assertExists(completedOutbox, true);
     }
 
+    @Test
+    void removesOnlyExpiredTerminalHandlerKeys() {
+        String suffix = UUID.randomUUID().toString();
+        LocalDateTime threshold = LocalDateTime.now().minusHours(24);
+        LocalDateTime expired = threshold.minusHours(1);
+
+        String completedHandler = "outbox_handler_completed_" + suffix;
+        String pendingHandler = "outbox_handler_pending_" + suffix;
+        String completedHttp = "http_completed_" + suffix;
+        insert(completedHandler, "COMPLETED", expired);
+        insert(pendingHandler, "PENDING", expired);
+        insert(completedHttp, "COMPLETED", expired);
+
+        assertEquals(1, repository.deleteExpiredHandlerKeys(threshold));
+
+        assertExists(completedHandler, false);
+        assertExists(pendingHandler, true);
+        assertExists(completedHttp, true);
+    }
+
+    @Test
+    void tryInsertDerivesKeyKindFromPrefix() {
+        String suffix = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+        String httpKey = "http_" + suffix;
+        String handlerKey = "outbox_handler_Test_" + suffix;
+
+        assertEquals(1, repository.tryInsert(httpKey, "hash", now));
+        assertEquals(1, repository.tryInsert(handlerKey, "hash", now));
+
+        assertEquals("HTTP", jdbc.queryForObject(
+                "SELECT key_kind FROM idempotency_keys WHERE key_value = ?", String.class, httpKey));
+        assertEquals("HANDLER", jdbc.queryForObject(
+                "SELECT key_kind FROM idempotency_keys WHERE key_value = ?", String.class, handlerKey));
+    }
+
     private void insert(String key, String status, LocalDateTime createdAt) {
-        jdbc.update("INSERT INTO idempotency_keys (key_value, status, created_at) VALUES (?, ?, ?)",
-                key, status, createdAt);
+        // Same discriminator the production tryInsert computes: prefix match
+        // on the literal, so the near-miss stays HTTP like in production.
+        String kind = key.startsWith("outbox_handler_") ? "HANDLER" : "HTTP";
+        jdbc.update("INSERT INTO idempotency_keys (key_value, status, created_at, key_kind) VALUES (?, ?, ?, ?)",
+                key, status, createdAt, kind);
     }
 
     private void assertExists(String key, boolean expected) {

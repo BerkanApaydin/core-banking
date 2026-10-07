@@ -52,18 +52,18 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
 
         AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId, "You are not authorized to generate a report for this account.");
 
-        List<Transfer> transfers = loadTransferPort.findHistoryBetween(
+        // The port over-fetches one row beyond the logical page (see
+        // TransferPersistenceAdapter): a single range scan decides both the
+        // content and hasNext, with no second query for page+1.
+        List<Transfer> fetched = loadTransferPort.findHistoryBetween(
             accountId,
             startDate,
             endDate,
             page,
             size
         );
-
-        // A full page may still be the last page. Probe the next page using
-        // the same size so PageRequest calculates the correct row offset.
-        boolean hasNext = transfers.size() == size && page < Integer.MAX_VALUE && !loadTransferPort.findHistoryBetween(
-            accountId, startDate, endDate, page + 1, size).isEmpty();
+        boolean hasNext = fetched.size() > size;
+        List<Transfer> transfers = hasNext ? fetched.subList(0, size) : fetched;
 
         // Batch load account IBANs to avoid N+1 query problem (see TransferViewEnricher)
         List<TransferResponse> responseList = viewEnricher.enrich(transfers);

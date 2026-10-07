@@ -1,6 +1,8 @@
 package com.bank.app.account.adapter.out.persistence;
 
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.AbstractIntegrationTest;
+import com.bank.app.common.domain.Currency;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,19 +20,25 @@ import static org.junit.jupiter.api.Assertions.*;
 @Transactional
 class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private AccountJpaRepository repo;
+    private final AccountJpaRepository repo;
+
+    private final EntityManager entityManager;
 
     @Autowired
-    private EntityManager entityManager;
+    AccountJpaRepositoryIntegrationTest(AccountJpaRepository repo, EntityManager entityManager) {
+        this.repo = repo;
+        this.entityManager = entityManager;
+    }
 
     private Long savedEntityId;
 
     @BeforeEach
     void setUp() {
-        // Delete child-first: transfers reference accounts (and the FK graph
-        // may exist on databases migrated before V22 dropped the constraints),
-        // so cleanup order must never depend on test execution order.
+        // Delete child-first: transfers and ledger_entries reference accounts
+        // (and the FK graph may exist on databases migrated before V22 dropped
+        // the constraints), so cleanup order must never depend on test
+        // execution order.
+        entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
@@ -137,8 +145,8 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
         assertEquals("TR870006200000000000000222", found.get().getIban());
         assertEquals("Another User", found.get().getOwnerName());
         assertEquals(0, new BigDecimal("500.50").compareTo(found.get().getBalance()));
-        assertEquals("EUR", found.get().getCurrency());
-        assertEquals("SUSPENDED", found.get().getStatus());
+        assertEquals(Currency.EUR, found.get().getCurrency());
+        assertEquals(AccountStatus.SUSPENDED, found.get().getStatus());
     }
 
     @Test
@@ -152,5 +160,39 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
         Optional<AccountJpaEntity> found = repo.findById(savedEntityId);
         assertTrue(found.isPresent());
         assertEquals(0, new BigDecimal("2000.00").compareTo(found.get().getBalance()));
+    }
+
+    @Test
+    void shouldProjectInfoByIdWithoutHydratingBalance() {
+        var rows = repo.findInfoById(savedEntityId);
+
+        assertEquals(1, rows.size());
+        assertEquals(2L, rows.get(0)[0]);
+        assertEquals(100L, rows.get(0)[1]);
+        assertEquals("TRY", String.valueOf(rows.get(0)[2]));
+        assertEquals("ACTIVE", String.valueOf(rows.get(0)[3]));
+    }
+
+    @Test
+    void shouldProjectInfoByIban() {
+        var rows = repo.findInfoByIban("TR770006200000000000000111");
+
+        assertEquals(1, rows.size());
+        assertEquals(2L, rows.get(0)[0]);
+        assertEquals("ACTIVE", String.valueOf(rows.get(0)[3]));
+    }
+
+    @Test
+    void shouldProjectIbansByIds() {
+        var rows = repo.findIbansByIds(java.util.List.of(2L));
+
+        assertEquals(1, rows.size());
+        assertEquals(2L, rows.get(0)[0]);
+        assertEquals("TR770006200000000000000111", rows.get(0)[1]);
+    }
+
+    @Test
+    void shouldReturnEmptyProjectionForUnknownId() {
+        assertTrue(repo.findInfoById(999L).isEmpty());
     }
 }

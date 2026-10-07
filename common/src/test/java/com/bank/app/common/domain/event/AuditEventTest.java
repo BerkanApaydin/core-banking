@@ -94,4 +94,13 @@ class AuditEventTest {
         assertEquals("Audit", event.aggregateType());
         assertEquals("system", event.aggregateId());
     }
+
+    @Test
+    void shouldDefaultActorUserIdToNullAndKeepItWhenProvided() {
+        assertEquals(null, new AuditEvent("ACTION", "Details", LocalDateTime.now()).actorUserId());
+        assertEquals(null, new AuditEvent("ACTION", "Details", LocalDateTime.now(), "alice").actorUserId());
+        AuditEvent event = new AuditEvent("ACTION", "Details", LocalDateTime.now(), "alice", 7L);
+        assertEquals(7L, event.actorUserId());
+        assertEquals("alice", event.username());
+    }
 }

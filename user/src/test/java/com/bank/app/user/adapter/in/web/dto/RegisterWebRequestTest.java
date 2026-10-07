@@ -13,21 +13,21 @@ class RegisterWebRequestTest {
 
     @Test
     void shouldAcceptValidRequest() {
-        var request = new RegisterWebRequest("alice", "Secret123", "alice@example.com", "+905551112233");
+        var request = new RegisterWebRequest("alice", "Secret123456", "alice@example.com", "+905551112233");
 
         assertTrue(validator.validate(request).isEmpty());
     }
 
     @Test
     void shouldAcceptNullOptionals() {
-        var request = new RegisterWebRequest("alice", "Secret123", null, null);
+        var request = new RegisterWebRequest("alice", "Secret123456", null, null);
 
         assertTrue(validator.validate(request).isEmpty());
     }
 
     @Test
     void shouldRejectShortPassword() {
-        // Policy minimum is 8: short secrets must fail at the web boundary,
+        // Policy minimum is 12: short secrets must fail at the web boundary,
         // not deep inside the use case.
         var request = new RegisterWebRequest("alice", "Short1", null, null);
 
@@ -35,8 +35,15 @@ class RegisterWebRequestTest {
     }
 
     @Test
+    void shouldRejectElevenCharPassword() {
+        var request = new RegisterWebRequest("alice", "Short123456", null, null);
+
+        assertFalse(validator.validate(request).isEmpty());
+    }
+
+    @Test
     void shouldRejectInvalidPhone() {
-        var request = new RegisterWebRequest("alice", "Secret123", null, "not-a-phone");
+        var request = new RegisterWebRequest("alice", "Secret123456", null, "not-a-phone");
 
         assertFalse(validator.validate(request).isEmpty());
     }

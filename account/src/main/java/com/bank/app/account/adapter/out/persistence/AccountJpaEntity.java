@@ -1,14 +1,20 @@
 package com.bank.app.account.adapter.out.persistence;
 
+import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.persistence.AuditableJpaEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "accounts")
@@ -30,20 +36,25 @@ public class AccountJpaEntity extends AuditableJpaEntity {
     @Column(nullable = false, precision = 38, scale = 2)
     private BigDecimal balance;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
-    private String currency;
+    private Currency currency;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, length = 20)
-    private String status;
+    private AccountStatus status;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     public AccountJpaEntity() {
     }
 
     public AccountJpaEntity(Long id, Long userId, String iban, String ownerName, BigDecimal balance,
-                            String currency, String status, Long version) {
+                            Currency currency, AccountStatus status, Long version) {
         this.id = id;
         this.userId = userId;
         this.iban = iban;
@@ -94,19 +105,19 @@ public class AccountJpaEntity extends AuditableJpaEntity {
         this.balance = balance;
     }
 
-    public String getCurrency() {
+    public Currency getCurrency() {
         return currency;
     }
 
-    public void setCurrency(String currency) {
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
-    public String getStatus() {
+    public AccountStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(AccountStatus status) {
         this.status = status;
     }
 

@@ -1,11 +1,13 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import com.bank.app.user.application.port.out.JwtPort;
+import org.springframework.beans.factory.annotation.Autowired;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -17,6 +19,20 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
+/**
+ * JWT issuance and verification behind {@link JwtPort}.
+ *
+ * <p>The remaining narrow readers ({@code extractUsername},
+ * {@code extractTokenType}, {@code getRemainingMs}) all re-verify the
+ * signature on every call and fail closed (null/zero on any JWT failure), so
+ * no caller can ever act on unverified claims. In particular
+ * {@code getRemainingMs} must re-verify rather than trust a presented
+ * expiry — a TTL read from an unverified token would be attacker-controlled.
+ * Anything beyond these goes through {@code verifyAndDecode}: single-claim
+ * extractors ({@code extractRole}, {@code extractUserId}) and the boolean
+ * {@code isTokenValid} were removed as dead surface — every production caller
+ * already used the verified token.
+ */
 @Service
 public class JwtTokenProvider implements JwtPort {
 
@@ -30,17 +46,33 @@ public class JwtTokenProvider implements JwtPort {
     public static final String DEFAULT_JWT_SECRET =
             "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
+    /** Token type claim distinguishing access from refresh tokens. */
+    public static final String TOKEN_TYPE_CLAIM = "typ";
+    public static final String TOKEN_TYPE_ACCESS = "access";
+    public static final String TOKEN_TYPE_REFRESH = "refresh";
+    /** Token generation claim (V39): bumped on role/password changes. */
+    public static final String TOKEN_VERSION_CLAIM = "ver";
+
     private String secretKey;
-    private long jwtExpiration;
+    private long accessExpiration;
+    private long refreshExpiration;
     private final boolean allowDefaultSecret;
     private volatile SecretKey signingKey;
     private volatile JwtParser verifiedParser;
 
-    public JwtTokenProvider(@Value("${jwt.secret}") String secretKey,
-                            @Value("${jwt.expiration:86400000}") long jwtExpiration,
-                            @Value("${jwt.allow-default-secret:false}") boolean allowDefaultSecret) {
+    // Primary constructor: typed properties (D13/K14) — no @Value scatter.
+    @Autowired
+    public JwtTokenProvider(JwtProperties properties) {
+        this(properties.secret(), properties.accessExpiration(),
+                properties.refreshExpiration(), properties.allowDefaultSecret());
+    }
+
+    // Legacy constructor kept for isolated unit tests (no Spring context).
+    public JwtTokenProvider(String secretKey, long accessExpiration,
+                            long refreshExpiration, boolean allowDefaultSecret) {
         this.secretKey = secretKey;
-        this.jwtExpiration = jwtExpiration;
+        this.accessExpiration = accessExpiration;
+        this.refreshExpiration = refreshExpiration;
         this.allowDefaultSecret = allowDefaultSecret;
     }
 
@@ -82,7 +114,10 @@ public class JwtTokenProvider implements JwtPort {
             }
             return new VerifiedToken(username, userId.longValue(), role,
                     claims.getId(), expiration.getTime());
-        } catch (Exception invalid) {
+        } catch (JwtException | IllegalArgumentException invalid) {
+            // Signature/expiry/claim problems mean "invalid token". Catching
+            // only JWT failures (never bare Exception) keeps programming
+            // errors visible instead of masking them as authentication noise.
             return null;
         }
     }
@@ -103,37 +138,80 @@ public class JwtTokenProvider implements JwtPort {
 
     @Override
     public String generateToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, 0L);
+    }
+
+    @Override
+    public String generateToken(Long userId, String username, String role, long tokenVersion) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("role", role);
-        return generateToken(extraClaims, userId, username);
+        extraClaims.put(TOKEN_VERSION_CLAIM, tokenVersion);
+        return generateToken(extraClaims, userId, username, TOKEN_TYPE_ACCESS, accessExpiration);
+    }
+
+    @Override
+    public String generateRefreshToken(Long userId, String username, String role) {
+        return generateRefreshToken(userId, username, role, 0L);
+    }
+
+    @Override
+    public String generateRefreshToken(Long userId, String username, String role, long tokenVersion) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", role);
+        extraClaims.put(TOKEN_VERSION_CLAIM, tokenVersion);
+        return generateToken(extraClaims, userId, username, TOKEN_TYPE_REFRESH, refreshExpiration);
     }
 
     public String generateToken(Map<String, Object> extraClaims, Long userId, String username) {
+        return generateToken(extraClaims, userId, username, TOKEN_TYPE_ACCESS, accessExpiration);
+    }
+
+    private String generateToken(Map<String, Object> extraClaims, Long userId, String username,
+                                 String tokenType, long ttlMs) {
         extraClaims.put("userId", userId);
+        extraClaims.put(TOKEN_TYPE_CLAIM, tokenType);
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(username)
                 .id(UUID.randomUUID().toString())
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + ttlMs))
                 .signWith(getSignInKey())
                 .compact();
     }
 
     @Override
-    public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+    public String extractTokenType(String token) {
+        try {
+            String type = extractClaim(token, claims -> claims.get(TOKEN_TYPE_CLAIM, String.class));
+            return (type == null || type.isBlank()) ? TOKEN_TYPE_ACCESS : type;
+        } catch (JwtException | IllegalArgumentException invalid) {
+            // Unverifiable tokens have no trustworthy type; callers validate
+            // the signature first (verifyAndDecode) and treat these as access.
+            return TOKEN_TYPE_ACCESS;
+        }
     }
 
     @Override
-    public Long extractUserId(String token) {
-        Number userId = extractClaim(token, claims -> claims.get("userId", Number.class));
-        return userId != null ? userId.longValue() : null;
+    public long extractTokenVersion(String token) {
+        try {
+            Number version = extractClaim(token, claims -> claims.get(TOKEN_VERSION_CLAIM, Number.class));
+            // Absent on pre-versioning tokens (rolling deploys) and on forged
+            // shapes that passed type checks: both mean generation 0.
+            return version == null ? 0L : Math.max(version.longValue(), 0L);
+        } catch (JwtException | IllegalArgumentException invalid) {
+            return 0L;
+        }
     }
 
     @Override
     public long getExpirationMs() {
-        return jwtExpiration;
+        return accessExpiration;
+    }
+
+    @Override
+    public long getRefreshExpirationMs() {
+        return refreshExpiration;
     }
 
     @Override
@@ -141,14 +219,9 @@ public class JwtTokenProvider implements JwtPort {
         try {
             long remaining = extractExpiration(token).getTime() - System.currentTimeMillis();
             return Math.max(remaining, 0);
-        } catch (Exception e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return 0;
         }
-    }
-
-    @Override
-    public boolean isTokenValid(String token) {
-        return verifyAndDecode(token) != null;
     }
 
     private Date extractExpiration(String token) {

@@ -1,0 +1,115 @@
+# OpenTelemetry Collector for bank-app tracing (opt-in).
+# The app defaults TRACING_ENABLED=false and fails fast without an endpoint
+# (D22), so applying this manifest alone changes nothing until the deployment
+# is patched with TRACING_ENABLED=true + MANAGEMENT_OTLP_TRACING_ENDPOINT
+# (see docs/tracing.md). Keep the collector in the same namespace as bank-app
+# so the short DNS name resolves.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  labels:
+    app: otel-collector
+data:
+  otel-collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch: {}
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    exporters:
+      # Replace with your backend (jaeger/tempo/otlphttp) for retention;
+      # logging alone keeps nothing queryable.
+      logging:
+        loglevel: warn
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [logging]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  labels:
+    app: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: otel-collector
+          # Versioned tag (never :latest, K9/D7). The release workflow only
+          # pins k8s/bank-app.yaml, so bump this tag deliberately per release.
+          image: otel/opentelemetry-collector-contrib:0.113.0
+          args: ["--config=/etc/otel/otel-collector.yaml"]
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  labels:
+    app: otel-collector
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318

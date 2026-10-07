@@ -9,9 +9,11 @@ import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,11 +32,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest {
 
-    @Autowired
-    private TestRestTemplate restTemplate;
+    private final TestRestTemplate restTemplate;
+
+    private final BacklogMetricsReporter backlogMetricsReporter;
 
     @Autowired
-    private BacklogMetricsReporter backlogMetricsReporter;
+    ApplicationSmokeIntegrationTest(TestRestTemplate restTemplate,
+            BacklogMetricsReporter backlogMetricsReporter, ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.restTemplate = restTemplate;
+        this.backlogMetricsReporter = backlogMetricsReporter;
+    }
 
     @Test
     void contextLoads() {
@@ -43,7 +52,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
     @Test
     void shouldRegisterUser() {
-        AuthRequest request = new AuthRequest("smoke_test_user", "Test1234");
+        AuthRequest request = new AuthRequest("smoke_test_user", "BankTest1234");
 
         ResponseEntity<Void> registerResponse = restTemplate.postForEntity(
                 "/api/v1/auth/register", request, Void.class);
@@ -54,7 +63,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     @Test
     void shouldCompleteRegistrationAndCreateAccountFlow() {
         String username = "flow_test_" + System.currentTimeMillis();
-        String password = "Flow1234";
+        String password = "FlowTest1234";
 
         ResponseEntity<Void> registerResponse = restTemplate.postForEntity(
                 "/api/v1/auth/register",
@@ -96,19 +105,19 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String userB = "transfer_receiver_" + System.currentTimeMillis();
 
         ResponseEntity<Void> regA = restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest(userA, "Sender1234"), Void.class);
+                new AuthRequest(userA, "SenderTest12"), Void.class);
         assertThat(regA.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<Void> regB = restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest(userB, "Receiver1234"), Void.class);
+                new AuthRequest(userB, "ReceiverTest12"), Void.class);
         assertThat(regB.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<AuthResponse> loginA = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(userA, "Sender1234"), AuthResponse.class);
+                new AuthRequest(userA, "SenderTest12"), AuthResponse.class);
         assertThat(loginA.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<AuthResponse> loginB = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(userB, "Receiver1234"), AuthResponse.class);
+                new AuthRequest(userB, "ReceiverTest12"), AuthResponse.class);
         assertThat(loginB.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         HttpHeaders headersA = new HttpHeaders();
@@ -159,7 +168,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     @Test
     void shouldReturnUnauthorizedWhenLoginWithWrongPassword() {
         restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest("wrong_pw_user", "Valid1234"), Void.class);
+                new AuthRequest("wrong_pw_user", "ValidUser1234"), Void.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.postForEntity("/api/v1/auth/login",
                 new AuthRequest("wrong_pw_user", "WrongPassword"),
@@ -169,15 +178,15 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     }
 
     @Test
-    void shouldReturnBadRequestWhenRegisteringDuplicateUsername() {
+    void shouldReturnConflictWhenRegisteringDuplicateUsername() {
         restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest("dup_user", "Test1234"), Void.class);
+                new AuthRequest("dup_user", "BankTest1234"), Void.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest("dup_user", "Test1234"),
+                new AuthRequest("dup_user", "BankTest1234"),
                 ProblemDetail.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -185,13 +194,13 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String sender = "poor_sender_" + System.currentTimeMillis();
         String receiver = "rich_receiver_" + System.currentTimeMillis();
 
-        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(sender, "Test1234"), Void.class);
-        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(receiver, "Test1234"), Void.class);
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(sender, "BankTest1234"), Void.class);
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(receiver, "BankTest1234"), Void.class);
 
         ResponseEntity<AuthResponse> loginSender = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(sender, "Test1234"), AuthResponse.class);
+                new AuthRequest(sender, "BankTest1234"), AuthResponse.class);
         ResponseEntity<AuthResponse> loginReceiver = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(receiver, "Test1234"), AuthResponse.class);
+                new AuthRequest(receiver, "BankTest1234"), AuthResponse.class);
 
         HttpHeaders headersSender = new HttpHeaders();
         headersSender.setBearerAuth(loginSender.getBody().token());
@@ -226,10 +235,10 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String user = "noiban_" + System.currentTimeMillis();
 
         restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest(user, "Test1234"), Void.class);
+                new AuthRequest(user, "BankTest1234"), Void.class);
 
         ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(user, "Test1234"), AuthResponse.class);
+                new AuthRequest(user, "BankTest1234"), AuthResponse.class);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(login.getBody().token());
@@ -256,10 +265,10 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     void shouldCompleteFullJourneyFromRegisterToLogout() {
         String user = "journey_" + System.currentTimeMillis();
         restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest(user, "Test1234"), Void.class);
+                new AuthRequest(user, "BankTest1234"), Void.class);
 
         ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(user, "Test1234"), AuthResponse.class);
+                new AuthRequest(user, "BankTest1234"), AuthResponse.class);
         assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
         HttpHeaders auth = new HttpHeaders();
         auth.setBearerAuth(login.getBody().token());
@@ -303,8 +312,10 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
 
         ResponseEntity<Map> report = restTemplate.exchange(
                 "/api/v1/transfers/report?accountId=" + senderId
-                        + "&startDate=" + LocalDateTime.now().minusHours(1)
-                        + "&endDate=" + LocalDateTime.now().plusHours(1),
+                        // UTC frame like the application clock: a machine-local
+                        // window would exclude fresh transfers off-UTC.
+                        + "&startDate=" + LocalDateTime.now(ZoneOffset.UTC).minusHours(1)
+                        + "&endDate=" + LocalDateTime.now(ZoneOffset.UTC).plusHours(1),
                 HttpMethod.GET, new HttpEntity<>(auth), Map.class);
         assertThat(report.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -331,13 +342,13 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String sender = "replay_sender_" + System.currentTimeMillis();
         String receiver = "replay_receiver_" + System.currentTimeMillis();
 
-        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(sender, "Test1234"), Void.class);
-        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(receiver, "Test1234"), Void.class);
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(sender, "BankTest1234"), Void.class);
+        restTemplate.postForEntity("/api/v1/auth/register", new AuthRequest(receiver, "BankTest1234"), Void.class);
 
         ResponseEntity<AuthResponse> loginSender = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(sender, "Test1234"), AuthResponse.class);
+                new AuthRequest(sender, "BankTest1234"), AuthResponse.class);
         ResponseEntity<AuthResponse> loginReceiver = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(receiver, "Test1234"), AuthResponse.class);
+                new AuthRequest(receiver, "BankTest1234"), AuthResponse.class);
 
         HttpHeaders headersSender = new HttpHeaders();
         headersSender.setBearerAuth(loginSender.getBody().token());
@@ -399,10 +410,10 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         String user = "sameacc_" + System.currentTimeMillis();
 
         restTemplate.postForEntity("/api/v1/auth/register",
-                new AuthRequest(user, "Test1234"), Void.class);
+                new AuthRequest(user, "BankTest1234"), Void.class);
 
         ResponseEntity<AuthResponse> login = restTemplate.postForEntity("/api/v1/auth/login",
-                new AuthRequest(user, "Test1234"), AuthResponse.class);
+                new AuthRequest(user, "BankTest1234"), AuthResponse.class);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(login.getBody().token());

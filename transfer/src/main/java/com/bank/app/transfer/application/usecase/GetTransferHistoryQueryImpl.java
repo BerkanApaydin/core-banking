@@ -44,12 +44,13 @@ public class GetTransferHistoryQueryImpl implements GetTransferHistoryQuery {
 
         AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId, "You are not authorized to view this account's transaction history.");
 
-        List<Transfer> transfers = loadTransferPort.findHistory(accountId, cappedPage, cappedSize);
+        // Single range scan serves both the page and its exact total (the
+        // port over-fetches nothing here; the window count rides along).
+        LoadTransferPort.HistoryPage historyPage =
+                loadTransferPort.findHistoryPage(accountId, cappedPage, cappedSize);
 
-        List<TransferResponse> items = viewEnricher.enrich(transfers);
+        List<TransferResponse> items = viewEnricher.enrich(historyPage.items());
 
-        long totalItems = loadTransferPort.countHistory(accountId);
-
-        return PageResponse.of(items, cappedPage, cappedSize, totalItems);
+        return PageResponse.of(items, cappedPage, cappedSize, historyPage.totalElements());
     }
 }

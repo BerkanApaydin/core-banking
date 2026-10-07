@@ -22,7 +22,9 @@ run 'Python version' "$python_cmd" -c "import sys; assert sys.version_info >= (3
 run 'Docker daemon for Testcontainers' docker info --format '{{.ServerVersion}}'
 run 'Java unit and integration tests with JaCoCo' ./mvnw -B -ntp clean verify
 run 'Aggregate coverage gate' "$python_cmd" scripts/check_aggregate_coverage.py app/target/site/jacoco-aggregate/jacoco.xml
+run 'No Spring field injection in tests' "$python_cmd" scripts/check_test_injection.py
 run 'Load-test runner unit tests' "$python_cmd" -m unittest load_tests.test_runner -v
+run 'Load acceptance thresholds pinned' "$python_cmd" scripts/check_load_acceptance.py
 run 'Health-smoke unit tests' "$python_cmd" -m unittest ops.test_health_smoke -v
 
 for script in i18n.js idempotency.js accounts.js transfers.js app.js; do

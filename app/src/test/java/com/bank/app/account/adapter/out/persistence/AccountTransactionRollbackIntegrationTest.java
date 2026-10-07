@@ -1,5 +1,6 @@
 package com.bank.app.account.adapter.out.persistence;
 
+import com.bank.app.user.domain.Role;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
@@ -10,7 +11,9 @@ import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -34,14 +37,21 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
         @MockitoBean
         private EventPublisherPort eventPublisherPort;
 
-        @Autowired
-        private CreateAccountUseCase createAccountUseCase;
+        private final CreateAccountUseCase createAccountUseCase;
+
+        private final AccountJpaRepository accountJpaRepository;
+
+        private final UserJpaRepository userRepository;
 
         @Autowired
-        private AccountJpaRepository accountJpaRepository;
-
-        @Autowired
-        private UserJpaRepository userRepository;
+        AccountTransactionRollbackIntegrationTest(CreateAccountUseCase createAccountUseCase,
+                        AccountJpaRepository accountJpaRepository, UserJpaRepository userRepository,
+                        ObjectProvider<CacheManager> cacheManagers) {
+                super(cacheManagers);
+                this.createAccountUseCase = createAccountUseCase;
+                this.accountJpaRepository = accountJpaRepository;
+                this.userRepository = userRepository;
+        }
 
         private Long userId;
 
@@ -50,7 +60,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
                 UserJpaEntity user = new UserJpaEntity();
                 user.setUsername("testuser");
                 user.setPassword("encoded");
-                user.setRole("ROLE_USER");
+                user.setRole(Role.ROLE_USER);
                 user = userRepository.save(user);
                 userId = user.getId();
 

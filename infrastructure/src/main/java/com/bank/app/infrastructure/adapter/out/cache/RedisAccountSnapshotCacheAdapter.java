@@ -10,15 +10,15 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -46,20 +46,45 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
     private static final int EVICTION_BATCH_SIZE = 500;
 
-    static final String KEY_PREFIX = "account-snapshot:";
-    static final String ID_PREFIX = "id-";
-    static final String IBAN_PREFIX = "iban-";
-    static final String BATCH_PREFIX = "batch:";
-    static final String IDX_IBANS_BY_ID_PREFIX = "idx:ibans-by-id:";
-    static final String IDX_ID_BY_IBAN_PREFIX = "idx:id-by-iban:";
+    /**
+     * Single-round-trip eviction: the SMEMBERS index read and the DEL run
+     * server-side, so a balance mutation costs 1 RTT per account instead of
+     * read-then-delete (2 RTT). KEYS = [idKey, mapKey, idxKey],
+     * ARGV = [ibanKeyPrefix, idByIbanPrefix].
+     */
+    private static final String LUA_EVICT_BY_ID =
+        "local members = redis.call('SMEMBERS', KEYS[3])\n" +
+        "local del = {KEYS[1], KEYS[2], KEYS[3]}\n" +
+        "for _, m in ipairs(members) do\n" +
+        "    del[#del + 1] = ARGV[1] .. m\n" +
+        "    del[#del + 1] = ARGV[2] .. m\n" +
+        "end\n" +
+        "return redis.call('DEL', unpack(del))";
+
+    /**
+     * Single-round-trip bulk write: N TTL'd id-to-IBAN mappings in one EVAL.
+     * KEYS = map keys in ascending id order, ARGV = [ttlSeconds, value...]
+     * aligned with KEYS.
+     */
+    private static final String LUA_PUT_IBANS =
+        "local ttl = tonumber(ARGV[1])\n" +
+        "for i, k in ipairs(KEYS) do\n" +
+        "    redis.call('SETEX', k, ttl, ARGV[i + 1])\n" +
+        "end\n" +
+        "return #KEYS";
+
 
     private final StringRedisTemplate redisTemplate;
     private final long ttlSeconds;
+    private final DefaultRedisScript<Long> evictByIdScript;
+    private final DefaultRedisScript<Long> putIbansScript;
 
     public RedisAccountSnapshotCacheAdapter(StringRedisTemplate redisTemplate,
             CacheProperties cacheProperties) {
         this.redisTemplate = redisTemplate;
-        this.ttlSeconds = cacheProperties.getAccountInfo().getExpireAfterWrite();
+        this.ttlSeconds = cacheProperties.accountInfo().expireAfterWrite();
+        this.evictByIdScript = new DefaultRedisScript<>(LUA_EVICT_BY_ID, Long.class);
+        this.putIbansScript = new DefaultRedisScript<>(LUA_PUT_IBANS, Long.class);
     }
 
     @Override
@@ -67,7 +92,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         if (accountId == null) {
             return Optional.empty();
         }
-        return readSnapshot(KEY_PREFIX + ID_PREFIX + accountId);
+        return readSnapshot(SnapshotKeys.idKey(accountId));
     }
 
     @Override
@@ -75,7 +100,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         if (accountId == null || snapshot == null) {
             return;
         }
-        writeSnapshot(KEY_PREFIX + ID_PREFIX + accountId, snapshot);
+        writeSnapshot(SnapshotKeys.idKey(accountId), snapshot);
     }
 
     @Override
@@ -83,7 +108,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         if (ibanValue == null) {
             return Optional.empty();
         }
-        return readSnapshot(KEY_PREFIX + IBAN_PREFIX + AccountSnapshotCache.ibanKey(ibanValue));
+        return readSnapshot(SnapshotKeys.ibanKey(ibanValue));
     }
 
     @Override
@@ -92,19 +117,32 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             return;
         }
         String ibanKey = AccountSnapshotCache.ibanKey(ibanValue);
-        writeSnapshot(KEY_PREFIX + IBAN_PREFIX + ibanKey, snapshot);
+        writeSnapshot(SnapshotKeys.ibanKeyRaw(ibanKey), snapshot);
         trackIban(snapshot.id(), ibanKey);
     }
 
     @Override
     public Optional<Map<Long, String>> getIbans(Collection<Long> accountIds) {
-        if (accountIds == null) {
+        if (accountIds == null || accountIds.isEmpty()) {
             return Optional.empty();
         }
+        List<Long> ids = accountIds.stream().distinct().sorted().toList();
+        if (ids.stream().anyMatch(id -> id == null)) {
+            return Optional.empty();
+        }
+        // All-or-nothing bulk read in a single MGET round trip.
+        List<String> keys = ids.stream().map(id -> SnapshotKeys.mapKey(id)).toList();
         try {
-            String raw = redisTemplate.opsForValue().get(KEY_PREFIX + BATCH_PREFIX
-                    + AccountSnapshotCache.ibansBatchKey(accountIds));
-            return Optional.ofNullable(decodeBatch(raw));
+            List<String> values = redisTemplate.opsForValue().multiGet(keys);
+            if (values == null || values.size() != keys.size()
+                    || values.stream().anyMatch(value -> value == null || value.isEmpty())) {
+                return Optional.empty();
+            }
+            Map<Long, String> result = new HashMap<>();
+            for (int index = 0; index < ids.size(); index++) {
+                result.put(ids.get(index), values.get(index));
+            }
+            return result.isEmpty() ? Optional.empty() : Optional.of(Map.copyOf(result));
         } catch (RuntimeException e) {
             log.warn("Redis snapshot batch read failed, falling back to DB: {}", e.getClass().getSimpleName());
             return Optional.empty();
@@ -117,9 +155,22 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             return;
         }
         try {
-            redisTemplate.opsForValue().set(
-                    KEY_PREFIX + BATCH_PREFIX + AccountSnapshotCache.ibansBatchKey(accountIds),
-                    encodeBatch(ibans), ttlSeconds, TimeUnit.SECONDS);
+            // Map keys are authoritative; one TTL'd entry per account id.
+            // Sorted for a deterministic KEYS/ARGV alignment (and testability).
+            List<Long> ids = ibans.keySet().stream()
+                    .filter(id -> id != null && ibans.get(id) != null && !ibans.get(id).isEmpty())
+                    .sorted()
+                    .toList();
+            if (ids.isEmpty()) {
+                return;
+            }
+            List<String> keys = ids.stream().map(SnapshotKeys::mapKey).toList();
+            Object[] args = new Object[ids.size() + 1];
+            args[0] = String.valueOf(ttlSeconds);
+            for (int i = 0; i < ids.size(); i++) {
+                args[i + 1] = ibans.get(ids.get(i));
+            }
+            redisTemplate.execute(putIbansScript, keys, args);
         } catch (RuntimeException e) {
             log.warn("Redis snapshot batch write failed: {}", e.getClass().getSimpleName());
         }
@@ -128,7 +179,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     @Override
     public void evictAll() {
         ScanOptions options = ScanOptions.scanOptions()
-                .match(KEY_PREFIX + "*")
+                .match(SnapshotKeys.scanPattern())
                 .count(EVICTION_BATCH_SIZE)
                 .build();
         try (Cursor<String> cursor = redisTemplate.scan(options)) {
@@ -154,50 +205,22 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             return;
         }
         try {
-            redisTemplate.delete(KEY_PREFIX + ID_PREFIX + accountId);
-            String idxKey = KEY_PREFIX + IDX_IBANS_BY_ID_PREFIX + accountId;
-            Set<String> ibanKeys = redisTemplate.opsForSet().members(idxKey);
-            if (ibanKeys != null) {
-                for (String ibanKey : ibanKeys) {
-                    redisTemplate.delete(KEY_PREFIX + IBAN_PREFIX + ibanKey);
-                    redisTemplate.delete(KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX + ibanKey);
-                }
-            }
-            redisTemplate.delete(idxKey);
+            // One server-side Lua (SMEMBERS + DEL) instead of N+1 singles:
+            // eviction runs inside the request path of every balance mutation.
+            List<String> keys = List.of(
+                    SnapshotKeys.idKey(accountId),
+                    SnapshotKeys.mapKey(accountId),
+                    SnapshotKeys.ibansByIdIndex(accountId));
+            redisTemplate.execute(evictByIdScript, keys,
+                    SnapshotKeys.ibanKeyPrefix(), SnapshotKeys.idByIbanPrefix());
         } catch (RuntimeException e) {
             log.warn("Redis snapshot evict-by-id failed: {}", e.getClass().getSimpleName());
         }
     }
 
-    @Override
-    public void evictByIban(String ibanValue) {
-        if (ibanValue == null) {
-            return;
-        }
-        String ibanKey = AccountSnapshotCache.ibanKey(ibanValue);
-        try {
-            redisTemplate.delete(KEY_PREFIX + IBAN_PREFIX + ibanKey);
-            String reverseKey = KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX + ibanKey;
-            String accountId = redisTemplate.opsForValue().get(reverseKey);
-            if (accountId != null) {
-                redisTemplate.opsForSet().remove(KEY_PREFIX + IDX_IBANS_BY_ID_PREFIX + accountId, ibanKey);
-            }
-            redisTemplate.delete(reverseKey);
-        } catch (RuntimeException e) {
-            log.warn("Redis snapshot evict-by-iban failed: {}", e.getClass().getSimpleName());
-        }
-    }
-
-    @Override
-    public void evictIbansBatch() {
-        // id->IBAN mappings are immutable (IBAN never changes on transfer), so batch
-        // entries cannot go stale due to balance mutations. No-op by design; the
-        // Redis TTL bounds any residual staleness from out-of-band changes.
-    }
-
     private Optional<AccountSnapshot> readSnapshot(String key) {
         try {
-            return Optional.ofNullable(decodeSnapshot(redisTemplate.opsForValue().get(key)));
+            return Optional.ofNullable(SnapshotCodec.decode(redisTemplate.opsForValue().get(key)));
         } catch (RuntimeException e) {
             log.warn("Redis snapshot read failed, falling back to DB: {}", e.getClass().getSimpleName());
             return Optional.empty();
@@ -206,7 +229,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private void writeSnapshot(String key, AccountSnapshot snapshot) {
         try {
-            redisTemplate.opsForValue().set(key, encodeSnapshot(snapshot), ttlSeconds, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(key, SnapshotCodec.encode(snapshot), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
             log.warn("Redis snapshot write failed: {}", e.getClass().getSimpleName());
         }
@@ -214,63 +237,15 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private void trackIban(Long accountId, String ibanKey) {
         try {
-            String idxKey = KEY_PREFIX + IDX_IBANS_BY_ID_PREFIX + accountId;
+            String idxKey = SnapshotKeys.ibansByIdIndex(accountId);
             redisTemplate.opsForSet().add(idxKey, ibanKey);
             redisTemplate.expire(idxKey, ttlSeconds, TimeUnit.SECONDS);
             redisTemplate.opsForValue().set(
-                    KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX + ibanKey,
+                    SnapshotKeys.idByIbanIndex(ibanKey),
                     String.valueOf(accountId), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
             log.warn("Redis snapshot index write failed: {}", e.getClass().getSimpleName());
         }
     }
 
-    static String encodeSnapshot(AccountSnapshot snapshot) {
-        return snapshot.id() + "|" + snapshot.userId() + "|" + snapshot.currency() + "|" + snapshot.status();
-    }
-
-    static AccountSnapshot decodeSnapshot(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return null;
-        }
-        String[] parts = raw.split("\\|", -1);
-        if (parts.length != 4) {
-            return null;
-        }
-        try {
-            return new AccountSnapshot(Long.parseLong(parts[0]), Long.parseLong(parts[1]), parts[2], parts[3]);
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    static String encodeBatch(Map<Long, String> ibans) {
-        StringBuilder sb = new StringBuilder();
-        new TreeMap<>(ibans).forEach((id, iban) -> {
-            if (!sb.isEmpty()) {
-                sb.append(',');
-            }
-            sb.append(id).append('=').append(iban);
-        });
-        return sb.toString();
-    }
-
-    static Map<Long, String> decodeBatch(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return null;
-        }
-        Map<Long, String> result = new HashMap<>();
-        for (String entry : raw.split(",", -1)) {
-            int sep = entry.indexOf('=');
-            if (sep <= 0) {
-                return null;
-            }
-            try {
-                result.put(Long.parseLong(entry.substring(0, sep)), entry.substring(sep + 1));
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return result.isEmpty() ? null : Map.copyOf(result);
-    }
 }

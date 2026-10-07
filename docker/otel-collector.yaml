@@ -1,0 +1,34 @@
+# OpenTelemetry Collector configuration for bank-app tracing.
+# Local: mounted into the otel-collector service in docker-compose.yml.
+# Prod: reference for the k8s/otel-collector.yaml ConfigMap (same content).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+  # Keep cardinality bounded: drop high-noise HTTP attributes the app does
+  # not need for banking traces (full URLs may carry account IDs).
+  attributes/delete-http-target:
+    action: delete
+    key: http.target
+
+exporters:
+  # Local default: human-readable verification that spans arrive.
+  # Production: replace with jaeger/tempo/otlphttp to your backend
+  # (see docs/tracing.md) — logging alone is not retention.
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 50
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/delete-http-target, batch]
+      exporters: [logging]

@@ -16,8 +16,14 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     @Query("SELECT t FROM TransferJpaEntity t WHERE t.id = :id")
     Optional<TransferJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
-    List<TransferJpaEntity> findBySenderAccountIdOrReceiverAccountIdOrderByCreatedAtDescIdDesc(
-            Long senderId, Long receiverId, Pageable pageable);
+    /**
+     * One range scan returns the page rows plus the total match count
+     * (window function, same value on every row): no second COUNT query.
+     * Each element is {@code Object[]{TransferJpaEntity, Long totalCount}}.
+     */
+    List<Object[]> findHistoryPage(@Param("accountId") Long accountId,
+                                   @Param("limit") int limit,
+                                   @Param("offset") long offset);
 
     // Business-time filter on business_created_at (V20, NOT NULL since V28).
     // The previous COALESCE(business_created_at, created_at) fallback defeated
@@ -27,12 +33,25 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     // created_at (insert order) by design.
     @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
            + "AND t.businessCreatedAt BETWEEN :start AND :end "
-           + "ORDER BY t.createdAt DESC, t.id DESC")
+            + "ORDER BY t.createdAt DESC, t.id DESC")
     List<TransferJpaEntity> findHistoryBetween(
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end,
             Pageable pageable);
 
-    long countBySenderAccountIdOrReceiverAccountId(Long senderId, Long receiverId);
+    /**
+     * Whole-range aggregates over the same business-time predicate (the V21
+     * business-time index applies; no entity hydration, one scan).
+     * Returns one row {@code [count, sum]}; sum is coalesced to zero when empty.
+     * {@code List} (not scalar) return: same single-row-list convention as
+     * the windowed history query.
+     */
+    @Query(value = "SELECT COUNT(*), COALESCE(SUM(t.amount), 0) FROM transfers t "
+            + "WHERE (t.sender_account_id = :accountId OR t.receiver_account_id = :accountId) "
+            + "AND t.business_created_at BETWEEN :start AND :end", nativeQuery = true)
+    List<Object[]> summarizeRange(
+            @Param("accountId") Long accountId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

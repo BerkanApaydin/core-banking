@@ -3,16 +3,21 @@ package com.bank.app.account.application.usecase;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.domain.Account;
+import com.bank.app.account.domain.LedgerEntry;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.event.DomainEvent;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -24,15 +29,21 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
     private final SaveAccountPort saveAccountPort;
     private final ClockProviderPort clockProvider;
     private final DomainEventPublisherService domainEventPublisherService;
+    private final AuditEventPort auditEventPort;
+    private final SaveLedgerPort ledgerPort;
 
     public AdjustAccountBalancesUseCaseImpl(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
             ClockProviderPort clockProvider,
-            DomainEventPublisherService domainEventPublisherService) {
+            DomainEventPublisherService domainEventPublisherService,
+            AuditEventPort auditEventPort,
+            SaveLedgerPort ledgerPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.clockProvider = clockProvider;
         this.domainEventPublisherService = domainEventPublisherService;
+        this.auditEventPort = auditEventPort;
+        this.ledgerPort = ledgerPort;
     }
 
     @Override
@@ -44,9 +55,23 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         Account receiver = resolveReceiver(pair, senderId, receiverId);
         sender.debit(amount, clockProvider.clock());
         receiver.credit(amount, clockProvider.clock());
-        saveAccounts(sender, receiver);
+        // 7.2: keep the saved aggregates — they carry the bumped @Version.
+        // Re-saving the pre-save instances later would fail on a stale version
+        // that looks like a real concurrency conflict.
+        Account savedSender = saveAccountPort.save(sender);
+        Account savedReceiver = saveAccountPort.save(receiver);
+        // Double-entry journal: both legs share one ref and join this
+        // transaction, so they net to zero or the money rolls back with them.
+        String operationRef = LedgerEntry.newTransactionRef();
+        ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
+                operationRef, clockProvider.clock()));
+        ledgerPort.save(LedgerEntry.credit(receiverId, amount, savedReceiver.getBalance(),
+                operationRef, clockProvider.clock()));
         publishCollectedEvents(sender, receiver);
-        return new AccountAdjustmentResult(senderId, receiverId, sender.getBalance(), receiver.getBalance());
+        auditMovement("ACCOUNT_DEBITED", savedSender, amount);
+        auditMovement("ACCOUNT_CREDITED", savedReceiver, amount);
+        return new AccountAdjustmentResult(senderId, receiverId,
+                savedSender.getBalance(), savedReceiver.getBalance());
     }
 
     @Override
@@ -58,9 +83,36 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         Account receiver = resolveReceiver(pair, senderId, receiverId);
         sender.credit(amount, clockProvider.clock());
         receiver.debit(amount, clockProvider.clock());
-        saveAccounts(sender, receiver);
+        Account savedSender = saveAccountPort.save(sender);
+        Account savedReceiver = saveAccountPort.save(receiver);
+        String operationRef = LedgerEntry.newTransactionRef();
+        ledgerPort.save(LedgerEntry.credit(senderId, amount, savedSender.getBalance(),
+                operationRef, clockProvider.clock()));
+        ledgerPort.save(LedgerEntry.debit(receiverId, amount, savedReceiver.getBalance(),
+                operationRef, clockProvider.clock()));
         publishCollectedEvents(sender, receiver);
-        return new AccountAdjustmentResult(senderId, receiverId, sender.getBalance(), receiver.getBalance());
+        auditMovement("ACCOUNT_CREDITED", savedSender, amount);
+        auditMovement("ACCOUNT_DEBITED", savedReceiver, amount);
+        return new AccountAdjustmentResult(senderId, receiverId,
+                savedSender.getBalance(), savedReceiver.getBalance());
+    }
+
+    /**
+     * One audit row per balance leg, in the same transaction as the mutation:
+     * a failed audit write rolls the money movement back. Legs are attributed
+     * to "system" (see {@link AuditEvent} default); the user-facing row that
+     * carries the acting username is written by the calling transfer use case
+     * ({@code TRANSFER_EXECUTED} / {@code TRANSFER_CANCELLED}).
+     */
+    // S6: the saved aggregate travels as one object instead of three
+    // loosely-related primitives (id + balance + implicit pairing).
+    private void auditMovement(String action, Account account, Money amount) {
+        String verb = "ACCOUNT_DEBITED".equals(action) ? "Debited" : "Credited";
+        auditEventPort.publish(new AuditEvent(action,
+                String.format("%s %s account ID %d (balance after: %s)",
+                        verb, amount, account.getId(), account.getBalance()),
+                LocalDateTime.now(clockProvider.clock()),
+                "system", account.getUserId().value()));
     }
 
     private void publishCollectedEvents(Account sender, Account receiver) {
@@ -98,8 +150,4 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         return senderId < receiverId ? pair.higherIdItem() : pair.lowerIdItem();
     }
 
-    private void saveAccounts(Account sender, Account receiver) {
-        saveAccountPort.save(sender);
-        saveAccountPort.save(receiver);
-    }
 }

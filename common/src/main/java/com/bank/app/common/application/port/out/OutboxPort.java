@@ -13,6 +13,13 @@ public interface OutboxPort {
     void markFailed(String id, String error, int retryCount);
     void markDeadLetter(String id, String error, int retryCount);
 
+    /**
+     * Retention hygiene: deletes processed, non-dead-letter rows older than the
+     * cutoff. Dead letters are evidence and are never auto-deleted; unprocessed
+     * rows are the recovery source. Returns the deleted count.
+     */
+    int deleteProcessedBefore(LocalDateTime cutoff);
+
     record EventEntry(String id, String aggregateType, String aggregateId, String eventType,
                       String payload, int retryCount, boolean processed, boolean deadLetter,
                       String lastError, int partition, LocalDateTime createdAt, LocalDateTime processedAt) {

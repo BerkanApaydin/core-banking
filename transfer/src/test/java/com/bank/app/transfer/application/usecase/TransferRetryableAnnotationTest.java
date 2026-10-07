@@ -29,7 +29,7 @@ class TransferRetryableAnnotationTest {
         @Test
         void aspectShouldRetryOnOptimisticLockingFailure() {
                 TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                        new TransferProperties(24, 3, 500, 2000, 100));
+                        new TransferProperties(java.time.Duration.ofHours(24), 3, 500, 2000, 100));
                 assertNotNull(aspect);
         }
 }

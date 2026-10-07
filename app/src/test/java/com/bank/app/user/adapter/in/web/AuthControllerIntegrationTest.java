@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.user.domain.Role;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
@@ -12,7 +13,9 @@ import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -32,20 +35,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SuppressWarnings("null")
 class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final MockMvc mockMvc;
+
+    private final UserJpaRepository userRepository;
+
+    private final PasswordEncoder passwordEncoder;
+
+    private final ObjectMapper objectMapper;
+
+    private final CaffeineLoginAttemptAdapter CaffeineLoginAttemptAdapter;
 
     @Autowired
-    private UserJpaRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private CaffeineLoginAttemptAdapter CaffeineLoginAttemptAdapter;
+    AuthControllerIntegrationTest(MockMvc mockMvc, UserJpaRepository userRepository,
+            PasswordEncoder passwordEncoder, ObjectMapper objectMapper,
+            CaffeineLoginAttemptAdapter CaffeineLoginAttemptAdapter,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.mockMvc = mockMvc;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.objectMapper = objectMapper;
+        this.CaffeineLoginAttemptAdapter = CaffeineLoginAttemptAdapter;
+    }
 
     @BeforeEach
     void setUp() {
@@ -55,7 +66,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Test
     void shouldRegisterUserSuccessfully() throws Exception {
-        AuthRequest request = new AuthRequest("new_user", "My_passw0rd");
+        AuthRequest request = new AuthRequest("new_user", "My_passw0rd12");
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -66,8 +77,8 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
                 .orElseThrow(() -> new AssertionError("User was not saved"));
 
         assertEquals("new_user", savedUser.getUsername());
-        assertEquals("ROLE_USER", savedUser.getRole());
-        assertTrue(passwordEncoder.matches("My_passw0rd", savedUser.getPassword()));
+        assertEquals(Role.ROLE_USER, savedUser.getRole());
+        assertTrue(passwordEncoder.matches("My_passw0rd12", savedUser.getPassword()));
     }
 
     @Test
@@ -75,17 +86,18 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         UserJpaEntity existingUser = new UserJpaEntity();
         existingUser.setUsername("existing_user");
         existingUser.setPassword(passwordEncoder.encode("password"));
-        existingUser.setRole("ROLE_USER");
+        existingUser.setRole(Role.ROLE_USER);
         userRepository.save(existingUser);
 
-        AuthRequest request = new AuthRequest("existing_user", "new_password");
+        AuthRequest request = new AuthRequest("existing_user", "NewPassword12");
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.code", is("INVALID_ARGUMENT")));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status", is(409)))
+                .andExpect(jsonPath("$.code", is("USERNAME_TAKEN")))
+                .andExpect(jsonPath("$.message", is("Username is already in use: existing_user")));
     }
 
     @Test
@@ -93,7 +105,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername("login_user");
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRole("ROLE_USER");
+        user.setRole(Role.ROLE_USER);
         userRepository.save(user);
 
         AuthRequest request = new AuthRequest("login_user", "password");
@@ -112,7 +124,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername("login_user");
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRole("ROLE_USER");
+        user.setRole(Role.ROLE_USER);
         userRepository.save(user);
 
         AuthRequest request = new AuthRequest("login_user", "wrong_password");
@@ -177,7 +189,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRole("ROLE_USER");
+        user.setRole(Role.ROLE_USER);
         return userRepository.save(user);
     }
 
@@ -269,7 +281,7 @@ class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername("blocked_user");
         user.setPassword(passwordEncoder.encode("Mypassw0rd!"));
-        user.setRole("ROLE_USER");
+        user.setRole(Role.ROLE_USER);
         userRepository.save(user);
 
         AuthRequest request = new AuthRequest("blocked_user", "wrongpass");

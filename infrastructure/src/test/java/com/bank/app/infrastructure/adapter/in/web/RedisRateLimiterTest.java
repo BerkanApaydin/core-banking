@@ -24,9 +24,7 @@ class RedisRateLimiterTest {
 
     @BeforeEach
     void setUp() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setMaxRequests(5);
-        props.setTimeWindowMs(10_000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000);
         rateLimiter = new RedisRateLimiter(
                 redisTemplate,
                 props);
@@ -75,5 +73,17 @@ class RedisRateLimiterTest {
     @Test
     void shouldThrowWhenClientKeyIsNull() {
         assertThrows(IllegalArgumentException.class, () -> rateLimiter.tryAcquire(null));
+    }
+
+    @Test
+    void shouldPassTierBudgetToLuaScript() {
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(), anyString(), anyString()))
+                .thenReturn(1L);
+
+        assertTrue(rateLimiter.tryAcquire("user1", 120, 60_000));
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("rate_limit:sliding:user1")),
+                anyString(), eq("60000"), eq("120"));
     }
 }

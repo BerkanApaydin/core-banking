@@ -40,4 +40,28 @@ class MicrometerAuditFailureAdapterTest {
 
         noMetrics.recordFailure("TRANSFER_CANCELLED", "DataAccessException");
     }
+
+    @Test
+    void shouldIncrementConsumedCounterTaggedByAction() {
+        adapter.recordConsumed("ACCOUNT_DEBITED");
+        adapter.recordConsumed("ACCOUNT_DEBITED");
+
+        assertEquals(2.0, meterRegistry.counter("audit.event.consumed",
+                "action", "ACCOUNT_DEBITED").count());
+    }
+
+    @Test
+    void shouldDefaultNullConsumedActionToUnknown() {
+        adapter.recordConsumed(null);
+
+        assertEquals(1.0, meterRegistry.counter("audit.event.consumed",
+                "action", "unknown").count());
+    }
+
+    @Test
+    void shouldIgnoreConsumedWhenNoRegistryAvailable() {
+        MicrometerAuditFailureAdapter noMetrics = new MicrometerAuditFailureAdapter(null);
+
+        noMetrics.recordConsumed("TRANSFER_CANCELLED");
+    }
 }

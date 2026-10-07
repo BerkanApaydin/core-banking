@@ -60,8 +60,8 @@ class DataSeederTest {
         CommandLineRunner runner = dataSeeder.seedData();
         runner.run();
 
-        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet123"));
-        verify(registerUserUseCase).execute(new AuthRequest("ayse", "Ayse1234"));
+        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet123456"));
+        verify(registerUserUseCase).execute(new AuthRequest("ayse", "Ayse12345678"));
         verify(createAccountPort, atLeastOnce()).execute(any(CreateAccountRequest.class));
     }
 
@@ -105,7 +105,7 @@ class DataSeederTest {
         assertEquals("User Ahmet not found.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ahmet", "Ahmet123"));
+                .execute(new AuthRequest("ahmet", "Ahmet123456"));
     }
 
     @Test
@@ -127,7 +127,7 @@ class DataSeederTest {
         assertEquals("User Ayse not found.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ayse", "Ayse1234"));
+                .execute(new AuthRequest("ayse", "Ayse12345678"));
     }
 
     @Test

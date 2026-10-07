@@ -68,12 +68,12 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     }
 
     @Override
-    public void deleteById(String key) {
-        repository.deleteById(key);
+    public int deleteExpired(LocalDateTime threshold) {
+        return repository.deleteExpiredTerminalRequests(threshold);
     }
 
     @Override
-    public int deleteExpired(LocalDateTime threshold) {
-        return repository.deleteExpiredTerminalRequests(threshold);
+    public int deleteExpiredHandlerKeys(LocalDateTime threshold) {
+        return repository.deleteExpiredHandlerKeys(threshold);
     }
 }

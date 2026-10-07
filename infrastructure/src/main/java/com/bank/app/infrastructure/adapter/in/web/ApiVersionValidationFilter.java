@@ -1,5 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -7,6 +9,7 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,17 @@ import java.io.IOException;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiVersionValidationFilter implements Filter {
 
+    private final ObjectMapper objectMapper;
+
+    public ApiVersionValidationFilter() {
+        this(new ObjectMapper());
+    }
+
+    @Autowired
+    public ApiVersionValidationFilter(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
@@ -26,7 +40,10 @@ public class ApiVersionValidationFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-        String path = httpRequest.getRequestURI();
+        // Same normalization as the rate limiter: encoded aliases and context
+        // paths must not silently disable version validation either. The
+        // "/api/" shape check stays as-is (extractVersionFromPath assumes it).
+        String path = RequestPathResolver.resolve(httpRequest);
 
         if (!path.startsWith("/api/")) {
             chain.doFilter(request, response);
@@ -38,17 +55,18 @@ public class ApiVersionValidationFilter implements Filter {
             // extractVersionFromPath never returns null here (path is /api/-prefixed).
             String pathVersion = extractVersionFromPath(path);
             if (!versionHeader.equals(pathVersion)) {
-                httpResponse.setStatus(HttpStatus.NOT_ACCEPTABLE.value());
-                httpResponse.setContentType("application/json");
-                httpResponse.setCharacterEncoding("UTF-8");
-                // Never reflect the raw header: quote/control characters would
-                // break the JSON body (and quoted reflection is an XSS vector
-                // if ever rendered). Emit only a safe allowlisted token.
+                // Same RFC 7807 shape as every other error body (ProblemDetail):
+                // the previous hand-rolled {"status","error","message"} payload
+                // forced clients to maintain two parsers. The allowlisted token
+                // rule below stays: raw header reflection would break JSON and
+                // is an XSS vector if ever rendered.
                 String safeHeader = versionHeader.matches("[A-Za-z0-9._-]{1,16}")
                         ? versionHeader : "invalid";
-                httpResponse.getWriter().write(
-                        "{\"status\":406,\"error\":\"API version mismatch\",\"message\":\"X-API-Version header '" +
-                        safeHeader + "' does not match requested API version '" + pathVersion + "'\"}");
+                ProblemDetailFactory.writeProblem(httpResponse, objectMapper,
+                        HttpStatus.NOT_ACCEPTABLE, "API_VERSION_MISMATCH",
+                        "API version mismatch: X-API-Version header '" + safeHeader
+                                + "' does not match requested API version '" + pathVersion + "'",
+                        path);
                 return;
             }
         }

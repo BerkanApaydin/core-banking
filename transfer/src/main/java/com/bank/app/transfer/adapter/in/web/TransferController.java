@@ -8,11 +8,13 @@ import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
+import com.bank.app.transfer.application.dto.TransferReportTotalsResponse;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportTotalsQuery;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -48,17 +50,20 @@ public class TransferController {
     private final GetTransferDetailQuery getTransferDetailQuery;
     private final GetTransferHistoryQuery getTransferHistoryQuery;
     private final GenerateTransferReportQuery generateTransferReportQuery;
+    private final GenerateTransferReportTotalsQuery generateTransferReportTotalsQuery;
 
     public TransferController(PlaceTransferUseCase placeTransferUseCase,
             CancelTransferUseCase cancelTransferUseCase,
             GetTransferDetailQuery getTransferDetailQuery,
             GetTransferHistoryQuery getTransferHistoryQuery,
-            GenerateTransferReportQuery generateTransferReportQuery) {
+            GenerateTransferReportQuery generateTransferReportQuery,
+            GenerateTransferReportTotalsQuery generateTransferReportTotalsQuery) {
         this.placeTransferUseCase = placeTransferUseCase;
         this.cancelTransferUseCase = cancelTransferUseCase;
         this.getTransferDetailQuery = getTransferDetailQuery;
         this.getTransferHistoryQuery = getTransferHistoryQuery;
         this.generateTransferReportQuery = generateTransferReportQuery;
+        this.generateTransferReportTotalsQuery = generateTransferReportTotalsQuery;
     }
 
     @PostMapping
@@ -76,7 +81,7 @@ public class TransferController {
 
     @PostMapping("/{id}/cancel")
     @Idempotent(required = true)
-    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within 24 hours by transfer ID and refunds balances. Idempotency-Key header is required.")
+    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within the configured cancellation window by transfer ID and refunds balances. Idempotency-Key header is required.")
     @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
             description = "Required de-duplication key; missing header is rejected with 409.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
@@ -110,5 +115,16 @@ public class TransferController {
             @RequestParam(defaultValue = "100") @Min(1) @Max(100) int size) {
         return ResponseEntity
                 .ok(generateTransferReportQuery.execute(new ReportCriteria(accountId, startDate, endDate, page, size)));
+    }
+
+    @GetMapping("/report/totals")
+    @Operation(summary = "Aggregates whole-range transfer totals by date range",
+            description = "Single indexed COUNT+SUM scan over the same window the paginated report uses. Currency comes from the account; cross-currency legs are rejected by the domain, so one total is exact.")
+    public ResponseEntity<TransferReportTotalsResponse> getReportTotals(
+            @RequestParam Long accountId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(generateTransferReportTotalsQuery
+                .execute(new ReportCriteria(accountId, startDate, endDate)));
     }
 }

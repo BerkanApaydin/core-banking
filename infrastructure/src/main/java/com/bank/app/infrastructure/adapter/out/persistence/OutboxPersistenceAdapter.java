@@ -5,6 +5,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +19,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public void save(EventEntry entry) {
         repository.save(new OutboxJpaEntity(
                 entry.id(), entry.aggregateType(), entry.aggregateId(),
@@ -29,7 +30,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public List<EventEntry> findAndLockUnprocessed(int limit, int partition) {
         return repository.findAndLockUnprocessed(partition, PageRequest.of(0, limit))
                 .stream()
@@ -44,27 +45,33 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public Optional<EventEntry> findByIdForUpdateSkipLocked(String id) {
         return repository.findByIdForUpdateSkipLocked(id).map(this::toDomain);
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public void markProcessed(String id) {
         repository.markProcessed(id);
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public void markFailed(String id, String error, int retryCount) {
         repository.markFailed(id, error, retryCount);
     }
 
     @Override
-    @Transactional
+    @Transactional(timeout = 30)
     public void markDeadLetter(String id, String error, int retryCount) {
         repository.markDeadLetter(id, error, retryCount);
+    }
+
+    @Override
+    @Transactional(timeout = 30)
+    public int deleteProcessedBefore(LocalDateTime cutoff) {
+        return repository.deleteProcessedBefore(cutoff);
     }
 
     private EventEntry toDomain(OutboxJpaEntity entity) {

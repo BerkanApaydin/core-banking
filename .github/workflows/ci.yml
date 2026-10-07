@@ -24,6 +24,9 @@ jobs:
         fail-on-severity: high
 
   build:
+    # D21: least privilege — checkout + artifact upload need only read.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -52,6 +55,15 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
+    - name: Guard against mutable image tags (K9/D7)
+      # The release workflow pins k8s/bank-app.yaml to a digest; the default
+      # must stay a versioned tag so an unpinned apply can never roll :latest.
+      run: |
+        if grep -q "bank-app:latest" k8s/bank-app.yaml; then
+          echo "::error::k8s/bank-app.yaml must not reference bank-app:latest (K9/D7)"
+          exit 1
+        fi
+
     - name: Set up JDK 21
       uses: actions/setup-java@v5
       with:
@@ -59,13 +71,8 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    - name: Cache Maven dependencies
-      uses: actions/cache@v5
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
-
+    # D21: no explicit actions/cache for ~/.m2 — setup-java's `cache: maven`
+    # above already handles it; the duplicate step only doubled cache writes.
     - name: Unit & Integration Tests (with coverage)
       # PIT runs in a separate parallel Maven invocation and needs reactor JARs
       # (including common's test JAR) installed in the local repository.
@@ -99,6 +106,57 @@ jobs:
 
     - name: Check load-test acceptance criteria
       run: python3 -m unittest load_tests.test_runner -v
+
+    - name: Check load acceptance thresholds are pinned
+      run: python3 scripts/check_load_acceptance.py
+
+    - name: Check restore-drill contract (script, template, ledger gauge)
+      run: python3 scripts/check_restore_drill.py
+
+    - name: Live rate-limit smoke (real app + runner)
+      # Boots the packaged jar against the CI postgres/redis services and runs
+      # the deterministic rate-limit profile (15 registrations -> 429, then
+      # success after the window). Workload/capacity modes stay manual (see
+      # load_tests/README.md): they need raised limits and a long runtime.
+      run: |
+        python3 -m pip install -r load_tests/requirements.txt
+        export SPRING_PROFILES_ACTIVE=dev
+        export DB_HOST=localhost DB_PORT=5432 DB_USERNAME=bank_user DB_PASSWORD=bank_password
+        export REDIS_HOST=localhost REDIS_PORT=6379
+        export JWT_SECRET="${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}"
+        java -jar app/target/app-*.jar > app-load-smoke.log 2>&1 &
+        echo $! > app-load.pid
+        trap 'kill "$(cat app-load.pid)" 2>/dev/null || true' EXIT
+        for i in $(seq 1 36); do
+          if python3 ops/health_smoke.py http://localhost:8080 >/dev/null 2>&1; then
+            break
+          fi
+          sleep 5
+        done
+        python3 ops/health_smoke.py http://localhost:8080
+        # K1/D1 in the profile that CI actually boots (dev). Only
+        # application-prod.yml whitelists /actuator/prometheus, so a secured
+        # endpoint is correct here -- but a 404 is not, and that is exactly the
+        # silent failure mode: prometheus dropped from
+        # management.endpoints.web.exposure.include kills the alarm line in every
+        # environment while every other check stays green.
+        python3 ops/health_smoke.py http://localhost:8080 --require-metrics --allow-metrics-secured
+        python3 load_tests/runner.py --mode rate-limit
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+    - name: Upload load-smoke app log
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: load-smoke-app-log
+        path: app-load-smoke.log
+        if-no-files-found: warn
 
     - name: Check deployment smoke-check contracts
       run: python3 -m unittest ops.test_health_smoke -v

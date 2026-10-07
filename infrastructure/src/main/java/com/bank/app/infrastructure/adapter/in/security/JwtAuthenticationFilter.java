@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
@@ -18,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,8 +30,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.util.Collections;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -49,21 +47,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenBlacklistPort tokenBlacklistPort;
     private final ObjectMapper objectMapper;
     private final BrowserSessionCookies browserSessionCookies;
+    private final com.bank.app.user.application.port.out.CsrfBindingPort csrfBinding;
 
     @Autowired
     public JwtAuthenticationFilter(JwtPort jwtPort,
             TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper,
-            @Value("${app.security.browser-session.secure:false}") boolean secureCookies) {
+            com.bank.app.user.application.port.out.CsrfBindingPort csrfBinding,
+            BrowserSessionCookieProperties browserSession) {
         this.jwtPort = jwtPort;
         this.tokenBlacklistPort = tokenBlacklistPort;
         this.objectMapper = objectMapper;
-        this.browserSessionCookies = new BrowserSessionCookies(secureCookies);
+        this.csrfBinding = csrfBinding;
+        this.browserSessionCookies = new BrowserSessionCookies(browserSession.secure());
     }
 
-    // Kept for isolated filter tests and non-Spring construction.
+    // Kept for isolated filter tests and non-Spring construction: falls back
+    // to the plain double-submit check (no server-side binding). Production
+    // wiring always uses the constructor above.
     public JwtAuthenticationFilter(JwtPort jwtPort,
             TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper) {
-        this(jwtPort, tokenBlacklistPort, objectMapper, false);
+        this(jwtPort, tokenBlacklistPort, objectMapper, new PlainDoubleSubmitCsrfBinding(),
+                new BrowserSessionCookieProperties(false));
+    }
+
+    /** Test-only fallback: unsigned double-submit equality, no MAC binding. */
+    static final class PlainDoubleSubmitCsrfBinding
+            implements com.bank.app.user.application.port.out.CsrfBindingPort {
+        @Override
+        public String issueCsrfToken(String bindingSubject) {
+            throw new UnsupportedOperationException("test fallback cannot mint bound tokens");
+        }
+
+        @Override
+        public boolean verifyCsrfToken(String header, String cookie, String bindingSubject) {
+            return BrowserSessionCookies.validCsrfPair(header, cookie);
+        }
     }
 
     @Override
@@ -75,12 +93,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader(HEADER_AUTHORIZATION);
         final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
         final String path = requestPath(request);
+        // Refresh endpoints own their authentication entirely (refresh token
+        // in body or cookie, validated by the controller): an expired or
+        // blacklisted access token in the header/cookie must not block a
+        // legitimate rotation, so the filter steps aside completely here.
+        if (isRefreshRequest(request, path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         // The browser session cookie is for API calls. Browsers also send it
         // with / and static assets; an expired cookie must not prevent the
         // public application shell from loading so it can show the login UI.
+        // Refresh endpoints authenticate with the refresh token itself (like
+        // login authenticates with a password), so they never require a
+        // valid session up front.
         final boolean browserAuth = authHeader == null
                 && path.startsWith("/api/")
-                && !isPublicLogin(request, path);
+                && !isPublicLogin(request, path)
+                && !isRefreshRequest(request, path);
         final String jwt = bearerAuth ? authHeader.substring(BEARER_PREFIX.length())
                 : browserAuth ? cookieValue(request, browserSessionCookies.sessionCookieName()) : null;
 
@@ -109,30 +139,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // revocation can be retried idempotently; every other route must
             // continue enforcing the blacklist.
             boolean logoutRequest = "POST".equals(request.getMethod())
-                    && ("/api/v1/auth/logout".equals(path)
-                    || "/api/v1/auth/browser/logout".equals(path));
+                    && (PublicApiPaths.LOGOUT.equals(path)
+                    || PublicApiPaths.BROWSER_LOGOUT.equals(path));
             if (!logoutRequest && tokenBlacklistPort.isBlacklisted(jwt)) {
                 ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
                         ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
                 return;
             }
-            if (!bearerAuth && requiresCsrf(request)
-                    && !validCsrf(request, browserSessionCookies.csrfCookieName())) {
+            // Refresh tokens authenticate only the refresh endpoints: a leaked
+            // long-lived token must never pass as API authorization.
+            if (JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
+                    && !isRefreshRequest(request, path)) {
+                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                return;
+            }
+            Long userId = verified.userId();
+            String role = verified.role();
+            if (userId == null || role == null) {
+                // Stateless JWT requires userId+role claims; legacy tokens without
+                // claims are rejected instead of falling back to a DB lookup.
+                // Clients must re-login to obtain a current token.
+                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                return;
+            }
+            // K7/D8: CSRF bound to the server-verified user id — a transplanted
+            // cookie minted for another user fails even with a matching header.
+            // (Legacy 43-char cookies from before the rollout fail closed here;
+            // affected browsers re-login once and receive bound tokens.)
+            if (!bearerAuth && BrowserSessionCookies.requiresCsrf(request.getMethod())
+                    && !csrfBinding.verifyCsrfToken(
+                            request.getHeader(BrowserSessionCookies.CSRF_HEADER),
+                            cookieValue(request, browserSessionCookies.csrfCookieName()),
+                            String.valueOf(userId))) {
                 ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.FORBIDDEN,
                         ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token", request.getRequestURI());
                 return;
             }
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                Long userId = verified.userId();
-                String role = verified.role();
-                if (userId == null || role == null) {
-                    // Stateless JWT requires userId+role claims; legacy tokens without
-                    // claims are rejected instead of falling back to a DB lookup.
-                    // Clients must re-login to obtain a current token.
-                    ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                            ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
-                    return;
-                }
                 UserDetails userDetails = new SimpleAuthenticatedPrincipal(
                         userId,
                         verified.username(),
@@ -176,8 +221,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static boolean isPublicLogin(HttpServletRequest request, String path) {
         if (!"POST".equals(request.getMethod())) return false;
+        // REGISTER is permitAll (see SecurityProperties): a stale/expired
+        // session cookie on a shared browser must not 401 a new registration
+        // before it reaches the controller.
         return PublicApiPaths.LOGIN.equals(path)
-                || PublicApiPaths.BROWSER_LOGIN.equals(path);
+                || PublicApiPaths.BROWSER_LOGIN.equals(path)
+                || PublicApiPaths.REGISTER.equals(path);
+    }
+
+    private static boolean isRefreshRequest(HttpServletRequest request, String path) {
+        if (!"POST".equals(request.getMethod())) return false;
+        return PublicApiPaths.REFRESH.equals(path)
+                || PublicApiPaths.BROWSER_REFRESH.equals(path);
     }
 
     private static String requestPath(HttpServletRequest request) {
@@ -189,23 +244,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String contextPath = request.getContextPath();
         return contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
                 ? uri.substring(contextPath.length()) : uri;
-    }
-
-    private static boolean requiresCsrf(HttpServletRequest request) {
-        return !switch (request.getMethod()) {
-            case "GET", "HEAD", "OPTIONS", "TRACE" -> true;
-            default -> false;
-        };
-    }
-
-    private static boolean validCsrf(HttpServletRequest request, String cookieName) {
-        String header = request.getHeader(BrowserSessionCookies.CSRF_HEADER);
-        String cookie = cookieValue(request, cookieName);
-        if (header == null || cookie == null || header.length() != 43 || cookie.length() != 43) {
-            return false;
-        }
-        return MessageDigest.isEqual(header.getBytes(StandardCharsets.US_ASCII),
-                cookie.getBytes(StandardCharsets.US_ASCII));
     }
 
     private static String cookieValue(HttpServletRequest request, String name) {

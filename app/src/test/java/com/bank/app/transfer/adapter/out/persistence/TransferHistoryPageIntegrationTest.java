@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -84,5 +86,25 @@ class TransferHistoryPageIntegrationTest extends AbstractIntegrationTest {
         List<Object[]> rows = repo.findHistoryPage(999L, 10, 0);
 
         assertTrue(rows.isEmpty());
+    }
+
+    @Test
+    void shouldSummarizeRangeWithCountAndSumInOneScan() {
+        var rows = repo.summarizeRange(201L,
+                LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1));
+
+        assertEquals(1, rows.size());
+        assertEquals(3L, ((Number) rows.get(0)[0]).longValue());
+        assertEquals(0, ((BigDecimal) rows.get(0)[1]).compareTo(new BigDecimal("60.00")));
+    }
+
+    @Test
+    void shouldSummarizeEmptyRangeAsZero() {
+        var rows = repo.summarizeRange(201L,
+                LocalDateTime.now().plusDays(2), LocalDateTime.now().plusDays(3));
+
+        assertEquals(1, rows.size());
+        assertEquals(0L, ((Number) rows.get(0)[0]).longValue());
+        assertEquals(0, ((BigDecimal) rows.get(0)[1]).compareTo(BigDecimal.ZERO));
     }
 }

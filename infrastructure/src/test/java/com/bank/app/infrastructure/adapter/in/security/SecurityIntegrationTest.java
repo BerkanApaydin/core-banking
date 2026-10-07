@@ -4,7 +4,9 @@ import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.TestApplication;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
@@ -29,11 +31,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityIntegrationTest.TestSecurityConfig.class, SecurityIntegrationTest.TestController.class})
 class SecurityIntegrationTest extends AbstractSpringBootIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final MockMvc mockMvc;
+
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+    SecurityIntegrationTest(MockMvc mockMvc, JwtTokenProvider jwtTokenProvider,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.mockMvc = mockMvc;
+        this.jwtTokenProvider = jwtTokenProvider;
+    }
 
     @RestController
     @Profile("security-test")

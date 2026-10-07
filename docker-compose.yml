@@ -2,6 +2,15 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: bank-postgres
+    # K22: local query observability (dev only — production observability
+    # belongs in the managed DB's parameter group, not in a compose file).
+    # pg_stat_statements enables per-query stats; log_min_duration_statement
+    # surfaces slow queries in `docker compose logs postgres`.
+    command:
+      - postgres
+      - -cshared_preload_libraries=pg_stat_statements
+      - -cpg_stat_statements.track=all
+      - -clog_min_duration_statement=200
     ports:
       - "5432:5432"
     environment:
@@ -48,18 +57,40 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-bank_password}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      # No default: the dev secret used to ship here and silently signed local
+      # tokens with a publicly known key. Generate one with:
+      #   openssl rand -base64 32
+      # then `export JWT_SECRET=<output>` (or add it to a local .env file).
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET first - generate one with: openssl rand -base64 32}
       JWT_ALLOW_DEFAULT_SECRET: ${JWT_ALLOW_DEFAULT_SECRET:-true}
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-10}
+      RATE_LIMIT_RESOURCE_MAX_REQUESTS: ${RATE_LIMIT_RESOURCE_MAX_REQUESTS:-120}
+      RATE_LIMIT_RESOURCE_TIME_WINDOW_MS: ${RATE_LIMIT_RESOURCE_TIME_WINDOW_MS:-60000}
       TOKEN_BLACKLIST_BACKEND: ${TOKEN_BLACKLIST_BACKEND:-hybrid}
       CACHE_ACCOUNT_INFO_BACKEND: redis
+      # Local tracing: the collector below receives OTLP/HTTP spans. Prod
+      # keeps TRACING_ENABLED=false until a collector is deployed (D22).
+      TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.113.0
+    container_name: bank-otel-collector
+    command: ["--config=/etc/otel/otel-collector.yaml"]
+    volumes:
+      - ./docker/otel-collector.yaml:/etc/otel/otel-collector.yaml:ro
+    ports:
+      - "4318:4318"
     restart: unless-stopped
 
 volumes:

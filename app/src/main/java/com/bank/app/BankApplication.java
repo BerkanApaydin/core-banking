@@ -5,7 +5,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
@@ -31,7 +30,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.bank.app.infrastructure.adapter.out.persistence",
         "com.bank.app.persistence"
 })
-@EnableAsync
+// No @EnableAsync: no @Async method exists — background work runs on the
+// outbox poller's own executor, which has explicit shutdown semantics.
 @EnableScheduling
 public class BankApplication {
 

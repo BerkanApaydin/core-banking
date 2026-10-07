@@ -114,6 +114,94 @@ class HealthSmokeTest(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             self.assertEqual(0, main([self.url, "--require-probes"]))
 
+    def test_prometheus_scrape_passes_on_exposition_format(self):
+        from ops.health_smoke import check_prometheus
+        from urllib.request import build_opener
+        from ops.health_smoke import NoRedirects
+        self.routes["/actuator/prometheus"] = (
+            200, "text/plain; version=0.0.4",
+            b'# HELP jvm_memory_used_bytes test\n# TYPE jvm_memory_used_bytes gauge\n', {})
+        opener = build_opener(NoRedirects())
+        result = check_prometheus(opener, self.url, 5.0)
+        self.assertTrue(result.passed)
+        self.assertIn("exposition format", result.detail)
+
+    def test_prometheus_scrape_fails_when_secured_or_missing(self):
+        from ops.health_smoke import check_prometheus
+        from urllib.request import build_opener
+        from ops.health_smoke import NoRedirects
+        opener = build_opener(NoRedirects())
+        for status, fragment in ((401, "alarm pipeline dead"), (403, "alarm pipeline dead"),
+                                 (404, "exposure misconfigured")):
+            with self.subTest(status=status):
+                self.routes["/actuator/prometheus"] = (
+                    status, "application/problem+json", b'{"status":%d}' % status, {})
+                result = check_prometheus(opener, self.url, 5.0)
+                self.assertFalse(result.passed)
+                self.assertIn(fragment, result.detail)
+
+    def test_prometheus_scrape_rejects_non_exposition_body(self):
+        from ops.health_smoke import check_prometheus
+        from urllib.request import build_opener
+        from ops.health_smoke import NoRedirects
+        self.routes["/actuator/prometheus"] = (
+            200, "text/plain", b'not metrics at all', {})
+        opener = build_opener(NoRedirects())
+        result = check_prometheus(opener, self.url, 5.0)
+        self.assertFalse(result.passed)
+
+    def test_allow_metrics_secured_accepts_a_deliberately_gated_endpoint(self):
+        from ops.health_smoke import check_prometheus
+        from urllib.request import build_opener
+        from ops.health_smoke import NoRedirects
+        opener = build_opener(NoRedirects())
+        for status in (401, 403):
+            with self.subTest(status=status):
+                self.routes["/actuator/prometheus"] = (
+                    status, "application/problem+json", b'{"status":%d}' % status, {})
+                result = check_prometheus(opener, self.url, 5.0, allow_secured=True)
+                self.assertTrue(result.passed)
+                self.assertIn("secured by policy", result.detail)
+
+    def test_allow_metrics_secured_still_fails_when_the_endpoint_is_not_exposed(self):
+        # This is the whole point of the flag: a secured endpoint is expected
+        # outside production, but a 404 means prometheus was dropped from
+        # management.endpoints.web.exposure.include and the alarm line is dead
+        # in every environment.
+        from ops.health_smoke import check_prometheus
+        from urllib.request import build_opener
+        from ops.health_smoke import NoRedirects
+        self.routes["/actuator/prometheus"] = (
+            404, "application/problem+json", b'{"status":404}', {})
+        opener = build_opener(NoRedirects())
+        result = check_prometheus(opener, self.url, 5.0, allow_secured=True)
+        self.assertFalse(result.passed)
+        self.assertIn("exposure misconfigured", result.detail)
+
+    def test_run_checks_forwards_allow_metrics_secured(self):
+        self.routes["/actuator/prometheus"] = (
+            403, "application/problem+json", b'{"status":403}', {})
+        strict = run_checks(self.url, require_metrics=True)
+        self.assertFalse(strict[-1].passed)
+        lenient = run_checks(self.url, require_metrics=True, allow_metrics_secured=True)
+        self.assertTrue(lenient[-1].passed)
+
+    def test_allow_metrics_secured_requires_require_metrics(self):
+        # A silently-ignored flag is worse than an error: the caller would believe
+        # the scrape endpoint was checked when it was not.
+        with self.assertRaises(SystemExit):
+            main([self.url, "--allow-metrics-secured"])
+
+    def test_require_metrics_appends_prometheus_check(self):
+        self.routes["/actuator/prometheus"] = (
+            200, "text/plain; version=0.0.4", b'# HELP x\ny\n', {})
+        results = run_checks(self.url, require_metrics=True)
+        self.assertEqual(3, len(results))
+        self.assertEqual("/actuator/prometheus", results[-1].path)
+        self.assertTrue(results[-1].passed)
+        # Default stays off: existing 2-check contract is unchanged.
+        self.assertEqual(2, len(run_checks(self.url)))
+
     def test_rejects_credentials_and_unbounded_timeouts(self):
         for value in ("file:///tmp/health", "http://user:secret@localhost", "http://localhost/?token=secret"):
             with self.subTest(url=value), self.assertRaises(argparse.ArgumentTypeError):

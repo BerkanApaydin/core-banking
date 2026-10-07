@@ -58,10 +58,23 @@ public class ApplicationStartupValidator {
         }
         requireRedisBackend("app.security.failed-login.backend");
         requireRedisBackend("app.security.rate-limit.backend");
+        requireProdCors();
         requirePositive("app.security.failed-login.max-attempts", 5L);
         requirePositive("app.security.failed-login.window-minutes", 15L);
         requirePositive("app.security.rate-limit.max-requests", 10L);
         requirePositive("app.security.rate-limit.time-window-ms", 10_000L);
+        requirePositive("app.security.rate-limit.resource-max-requests", 120L);
+        requirePositive("app.security.rate-limit.resource-time-window-ms", 60_000L);
+        // Outbox poller misconfiguration silently stops money-movement
+        // callbacks: a zero batch/negative retry count must fail fast at
+        // startup, not as a stalled outbox in production.
+        requirePositive("app.outbox.max-retries", 5L);
+        requirePositive("app.outbox.batch-size", 50L);
+        requirePositive("app.outbox.poll-delay-ms", 2000L);
+        requirePositive("app.outbox.retention-days", 30L);
+        // partition-count 0 is the legal unpartitioned mode (single thread);
+        // only negatives (typos) are rejected.
+        requireNonNegative("app.outbox.partition-count", 2L);
     }
 
     private void requireRedisBackend(String property) {
@@ -70,9 +83,30 @@ public class ApplicationStartupValidator {
         }
     }
 
+    private void requireProdCors() {
+        // Base application.yml ships localhost origins for local development and
+        // application-prod.yml inherits them. A prod deployment that forgets
+        // CORS_ALLOWED_ORIGINS would otherwise accept cross-origin credentialed
+        // calls from any localhost page (e.g. a malicious site opened in the
+        // same browser as the banking UI). Fail fast instead of serving them.
+        String origins = environment.getProperty("app.security.cors.allowed-origins", "");
+        String lowered = origins == null ? "" : origins.toLowerCase(java.util.Locale.ROOT);
+        if (lowered.contains("localhost") || lowered.contains("127.0.0.1")) {
+            throw new IllegalStateException(
+                    "Production must not allow localhost CORS origins. "
+                    + "Set CORS_ALLOWED_ORIGINS to explicit deployment origins.");
+        }
+    }
+
     private void requirePositive(String property, long defaultValue) {
         if (environment.getProperty(property, Long.class, defaultValue) <= 0) {
             throw new IllegalStateException("Production requires a positive value: " + property);
+        }
+    }
+
+    private void requireNonNegative(String property, long defaultValue) {
+        if (environment.getProperty(property, Long.class, defaultValue) < 0) {
+            throw new IllegalStateException("Production requires a non-negative value: " + property);
         }
     }
 

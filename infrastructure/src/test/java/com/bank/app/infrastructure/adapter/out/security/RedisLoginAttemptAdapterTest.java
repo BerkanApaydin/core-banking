@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
+import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +39,7 @@ class RedisLoginAttemptAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new RedisLoginAttemptAdapter(redisTemplate, 5, 15);
+        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 15));
     }
 
     private void stubOpsForValue() {
@@ -79,7 +80,7 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldReturnFalseWhenIpBlockingDisabled() {
-        assertThat(new RedisLoginAttemptAdapter(redisTemplate, -1, 15).isIpBlocked(TEST_IP)).isFalse();
+        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15)).isIpBlocked(TEST_IP)).isFalse();
     }
 
     @Test
@@ -116,7 +117,7 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldReturnFalseWhenUsernameBlockingDisabled() {
-        assertThat(new RedisLoginAttemptAdapter(redisTemplate, -1, 15).isUsernameBlocked(TEST_USERNAME)).isFalse();
+        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15)).isUsernameBlocked(TEST_USERNAME)).isFalse();
     }
 
     @Test
@@ -153,15 +154,10 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldRejectNonPositiveWindowBecauseCountersMustExpire() {
-        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, 5, 0))
+        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 0)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, 5, -1))
+        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, -1)))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void shouldReturnMaxAttempts() {
-        assertThat(adapter.getMaxAttempts()).isEqualTo(5);
     }
 
     @Test

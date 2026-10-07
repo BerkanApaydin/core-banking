@@ -11,11 +11,20 @@ public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKe
     @Modifying
     @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
             + "AND status <> 'PENDING' "
-            + "AND left(key_value, length('outbox_handler_')) <> 'outbox_handler_'", nativeQuery = true)
+            + "AND key_kind = 'HTTP'", nativeQuery = true)
     int deleteExpiredTerminalRequests(@Param("threshold") LocalDateTime threshold);
 
     @Modifying
-    @Query(value = "INSERT INTO idempotency_keys (key_value, status, created_at, request_hash) VALUES (:key, 'PENDING', :now, :requestHash) ON CONFLICT (key_value) DO NOTHING", nativeQuery = true)
+    @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
+            + "AND status <> 'PENDING' "
+            + "AND key_kind = 'HANDLER'", nativeQuery = true)
+    int deleteExpiredHandlerKeys(@Param("threshold") LocalDateTime threshold);
+
+    @Modifying
+    @Query(value = "INSERT INTO idempotency_keys (key_value, status, created_at, request_hash, key_kind) "
+            + "VALUES (:key, 'PENDING', :now, :requestHash, "
+            + "CASE WHEN left(:key, length('outbox_handler_')) = 'outbox_handler_' THEN 'HANDLER' ELSE 'HTTP' END) "
+            + "ON CONFLICT (key_value) DO NOTHING", nativeQuery = true)
     int tryInsert(@Param("key") String key, @Param("requestHash") String requestHash, @Param("now") LocalDateTime now);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

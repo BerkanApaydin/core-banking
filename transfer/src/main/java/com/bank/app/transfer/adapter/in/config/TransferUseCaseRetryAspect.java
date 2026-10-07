@@ -48,6 +48,10 @@ public class TransferUseCaseRetryAspect {
             try {
                 return joinPoint.proceed();
             } catch (OptimisticLockingFailureException | PessimisticLockingFailureException e) {
+                // No narrower listing needed: DeadlockLoserDataAccessException and
+                // CannotAcquireLockException both extend PessimisticLockingFailureException,
+                // so the two-account deadlock/lock-timeout path already retries here
+                // (pinned by shouldRetryOnDeadlockLoser/shouldRetryOnCannotAcquireLock).
                 lastException = e;
                 if (attempt < transferProperties.maxAttempts()) {
                     try {

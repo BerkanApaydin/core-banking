@@ -1,9 +1,7 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
-import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.domain.TransferStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -20,8 +18,8 @@ public class TransferJpaMapper {
                 transfer.getSenderAccountId(),
                 transfer.getReceiverAccountId(),
                 transfer.getAmount().amount(),
-                transfer.getAmount().currency().name(),
-                transfer.getStatus().name(),
+                transfer.getAmount().currency(),
+                transfer.getStatus(),
                 transfer.getVersion()
         );
         entity.setBusinessCreatedAt(transfer.getCreatedAt());
@@ -39,8 +37,8 @@ public class TransferJpaMapper {
                 entity.getId(),
                 entity.getSenderAccountId(),
                 entity.getReceiverAccountId(),
-                Money.exact(entity.getAmount(), Currency.valueOf(entity.getCurrency())),
-                TransferStatus.valueOf(entity.getStatus()),
+                Money.exact(entity.getAmount(), entity.getCurrency()),
+                entity.getStatus(),
                 createdAt,
                 entity.getVersion()
         );
@@ -50,7 +48,7 @@ public class TransferJpaMapper {
         if (entity == null || transfer == null) {
             throw new IllegalArgumentException("Entity and Transfer must not be null");
         }
-        entity.setStatus(transfer.getStatus().name());
+        entity.setStatus(transfer.getStatus());
         // The managed version belongs to Hibernate; the adapter checks the expected version.
     }
 }

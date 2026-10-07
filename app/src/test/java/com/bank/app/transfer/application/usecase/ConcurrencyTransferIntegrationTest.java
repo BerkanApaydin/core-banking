@@ -1,5 +1,9 @@
 package com.bank.app.transfer.application.usecase;
 
+
+
+import com.bank.app.user.domain.Role;
+import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
@@ -13,7 +17,9 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -38,23 +44,31 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     @MockitoBean
     private EventPublisherPort eventPublisherPort;
 
-    @Autowired
-    private AccountAclPort accountAclPort;
+    private final AccountAclPort accountAclPort;
+
+    private final AccountJpaRepository accountRepo;
+
+    private final UserJpaRepository userRepository;
+
+    private final OutboxJpaRepository outboxEventRepo;
+
+    private final PlatformTransactionManager transactionManager;
+
+    private final EntityManager entityManager;
 
     @Autowired
-    private AccountJpaRepository accountRepo;
-
-    @Autowired
-    private UserJpaRepository userRepository;
-
-    @Autowired
-    private OutboxJpaRepository outboxEventRepo;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
-
-    @Autowired
-    private EntityManager entityManager;
+    ConcurrencyTransferIntegrationTest(AccountAclPort accountAclPort, AccountJpaRepository accountRepo,
+            UserJpaRepository userRepository, OutboxJpaRepository outboxEventRepo,
+            PlatformTransactionManager transactionManager, EntityManager entityManager,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.accountAclPort = accountAclPort;
+        this.accountRepo = accountRepo;
+        this.userRepository = userRepository;
+        this.outboxEventRepo = outboxEventRepo;
+        this.transactionManager = transactionManager;
+        this.entityManager = entityManager;
+    }
 
     @MockitoBean
     private SecurityContextAdapter securityUtils;
@@ -75,12 +89,12 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
     @BeforeEach
     void setUp() {
         runInNewTx(() -> {
-            user = userRepository.save(new UserJpaEntity(null, "user1", "password", "ROLE_USER", null, null, null));
+            user = userRepository.save(new UserJpaEntity(null, "user1", "password", Role.ROLE_USER, null, null, null));
 
             AccountJpaEntity sender = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR770006200000000000000111", "Sender", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                    "TR770006200000000000000111", "Sender", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
             AccountJpaEntity receiver = accountRepo.save(new AccountJpaEntity(null, user.getId(),
-                    "TR870006200000000000000222", "Receiver", new BigDecimal("1000.00"), "TRY", "ACTIVE", null));
+                    "TR870006200000000000000222", "Receiver", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
             senderAccountId = sender.getId();
             receiverAccountId = receiver.getId();
         });
@@ -94,6 +108,10 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         runInNewTx(() -> {
             outboxEventRepo.deleteAll();
             entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
+            // Child tables first: ledger_entries references accounts (V29 FK),
+            // so accounts cannot be deleted before their journal legs.
+            entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM audit_logs").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
         });

@@ -31,4 +31,8 @@ public class UserContextService {
     public void checkUserAuthorization(Long resourceUserId, String errorMessage) {
         securityContextPort.checkUserAuthorization(resourceUserId, errorMessage);
     }
+
+    public boolean hasRole(String role) {
+        return securityContextPort.hasRole(role);
+    }
 }

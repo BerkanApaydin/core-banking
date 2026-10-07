@@ -3,9 +3,11 @@ package com.bank.app.infrastructure.adapter.in.web;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
@@ -125,7 +127,7 @@ class CaffeineRateLimiterTest {
     }
 
     @Test
-    void shouldRetainCacheEntryBeyondTimeWindow() throws Exception {
+    void shouldRetainCacheEntryBeyondTimeWindow() {
         // Verifies expireAfterWrite uses timeWindowMs * 2 (not / 2)
         // Caffeine's expireAfterWrite uses system ticker, so we need real time to pass
         // timeWindowMs=500, expireAfterWrite = 1000ms (original) vs 250ms (mutant)
@@ -134,7 +136,8 @@ class CaffeineRateLimiterTest {
 
         limiter.tryAcquire("client"); // miss at t=0, cache entry created at real-time T0
 
-        Thread.sleep(300); // real time passes — at T0+300ms
+        // D19: bounded wait (same 300ms real-time lapse) instead of raw sleep.
+        await().pollDelay(Duration.ofMillis(300)).atMost(Duration.ofSeconds(5)).until(() -> true);
 
         testClock.advance(600);
         // mutant: entry expired (300ms > 250ms) → evicted → miss

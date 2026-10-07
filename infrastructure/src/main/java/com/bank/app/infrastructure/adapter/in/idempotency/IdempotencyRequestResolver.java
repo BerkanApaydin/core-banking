@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
+import com.bank.app.infrastructure.adapter.in.web.RequestPathResolver;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
@@ -59,11 +60,16 @@ final class IdempotencyRequestResolver {
             scope = "user";
         }
 
+        // Normalized path (decoded, no context path): percent-encoded aliases of
+        // the same endpoint must derive the same key and hash, otherwise a
+        // retried request under a different encoding escapes de-duplication
+        // and executes the business operation twice.
+        String path = RequestPathResolver.resolve(request);
         String key = IdempotencyFingerprint.operationKey(scope, subject,
-                request.getMethod(), request.getRequestURI(), clientKey);
+                request.getMethod(), path, clientKey);
         byte[] requestBytes = objectMapper.writeValueAsBytes(arguments == null ? new Object[0] : arguments);
         String hash = IdempotencyFingerprint.requestHash(
-                request.getMethod(), request.getRequestURI(), request.getQueryString(), requestBytes);
+                request.getMethod(), path, request.getQueryString(), requestBytes);
         return new RequestIdentity(key, hash);
     }
 

@@ -1,5 +1,9 @@
 package com.bank.app.account.adapter.out.persistence;
 
+
+
+import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -11,15 +15,15 @@ class AccountJpaEntityTest {
 
     @Test
     void shouldCreateAccountJpaEntity() {
-        AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, "TRY", "ACTIVE", null);
+        AccountJpaEntity entity = new AccountJpaEntity(1L, 2L, "IBAN", "name", BigDecimal.TEN, Currency.TRY, AccountStatus.ACTIVE, null);
 
         assertThat(entity.getId()).isEqualTo(1L);
         assertThat(entity.getUserId()).isEqualTo(2L);
         assertThat(entity.getIban()).isEqualTo("IBAN");
         assertThat(entity.getOwnerName()).isEqualTo("name");
         assertThat(entity.getBalance()).isEqualByComparingTo(BigDecimal.TEN);
-        assertThat(entity.getCurrency()).isEqualTo("TRY");
-        assertThat(entity.getStatus()).isEqualTo("ACTIVE");
+        assertThat(entity.getCurrency()).isEqualTo(Currency.TRY);
+        assertThat(entity.getStatus()).isEqualTo(AccountStatus.ACTIVE);
 
         AccountJpaEntity empty = new AccountJpaEntity();
         empty.setId(10L);
@@ -27,8 +31,8 @@ class AccountJpaEntityTest {
         empty.setIban("IBAN2");
         empty.setOwnerName("name2");
         empty.setBalance(BigDecimal.ONE);
-        empty.setCurrency("USD");
-        empty.setStatus("SUSPENDED");
+        empty.setCurrency(Currency.USD);
+        empty.setStatus(AccountStatus.SUSPENDED);
         empty.setVersion(5L);
 
         assertThat(empty.getId()).isEqualTo(10L);
@@ -36,8 +40,8 @@ class AccountJpaEntityTest {
         assertThat(empty.getIban()).isEqualTo("IBAN2");
         assertThat(empty.getOwnerName()).isEqualTo("name2");
         assertThat(empty.getBalance()).isEqualByComparingTo(BigDecimal.ONE);
-        assertThat(empty.getCurrency()).isEqualTo("USD");
-        assertThat(empty.getStatus()).isEqualTo("SUSPENDED");
+        assertThat(empty.getCurrency()).isEqualTo(Currency.USD);
+        assertThat(empty.getStatus()).isEqualTo(AccountStatus.SUSPENDED);
         assertThat(empty.getVersion()).isEqualTo(5L);
     }
 }

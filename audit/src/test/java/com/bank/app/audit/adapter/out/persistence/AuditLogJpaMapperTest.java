@@ -36,8 +36,8 @@ class AuditLogJpaMapperTest {
             AuditLogJpaEntity entity = mapper.toJpaEntity(auditLog);
 
             assertThat(entity.getId()).isEqualTo(1L);
-            assertThat(entity.getUsername()).isEqualTo("testuser");
-            assertThat(entity.getAction()).isEqualTo("ACCOUNT_CREATED");
+        assertThat(entity.getUsername()).isEqualTo("testuser");
+        assertThat(entity.getAction()).isEqualTo(AuditAction.ACCOUNT_CREATED);
             assertThat(entity.getDetails()).isEqualTo("details");
             assertThat(entity.getTimestamp()).isEqualTo(now);
         }
@@ -59,7 +59,7 @@ class AuditLogJpaMapperTest {
         @DisplayName("should map valid entity")
         void shouldMapValidEntity() {
             LocalDateTime now = LocalDateTime.now();
-            AuditLogJpaEntity entity = new AuditLogJpaEntity(1L, "testuser", "ACCOUNT_CREATED", "details", now);
+            AuditLogJpaEntity entity = new AuditLogJpaEntity(1L, "testuser", AuditAction.ACCOUNT_CREATED, "details", now);
 
             AuditLog auditLog = mapper.toDomain(entity);
 

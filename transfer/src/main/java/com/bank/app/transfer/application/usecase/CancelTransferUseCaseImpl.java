@@ -14,6 +14,7 @@ import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.domain.Transfer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -29,7 +30,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
     private final TransferAuthorizationService transferAuthorizationService;
     private final DomainEventPublisherService domainEventPublisherService;
     private final ClockProviderPort clockProvider;
-    private final int cancellationWindowHours;
+    private final Duration cancellationWindow;
 
     public CancelTransferUseCaseImpl(LoadTransferPort loadTransferPort,
                                  SaveTransferPort saveTransferPort,
@@ -38,7 +39,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
                                  TransferAuthorizationService transferAuthorizationService,
                                  DomainEventPublisherService domainEventPublisherService,
                                  ClockProviderPort clockProvider,
-                                 int cancellationWindowHours) {
+                                 Duration cancellationWindow) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.accountAclPort = accountAclPort;
@@ -46,7 +47,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         this.transferAuthorizationService = transferAuthorizationService;
         this.domainEventPublisherService = domainEventPublisherService;
         this.clockProvider = clockProvider;
-        this.cancellationWindowHours = cancellationWindowHours;
+        this.cancellationWindow = Objects.requireNonNull(cancellationWindow, "Cancellation window must not be null");
     }
 
     @Override
@@ -60,7 +61,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
 
         transferAuthorizationService.authorizeByAccountId(senderAccountId);
 
-        transfer.cancel(clockProvider.clock(), cancellationWindowHours);
+        transfer.cancel(clockProvider.clock(), cancellationWindow);
 
         // Balance reversal joins this use-case's local transaction (REQUIRED):
         // atomic in the modular monolith (single DataSource). If the Account

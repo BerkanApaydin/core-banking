@@ -2,9 +2,13 @@ package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.TokenDigest;
+import com.bank.app.common.domain.UserId;
+import com.bank.app.user.domain.Role;
+import com.bank.app.user.domain.User;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.JwtPort.VerifiedToken;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
@@ -41,6 +45,7 @@ class RefreshSessionUseCaseImplTest {
 
     @Mock private JwtPort jwtPort;
     @Mock private RefreshTokenPort refreshTokenPort;
+    @Mock private LoadUserPort loadUserPort;
     @Mock private ClockProviderPort clockProvider;
     @Mock private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
 
@@ -53,7 +58,7 @@ class RefreshSessionUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, clockProvider, auditEventPort);
+        useCase = new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort);
         lenient().when(clockProvider.clock()).thenReturn(FIXED);
     }
 
@@ -73,8 +78,10 @@ class RefreshSessionUseCaseImplTest {
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
-        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER")).thenReturn("new-refresh");
-        when(jwtPort.generateToken(7L, "alice", "ROLE_USER")).thenReturn("new-access");
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
+        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(freshUser()));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
         when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
         when(jwtPort.getExpirationMs()).thenReturn(900000L);
 
@@ -174,7 +181,7 @@ class RefreshSessionUseCaseImplTest {
                 .isExactlyInstanceOf(RefreshTokenReuseException.class);
 
         verify(refreshTokenPort).revokeFamily("family-1");
-        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString());
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
     }
 
     @Test
@@ -210,6 +217,65 @@ class RefreshSessionUseCaseImplTest {
                 .isExactlyInstanceOf(AuthenticationFailedException.class);
 
         verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
-        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString());
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+    }
+
+    private static User freshUser() {
+        return new User(new UserId(7L), "alice", "encoded", Role.ROLE_USER);
+    }
+
+    private static User versionedUser(long tokenVersion) {
+        return new User(new UserId(7L), "alice", "encoded", Role.ROLE_USER, null, null, null, tokenVersion);
+    }
+
+    @Test
+    @DisplayName("should rotate with the user's current token version")
+    void shouldRotateWithCurrentVersion() {
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(versionedUser(4L)));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(4L);
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 4L)).thenReturn("new-refresh");
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 4L)).thenReturn("new-access");
+        when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+        when(jwtPort.getExpirationMs()).thenReturn(900000L);
+
+        AuthResponse response = useCase.execute(REFRESH);
+
+        assertThat(response.token()).isEqualTo("new-access");
+        verify(refreshTokenPort).markRotated(eq(HASH), eq(TokenDigest.sha256Hex("new-refresh")));
+    }
+
+    @Test
+    @DisplayName("should reject a refresh minted before a role or password change")
+    void shouldRejectStaleTokenVersion() {
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(versionedUser(2L)));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(1L);
+
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("no longer valid");
+
+        verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        verify(jwtPort, never()).generateRefreshToken(anyLong(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("should reject rotation when the user no longer exists")
+    void shouldRejectMissingUser() {
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+        verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
     }
 }

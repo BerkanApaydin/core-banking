@@ -15,9 +15,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TransferBeanConfigTest {
@@ -32,7 +35,8 @@ class TransferBeanConfigTest {
     @Mock private AccountApi accountApi;
     @Mock private AccountSnapshotCache cachePort;
 
-    private final TransferProperties transferProperties = new TransferProperties(24, 3, 500L, 2000L, 100);
+    private final TransferProperties transferProperties = new TransferProperties(
+            java.time.Duration.ofHours(24), 3, 500L, 2000L, 100);
 
     @Test
     void shouldCreateTransferDomainServiceBean() {
@@ -94,7 +98,21 @@ class TransferBeanConfigTest {
     @Test
     void shouldCreateAccountInfoCachePortFallbackBean() {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
-        assertNotNull(config.accountInfoCachePort());
+        Environment environment = org.mockito.Mockito.mock(Environment.class);
+        assertNotNull(config.accountInfoCachePort(environment));
+    }
+
+    @Test
+    void shouldFailFastWhenFallbackWouldRunUnderProd() {
+        // Defense in depth: the prod profile pins the shared Redis backend via
+        // ProductionConfigContractTest, so this fallback must never activate
+        // there. If the wiring ever degrades, fail at startup instead of
+        // serving per-JVM snapshots silently across replicas.
+        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        Environment prod = org.mockito.Mockito.mock(Environment.class);
+        when(prod.matchesProfiles("prod")).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> config.accountInfoCachePort(prod));
     }
 
     @Test

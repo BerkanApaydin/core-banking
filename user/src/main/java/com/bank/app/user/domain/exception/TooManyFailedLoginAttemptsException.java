@@ -9,6 +9,9 @@ public class TooManyFailedLoginAttemptsException extends BusinessException {
     @Override
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.RATE_LIMITED; }
 
+    @Override
+    public String getErrorCode() { return "TOO_MANY_FAILED_LOGIN_ATTEMPTS"; }
+
     public TooManyFailedLoginAttemptsException(String message) {
         super("error.too_many_failed_login_attempts", new Object[]{message}, "Too many failed login attempts: " + message);
     }

@@ -53,8 +53,8 @@ public class DataSeeder {
     @Bean
     CommandLineRunner seedData() {
         return args -> {
-            seedUser("ahmet", "Ahmet123");
-            seedUser("ayse", "Ayse1234");
+            seedUser("ahmet", "Ahmet123456");
+            seedUser("ayse", "Ayse12345678");
 
             var ahmet = loadUserPort.findByUsername("ahmet")
                     .orElseThrow(() -> new IllegalStateException("User Ahmet not found."));

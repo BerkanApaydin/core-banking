@@ -35,9 +35,13 @@ class RateLimitingFilterEdgeCaseTest {
     @BeforeEach
     void setUp() {
         when(request.getMethod()).thenReturn("POST");
+        // Servlet contract: context path is never null ("" when absent).
+        // RequestPathResolver relies on UrlPathHelper, which decodes it.
+        when(request.getContextPath()).thenReturn("");
         objectMapper = new ObjectMapper();
         clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
-        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper, clientIpResolver);
+        filter = new RateLimitingFilter(rateLimiter, messageSource,
+                new RateLimitProperties(null, null, 10, 10_000, 120, 60000), objectMapper, clientIpResolver);
     }
 
     @Test
@@ -55,7 +59,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(true);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -67,7 +71,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(false);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/auth/login", 10, 10_000)).thenReturn(false);
         when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Too many requests sent. Please try again later.");
 
         StringWriter stringWriter = new StringWriter();
@@ -85,7 +89,7 @@ class RateLimitingFilterEdgeCaseTest {
     void shouldFailClosedWithProblemDetailWhenRedisLimiterIsUnavailable() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1"))
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/auth/login", 10, 10_000))
                 .thenThrow(new RedisConnectionFailureException("Redis connection failed"));
         when(messageSource.getMessage(anyString(), any(), anyString(), any()))
                 .thenReturn("Security service temporarily unavailable.");
@@ -105,7 +109,9 @@ class RateLimitingFilterEdgeCaseTest {
     void shouldUseXForwardedForHeaderWhenPresent() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/v1/transfers");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
-        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
+        // Append-semantics: the edge proxy appends the peer it saw, so the
+        // bucket uses the last (trustworthy) entry, not the spoofable first.
+        when(rateLimiter.tryAcquire("10.0.0.2|/api/v1/transfers", 120, 60_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -117,7 +123,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getRequestURI()).thenReturn("/api/v1/transfers");
         when(request.getHeader("X-Forwarded-For")).thenReturn("unknown");
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(true);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/transfers", 120, 60_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -129,7 +135,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getRequestURI()).thenReturn("/api/v1/transfers");
         when(request.getHeader("X-Forwarded-For")).thenReturn("");
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1")).thenReturn(true);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/transfers", 120, 60_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -141,7 +147,7 @@ class RateLimitingFilterEdgeCaseTest {
         when(request.getRequestURI()).thenReturn("/api/v1/transfers");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.5");
-        when(rateLimiter.tryAcquire("10.0.0.5")).thenReturn(false);
+        when(rateLimiter.tryAcquire("10.0.0.5|/api/v1/transfers", 120, 60_000)).thenReturn(false);
         when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Rate limit exceeded");
 
         StringWriter stringWriter = new StringWriter();
@@ -155,11 +161,31 @@ class RateLimitingFilterEdgeCaseTest {
     }
 
     @Test
+    void shouldIsolateBucketsPerEndpointForSameIp() throws Exception {
+        // One NAT address must not share a single global bucket: login abuse
+        // must not eat the transfer budget and vice versa.
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("10.0.0.9");
+        when(rateLimiter.tryAcquire("10.0.0.9|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
+        when(rateLimiter.tryAcquire("10.0.0.9|/api/v1/transfers", 120, 60_000)).thenReturn(true);
+
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
+        filter.doFilter(request, response, chain);
+
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers/123");
+        filter.doFilter(request, response, chain);
+
+        verify(rateLimiter).tryAcquire("10.0.0.9|/api/v1/auth/login", 10, 10_000);
+        verify(rateLimiter).tryAcquire("10.0.0.9|/api/v1/transfers", 120, 60_000);
+        verify(chain, times(2)).doFilter(request, response);
+    }
+
+    @Test
     void shouldBlockRegisterRequestWhenOverLimit() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/v1/auth/register");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.5");
-        when(rateLimiter.tryAcquire("10.0.0.5")).thenReturn(false);
+        when(rateLimiter.tryAcquire("10.0.0.5|/api/v1/auth/register", 10, 10_000)).thenReturn(false);
         when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Rate limit exceeded");
 
         StringWriter stringWriter = new StringWriter();

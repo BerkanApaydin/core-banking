@@ -19,6 +19,8 @@ public record PageResponse<T>(
     }
 
     public static <T> PageResponse<T> empty(int page, int size) {
-        return new PageResponse<>(List.of(), page, size, 0, 0, true, true);
+        // An empty page is always last, but first only when page 0 was
+        // requested: page=5 with no results previously reported first=true.
+        return new PageResponse<>(List.of(), page, size, 0, 0, page == 0, true);
     }
 }

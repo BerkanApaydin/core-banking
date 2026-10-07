@@ -3,6 +3,7 @@ package com.bank.app.account.config;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.port.out.IbanGeneratorPort;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -23,10 +24,12 @@ class AccountBeanConfigTest {
 
     @Mock private LoadAccountPort loadAccountPort;
     @Mock private SaveAccountPort saveAccountPort;
+    @Mock private com.bank.app.account.application.port.out.SaveLedgerPort ledgerPort;
     @Mock private IbanGeneratorPort ibanGeneratorPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private AuditEventPort auditEventPort;
     @Mock private UserContextService userContextService;
+    @Mock private AccountSnapshotCache snapshotCache;
     @Mock private AccountAuthorizationService accountAuthorizationService;
     @Mock private ClockProviderPort clockProvider;
 
@@ -91,6 +94,14 @@ class AccountBeanConfigTest {
     @Test
     void shouldCreateAdjustAccountBalancesUseCaseBean() {
         AccountBeanConfig config = new AccountBeanConfig();
-        assertNotNull(config.adjustAccountBalancesUseCase(loadAccountPort, saveAccountPort, clockProvider, domainEventPublisherService));
+        assertNotNull(config.adjustAccountBalancesUseCase(loadAccountPort, saveAccountPort, clockProvider,
+                domainEventPublisherService, auditEventPort, ledgerPort));
+    }
+
+    @Test
+    void shouldCreateSuspendAccountUseCaseBean() {
+        AccountBeanConfig config = new AccountBeanConfig();
+        assertNotNull(config.suspendAccountUseCase(loadAccountPort, saveAccountPort, userContextService,
+                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache));
     }
 }

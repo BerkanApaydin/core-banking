@@ -9,6 +9,9 @@ public class DuplicateIbanException extends BusinessException {
     @Override
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.CONFLICT; }
 
+    @Override
+    public String getErrorCode() { return "DUPLICATE_IBAN"; }
+
     public DuplicateIbanException(String iban) {
         super("error.duplicate_iban", new Object[]{iban}, "An account already exists with this IBAN: " + iban);
     }

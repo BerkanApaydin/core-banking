@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +24,7 @@ import static org.mockito.Mockito.when;
 class TransferUseCaseRetryAspectTest {
 
     private final TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-            new TransferProperties(24, 3, 50, 500, 100));
+            new TransferProperties(java.time.Duration.ofHours(24), 3, 50, 500, 100));
 
     @Mock
     private ProceedingJoinPoint joinPoint;
@@ -48,6 +50,34 @@ class TransferUseCaseRetryAspectTest {
 
             Object result = aspect.around(joinPoint);
             assertThat(result).isEqualTo("success");
+        }
+
+        @Test
+        @DisplayName("should retry on deadlock-loser failures via the pessimistic predicate")
+        void shouldRetryOnDeadlockLoser() throws Throwable {
+            // DeadlockLoserDataAccessException extends PessimisticLockingFailureException,
+            // so the existing catch clause already retries the most likely
+            // two-account failure — this test pins that subtyping contract.
+            when(joinPoint.proceed())
+                    .thenThrow(new DeadlockLoserDataAccessException("deadlock detected",
+                            new RuntimeException("db deadlock")))
+                    .thenReturn("success");
+
+            Object result = aspect.around(joinPoint);
+            assertThat(result).isEqualTo("success");
+            verify(joinPoint, times(2)).proceed();
+        }
+
+        @Test
+        @DisplayName("should retry on lock-acquisition timeouts via the pessimistic predicate")
+        void shouldRetryOnCannotAcquireLock() throws Throwable {
+            when(joinPoint.proceed())
+                    .thenThrow(new CannotAcquireLockException("lock timeout"))
+                    .thenReturn("success");
+
+            Object result = aspect.around(joinPoint);
+            assertThat(result).isEqualTo("success");
+            verify(joinPoint, times(2)).proceed();
         }
 
         @Test
@@ -96,7 +126,7 @@ class TransferUseCaseRetryAspectTest {
             // L35 mutant (attempt <= maxAttempts → attempt < maxAttempts) skips the loop entirely,
             // leaving lastException=null and throwing IllegalStateException instead.
             TransferUseCaseRetryAspect aspect1 = new TransferUseCaseRetryAspect(
-                    new TransferProperties(24, 1, 100, 1000, 100));
+                    new TransferProperties(java.time.Duration.ofHours(24), 1, 100, 1000, 100));
             OptimisticLockingFailureException original = new OptimisticLockingFailureException("conflict");
             when(joinPoint.proceed()).thenThrow(original);
 
@@ -114,7 +144,7 @@ class TransferUseCaseRetryAspectTest {
             // L42 delay/2: sleep(1000) + sleep(500) = ~1500ms (< 2000 assertion fails)
             // L41 removed sleep: ~0ms (< 2000 assertion fails)
             TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                    new TransferProperties(24, 3, 1000, 10000, 100));
+                    new TransferProperties(java.time.Duration.ofHours(24), 3, 1000, 10000, 100));
             when(joinPoint.proceed())
                     .thenThrow(new OptimisticLockingFailureException("1"))
                     .thenThrow(new OptimisticLockingFailureException("2"))

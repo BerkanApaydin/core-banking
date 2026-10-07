@@ -22,7 +22,7 @@ public class CommonBeanConfig {
 
     @Bean
     public ClockProviderPort clockProvider() {
-        return new SystemClockProvider(Clock.systemDefaultZone());
+        return new SystemClockProvider(Clock.systemUTC());
     }
 
     @Bean

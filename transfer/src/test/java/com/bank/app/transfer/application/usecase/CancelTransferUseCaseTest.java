@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -58,7 +59,7 @@ class CancelTransferUseCaseTest {
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
-                accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, 72);
+                accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, Duration.ofHours(72));
     }
 
     @Test
@@ -121,7 +122,7 @@ class CancelTransferUseCaseTest {
         Long transferId = 1L;
         Transfer transfer = createCompletedTransfer(transferId, 10L, 20L,
                 new Money(new BigDecimal("100.00"), Currency.TRY));
-        transfer.cancel(Clock.systemDefaultZone(), 24);
+        transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))

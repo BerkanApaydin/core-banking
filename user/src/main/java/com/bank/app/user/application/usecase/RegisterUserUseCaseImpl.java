@@ -12,6 +12,8 @@ import com.bank.app.user.domain.EmailAddress;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.PhoneNumber;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
+import com.bank.app.user.domain.exception.WeakPasswordException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
@@ -43,12 +45,12 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     @Override
     public void execute(AuthRequest request) {
         if (loadUserPort.findByUsername(request.username()).isPresent()) {
-            throw new IllegalArgumentException("Username already in use.");
+            throw new UsernameAlreadyTakenException(request.username());
         }
 
         List<String> policyErrors = passwordPolicy.validate(request.password());
         if (!policyErrors.isEmpty()) {
-            throw new IllegalArgumentException(String.join("; ", policyErrors));
+            throw new WeakPasswordException(policyErrors);
         }
 
         String encodedPassword = passwordEncoderPort.encode(request.password());

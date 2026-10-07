@@ -81,7 +81,8 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
                 "Transfer completed. Transfer ID: " + savedTransfer.getId(),
                 LocalDateTime.now(clockProvider.clock()),
-                transferAuthorizationService.getCurrentUsername()));
+                transferAuthorizationService.getCurrentUsername(),
+                senderInfo.userId()));
 
         log.info("Transfer completed: id={}, senderId={}, receiverId={}",
             savedTransfer.getId(), savedTransfer.getSenderAccountId(),

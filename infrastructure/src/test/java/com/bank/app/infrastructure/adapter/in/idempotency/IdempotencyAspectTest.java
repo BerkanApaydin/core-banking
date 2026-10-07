@@ -65,8 +65,8 @@ class IdempotencyAspectTest {
                 clientIpResolver,
                 transactionManager,
                 new TransactionProperties(30),
-                3,
-                0);
+                new com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties(
+                        24, "0 0 * * * *", 3, 0));
         lenient().when(transactionManager.getTransaction(any())).thenAnswer(
                 ignored -> new SimpleTransactionStatus());
         lenient().when(userContextService.getCurrentUserId()).thenReturn(Optional.of(42L));
@@ -85,6 +85,8 @@ class IdempotencyAspectTest {
                 .thenReturn(header);
         lenient().when(request.getMethod()).thenReturn("POST");
         lenient().when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        // Servlet contract: never null. RequestPathResolver decodes via UrlPathHelper.
+        lenient().when(request.getContextPath()).thenReturn("");
     }
 
     private String userKey() {

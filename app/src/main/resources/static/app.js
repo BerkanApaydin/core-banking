@@ -240,6 +240,11 @@ async function fetchApi(endpoint, options = {}) {
                 try { data = JSON.parse(text); } catch (e) { data = { message: text }; }
             }
             if (authenticated) {
+                // One silent rotation before giving up: short-lived access
+                // tokens expire every 15 minutes by design.
+                if (!options._refreshed && await trySilentRefresh()) {
+                    return fetchApi(endpoint, { ...options, _refreshed: true });
+                }
                 logout();
                 const expired = new Error(__('auth.session_expired'));
                 expired.status = 401;
@@ -300,12 +305,61 @@ function browserCsrfToken() {
     return match ? decodeURIComponent(match[1]) : null;
 }
 
+// Single in-flight rotation shared by concurrent 401s: the backend treats a
+// second presentation of the same refresh token as theft (whole family
+// revoked), so parallel refresh calls must be coalesced client-side.
+let refreshInFlight = null;
+
+async function trySilentRefresh() {
+    if (refreshInFlight) {
+        try {
+            await refreshInFlight;
+            return authenticated;
+        } catch (e) { return false; }
+    }
+    refreshInFlight = (async () => {
+        const csrf = browserCsrfToken();
+        const headers = { 'Accept-Language': getLanguage() };
+        if (csrf) headers['X-CSRF-Token'] = csrf;
+        const response = await fetch(`${API_BASE}/auth/browser/refresh`, {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('refresh failed');
+        let result = null;
+        try { result = await response.json(); } catch (e) { /* empty body: still rotated */ }
+        if (result && result.userId) {
+            userId = result.userId;
+            username = result.username;
+        }
+        authenticated = true;
+        return true;
+    })();
+    try {
+        return await refreshInFlight;
+    } catch (e) {
+        return false;
+    } finally {
+        refreshInFlight = null;
+    }
+}
+
 async function restoreBrowserSession() {
     try {
-        const response = await fetch(`${API_BASE}/auth/browser/session`, {
+        let response = await fetch(`${API_BASE}/auth/browser/session`, {
             credentials: 'same-origin', headers: { 'Accept-Language': getLanguage() }
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+            // The short-lived access cookie (15m) may have expired while the
+            // refresh cookie (7d) is still valid: one silent rotation before
+            // falling back to the login screen.
+            if (response.status !== 401 || !(await trySilentRefresh())) return;
+            response = await fetch(`${API_BASE}/auth/browser/session`, {
+                credentials: 'same-origin', headers: { 'Accept-Language': getLanguage() }
+            });
+            if (!response.ok) return;
+        }
         const result = await response.json();
         authenticated = true;
         userId = result.userId;
@@ -320,12 +374,14 @@ function extractErrorMessage(data) {
     if (!data || typeof data !== 'object') {
         return (typeof data === 'string' && data) ? data : '';
     }
-    if (data.message) return data.message;
-    if (data.detail) return data.detail;
+    // Field errors first: validation 400s carry a generic message
+    // ("Validation failed") with the actionable per-field text here.
     if (data.errors && typeof data.errors === 'object') {
         const parts = Object.entries(data.errors).map(([f, m]) => `${f}: ${m}`);
         if (parts.length > 0) return parts.join(' · ');
     }
+    if (data.message) return data.message;
+    if (data.detail) return data.detail;
     if (data.title && data.status) return `${data.title} (${data.status})`;
     return '';
 }
@@ -1130,7 +1186,7 @@ function initAuth() {
             return;
         }
 
-        // Client mirror of backend PasswordPolicy defaults (min 8, upper,
+        // Client mirror of backend PasswordPolicy defaults (min 12, upper,
         // lower, digit): instant feedback instead of a round-trip 400.
         if (!meetsPasswordPolicy(passwordVal)) {
             showAlert(__('auth.password.hint'), 'danger');
@@ -1197,6 +1253,15 @@ function initAuth() {
                         });
                         revoked = response.ok;
                         if (!response.ok) console.error('Logout revoke failed with HTTP', response.status);
+                        // An expired access cookie is rejected by the filter
+                        // before reaching the controller (so its cookie-clear
+                        // never runs): rotate once, then retry the revoke so
+                        // the server-side session is actually cleared.
+                        if (!response.ok && response.status === 401 && attempt === 0
+                                && typeof trySilentRefresh === 'function'
+                                && await trySilentRefresh()) {
+                            continue;
+                        }
                         break; // Only a lost/aborted response warrants retrying.
                     } catch (e) {
                         console.error('Logout revoke attempt failed:', e);
@@ -1323,8 +1388,8 @@ function drawReportChart(transfers) {
 function passwordScore(pw) {
     let s = 0;
     if (!pw) return 0;
-    if (pw.length >= 8) s++;
     if (pw.length >= 12) s++;
+    if (pw.length >= 16) s++;
     if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
     if (/\d/.test(pw)) s++;
     if (/[^A-Za-z0-9]/.test(pw)) s++;
@@ -1332,7 +1397,7 @@ function passwordScore(pw) {
 }
 
 function meetsPasswordPolicy(pw) {
-    return !!pw && pw.length >= 8
+    return !!pw && pw.length >= 12
         && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw);
 }
 

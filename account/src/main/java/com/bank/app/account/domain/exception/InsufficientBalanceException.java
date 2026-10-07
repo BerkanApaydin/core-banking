@@ -4,6 +4,10 @@ import com.bank.app.common.domain.exception.BusinessException;
 
 public class InsufficientBalanceException extends BusinessException {
     private static final long serialVersionUID = 1L;
+
+    @Override
+    public String getErrorCode() { return "INSUFFICIENT_BALANCE"; }
+
     public InsufficientBalanceException(String message) {
         super(message);
     }

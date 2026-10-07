@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -41,17 +42,19 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
             return;
         }
         long ttl = Math.min(Math.max(expirationMs, minTtlMs), maxTtlMs);
-        blacklist.put(token, System.currentTimeMillis() + ttl);
+        // Hash-only storage like the Redis/DB backends: a cache read must
+        // never yield a usable credential (heap-dump disclosure).
+        blacklist.put(TokenDigest.sha256Hex(token), System.currentTimeMillis() + ttl);
     }
 
     @Override
     public boolean isBlacklisted(String token) {
-        Long expiresAt = blacklist.getIfPresent(token);
+        Long expiresAt = blacklist.getIfPresent(TokenDigest.sha256Hex(token));
         if (expiresAt == null) {
             return false;
         }
         if (System.currentTimeMillis() >= expiresAt) {
-            blacklist.invalidate(token);
+            blacklist.invalidate(TokenDigest.sha256Hex(token));
             return false;
         }
         return true;

@@ -95,4 +95,18 @@ class CaffeineRateLimiterEdgeCaseTest {
 
         assertFalse(limiter.tryAcquire("client-1"));
     }
+
+    @Test
+    void shouldIsolateTiersPerBudget() {
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 60000, 10000, Clock.systemDefaultZone());
+
+        assertTrue(limiter.tryAcquire("tiered"));
+        assertTrue(limiter.tryAcquire("tiered"));
+        assertFalse(limiter.tryAcquire("tiered"));
+        // Same key under a looser tier still has budget: auth abuse must not
+        // eat the resource budget.
+        assertTrue(limiter.tryAcquire("tiered", 120, 60_000));
+        // And the exhausted tight tier stays exhausted.
+        assertFalse(limiter.tryAcquire("tiered", 2, 60_000));
+    }
 }

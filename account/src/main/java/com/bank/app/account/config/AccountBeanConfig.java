@@ -3,6 +3,7 @@ package com.bank.app.account.config;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.dto.SimulationFundingCapability;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
+import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
@@ -10,13 +11,16 @@ import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.application.usecase.CreateAccountUseCaseImpl;
 import com.bank.app.account.application.usecase.AdjustAccountBalancesUseCaseImpl;
+import com.bank.app.account.application.usecase.SuspendAccountUseCaseImpl;
 import com.bank.app.account.application.usecase.GetAccountByIdQueryImpl;
 import com.bank.app.account.application.usecase.GetAccountByIbanQueryImpl;
 import com.bank.app.account.application.usecase.GetAccountsByUserQueryImpl;
 import com.bank.app.account.application.usecase.AccountQueryUseCaseImpl;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.application.port.out.IbanGeneratorPort;
+import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
@@ -84,7 +88,18 @@ public class AccountBeanConfig {
     @Bean
     public AdjustAccountBalancesUseCase adjustAccountBalancesUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort, ClockProviderPort clockProvider,
-            DomainEventPublisherService domainEventPublisherService) {
-        return new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider, domainEventPublisherService);
+            DomainEventPublisherService domainEventPublisherService, AuditEventPort auditEventPort,
+            SaveLedgerPort ledgerPort) {
+        return new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider,
+                domainEventPublisherService, auditEventPort, ledgerPort);
+    }
+
+    @Bean
+    public SuspendAccountUseCase suspendAccountUseCase(LoadAccountPort loadAccountPort,
+            SaveAccountPort saveAccountPort, UserContextService userContextService,
+            ClockProviderPort clockProvider, DomainEventPublisherService domainEventPublisherService,
+            AuditEventPort auditEventPort, AccountSnapshotCache snapshotCache) {
+        return new SuspendAccountUseCaseImpl(loadAccountPort, saveAccountPort, userContextService,
+                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache);
     }
 }

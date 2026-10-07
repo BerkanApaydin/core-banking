@@ -9,20 +9,34 @@ import static org.junit.jupiter.api.Assertions.*;
 class AuthenticationFailedExceptionTest {
 
     @Test
-    void shouldCreateWithMessage() {
-        AuthenticationFailedException ex = new AuthenticationFailedException("wrong password");
+    void shouldCreateWithFixedMessageKeyAndEmptyArgs() {
+        AuthenticationFailedException ex = new AuthenticationFailedException();
         assertEquals("error.authentication_failed", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"wrong password"}, ex.getArgs());
-        assertTrue(ex.getMessage().contains("wrong password"));
+        assertArrayEquals(new Object[]{}, ex.getArgs());
+        assertEquals("Authentication failed.", ex.getMessage());
     }
 
     @Test
-    void shouldCreateWithMessageAndCause() {
-        Throwable cause = new RuntimeException("root cause");
-        AuthenticationFailedException ex = new AuthenticationFailedException("wrong password", cause);
+    void shouldCreateWithStaticDetailWithoutExposingArgs() {
+        AuthenticationFailedException ex = new AuthenticationFailedException("Refresh token has expired.");
         assertEquals("error.authentication_failed", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"wrong password"}, ex.getArgs());
+        // D11/K13: static detail lives only in the default message for logs;
+        // args stay empty so no template can ever interpolate it outward.
+        assertArrayEquals(new Object[]{}, ex.getArgs());
+        assertTrue(ex.getMessage().contains("Refresh token has expired."));
+    }
+
+    @Test
+    void shouldCreateWithCauseOnlyAndNeverEchoFrameworkMessage() {
+        // Simulates Spring's UsernameNotFoundException("User not found: admin"):
+        // the username must not appear anywhere client-visible.
+        Throwable cause = new RuntimeException("User not found: admin");
+        AuthenticationFailedException ex = new AuthenticationFailedException(cause);
+        assertEquals("error.authentication_failed", ex.getMessageKey());
+        assertArrayEquals(new Object[]{}, ex.getArgs());
         assertSame(cause, ex.getCause());
+        assertFalse(ex.getMessage().contains("admin"));
+        assertFalse(ex.getMessage().contains("User not found"));
     }
 
     @Test

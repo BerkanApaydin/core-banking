@@ -122,4 +122,15 @@ class OutboxPersistenceAdapterTest {
 
         verify(repository).markDeadLetter("id-1", "error", 3);
     }
+
+    @Test
+    void shouldDeleteProcessedBeforeCutoff() {
+        LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
+        when(repository.deleteProcessedBefore(cutoff)).thenReturn(7);
+
+        int deleted = adapter.deleteProcessedBefore(cutoff);
+
+        assertThat(deleted).isEqualTo(7);
+        verify(repository).deleteProcessedBefore(cutoff);
+    }
 }

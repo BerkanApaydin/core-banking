@@ -80,19 +80,6 @@ class InMemoryAccountInfoCacheAdapterTest {
     }
 
     @Test
-    void shouldEvictSingleIbanEntry() {
-        var info1 = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
-        var info2 = new AccountSnapshot(2L, 20L, "TRY", "ACTIVE");
-        cache.putByIban("TR721111111111111111111111", info1);
-        cache.putByIban("TR972222222222222222222222", info2);
-
-        cache.evictByIban("TR721111111111111111111111");
-
-        assertTrue(cache.getByIban("TR721111111111111111111111").isEmpty());
-        assertTrue(cache.getByIban("TR972222222222222222222222").isPresent());
-    }
-
-    @Test
     void shouldIgnoreNulls() {
         assertDoesNotThrow(() -> {
             cache.putById(null, null);
@@ -100,7 +87,6 @@ class InMemoryAccountInfoCacheAdapterTest {
             cache.putIbans(null, null);
             cache.putIbans(Set.of(1L), Map.of());
             cache.evictById(null);
-            cache.evictByIban(null);
         });
         assertTrue(cache.getById(null).isEmpty());
         assertTrue(cache.getByIban(null).isEmpty());

@@ -12,6 +12,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
 import com.bank.app.infrastructure.adapter.out.security.RedisLoginAttemptAdapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,7 +36,7 @@ class RedisLoginAttemptIntegrationTest {
             redisTemplate = new StringRedisTemplate(factory);
             redisTemplate.afterPropertiesSet();
         }
-        adapter = new RedisLoginAttemptAdapter(redisTemplate, 3, 15);
+        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(3, 15));
         adapter.reset("10.0.0.1");
         adapter.resetByUsername("testuser");
     }

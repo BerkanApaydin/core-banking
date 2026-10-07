@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -42,6 +43,7 @@ public final class ProblemDetailFactory {
         problemDetail.setProperty("message", "Validation failed");
         problemDetail.setProperty("timestamp", LocalDateTime.now());
         problemDetail.setProperty("errors", new HashMap<>(fieldErrors));
+        setCorrelationId(problemDetail);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .contentType(Objects.requireNonNull(MediaType.APPLICATION_PROBLEM_JSON))
                 .body(problemDetail);
@@ -68,6 +70,7 @@ public final class ProblemDetailFactory {
         // ISO-8601 string (not LocalDateTime) so this writer works with any ObjectMapper,
         // including ones without the JSR-310 module. Same shape Spring Boot renders by default.
         problemDetail.setProperty("timestamp", LocalDateTime.now().toString());
+        setCorrelationId(problemDetail);
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -84,9 +87,23 @@ public final class ProblemDetailFactory {
         problemDetail.setProperty("code", code);
         problemDetail.setProperty("message", message);
         problemDetail.setProperty("timestamp", LocalDateTime.now());
+        setCorrelationId(problemDetail);
         return ResponseEntity.status(status)
                 .contentType(Objects.requireNonNull(MediaType.APPLICATION_PROBLEM_JSON))
                 .body(problemDetail);
+    }
+
+    private static void setCorrelationId(ProblemDetail problemDetail) {
+        // CorrelationIdFilter puts the id into MDC before every other filter
+        // and echoes it as a response header. Mirroring it in the body lets
+        // clients include it in bug reports without reading headers, and gives
+        // operators a join key between the error payload and the JSON logs.
+        // Absent outside a request thread (e.g. unit tests without the filter):
+        // omit rather than emitting null.
+        String correlationId = MDC.get("correlationId");
+        if (correlationId != null && !correlationId.isBlank()) {
+            problemDetail.setProperty("correlationId", correlationId);
+        }
     }
 
     private static void setInstanceFromRequest(ProblemDetail problemDetail, @Nullable WebRequest request) {

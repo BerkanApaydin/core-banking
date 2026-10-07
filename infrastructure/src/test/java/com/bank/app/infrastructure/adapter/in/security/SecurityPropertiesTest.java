@@ -20,29 +20,40 @@ class SecurityPropertiesTest {
         void shouldUseDefaultsWhenNull() {
             SecurityProperties props = new SecurityProperties(null);
 
-            assertThat(props.whitelistPaths()).containsExactly(
-                    "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
+            assertThat(props.whitelistPaths()).containsExactlyElementsOf(SecurityProperties.DEFAULT_WHITELIST);
+            assertThat(props.whitelistPaths()).contains(
+                    "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/browser/refresh",
                     "/v3/api-docs/**", "/swagger-ui/**",
                     "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/boot.js", "/accounts.js", "/transfers.js",
-                    "/idempotency.js", "/i18n.js",
+                    "/*.js", "/*.css", "/assets/**",
                     "/style.css", "/favicon.ico", "/error"
             );
         }
 
         @Test
-        @DisplayName("should use default paths when whitelistPaths is empty")
-        void shouldUseDefaultsWhenEmpty() {
+        @DisplayName("should stay empty when whitelistPaths is explicitly empty (fail-closed K2/D2)")
+        void shouldStayEmptyWhenExplicitlyEmpty() {
             SecurityProperties props = new SecurityProperties(List.of());
 
-            assertThat(props.whitelistPaths()).containsExactly(
-                    "/api/v1/auth/login", "/api/v1/auth/browser/login", "/api/v1/auth/register",
-                    "/v3/api-docs/**", "/swagger-ui/**",
-                    "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
-                    "/app.js", "/boot.js", "/accounts.js", "/transfers.js",
-                    "/idempotency.js", "/i18n.js",
-                    "/style.css", "/favicon.ico", "/error"
-            );
+            assertThat(props.whitelistPaths()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("default whitelist must use asset patterns instead of enumerated files (6.3)")
+        void defaultWhitelistMustUseAssetPatterns() {
+            SecurityProperties props = new SecurityProperties(null);
+
+            assertThat(props.whitelistPaths()).contains("/*.js", "/*.css", "/assets/**");
+            assertThat(props.whitelistPaths()).doesNotContain("/app.js", "/boot.js", "/accounts.js");
+        }
+
+        @Test
+        @DisplayName("default whitelist must NOT expose prometheus; only explicit prod config may (K1/D1)")
+        void defaultWhitelistMustNotExposePrometheus() {
+            SecurityProperties props = new SecurityProperties(null);
+
+            assertThat(props.whitelistPaths()).doesNotContain("/actuator/prometheus");
+            assertThat(props.whitelistPaths()).contains("/actuator/health/**");
         }
     }
 

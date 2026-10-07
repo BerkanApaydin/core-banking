@@ -5,19 +5,13 @@ import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
-import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Iban;
-import com.bank.app.common.domain.Money;
-import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.bank.app.common.domain.UserId;
-import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -40,14 +34,13 @@ class AccountQueryUseCaseImplTest {
         accountQueryUseCase = new AccountQueryUseCaseImpl(loadAccountPort);
     }
 
-    private Account account(Long id, Long userId, String iban, BigDecimal balance, AccountStatus status) {
-        return new Account(id, new UserId(userId), new Iban(iban), "Owner" + id, Money.of(balance, Currency.TRY), status);
+    private AccountInfo info(Long id, Long userId, String currency, String status) {
+        return new AccountInfo(id, userId, currency, status);
     }
 
     @Test
     void shouldGetAccountInfoSuccessfully() {
-        Account account = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-        when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
+        when(loadAccountPort.findInfoById(1L)).thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
         AccountInfo info = accountQueryUseCase.getAccountInfo(1L);
 
@@ -55,20 +48,20 @@ class AccountQueryUseCaseImplTest {
         assertEquals(100L, info.userId());
         assertEquals("TRY", info.currency());
         assertEquals("ACTIVE", info.status());
+        verify(loadAccountPort, never()).findById(any());
     }
 
     @Test
     void shouldThrowAccountNotFoundExceptionWhenAccountNotFound() {
-        when(loadAccountPort.findById(99L)).thenReturn(Optional.empty());
+        when(loadAccountPort.findInfoById(99L)).thenReturn(Optional.empty());
 
         assertThrows(AccountNotFoundException.class, () -> accountQueryUseCase.getAccountInfo(99L));
     }
 
     @Test
     void shouldGetAccountInfoForTransferByIbanSuccessfully() {
-        Account account = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
         Iban iban = new Iban("TR770006200000000000000111");
-        when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
+        when(loadAccountPort.findInfoByIban(iban)).thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
         AccountInfo info = accountQueryUseCase.getAccountInfoForTransfer("TR770006200000000000000111");
 
@@ -81,7 +74,7 @@ class AccountQueryUseCaseImplTest {
     @Test
     void shouldThrowAccountNotFoundExceptionWhenIbanNotFound() {
         Iban iban = new Iban("TR600006200000000000000999");
-        when(loadAccountPort.findByIban(iban)).thenReturn(Optional.empty());
+        when(loadAccountPort.findInfoByIban(iban)).thenReturn(Optional.empty());
 
         assertThrows(AccountNotFoundException.class,
                 () -> accountQueryUseCase.getAccountInfoForTransfer("TR600006200000000000000999"));
@@ -95,16 +88,15 @@ class AccountQueryUseCaseImplTest {
 
     @Test
     void shouldGetIbansForAccountsSuccessfully() {
-        Account account1 = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-        Account account2 = account(2L, 100L, "TR870006200000000000000222", new BigDecimal("300.00"), AccountStatus.ACTIVE);
-
-        when(loadAccountPort.findByIds(List.of(1L, 2L))).thenReturn(List.of(account1, account2));
+        when(loadAccountPort.findIbansByIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
 
         Map<Long, String> ibans = accountQueryUseCase.getIbansForAccounts(List.of(1L, 2L));
 
         assertEquals(2, ibans.size());
         assertEquals("TR770006200000000000000111", ibans.get(1L));
         assertEquals("TR870006200000000000000222", ibans.get(2L));
+        verify(loadAccountPort, never()).findByIds(any());
     }
 
     @Test
@@ -125,8 +117,7 @@ class AccountQueryUseCaseImplTest {
 
     @Test
     void shouldGetAccountInfoWithSuspendedStatus() {
-        Account account = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.SUSPENDED);
-        when(loadAccountPort.findById(1L)).thenReturn(Optional.of(account));
+        when(loadAccountPort.findInfoById(1L)).thenReturn(Optional.of(info(1L, 100L, "TRY", "SUSPENDED")));
 
         AccountInfo info = accountQueryUseCase.getAccountInfo(1L);
 
@@ -135,16 +126,15 @@ class AccountQueryUseCaseImplTest {
 
     @Test
     void shouldThrowAccountNotFoundExceptionWhenFindByIdsReturnsEmpty() {
-        when(loadAccountPort.findById(1L)).thenReturn(Optional.empty());
+        when(loadAccountPort.findInfoById(1L)).thenReturn(Optional.empty());
 
         assertThrows(AccountNotFoundException.class, () -> accountQueryUseCase.getAccountInfo(1L));
     }
 
     @Test
     void shouldGetAccountInfoForTransferWithSuspendedStatus() {
-        Account account = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.SUSPENDED);
         Iban iban = new Iban("TR770006200000000000000111");
-        when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
+        when(loadAccountPort.findInfoByIban(iban)).thenReturn(Optional.of(info(1L, 100L, "TRY", "SUSPENDED")));
 
         AccountInfo info = accountQueryUseCase.getAccountInfoForTransfer("TR770006200000000000000111");
 
@@ -153,9 +143,9 @@ class AccountQueryUseCaseImplTest {
 
     @Test
     void shouldNormalizeIbanWithSpacesWhenGettingInfoForTransfer() {
-        Account account = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
         Iban normalizedIban = new Iban("TR770006200000000000000111");
-        when(loadAccountPort.findByIban(normalizedIban)).thenReturn(Optional.of(account));
+        when(loadAccountPort.findInfoByIban(normalizedIban))
+                .thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
         AccountInfo info = accountQueryUseCase.getAccountInfoForTransfer("TR77 0006 2000 0000 0000 0001 11");
 
@@ -164,10 +154,9 @@ class AccountQueryUseCaseImplTest {
     }
 
     @Test
-    void shouldGetIbansForAccountsWithMixedIdsAndFilterNulls() {
-        Account account1 = account(1L, 100L, "TR770006200000000000000111", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-
-        when(loadAccountPort.findByIds(List.of(1L, 99L))).thenReturn(List.of(account1));
+    void shouldGetIbansForAccountsWithMixedIds() {
+        when(loadAccountPort.findIbansByIds(List.of(1L, 99L)))
+                .thenReturn(Map.of(1L, "TR770006200000000000000111"));
 
         Map<Long, String> ibans = accountQueryUseCase.getIbansForAccounts(List.of(1L, 99L));
 

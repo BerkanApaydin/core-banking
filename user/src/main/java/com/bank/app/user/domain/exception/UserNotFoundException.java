@@ -9,6 +9,9 @@ public class UserNotFoundException extends BusinessException {
     @Override
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.NOT_FOUND; }
 
+    @Override
+    public String getErrorCode() { return "USER_NOT_FOUND"; }
+
     public UserNotFoundException(String message) {
         super(message);
     }

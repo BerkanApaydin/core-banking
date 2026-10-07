@@ -6,6 +6,10 @@ import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
+import com.bank.app.infrastructure.adapter.in.handler.BusinessProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.SecurityProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.RequestProblemHandler;
+import com.bank.app.infrastructure.adapter.in.handler.ProblemMessageResolver;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +30,7 @@ import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
+import com.bank.app.transfer.application.dto.TransferReportTotalsResponse;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.application.port.in.*;
 
@@ -39,17 +44,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransferController.class)
-@Import({ ApiVersionConfig.class, GlobalExceptionHandler.class })
+@Import({ ApiVersionConfig.class, GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class })
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("TransferController Web MVC")
 @SuppressWarnings("null")
 class TransferControllerWebMvcTest {
 
-        @Autowired
-        private MockMvc mockMvc;
+        private final MockMvc mockMvc;
+
+        private final ObjectMapper objectMapper;
 
         @Autowired
-        private ObjectMapper objectMapper;
+        TransferControllerWebMvcTest(MockMvc mockMvc, ObjectMapper objectMapper) {
+                this.mockMvc = mockMvc;
+                this.objectMapper = objectMapper;
+        }
 
         @MockitoBean
         private PlaceTransferUseCase placeTransferPort;
@@ -65,6 +74,9 @@ class TransferControllerWebMvcTest {
 
         @MockitoBean
         private GenerateTransferReportQuery generateTransferReportPort;
+
+        @MockitoBean
+        private GenerateTransferReportTotalsQuery generateTransferReportTotalsPort;
 
         @Nested
         @DisplayName("POST /api/v1/transfers")
@@ -289,9 +301,9 @@ class TransferControllerWebMvcTest {
                                         && criteria.endDate().equals(LocalDateTime.parse("2025-01-10T23:59:59.999999"))));
                 }
 
-                @Test
-                @DisplayName("should return 200 with empty report when no transfers")
-                void shouldReturn200WithEmptyReport() throws Exception {
+        @Test
+        @DisplayName("should return 200 with empty report when no transfers")
+        void shouldReturn200WithEmptyReport() throws Exception {
                         TransferReportResponse emptyReport = new TransferReportResponse(1L, 0,
                                         BigDecimal.ZERO, "TRY", List.of());
 
@@ -321,5 +333,32 @@ class TransferControllerWebMvcTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                                 .andExpect(jsonPath("$.errors.startDate").exists());
+        }
+
+        @Nested
+        @DisplayName("GET /api/v1/transfers/report/totals")
+        class GetTransferReportTotals {
+
+                @Test
+                @DisplayName("should return 200 with whole-range totals")
+                void shouldReturn200() throws Exception {
+                        TransferReportTotalsResponse totals = new TransferReportTotalsResponse(1L, 5,
+                                        new BigDecimal("1250.00"), "TRY");
+
+                        when(generateTransferReportTotalsPort.execute(any(ReportCriteria.class))).thenReturn(totals);
+
+                        mockMvc.perform(get("/api/v1/transfers/report/totals")
+                                        .param("accountId", "1")
+                                        .param("startDate", "2025-01-01T00:00:00")
+                                        .param("endDate", "2025-01-10T23:59:59.999999"))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.accountId").value(1L))
+                                        .andExpect(jsonPath("$.totalTransferCount").value(5))
+                                        .andExpect(jsonPath("$.totalVolume").value(1250.00))
+                                        .andExpect(jsonPath("$.currency").value("TRY"));
+                        verify(generateTransferReportTotalsPort).execute(argThat(criteria ->
+                                        criteria.accountId().equals(1L)
+                                        && criteria.startDate().equals(LocalDateTime.parse("2025-01-01T00:00:00"))));
+                }
         }
 }

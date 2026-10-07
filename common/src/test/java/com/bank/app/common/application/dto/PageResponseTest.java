@@ -71,5 +71,14 @@ class PageResponseTest {
             assertThat(response.first()).isTrue();
             assertThat(response.last()).isTrue();
         }
+
+        @Test
+        @DisplayName("should not be first for empty non-zero page")
+        void shouldNotBeFirstForEmptyNonZeroPage() {
+            PageResponse<String> response = PageResponse.empty(5, 10);
+            assertThat(response.content()).isEmpty();
+            assertThat(response.first()).isFalse();
+            assertThat(response.last()).isTrue();
+        }
     }
 }

@@ -6,10 +6,12 @@ import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.bank.app.user.domain.exception.UserNotFoundException;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -62,9 +64,12 @@ class BusinessErrorHttpMapperTest {
     @MethodSource("businessFailures")
     void shouldPreserveConcreteBusinessFailureResponses(
             BusinessException exception, int expectedStatus, String expectedCode) throws Exception {
-        var handler = new GlobalExceptionHandler(new StaticMessageSource());
+        var messages = new ProblemMessageResolver(new StaticMessageSource());
+        // Deliberately fallback-first: @Order on the advice classes (not
+        // registration order) must decide which handler wins.
         var mvc = MockMvcBuilders.standaloneSetup(new FailureController(exception))
-                .setControllerAdvice(handler).build();
+                .setControllerAdvice(new GlobalExceptionHandler(messages),
+                        new BusinessProblemHandler(messages, null)).build();
 
         assertThat(BusinessErrorHttpMapper.toStatus(exception).value()).isEqualTo(expectedStatus);
         mvc.perform(get("/failure"))
@@ -88,6 +93,29 @@ class BusinessErrorHttpMapperTest {
                 Arguments.of(new TooManyFailedLoginAttemptsException("Retry later"),
                         429, "TOO_MANY_FAILED_LOGIN_ATTEMPTS")
         );
+    }
+
+    @Test
+    void shouldMapEveryErrorCode() {
+        // Guards future ErrorCode additions even if the CsvSource above is
+        // not extended: the mapper's static guard fails the class load, and
+        // this test names the missing constant.
+        for (ErrorCode code : ErrorCode.values()) {
+            assertThat(BusinessErrorHttpMapper.toStatus(code)).isNotNull();
+        }
+    }
+
+    @Test
+    void shouldMapEveryBusinessFailureKind() {
+        for (BusinessFailureKind kind : BusinessFailureKind.values()) {
+            BusinessException exception = new BusinessException("error.test", null, "test") {
+                @Override
+                public BusinessFailureKind getFailureKind() {
+                    return kind;
+                }
+            };
+            assertThat(BusinessErrorHttpMapper.toStatus(exception)).isNotNull();
+        }
     }
 
     @RestController

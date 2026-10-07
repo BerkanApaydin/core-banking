@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -48,7 +50,7 @@ class RedisAccountSnapshotCacheAdapterTest {
     void setUp() {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
         lenient().when(redisTemplate.opsForSet()).thenReturn(setOps);
-        adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate, new CacheProperties());
+        adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate, new CacheProperties(null));
     }
 
     @Test
@@ -99,42 +101,48 @@ class RedisAccountSnapshotCacheAdapterTest {
     }
 
     @Test
-    void shouldEvictByIdAcrossReplicas() {
-        // Index written by another pod is still visible because it lives in Redis.
-        when(setOps.members("account-snapshot:idx:ibans-by-id:1")).thenReturn(Set.of("TR1"));
+    void shouldEvictByIdInSingleLuaRoundTrip() {
+        // Index written by another pod is still visible because SMEMBERS runs
+        // server-side inside the Lua script (no client-side read-then-delete).
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(), any()))
+                .thenReturn(5L);
 
         adapter.evictById(1L);
 
-        verify(redisTemplate).delete("account-snapshot:id-1");
-        verify(redisTemplate).delete("account-snapshot:iban-TR1");
-        verify(redisTemplate).delete("account-snapshot:idx:id-by-iban:TR1");
-        verify(redisTemplate).delete("account-snapshot:idx:ibans-by-id:1");
+        // One EVAL with the base keys + key prefixes: 1 round trip on the
+        // mutation hot path instead of SMEMBERS + DEL.
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(java.util.List.of(
+                        "account-snapshot:id-1",
+                        "account-snapshot:iban-of:1",
+                        "account-snapshot:idx:ibans-by-id:1")),
+                eq("account-snapshot:iban-"),
+                eq("account-snapshot:idx:id-by-iban:"));
+        verify(redisTemplate, never()).delete(anyList());
     }
 
     @Test
-    void shouldEvictByIbanAndUntrackIndex() {
-        when(valueOps.get("account-snapshot:idx:id-by-iban:TR1")).thenReturn("1");
-
-        adapter.evictByIban("TR1");
-
-        verify(redisTemplate).delete("account-snapshot:iban-TR1");
-        verify(setOps).remove("account-snapshot:idx:ibans-by-id:1", "TR1");
-        verify(redisTemplate).delete("account-snapshot:idx:id-by-iban:TR1");
-    }
-
-    @Test
-    void shouldPutAndGetIbansBatch() {
+    void shouldPutAndGetIbansBatchPerId() {
         var ids = Set.of(1L, 2L);
         var ibans = Map.of(1L, "TR1", 2L, "TR2");
-        when(valueOps.get("account-snapshot:batch:" + AccountSnapshotCache.ibansBatchKey(ids)))
-                .thenReturn("1=TR1,2=TR2");
+        when(valueOps.multiGet(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
+                .thenReturn(java.util.List.of("TR1", "TR2"));
 
         assertEquals(ibans, adapter.getIbans(ids).orElseThrow());
 
         adapter.putIbans(ids, ibans);
-        verify(valueOps).set(
-                eq("account-snapshot:batch:" + AccountSnapshotCache.ibansBatchKey(ids)),
-                eq("1=TR1,2=TR2"), eq(60L), eq(TimeUnit.SECONDS));
+        // One EVAL with KEYS/ARGV aligned in ascending id order (TTL + values).
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")),
+                eq("60"), eq("TR1"), eq("TR2"));
+    }
+
+    @Test
+    void shouldMissBulkReadOnPartialHit() {
+        when(valueOps.multiGet(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
+                .thenReturn(java.util.Arrays.asList("TR1", null));
+
+        assertTrue(adapter.getIbans(Set.of(1L, 2L)).isEmpty());
     }
 
     @Test
@@ -151,10 +159,16 @@ class RedisAccountSnapshotCacheAdapterTest {
     }
 
     @Test
-    void shouldKeepBatchOnGranularEvict() {
-        adapter.evictIbansBatch();
+    void shouldDropIbanMappingOnEvictById() {
+        adapter.evictById(1L);
 
-        verifyNoInteractions(redisTemplate);
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(java.util.List.of(
+                        "account-snapshot:id-1",
+                        "account-snapshot:iban-of:1",
+                        "account-snapshot:idx:ibans-by-id:1")),
+                eq("account-snapshot:iban-"),
+                eq("account-snapshot:idx:id-by-iban:"));
     }
 
     @Test
@@ -164,7 +178,6 @@ class RedisAccountSnapshotCacheAdapterTest {
             adapter.putByIban(null, null);
             adapter.putIbans(null, null);
             adapter.evictById(null);
-            adapter.evictByIban(null);
         });
         assertTrue(adapter.getById(null).isEmpty());
         assertTrue(adapter.getByIban(null).isEmpty());
@@ -175,6 +188,7 @@ class RedisAccountSnapshotCacheAdapterTest {
     @Test
     void shouldFailOpenWhenRedisDown() {
         when(valueOps.get(anyString())).thenThrow(new RuntimeException("connection refused"));
+        when(valueOps.multiGet(any())).thenThrow(new RuntimeException("connection refused"));
 
         // Reads degrade to DB fallback instead of 500.
         assertTrue(adapter.getById(1L).isEmpty());
@@ -187,32 +201,24 @@ class RedisAccountSnapshotCacheAdapterTest {
             adapter.putByIban("TR1", SNAPSHOT);
             adapter.putIbans(Set.of(1L), Map.of(1L, "TR1"));
             adapter.evictById(1L);
-            adapter.evictByIban("TR1");
             adapter.evictAll();
         });
     }
 
     @Test
     void shouldRoundTripCodec() {
-        assertEquals(SNAPSHOT, RedisAccountSnapshotCacheAdapter.decodeSnapshot(
-                RedisAccountSnapshotCacheAdapter.encodeSnapshot(SNAPSHOT)));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeSnapshot(null));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeSnapshot(""));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeSnapshot("1|2|TRY"));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeSnapshot("x|y|TRY|ACTIVE"));
-
-        var ibans = Map.of(2L, "TR2", 1L, "TR1");
-        assertEquals(ibans, RedisAccountSnapshotCacheAdapter.decodeBatch(
-                RedisAccountSnapshotCacheAdapter.encodeBatch(ibans)));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeBatch(null));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeBatch(""));
-        assertNull(RedisAccountSnapshotCacheAdapter.decodeBatch("no-separator"));
+        // S4: wire format lives in SnapshotCodec; the adapter only calls it.
+        assertEquals(SNAPSHOT, SnapshotCodec.decode(SnapshotCodec.encode(SNAPSHOT)));
+        assertNull(SnapshotCodec.decode(null));
+        assertNull(SnapshotCodec.decode(""));
+        assertNull(SnapshotCodec.decode("1|2|TRY"));
+        assertNull(SnapshotCodec.decode("x|y|TRY|ACTIVE"));
     }
 
     @Test
     void shouldHonorConfiguredTtl() {
-        CacheProperties props = new CacheProperties();
-        props.getAccountInfo().setExpireAfterWrite(10L);
+        CacheProperties props = new CacheProperties(
+                new CacheProperties.AccountInfoCache("caffeine", 1000, 10L));
         var customTtl = new RedisAccountSnapshotCacheAdapter(redisTemplate, props);
 
         customTtl.putById(1L, SNAPSHOT);

@@ -13,12 +13,22 @@ package com.bank.app.common.adapter.in.api;
  */
 public final class PublicApiPaths {
 
+    /** Shared prefix of every authentication endpoint — the tight rate-limit tier. */
+    public static final String AUTH_PREFIX = "/api/v1/auth";
+
     public static final String LOGIN = "/api/v1/auth/login";
     public static final String BROWSER_LOGIN = "/api/v1/auth/browser/login";
     public static final String REGISTER = "/api/v1/auth/register";
+    public static final String REFRESH = "/api/v1/auth/refresh";
+    public static final String BROWSER_REFRESH = "/api/v1/auth/browser/refresh";
+    public static final String LOGOUT = "/api/v1/auth/logout";
+    public static final String BROWSER_LOGOUT = "/api/v1/auth/browser/logout";
+    public static final String BROWSER_SESSION = "/api/v1/auth/browser/session";
 
     public static final String ACCOUNTS = "/api/v1/accounts";
     public static final String TRANSFERS = "/api/v1/transfers";
+
+    public static final String ADMIN = "/api/v1/admin";
 
     private PublicApiPaths() {}
 }

@@ -1,5 +1,11 @@
 package com.bank.app.account.adapter.in.web;
 
+
+
+
+import com.bank.app.user.domain.Role;
+import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.domain.Currency;
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
@@ -11,7 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -45,20 +53,27 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
         @MockitoBean
         private EventPublisherPort eventPublisherPort;
 
-        @Autowired
-        private MockMvc mockMvc;
+        private final MockMvc mockMvc;
+
+        private final AccountJpaRepository accountRepo;
+
+        private final UserJpaRepository userRepository;
+
+        private final ObjectMapper objectMapper;
+
+        private final JwtTokenProvider jwtTokenProvider;
 
         @Autowired
-        private AccountJpaRepository accountRepo;
-
-        @Autowired
-        private UserJpaRepository userRepository;
-
-        @Autowired
-        private ObjectMapper objectMapper;
-
-        @Autowired
-        private JwtTokenProvider jwtTokenProvider;
+        AccountControllerIntegrationTest(MockMvc mockMvc, AccountJpaRepository accountRepo,
+                        UserJpaRepository userRepository, ObjectMapper objectMapper,
+                        JwtTokenProvider jwtTokenProvider, ObjectProvider<CacheManager> cacheManagers) {
+                super(cacheManagers);
+                this.mockMvc = mockMvc;
+                this.accountRepo = accountRepo;
+                this.userRepository = userRepository;
+                this.objectMapper = objectMapper;
+                this.jwtTokenProvider = jwtTokenProvider;
+        }
 
         private Long testUserId;
         private String jwtToken;
@@ -73,7 +88,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
         void setUp() {
                 LocaleContextHolder.setLocale(Locale.of("tr", "TR"), true);
                 UserJpaEntity u = userRepository.save(
-                                new UserJpaEntity(null, "test_user", "pass", "ROLE_USER", null, null, null));
+                                new UserJpaEntity(null, "test_user", "pass", Role.ROLE_USER, null, null, null));
                 testUserId = u.getId();
                 jwtToken = jwtTokenProvider.generateToken(u.getId(), "test_user");
         }
@@ -105,7 +120,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should ignore a client-supplied IBAN")
                 void shouldIgnoreClientSuppliedIban() throws Exception {
                         accountRepo.save(new AccountJpaEntity(null, testUserId, "TR600006200000000000000999",
-                                        "Eski Sahip", new BigDecimal("100.00"), "TRY", "ACTIVE", null));
+                                        "Eski Sahip", new BigDecimal("100.00"), Currency.TRY, AccountStatus.ACTIVE, null));
 
                         Map<String, Object> request = Map.of("iban", "TR600006200000000000000999",
                                         "ownerName", "Fatma Demir", "initialBalance", new BigDecimal("1500.00"),
@@ -137,7 +152,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should ignore a forged userId and use the authenticated principal")
                 void shouldIgnoreForgedUserId() throws Exception {
                         UserJpaEntity otherUser = userRepository.save(
-                                        new UserJpaEntity(null, "other_user3", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "other_user3", "pass", Role.ROLE_USER, null, null, null));
 
                         Map<String, Object> request = Map.of("userId", otherUser.getId(),
                                         "ownerName", "Victim", "initialBalance", new BigDecimal("100.00"),
@@ -175,7 +190,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should list all accounts for the user")
                 void shouldListAccounts() throws Exception {
                         accountRepo.save(new AccountJpaEntity(null, testUserId, "TR500006200000000000000888",
-                                        "Fatma Demir", new BigDecimal("2000.00"), "TRY", "ACTIVE", null));
+                                        "Fatma Demir", new BigDecimal("2000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
 
                         mockMvc.perform(get("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken))
@@ -196,8 +211,8 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 void shouldReturn200() throws Exception {
                         AccountJpaEntity saved = accountRepo.save(
                                         new AccountJpaEntity(null, testUserId, "TR500006200000000000000888",
-                                                        "Fatma Demir", new BigDecimal("2000.00"), "TRY",
-                                                        "ACTIVE", null));
+                                                        "Fatma Demir", new BigDecimal("2000.00"), Currency.TRY,
+                                                        AccountStatus.ACTIVE, null));
 
                         mockMvc.perform(get("/api/v1/accounts/" + saved.getId())
                                         .header("Authorization", "Bearer " + jwtToken))
@@ -222,11 +237,11 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should return 404 when accessing another user's account")
                 void shouldReturn404ForOtherUser() throws Exception {
                         UserJpaEntity otherUser = userRepository.save(
-                                        new UserJpaEntity(null, "other_user", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "other_user", "pass", Role.ROLE_USER, null, null, null));
                         AccountJpaEntity otherAccount = accountRepo.save(
                                         new AccountJpaEntity(null, otherUser.getId(), "TR200006200000000000000555",
-                                                        "Other Owner", new BigDecimal("500.00"), "TRY",
-                                                        "ACTIVE", null));
+                                                        "Other Owner", new BigDecimal("500.00"), Currency.TRY,
+                                                        AccountStatus.ACTIVE, null));
 
                         mockMvc.perform(get("/api/v1/accounts/" + otherAccount.getId())
                                         .header("Authorization", "Bearer " + jwtToken))
@@ -243,7 +258,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should return 200 when account exists")
                 void shouldReturn200() throws Exception {
                         accountRepo.save(new AccountJpaEntity(null, testUserId, "TR500006200000000000000888",
-                                        "Fatma Demir", new BigDecimal("2000.00"), "TRY", "ACTIVE", null));
+                                        "Fatma Demir", new BigDecimal("2000.00"), Currency.TRY, AccountStatus.ACTIVE, null));
 
                         mockMvc.perform(get("/api/v1/accounts/iban/TR500006200000000000000888")
                                         .header("Authorization", "Bearer " + jwtToken))
@@ -265,11 +280,11 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
                 @DisplayName("should return 404 when accessing another user's account by IBAN")
                 void shouldReturn404ForOtherUser() throws Exception {
                         UserJpaEntity otherUser = userRepository.save(
-                                        new UserJpaEntity(null, "other_user2", "pass", "ROLE_USER", null, null, null));
+                                        new UserJpaEntity(null, "other_user2", "pass", Role.ROLE_USER, null, null, null));
                         accountRepo.save(
                                         new AccountJpaEntity(null, otherUser.getId(), "TR300006200000000000000666",
-                                                        "Other Owner", new BigDecimal("500.00"), "TRY",
-                                                        "ACTIVE", null));
+                                                        "Other Owner", new BigDecimal("500.00"), Currency.TRY,
+                                                        AccountStatus.ACTIVE, null));
 
                         mockMvc.perform(get("/api/v1/accounts/iban/TR300006200000000000000666")
                                         .header("Authorization", "Bearer " + jwtToken))

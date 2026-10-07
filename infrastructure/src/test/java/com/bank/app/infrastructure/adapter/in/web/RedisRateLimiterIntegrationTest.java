@@ -27,9 +27,7 @@ class RedisRateLimiterIntegrationTest {
         factory.afterPropertiesSet();
         var redisTemplate = new StringRedisTemplate(factory);
         redisTemplate.afterPropertiesSet();
-        var props = new RateLimitProperties();
-        props.setMaxRequests(5);
-        props.setTimeWindowMs(10_000);
+        var props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000);
         rateLimiter = new RedisRateLimiter(redisTemplate, props);
     }
 

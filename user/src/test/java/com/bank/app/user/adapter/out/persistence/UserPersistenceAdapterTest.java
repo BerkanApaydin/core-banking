@@ -48,7 +48,7 @@ class UserJpaAdapterTest {
         existingEntity.setVersion(0L);
         existingEntity.setUsername("testuser");
         existingEntity.setPassword("oldpassword");
-        existingEntity.setRole("ROLE_USER");
+        existingEntity.setRole(Role.ROLE_USER);
         when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
         User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER, null, null, 0L);
@@ -63,7 +63,7 @@ class UserJpaAdapterTest {
         entity.setId(1L);
         entity.setUsername("testuser");
         entity.setPassword("password");
-        entity.setRole("ROLE_USER");
+        entity.setRole(Role.ROLE_USER);
         when(userJpaRepository.findByUsername("testuser")).thenReturn(Optional.of(entity));
 
         Optional<User> result = adapter.findByUsername("testuser");
@@ -108,7 +108,7 @@ class UserJpaAdapterTest {
             UserJpaEntity saved = captor.getValue();
             assertNull(saved.getId());
             assertEquals("newuser", saved.getUsername());
-            assertEquals("ROLE_USER", saved.getRole());
+            assertEquals(Role.ROLE_USER, saved.getRole());
         }
 
         @Test
@@ -151,7 +151,7 @@ class UserJpaAdapterTest {
             existingEntity.setVersion(0L);
             existingEntity.setUsername("testuser");
             existingEntity.setPassword("oldpassword");
-            existingEntity.setRole("ROLE_USER");
+            existingEntity.setRole(Role.ROLE_USER);
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
             User user = new User(new UserId(1L), "testuser", "newpassword", Role.ROLE_USER,
@@ -207,7 +207,7 @@ class UserJpaAdapterTest {
             entity.setId(1L);
             entity.setUsername("testuser");
             entity.setPassword("password");
-            entity.setRole("ROLE_USER");
+            entity.setRole(Role.ROLE_USER);
             entity.setEmail("test@example.com");
             entity.setPhone("+905551234567");
             when(userJpaRepository.findByUsername("testuser")).thenReturn(Optional.of(entity));

@@ -71,12 +71,21 @@ class UserContextServiceTest {
                 .hasMessage("error");
     }
 
+    @Test
+    void hasRoleShouldDelegateToPort() {
+        port.roles.add("ROLE_ADMIN");
+
+        assertThat(service.hasRole("ROLE_ADMIN")).isTrue();
+        assertThat(service.hasRole("ROLE_USER")).isFalse();
+    }
+
     private static class StubSecurityContextPort implements SecurityContextPort {
         Optional<Long> userId = Optional.empty();
         Optional<String> username = Optional.empty();
         Long lastCheckedUserId;
         String lastCheckedMessage;
         boolean throwOnCheck;
+        final java.util.Set<String> roles = new java.util.HashSet<>();
 
         @Override
         public Optional<Long> getCurrentUserId() {
@@ -95,6 +104,11 @@ class UserContextServiceTest {
             }
             lastCheckedUserId = resourceUserId;
             lastCheckedMessage = errorMessage;
+        }
+
+        @Override
+        public boolean hasRole(String role) {
+            return roles.contains(role);
         }
     }
 }

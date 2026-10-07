@@ -24,6 +24,18 @@ class AuditLogTest {
         assertEquals(AuditAction.ACCOUNT_CREATED, log.getAction());
         assertEquals("Account created", log.getDetails());
         assertEquals(LocalDateTime.of(2025, 1, 15, 10, 0), log.getTimestamp());
+        // 8.2: legacy constructor leaves the stable identity empty.
+        assertNull(log.getActorUserId());
+    }
+
+    @Test
+    @DisplayName("should carry the stable actor identity alongside the username snapshot (8.2)")
+    void shouldCarryActorUserId() {
+        AuditLog log = new AuditLog(1L, "alice", AuditAction.LOGIN_SUCCEEDED, "Logged in",
+                LocalDateTime.of(2026, 1, 2, 3, 4), 7L);
+
+        assertEquals("alice", log.getUsername());
+        assertEquals(7L, log.getActorUserId());
     }
 
     @Test

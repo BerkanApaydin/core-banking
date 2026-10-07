@@ -8,8 +8,10 @@ import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
+import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.RefreshTokenReuseException;
 import org.slf4j.Logger;
@@ -36,13 +38,16 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
 
     private final JwtPort jwtPort;
     private final RefreshTokenPort refreshTokenPort;
+    private final LoadUserPort loadUserPort;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public RefreshSessionUseCaseImpl(JwtPort jwtPort, RefreshTokenPort refreshTokenPort,
+                                     LoadUserPort loadUserPort,
                                      ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.jwtPort = jwtPort;
         this.refreshTokenPort = refreshTokenPort;
+        this.loadUserPort = loadUserPort;
         this.clockProvider = clockProvider;
         this.auditEventPort = auditEventPort;
     }
@@ -79,10 +84,26 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         if (stored.expiresAt() == null || !stored.expiresAt().isAfter(now)) {
             throw new AuthenticationFailedException("Refresh token has expired.");
         }
+        // Token-generation enforcement (V39): a role or password change bumps
+        // the user's generation, so a refresh minted before the bump is
+        // rejected here and the client must re-authenticate. Access tokens
+        // stay valid until their (short) expiry — the residual window is
+        // bounded by the access lifetime, by design.
+        User user = loadUserPort.findByUsername(verified.username())
+                .orElseThrow(() -> new AuthenticationFailedException("Invalid refresh token."));
+        long tokenVersion = jwtPort.extractTokenVersion(refreshToken);
+        if (tokenVersion != user.getTokenVersion()) {
+            log.warn("Stale refresh token generation rejected: userId={}", verified.userId());
+            auditEventPort.publish(new AuditEvent("TOKEN_REVOKED",
+                    "Stale refresh token generation rejected; re-authentication required.",
+                    LocalDateTime.now(clockProvider.clock()), verified.username(),
+                    verified.userId()));
+            throw new AuthenticationFailedException("Session is no longer valid. Please log in again.");
+        }
         String newRefreshToken = jwtPort.generateRefreshToken(
-                verified.userId(), verified.username(), verified.role());
+                verified.userId(), verified.username(), verified.role(), user.getTokenVersion());
         String newAccessToken = jwtPort.generateToken(
-                verified.userId(), verified.username(), verified.role());
+                verified.userId(), verified.username(), verified.role(), user.getTokenVersion());
         String newHash = TokenDigest.sha256Hex(newRefreshToken);
         refreshTokenPort.markRotated(hash, newHash);
         refreshTokenPort.save(newHash, verified.userId(), stored.familyId(),

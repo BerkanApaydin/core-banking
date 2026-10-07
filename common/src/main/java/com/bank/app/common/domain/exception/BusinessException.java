@@ -39,6 +39,16 @@ public abstract class BusinessException extends RuntimeException {
         return BusinessFailureKind.RULE_VIOLATION;
     }
 
+    /**
+     * Wire-stable error code. Concrete exceptions SHOULD declare their own
+     * literal (enforced by {@code ExceptionCodeArchitectureTest}); the
+     * derivation below is the legacy fallback for the few instance-variant
+     * codes whose value legitimately differs per throw site
+     * (e.g. {@code ConcurrentRequestException} reports payload-conflict vs
+     * key-required, {@code TransferNotCancellableException} reports
+     * not-cancellable vs window-expired). Never rely on the class-name branch
+     * for new exceptions — declare the literal.
+     */
     public String getErrorCode() {
         if (messageKey != null) {
             return messageKey.replace("error.", "").toUpperCase(LOCALE);

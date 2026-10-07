@@ -10,14 +10,21 @@ class PasswordPolicyPropertiesTest {
 
     @Test
     void shouldBuildDefaultPolicy() {
-        assertThat(new PasswordPolicyProperties(8, true, true, true).toDomain())
-                .isEqualTo(new PasswordPolicy(8, true, true, true));
+        assertThat(new PasswordPolicyProperties(12, true, true, true).toDomain())
+                .isEqualTo(new PasswordPolicy(12, true, true, true));
     }
 
     @Test
     void shouldRejectWeakMinLength() {
         assertThatThrownBy(() -> new PasswordPolicyProperties(6, true, true, true).toDomain())
                 .isExactlyInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldRejectNistMinimumAsBelowOrganizationStandard() {
+        assertThatThrownBy(() -> new PasswordPolicyProperties(8, true, true, true).toDomain())
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 12 and 72");
     }
 
     @Test

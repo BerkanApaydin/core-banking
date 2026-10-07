@@ -76,7 +76,6 @@ class IdempotencyGuardTest {
 
             assertEquals(IdempotencyResult.Status.NEW, result.status());
             verify(idempotencyPort).tryResetFailed(eq("key-1"), any(LocalDateTime.class));
-            verify(idempotencyPort, never()).deleteById("key-1");
         }
 
         @Test

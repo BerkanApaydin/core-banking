@@ -9,7 +9,9 @@ import com.bank.app.infrastructure.adapter.out.security.TokenBlacklistAdapter;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,11 +43,23 @@ class HybridBlacklistContextIT extends AbstractSpringBootIntegrationTest {
         registry.add("spring.data.redis.port", redis::getFirstMappedPort);
     }
 
-    @Autowired private TokenBlacklistPort blacklist;
-    @Autowired private JwtPort jwtPort;
-    @Autowired private JdbcTemplate jdbc;
-    @Autowired private PlatformTransactionManager transactionManager;
-    @Autowired private StringRedisTemplate redisTemplate;
+    private final TokenBlacklistPort blacklist;
+    private final JwtPort jwtPort;
+    private final JdbcTemplate jdbc;
+    private final PlatformTransactionManager transactionManager;
+    private final StringRedisTemplate redisTemplate;
+
+    @Autowired
+    HybridBlacklistContextIT(TokenBlacklistPort blacklist, JwtPort jwtPort, JdbcTemplate jdbc,
+            PlatformTransactionManager transactionManager, StringRedisTemplate redisTemplate,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.blacklist = blacklist;
+        this.jwtPort = jwtPort;
+        this.jdbc = jdbc;
+        this.transactionManager = transactionManager;
+        this.redisTemplate = redisTemplate;
+    }
 
     @Test
     void shouldKeepNewRevocationAcrossPodsAndRedisDataLoss() {

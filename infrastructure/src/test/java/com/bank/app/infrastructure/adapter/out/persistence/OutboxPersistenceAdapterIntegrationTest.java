@@ -4,7 +4,9 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.TestApplication;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,11 +37,18 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         }
     }
 
-    @Autowired
-    private OutboxJpaRepository outboxJpaRepository;
+    private final OutboxJpaRepository outboxJpaRepository;
+
+    private final PlatformTransactionManager transactionManager;
 
     @Autowired
-    private PlatformTransactionManager transactionManager;
+    OutboxPersistenceAdapterIntegrationTest(OutboxJpaRepository outboxJpaRepository,
+            PlatformTransactionManager transactionManager,
+            ObjectProvider<CacheManager> cacheManagers) {
+        super(cacheManagers);
+        this.outboxJpaRepository = outboxJpaRepository;
+        this.transactionManager = transactionManager;
+    }
 
     @AfterEach
     void tearDown() {

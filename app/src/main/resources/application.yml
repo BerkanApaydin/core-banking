@@ -38,7 +38,10 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 50
+      # K3: 20, not 50 — pool x replicas must fit the database budget
+      # (6 pods x 20 = 120; see docs/operations.md). Override per deployment
+      # with DB_MAX_POOL_SIZE; measure pool-wait before raising.
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:20}
       minimum-idle: 10
       connection-timeout: 5000
       idle-timeout: 300000
@@ -55,7 +58,10 @@ spring:
         format_sql: false
     show-sql: false
   flyway:
-    baseline-on-migrate: true
+    # Never auto-baseline in any environment: adopting a non-empty schema
+    # without history must be a reviewed, explicit migration baseline, not a
+    # silent startup side effect. Fresh databases migrate normally with false.
+    baseline-on-migrate: false
     validate-on-migrate: true
   data:
     redis:
@@ -64,7 +70,10 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  # Short-lived access tokens + rotating refresh tokens. JWT_EXPIRATION stays
+  # honored as the access lifetime so existing deployments keep working.
+  access-expiration: ${JWT_ACCESS_EXPIRATION:${JWT_EXPIRATION:900000}}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   allow-default-secret: ${JWT_ALLOW_DEFAULT_SECRET:false}
 
 app:
@@ -76,20 +85,37 @@ app:
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
+    browser-session:
+      # __Host- cookie prefix requires Secure; true only behind TLS (prod).
+      # Dev serves plain HTTP, so this stays false outside prod.
+      secure: ${BROWSER_SESSION_SECURE:false}
     failed-login:
       backend: ${FAILED_LOGIN_BACKEND:caffeine}
       max-attempts: ${FAILED_LOGIN_MAX_ATTEMPTS:5}
       window-minutes: ${FAILED_LOGIN_WINDOW_MINUTES:15}
     rate-limit:
       backend: ${RATE_LIMIT_BACKEND:caffeine}
+      # Auth tier (/api/v1/auth/*): tight brute-force budget, unchanged.
       max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
       time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
+      # Resource tier (/api/v1/accounts, /api/v1/transfers, /api/v1/admin):
+      # looser budget for authenticated dashboard-style reads, so a normal
+      # page load plus navigation — or several users behind one NAT address —
+      # does not 429 on the login budget.
+      resource-max-requests: ${RATE_LIMIT_RESOURCE_MAX_REQUESTS:120}
+      resource-time-window-ms: ${RATE_LIMIT_RESOURCE_TIME_WINDOW_MS:60000}
       paths:
         - /api/v1/auth/login
         - /api/v1/auth/browser/login
         - /api/v1/auth/register
+        - /api/v1/auth/refresh
+        - /api/v1/auth/browser/refresh
+        - /api/v1/auth/logout
+        - /api/v1/auth/browser/logout
+        - /api/v1/auth/browser/session
         - /api/v1/accounts
         - /api/v1/transfers
+        - /api/v1/admin
     token-blacklist:
       backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
       min-ttl-ms: ${TOKEN_BLACKLIST_MIN_TTL_MS:1000}
@@ -110,7 +136,9 @@ app:
       enabled: ${BACKLOG_METRICS_ENABLED:true}
       scan-delay-ms: ${BACKLOG_METRICS_SCAN_DELAY_MS:60000}
   transfer:
-    cancellation-window-hours: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
+    # S7/S8: binds to a Duration (hours for plain numbers); the env name is
+    # unchanged so existing deployments keep working.
+    cancellation-window: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
   transaction:
     timeout-seconds: ${TRANSACTION_TIMEOUT_SECONDS:30}
   outbox:
@@ -119,6 +147,9 @@ app:
     max-retries: ${OUTBOX_MAX_RETRIES:5}
     partition-count: ${OUTBOX_PARTITION_COUNT:2}
     batch-size: ${OUTBOX_BATCH_SIZE:50}
+    # Retention window for processed outbox rows and their handler dedup keys
+    # (unprocessed and dead-letter rows are never deleted).
+    retention-days: ${OUTBOX_RETENTION_DAYS:30}
   cache:
     caffeine:
       account-info:
@@ -130,7 +161,9 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        # info is intentionally NOT exposed: it is not whitelisted and would
+        # be unreachable anyway (K1/D1). Keep the surface to health+prometheus.
+        include: health,prometheus
   endpoint:
     health:
       show-details: when_authorized

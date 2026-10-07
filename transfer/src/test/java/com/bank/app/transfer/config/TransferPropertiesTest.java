@@ -9,15 +9,23 @@ class TransferPropertiesTest {
 
     @Test
     void shouldRejectNonPositiveMaxAttempts() {
-        assertThatThrownBy(() -> new TransferProperties(24, 0, 500L, 2000L, 100))
+        assertThatThrownBy(() -> new TransferProperties(java.time.Duration.ofHours(24), 0, 500L, 2000L, 100))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxAttempts");
     }
 
     @Test
     void shouldAcceptValidProperties() {
-        TransferProperties props = new TransferProperties(24, 3, 500L, 2000L, 100);
+        TransferProperties props = new TransferProperties(java.time.Duration.ofHours(24), 3, 500L, 2000L, 100);
 
         assertThat(props.maxAttempts()).isEqualTo(3);
+        assertThat(props.cancellationWindow()).isEqualTo(java.time.Duration.ofHours(24));
+    }
+
+    @Test
+    void shouldRejectNonPositiveCancellationWindow() {
+        assertThatThrownBy(() -> new TransferProperties(java.time.Duration.ZERO, 3, 500L, 2000L, 100))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cancellationWindow");
     }
 }

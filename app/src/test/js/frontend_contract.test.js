@@ -255,3 +255,66 @@ test('opening-balance field follows the authenticated backend capability', async
     assert.equal(balance.value, '0.00');
     assert.equal(hint.textContent, 'account.funding_disabled');
 });
+
+test('concurrent 401s share one silent refresh (theft-safe coalescing)', async () => {
+    const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
+        + source.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+    let fetchCalls = 0;
+    const context = vm.createContext({
+        API_BASE: '',
+        authenticated: true,
+        userId: null,
+        username: null,
+        document: { cookie: 'BANK_CSRF=' + 'x'.repeat(43) },
+        getLanguage: () => 'en',
+        browserCsrfToken: () => 'x'.repeat(43),
+        fetch: async () => {
+            fetchCalls++;
+            await new Promise(resolve => setTimeout(resolve, 10));
+            return { ok: true, json: async () => ({ userId: 7, username: 'alice' }) };
+        },
+        __: key => key
+    });
+    vm.runInContext(functions, context);
+
+    const [first, second] = await vm.runInContext(
+        'Promise.all([trySilentRefresh(), trySilentRefresh()])', context);
+    assert.equal(first, true);
+    assert.equal(second, true);
+    assert.equal(fetchCalls, 1);
+    assert.equal(vm.runInContext('userId', context), 7);
+});
+
+test('password gate mirrors backend policy (min 12 + upper/lower/digit)', () => {
+    const functions = 'function meetsPasswordPolicy(pw) {'
+        + source.split('function meetsPasswordPolicy(pw) {')[1].split('function initUxEnhancements')[0];
+    const context = vm.createContext({});
+    vm.runInContext(functions, context);
+
+    // Backend PasswordPolicy.DEFAULT is (12, upper, lower, digit); the
+    // client gate must reject everything the backend would reject.
+    assert.equal(vm.runInContext("meetsPasswordPolicy('Short123456')", context), false);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('alllowercase12')", context), false);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('ALLUPPERCASE12')", context), false);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('NoDigitsHereAA')", context), false);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('ValidPass1234')", context), true);
+});
+
+test('failed silent refresh keeps the session logged out', async () => {
+    const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
+        + source.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+    const context = vm.createContext({
+        API_BASE: '',
+        authenticated: true,
+        userId: 7,
+        username: 'alice',
+        document: { cookie: '' },
+        getLanguage: () => 'en',
+        browserCsrfToken: () => null,
+        fetch: async () => ({ ok: false }),
+        __: key => key
+    });
+    vm.runInContext(functions, context);
+
+    assert.equal(await vm.runInContext('trySilentRefresh()', context), false);
+});

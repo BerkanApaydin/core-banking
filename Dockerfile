@@ -33,7 +33,10 @@ RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -B
 
 # Runner stage
 FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S bank && adduser -S bank -G bank \
+# D20: pin UID 1000 so the image user matches k8s runAsUser: 1000.
+# (Alpine -S assigns the next free system UID otherwise, and the pod
+# securityContext would override USER bank with an anonymous UID.)
+RUN addgroup -S bank && adduser -S -u 1000 -G bank bank \
     && apk add --no-cache curl
 USER bank
 WORKDIR /app

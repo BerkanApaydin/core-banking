@@ -3,14 +3,11 @@ package com.bank.app.account.application.usecase;
 import com.bank.app.account.application.port.in.AccountInfo;
 import com.bank.app.account.application.port.in.AccountQueryUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
-import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @ReadOnlyUseCase
 public class AccountQueryUseCaseImpl implements AccountQueryUseCase {
@@ -22,16 +19,23 @@ public class AccountQueryUseCaseImpl implements AccountQueryUseCase {
 
     @Override
     public AccountInfo getAccountInfo(Long accountId) {
-        Account account = loadAccountPort.findById(accountId)
-                .orElseThrow(() -> new AccountNotFoundException(accountId));
-        return toAccountInfo(account);
+        // S9: lookup differs, the orElseThrow+map shape does not.
+        // Projection read (no aggregate hydration): authorization paths need
+        // only id/owner/currency/status, never the balance.
+        return findOrThrow(loadAccountPort.findInfoById(accountId),
+                () -> new AccountNotFoundException(accountId));
     }
 
     @Override
     public AccountInfo getAccountInfoForTransfer(String ibanValue) {
         Iban iban = new Iban(ibanValue);
-        Account account = loadAccountPort.findByIban(iban).orElseThrow(() -> new AccountNotFoundException(ibanValue));
-        return toAccountInfo(account);
+        return findOrThrow(loadAccountPort.findInfoByIban(iban),
+                () -> new AccountNotFoundException(ibanValue));
+    }
+
+    private AccountInfo findOrThrow(java.util.Optional<AccountInfo> lookup,
+                                    java.util.function.Supplier<AccountNotFoundException> missing) {
+        return lookup.orElseThrow(missing);
     }
 
     @Override
@@ -39,13 +43,8 @@ public class AccountQueryUseCaseImpl implements AccountQueryUseCase {
         if (accountIds == null || accountIds.isEmpty()) {
             return Map.of();
         }
-        return loadAccountPort.findByIds(accountIds).stream()
-                .collect(Collectors.toMap(Account::getId, a -> a.getIban().value()));
-    }
-
-    private AccountInfo toAccountInfo(Account account) {
-        return new AccountInfo(Objects.requireNonNull(account.getId()),
-                Objects.requireNonNull(account.getUserId()).value(),
-                Objects.requireNonNull(account.getBalance().currency().name()), account.getStatus().name());
+        // Id-to-IBAN pairs straight from the projection: batch enrichment
+        // without hydrating one aggregate per row.
+        return loadAccountPort.findIbansByIds(accountIds);
     }
 }

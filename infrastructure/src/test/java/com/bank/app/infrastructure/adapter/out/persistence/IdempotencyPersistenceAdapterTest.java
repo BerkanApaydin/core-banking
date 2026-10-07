@@ -125,13 +125,6 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
-    void shouldDeleteById() {
-        adapter.deleteById("key1");
-
-        verify(repository).deleteById("key1");
-    }
-
-    @Test
     void shouldDeleteExpired() {
         var threshold = LocalDateTime.now();
         when(repository.deleteExpiredTerminalRequests(threshold)).thenReturn(3);
@@ -139,5 +132,15 @@ class IdempotencyPersistenceAdapterTest {
         int deleted = adapter.deleteExpired(threshold);
 
         assertThat(deleted).isEqualTo(3);
+    }
+
+    @Test
+    void shouldDeleteExpiredHandlerKeys() {
+        var threshold = LocalDateTime.now();
+        when(repository.deleteExpiredHandlerKeys(threshold)).thenReturn(4);
+
+        int deleted = adapter.deleteExpiredHandlerKeys(threshold);
+
+        assertThat(deleted).isEqualTo(4);
     }
 }

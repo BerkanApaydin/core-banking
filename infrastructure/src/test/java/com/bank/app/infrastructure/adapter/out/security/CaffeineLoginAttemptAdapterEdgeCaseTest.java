@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,7 +10,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldBlockWhenMaxAttemptsIsZeroAndAttemptExists() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(0, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(0, 1));
         String ip = "10.0.0.1";
 
         assertFalse(service.isIpBlocked(ip));
@@ -20,7 +21,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldNeverBlockWhenMaxAttemptsIsNegative() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(-1, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(-1, 1));
         String ip = "10.0.0.2";
 
         service.recordFailure(ip, "user");
@@ -32,7 +33,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldHandleDifferentIpsIndependently() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(2, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(2, 1));
         String ip1 = "10.0.0.7";
         String ip2 = "10.0.0.8";
 
@@ -47,7 +48,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldResetBlockedIp() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(3, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 1));
         String ip = "10.0.0.4";
 
         service.recordFailure(ip, "user");
@@ -61,7 +62,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldRespectMaxAttemptsSetting() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(Integer.MAX_VALUE, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(Integer.MAX_VALUE, 1));
         String ip = "10.0.0.5";
 
         for (int i = 0; i < 100; i++) {
@@ -72,7 +73,7 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
 
     @Test
     void shouldBlockExactlyAtMaxAttempts() {
-        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(5, 1);
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(5, 1));
         String ip = "10.0.0.6";
 
         assertFalse(service.isIpBlocked(ip));
@@ -80,5 +81,17 @@ class CaffeineLoginAttemptAdapterEdgeCaseTest {
             service.recordFailure(ip, "user");
         }
         assertTrue(service.isIpBlocked(ip));
+    }
+
+    @Test
+    void shouldTreatNullKeysAsNoOpInsteadOfThrowing() {
+        CaffeineLoginAttemptAdapter service = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 1));
+
+        assertDoesNotThrow(() -> service.recordFailure(null, null));
+        assertDoesNotThrow(() -> service.recordFailure("10.0.0.9", null));
+        assertDoesNotThrow(() -> service.reset(null));
+        assertDoesNotThrow(() -> service.resetByUsername(null));
+        assertFalse(service.isIpBlocked(null));
+        assertFalse(service.isUsernameBlocked(null));
     }
 }

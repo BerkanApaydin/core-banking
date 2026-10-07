@@ -61,7 +61,10 @@ buildNumber.properties
 .mvn/timing.properties
 /load_tests/__pycache__/
 /load_tests/.venv/
+__pycache__/
 *.pyc
+*.pid
+!/code
 /audit-work/
 *.log
 run.err

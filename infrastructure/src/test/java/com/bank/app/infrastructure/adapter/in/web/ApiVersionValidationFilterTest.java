@@ -74,7 +74,9 @@ class ApiVersionValidationFilterTest {
 
         verify(chain, never()).doFilter(any(), any());
         assertEquals(406, response.getStatus());
+        assertTrue(response.getContentType().contains("application/problem+json"));
         assertTrue(response.getContentAsString().contains("API version mismatch"));
+        assertTrue(response.getContentAsString().contains("API_VERSION_MISMATCH"));
     }
 
     @Test
@@ -144,6 +146,7 @@ class ApiVersionValidationFilterTest {
 
         assertEquals(406, response.getStatus());
         assertTrue(response.getContentAsString().contains("API version mismatch"));
+        assertTrue(response.getContentAsString().contains("API_VERSION_MISMATCH"));
     }
 
     @Test

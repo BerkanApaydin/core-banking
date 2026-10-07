@@ -12,7 +12,7 @@
 
     <artifactId>infrastructure</artifactId>
     <name>infrastructure</name>
-    <description>[Platform] Cross-cutting adapters implementing context-owned ports: security filter chain, JWT/token-blacklist backends, outbox/idempotency persistence, rate limiting, caching, web filters, exception handling. Depends only on port-owning modules (common, user, audit, transfer for cache port) — never on account internals.</description>
+    <description>[Platform] Cross-cutting adapters implementing context-owned ports: security filter chain, JWT/token-blacklist backends, outbox/idempotency persistence, rate limiting, caching, web filters, exception handling. Depends only on port-owning modules (common, account-api, plus account/user/audit for their ports) — never on adapter internals of another bounded context.</description>
 
     <dependencies>
         <dependency>
@@ -113,6 +113,11 @@
             <artifactId>common</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

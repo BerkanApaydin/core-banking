@@ -24,16 +24,14 @@ class RateLimitingFilterTest {
 
     @BeforeEach
     void setUp() {
-        RateLimitProperties props = new RateLimitProperties();
-        props.setMaxRequests(10);
-        props.setTimeWindowMs(10_000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 120, 60000);
         rateLimiter = new CaffeineRateLimiter(props);
         messageSource = mock(MessageSource.class);
         clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
         when(messageSource.getMessage(anyString(), any(), anyString(), any()))
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
-        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(), objectMapper,
+        filter = new RateLimitingFilter(rateLimiter, messageSource, new RateLimitProperties(null, null, 10, 10_000, 120, 60000), objectMapper,
                 clientIpResolver);
     }
 
@@ -102,12 +100,10 @@ class RateLimitingFilterTest {
     void shouldNotInvokeFilterChainWhenRateLimitExceeded()
             throws IOException, ServletException {
 
-        RateLimitProperties p = new RateLimitProperties();
-        p.setMaxRequests(1);
-        p.setTimeWindowMs(10_000);
+        RateLimitProperties p = new RateLimitProperties(null, null, 1, 10_000, 120, 60000);
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(p);
         ObjectMapper objectMapper = new ObjectMapper();
-        RateLimitingFilter filter = new RateLimitingFilter(limiter, messageSource, new RateLimitProperties(),
+        RateLimitingFilter filter = new RateLimitingFilter(limiter, messageSource, new RateLimitProperties(null, null, 1, 10_000, 120, 60000),
                 objectMapper, clientIpResolver);
 
         FilterChain chain = mock(FilterChain.class);
@@ -153,7 +149,7 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void shouldUseFirstIpFromXForwardedForHeader()
+    void shouldUseLastIpFromXForwardedForHeader()
             throws IOException, ServletException {
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -223,9 +219,7 @@ class RateLimitingFilterTest {
     }
 
     private static CaffeineRateLimiter createLimiter(int maxRequests, int timeWindowMs) {
-        RateLimitProperties p = new RateLimitProperties();
-        p.setMaxRequests(maxRequests);
-        p.setTimeWindowMs(timeWindowMs);
+        RateLimitProperties p = new RateLimitProperties(null, null, maxRequests, timeWindowMs, 120, 60000);
         return new CaffeineRateLimiter(p);
     }
 
@@ -263,7 +257,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -293,7 +287,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -323,7 +317,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/accounts");
@@ -349,7 +343,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/transfers/send");
@@ -375,7 +369,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -401,7 +395,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -427,7 +421,7 @@ class RateLimitingFilterTest {
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/auth/login");
@@ -443,5 +437,139 @@ class RateLimitingFilterTest {
         strictFilter.doFilter(req2, resp, mock(FilterChain.class));
 
         assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldLimitPercentEncodedAliasOfProtectedPath() throws Exception {
+        // %61 == 'a': Spring MVC decodes /api/v1/%61ccounts to /api/v1/accounts
+        // and routes it to the account endpoint. The limiter must decide on the
+        // same decoded path, otherwise the alias escapes rate limiting.
+        CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
+                .thenReturn("Too many requests sent. Please try again later.");
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
+                new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRequestURI("/api/v1/%61ccounts");
+        req.setRemoteAddr("10.0.0.77");
+        req.setMethod("POST");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setRequestURI("/api/v1/%61ccounts");
+        req2.setRemoteAddr("10.0.0.77");
+        req2.setMethod("POST");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldLimitProtectedPathUnderContextPath() throws Exception {
+        // getRequestURI() includes the context path ("/bank/api/..."), which
+        // never startsWith("/api/..."). The limiter must strip it first,
+        // otherwise every non-root deployment silently disables limiting.
+        CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
+                .thenReturn("Too many requests sent. Please try again later.");
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
+
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setContextPath("/bank");
+        req.setRequestURI("/bank/api/v1/auth/login");
+        req.setRemoteAddr("10.0.0.78");
+        req.setMethod("POST");
+        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        MockHttpServletRequest req2 = new MockHttpServletRequest();
+        req2.setContextPath("/bank");
+        req2.setRequestURI("/bank/api/v1/auth/login");
+        req2.setRemoteAddr("10.0.0.78");
+        req2.setMethod("POST");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+
+        assertEquals(429, resp.getStatus());
+    }
+
+    @Test
+    void shouldNotLimitSiblingPathSharingAPrefix() throws Exception {
+        // "/api/v1/accountsextra" shares a string prefix with "/api/v1/accounts"
+        // but is a different path. Prefix matching must be segment-aware.
+        CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
+        MessageSource localMessageSource = mock(MessageSource.class);
+        when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
+                .thenReturn("Too many requests sent. Please try again later.");
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
+        FilterChain chain = mock(FilterChain.class);
+
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest();
+            req.setRequestURI("/api/v1/accountsextra");
+            req.setRemoteAddr("10.0.0.79");
+            req.setMethod("POST");
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            strictFilter.doFilter(req, resp, chain);
+            assertEquals(200, resp.getStatus());
+        }
+
+        verify(chain, times(3)).doFilter(any(), any());
+    }
+
+    @Test
+    void shouldApplyLooseResourceTierToTransfers() throws Exception {
+        // 11 transfer reads must NOT 429 on the auth budget (10/10s): the
+        // resource tier is 120/60s by default.
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 120, 60000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(props);
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter tieredFilter = new RateLimitingFilter(limiter, messageSource,
+                props, objectMapper, clientIpResolver);
+        FilterChain chain = mock(FilterChain.class);
+
+        for (int i = 0; i < 11; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest();
+            req.setRequestURI("/api/v1/transfers/123");
+            req.setRemoteAddr("10.0.0.100");
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            tieredFilter.doFilter(req, resp, chain);
+            assertEquals(200, resp.getStatus());
+        }
+
+        verify(chain, times(11)).doFilter(any(), any());
+    }
+
+    @Test
+    void shouldReturnTieredRetryAfterForResourceTier() throws Exception {
+        // Resource tier (2, 1s): the 3rd request 429s with Retry-After from
+        // the resource window, not the auth window.
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 2, 1_000);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(props);
+        ObjectMapper objectMapper = new ObjectMapper();
+        RateLimitingFilter tieredFilter = new RateLimitingFilter(limiter, messageSource,
+                props, objectMapper, clientIpResolver);
+        FilterChain chain = mock(FilterChain.class);
+
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest();
+            req.setRequestURI("/api/v1/accounts");
+            req.setRemoteAddr("10.0.0.101");
+            req.setMethod("POST");
+            resp = new MockHttpServletResponse();
+            tieredFilter.doFilter(req, resp, chain);
+        }
+
+        assertEquals(429, resp.getStatus());
+        assertEquals("1", resp.getHeader("Retry-After"));
     }
 }

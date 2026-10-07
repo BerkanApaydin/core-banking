@@ -3,16 +3,28 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDateTime;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(name = "outbox_events")
-public class OutboxJpaEntity {
+public class OutboxJpaEntity implements Persistable<String> {
 
     @Id
     @Column(length = 36)
     private String id;
+
+    /**
+     * Assigned UUID ids look "existing" to Spring Data, which would merge()
+     * (SELECT-before-INSERT) on every event write. Fresh instances are always
+     * new rows — the id is a random UUID — so persist() directly.
+     */
+    @Transient
+    private boolean isNew = true;
 
     @Column(name = "aggregate_type", nullable = false)
     private String aggregateType;
@@ -73,8 +85,20 @@ public class OutboxJpaEntity {
         this.partition = partition;
     }
 
+    @Override
     public String getId() {
         return id;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PrePersist
+    void markNotNew() {
+        this.isNew = false;
     }
 
     public void setId(String id) {

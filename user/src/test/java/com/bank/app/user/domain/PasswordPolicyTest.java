@@ -38,7 +38,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should accept valid password")
         void shouldAcceptValidPassword() {
-            assertThat(defaultPolicy.validate("Password1")).isEmpty();
+            assertThat(defaultPolicy.validate("ValidPass1234")).isEmpty();
         }
 
         @Test
@@ -50,7 +50,22 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should accept password at exact min length")
         void shouldAcceptPasswordAtExactMinLength() {
-            assertThat(defaultPolicy.validate("Abcdef1g")).isEmpty();
+            assertThat(defaultPolicy.validate("Abcdef123456")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should reject breached passwords even when they meet every rule")
+        void shouldRejectCommonPasswords() {
+            // 12 chars, upper + lower + digit: passes every rule except the denylist.
+            assertThat(defaultPolicy.validate("Password1234"))
+                    .anyMatch(e -> e.contains("too common"));
+        }
+
+        @Test
+        @DisplayName("should match common passwords case-insensitively")
+        void shouldMatchCommonPasswordsCaseInsensitively() {
+            assertThat(defaultPolicy.validate("PASSWORD1234"))
+                    .anyMatch(e -> e.contains("too common"));
         }
     }
 
@@ -93,7 +108,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing uppercase")
         void shouldFailWhenMissingUppercase() {
-            List<String> errors = defaultPolicy.validate("password1");
+            List<String> errors = defaultPolicy.validate("testuser1234");
             assertThat(errors).hasSize(1);
             assertThat(errors.get(0)).contains("uppercase");
         }
@@ -101,7 +116,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing lowercase")
         void shouldFailWhenMissingLowercase() {
-            List<String> errors = defaultPolicy.validate("PASSWORD1");
+            List<String> errors = defaultPolicy.validate("TESTUSER1234");
             assertThat(errors).hasSize(1);
             assertThat(errors.get(0)).contains("lowercase");
         }
@@ -109,7 +124,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing digit")
         void shouldFailWhenMissingDigit() {
-            List<String> errors = defaultPolicy.validate("Password");
+            List<String> errors = defaultPolicy.validate("TestUserabcd");
             assertThat(errors).hasSize(1);
             assertThat(errors.get(0)).contains("digit");
         }
@@ -149,7 +164,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing both cases")
         void shouldFailWhenMissingBothCases() {
-            List<String> errors = defaultPolicy.validate("12345678");
+            List<String> errors = defaultPolicy.validate("102030405060");
             assertThat(errors).hasSize(2);
             assertThat(errors).anyMatch(e -> e.contains("uppercase"));
             assertThat(errors).anyMatch(e -> e.contains("lowercase"));
@@ -158,7 +173,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing uppercase and digit")
         void shouldFailWhenMissingUppercaseAndDigit() {
-            List<String> errors = defaultPolicy.validate("password!");
+            List<String> errors = defaultPolicy.validate("password!@#$");
             assertThat(errors).hasSize(2);
             assertThat(errors).anyMatch(e -> e.contains("uppercase"));
             assertThat(errors).anyMatch(e -> e.contains("digit"));
@@ -167,7 +182,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail when missing lowercase and digit")
         void shouldFailWhenMissingLowercaseAndDigit() {
-            List<String> errors = defaultPolicy.validate("PASSWORD!");
+            List<String> errors = defaultPolicy.validate("PASSWORD!@#$");
             assertThat(errors).hasSize(2);
             assertThat(errors).anyMatch(e -> e.contains("lowercase"));
             assertThat(errors).anyMatch(e -> e.contains("digit"));
@@ -187,7 +202,7 @@ class PasswordPolicyTest {
         @Test
         @DisplayName("should fail all except length when length met but all else missing")
         void shouldFailAllExceptLengthWhenLengthMetButAllElseMissing() {
-            List<String> errors = defaultPolicy.validate("@@@@@@@@");
+            List<String> errors = defaultPolicy.validate("@@@@@@@@@@@@");
             assertThat(errors).hasSize(3);
             assertThat(errors).noneMatch(e -> e.contains("characters"));
             assertThat(errors).anyMatch(e -> e.contains("uppercase"));

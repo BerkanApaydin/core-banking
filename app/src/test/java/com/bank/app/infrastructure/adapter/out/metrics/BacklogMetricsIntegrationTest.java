@@ -14,8 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
 
+    private final JdbcTemplate jdbc;
+
     @Autowired
-    private JdbcTemplate jdbc;
+    BacklogMetricsIntegrationTest(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
 
     @Test
     void scansOnlyActiveOutboxEventsAndPendingHttpRequestsOnMigratedPostgres() {
@@ -54,8 +58,9 @@ class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void insertKey(String key, String status, LocalDateTime createdAt) {
-        jdbc.update("INSERT INTO idempotency_keys (key_value, status, created_at) VALUES (?, ?, ?)",
-                key, status, createdAt);
+        String kind = key.startsWith("outbox_handler_") ? "HANDLER" : "HTTP";
+        jdbc.update("INSERT INTO idempotency_keys (key_value, status, created_at, key_kind) VALUES (?, ?, ?, ?)",
+                key, status, createdAt, kind);
     }
 
     private static double gauge(SimpleMeterRegistry registry, String name) {

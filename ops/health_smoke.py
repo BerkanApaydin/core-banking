@@ -76,7 +76,68 @@ def check(opener, url, path, timeout, expected_http, expected_status):
     return CheckResult(path, passed, detail, round((time.monotonic() - started) * 1000))
 
 
-def run_checks(url, timeout=5.0, require_probes=False):
+def check_prometheus(opener, url, timeout, allow_secured=False):
+    """Regression for K1/D1: the scrape endpoint must be reachable.
+
+    Prometheus exposition format is text/plain (not JSON), so the generic
+    JSON contract checker cannot be reused. Pass = HTTP 200 with a body
+    that looks like exposition format. A 401/403 here means the alarm
+    pipeline is dead (whitelist regression); a 404 means actuator
+    exposure is misconfigured.
+
+    ``allow_secured`` exists because the two environments differ by design.
+    Only ``application-prod.yml`` puts ``/actuator/prometheus`` in the
+    whitelist; under dev/test it is intentionally secured. A single strict
+    mode therefore cannot be used everywhere, and the tempting shortcut --
+    not checking metrics at all outside prod -- loses the one signal dev *can*
+    still see: that the endpoint exists at all. With ``allow_secured`` a
+    401/403 passes ("exposed, gated by policy") while 404 still fails, so
+    dropping ``prometheus`` from ``management.endpoints.web.exposure.include``
+    is caught in CI instead of surfacing as a silently dead alarm line.
+    """
+    started = time.monotonic()
+    request = Request(url + "/actuator/prometheus",
+                      headers={"Accept": "text/plain"}, method="GET")
+    try:
+        try:
+            response = opener.open(request, timeout=timeout)
+        except HTTPError as response_error:
+            response = response_error
+        with response:
+            status = response.code
+            body = response.read(MAX_BODY_BYTES + 1)
+        if status in (401, 403):
+            if allow_secured:
+                detail = (f"HTTP {status}; endpoint exposed and secured by policy "
+                          f"(expected outside production)")
+                passed = True
+            else:
+                detail = f"HTTP {status}; scrape endpoint secured, alarm pipeline dead (K1/D1)"
+                passed = False
+        elif status == 404:
+            detail = "HTTP 404; actuator exposure misconfigured (K1/D1)"
+            passed = False
+        elif status != 200:
+            detail = f"HTTP {status}; expected 200"
+            passed = False
+        elif len(body) > MAX_BODY_BYTES:
+            detail = "Response exceeded 64 KiB"
+            passed = False
+        elif b"# HELP" in body or b"# TYPE" in body:
+            detail = "Prometheus exposition format confirmed"
+            passed = True
+        else:
+            detail = "Unexpected scrape body (not exposition format)"
+            passed = False
+    except (OSError, URLError, HTTPException, ValueError) as exc:
+        detail = f"Request/response error ({type(exc).__name__})"
+        passed = False
+    return CheckResult("/actuator/prometheus", passed, detail,
+                       round((time.monotonic() - started) * 1000))
+
+
+def run_checks(url, timeout=5.0, require_probes=False, require_metrics=False,
+               allow_metrics_secured=False):
     opener = build_opener(NoRedirects())
     contracts = [("/actuator/health", 200, "UP")]
     if require_probes:
@@ -87,8 +148,11 @@ def run_checks(url, timeout=5.0, require_probes=False):
     # Browser session is protected but not covered by the IP rate limiter.
     # Checking /accounts here could yield 429 during legitimate load.
     contracts.append(("/api/v1/auth/browser/session", 401, 401))
-    return [check(opener, url, path, timeout, status, payload_status)
-            for path, status, payload_status in contracts]
+    results = [check(opener, url, path, timeout, status, payload_status)
+               for path, status, payload_status in contracts]
+    if require_metrics:
+        results.append(check_prometheus(opener, url, timeout, allow_metrics_secured))
+    return results
 
 
 def main(argv=None):
@@ -98,9 +162,19 @@ def main(argv=None):
                         help="Socket timeout per request in seconds (default: 5)")
     parser.add_argument("--require-probes", action="store_true",
                         help="Also require liveness/readiness endpoints (e.g. Kubernetes)")
+    parser.add_argument("--require-metrics", action="store_true",
+                        help="Also require the Prometheus scrape endpoint (K1/D1 alarm-pipeline guard)")
+    parser.add_argument("--allow-metrics-secured", action="store_true",
+                        help="With --require-metrics, accept a deliberately secured scrape endpoint "
+                             "(401/403) as long as it is exposed. Use where the profile does not "
+                             "whitelist /actuator/prometheus, e.g. dev/test: this still catches the "
+                             "endpoint disappearing entirely (404).")
     parser.add_argument("--json", action="store_true", help="Print machine-readable results")
     args = parser.parse_args(argv)
-    results = run_checks(args.base_url, args.timeout, args.require_probes)
+    if args.allow_metrics_secured and not args.require_metrics:
+        parser.error("--allow-metrics-secured has no effect without --require-metrics")
+    results = run_checks(args.base_url, args.timeout, args.require_probes, args.require_metrics,
+                         args.allow_metrics_secured)
     if args.json:
         print(json.dumps({"passed": all(result.passed for result in results),
                           "checks": [asdict(result) for result in results]}))

@@ -16,7 +16,7 @@ public class CorsConfig {
     private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     private static final List<String> ALLOWED_HEADERS = List.of("Authorization", "Content-Type", "Idempotency-Key",
             "X-Requested-With", "X-CSRF-Token");
-    private static final List<String> EXPOSED_HEADERS = List.of("X-Correlation-ID");
+    private static final List<String> EXPOSED_HEADERS = List.of("X-Correlation-ID", "X-Trace-ID");
 
     private final CorsProperties corsProperties;
 

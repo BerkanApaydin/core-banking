@@ -1,7 +1,12 @@
 jwt:
   allow-default-secret: false
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:3600000}
+  # D9: the old `expiration` key was never read by JwtTokenProvider (dead
+  # config implying a 1h prod lifetime that never applied). The live key is
+  # `access-expiration`; JWT_EXPIRATION stays honored as a legacy fallback so
+  # existing deployments keep working. Effective prod default: 15 min.
+  access-expiration: ${JWT_ACCESS_EXPIRATION:${JWT_EXPIRATION:900000}}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 spring:
   flyway:
@@ -28,10 +33,29 @@ management:
       group:
         readiness:
           include: readinessState,db,redisBackends
-  # NOTE: no micrometer-tracing/OTel SDK on the classpath yet, so there is
-  # intentionally no management.tracing block here. Correlation/trace IDs in
-  # logs are generated locally by CorrelationIdFilter until real distributed
-  # tracing is added (then reintroduce sampling config + OTLP endpoint).
+  tracing:
+    # D22: tracing is OFF by default in prod. With the OTLP exporter on the
+    # classpath but no collector deployed, the SDK pointlessly dials localhost
+    # (noisy, non-fatal). Operators enable with TRACING_ENABLED=true plus
+    # MANAGEMENT_OTLP_TRACING_ENDPOINT pointing at the collector; log
+    # correlation (CorrelationIdFilter) works regardless.
+    enabled: ${TRACING_ENABLED:false}
+    # Production sampling: head-based 10%. Raise toward 1.0 only while
+    # chasing a live incident, then restore — full sampling at high
+    # throughput saturates the collector and doubles span-related CPU.
+    sampling:
+      probability: 0.1
+  otlp:
+    tracing:
+      # Set alongside TRACING_ENABLED=true when a collector is deployed, e.g.:
+      # MANAGEMENT_OTLP_TRACING_ENDPOINT=https://otel-collector.monitoring.svc:4318/v1/traces
+      # Tracing itself defaults to disabled above (D22), so this empty default
+      # is inert until then. Enabling tracing without an endpoint fails fast
+      # at exporter creation instead of noisily dialing localhost (D22).
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:}
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 app:
   cache:
@@ -39,10 +63,39 @@ app:
       account-info:
         backend: redis
   security:
+    # Explicit prod whitelist (K1/D1): /actuator/prometheus must be reachable
+    # for scraping (NetworkPolicy isolates it to the monitoring namespace).
+    # Defined explicitly here — never rely on SecurityProperties defaults in prod.
+    # Swagger paths are deliberately ABSENT: springdoc is disabled below, so the
+    # endpoints 404 anyway; keeping them whitelisted would be dead config
+    # widening the anonymous surface for no reason (dev keeps them via
+    # SecurityProperties.DEFAULT_WHITELIST, where springdoc is enabled).
+    whitelist-paths:
+      - /api/v1/auth/login
+      - /api/v1/auth/browser/login
+      - /api/v1/auth/register
+      - /api/v1/auth/refresh
+      - /api/v1/auth/browser/refresh
+      - /actuator/health/**
+      - /actuator/prometheus
+      - /
+      - /index.html
+      - /*.js
+      - /*.css
+      - /assets/**
+      - /style.css
+      - /favicon.ico
+      - /error
     browser-session:
       secure: true
     rate-limit:
       backend: redis
+      # Explicit prod budgets (fail-closed review surface): the resource tier
+      # must never silently inherit a dev-tuned default. Auth stays tight.
+      max-requests: ${RATE_LIMIT_MAX_REQUESTS:10}
+      time-window-ms: ${RATE_LIMIT_TIME_WINDOW_MS:10000}
+      resource-max-requests: ${RATE_LIMIT_RESOURCE_MAX_REQUESTS:120}
+      resource-time-window-ms: ${RATE_LIMIT_RESOURCE_TIME_WINDOW_MS:60000}
     failed-login:
       backend: redis
     token-blacklist:

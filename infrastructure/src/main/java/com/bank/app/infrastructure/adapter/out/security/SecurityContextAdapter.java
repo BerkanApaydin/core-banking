@@ -55,4 +55,19 @@ public class SecurityContextAdapter implements SecurityContextPort {
             throw new AuthorizationException(errorMessage);
         }
     }
+
+    @Override
+    public boolean hasRole(String role) {
+        if (role == null || role.isBlank()) {
+            return false;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()
+                || auth instanceof AnonymousAuthenticationToken
+                || "anonymousUser".equals(auth.getName())) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
+    }
 }

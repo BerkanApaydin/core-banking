@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
+import com.bank.app.common.domain.TokenDigest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

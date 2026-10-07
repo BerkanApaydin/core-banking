@@ -140,8 +140,10 @@ class UserTest {
         @DisplayName("should change password")
         void shouldChangePassword() {
             User user = User.create("testuser", "old_password");
+            assertThat(user.getTokenVersion()).isZero();
             user.changePassword("new_encoded_password");
             assertThat(user.getPassword()).isEqualTo("new_encoded_password");
+            assertThat(user.getTokenVersion()).isEqualTo(1L);
         }
 
         @Test
@@ -200,8 +202,10 @@ class UserTest {
         @DisplayName("should assign role")
         void shouldAssignRole() {
             User user = User.create("testuser", "password");
+            assertThat(user.getTokenVersion()).isZero();
             user.assignRole(Role.ROLE_ADMIN);
             assertThat(user.getRole()).isEqualTo(Role.ROLE_ADMIN);
+            assertThat(user.getTokenVersion()).isEqualTo(1L);
         }
 
         @Test
