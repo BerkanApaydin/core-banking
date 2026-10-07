@@ -1,0 +1,112 @@
+# Prometheus alerting rules for the instrumented signals. Thresholds below
+# are starting points — derive production values from staging baselines
+# (see docs/operational-checks.md) before paging anyone.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: bank-app
+  labels:
+    app: bank-app
+spec:
+  groups:
+    - name: outbox
+      interval: 60s
+      rules:
+        - alert: OutboxDeadLetter
+          # The dead_letter counter carries no `type` label, so no `by (...)`
+          # grouping: grouping by a missing label is misleading in dashboards.
+          expr: sum(increase(outbox_event_dead_letter_total[1h])) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Outbox events exhausted retries and moved to dead letter"
+            runbook_url: "docs/outbox-operations.md"
+        - alert: OutboxFailuresRising
+          expr: sum(rate(outbox_event_failed_total[5m])) > 0.1
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Outbox event failures retrying above 0.1/sec"
+        - alert: OutboxOldestPendingGrowing
+          # Leader-elected scan like the orphan/backlog gauges: max() keeps a
+          # follower's frozen gauge from paging.
+          expr: max(outbox_oldest_pending_age_seconds) > 600
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Oldest pending outbox event is older than 10 minutes"
+        - alert: OutboxPollFailures
+          expr: sum(rate(outbox_poll_partition_error_total[5m])) by (partition) > 0
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Outbox poll cycles aborting — selection, locking or dispatch failing"
+            runbook_url: "docs/outbox-operations.md"
+    - name: integrity
+      interval: 60s
+      rules:
+        - alert: LedgerImbalance
+          # Money invariant: legs sharing a transaction_ref must net to zero.
+          # Any nonzero group is a page — it means a partial write escaped the
+          # single-transaction ledger discipline (see docs/slo.md).
+          expr: max(ledger_nonzero_transaction_refs) > 0
+          for: 15m
+          labels:
+            severity: page
+          annotations:
+            summary: "Ledger legs do not net to zero — investigate unbalanced transaction_refs"
+            runbook_url: "docs/slo.md"
+        - alert: DatabaseOrphanAlarm
+          expr: sum(increase(db_orphan_alarm_total[1h])) by (type) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Orphan rows above threshold — constraint enforcement or restore integrity needs review"
+        - alert: OrphanScanStale
+          # K12/D5: scans are leader-elected, so only the leader's gauge moves.
+          # max() across instances keeps followers' frozen gauges from paging.
+          expr: time() - max(db_orphan_last_success_epoch_seconds) > 7200
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Orphan integrity scan has not completed in 2h"
+    - name: audit
+      interval: 60s
+      rules:
+        - alert: AuditPersistFailures
+          expr: sum(increase(audit_persist_failures_total[1h])) by (action) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Audit persistence failed — money movements may lack their audit trail"
+        # Liveness of the audit dispatch seam (K2 rewire): consumed must track
+        # persisted rows. A flat consumed counter while transfers succeed means
+        # the AFTER_COMMIT observation path is broken again.
+        - alert: AuditDispatchStalled
+          expr: |
+            sum(increase(audit_event_consumed_total[15m])) == 0
+            and
+            sum(increase(http_server_requests_seconds_count{uri="/api/v1/transfers",status="201"}[15m])) > 0
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Audit events are persisted but never observed after commit"
+    - name: idempotency-backlog
+      interval: 60s
+      rules:
+        - alert: IdempotencyHttpBacklogStale
+          # K12/D5: leader-elected scan — max() across instances, same as orphan scan.
+          expr: time() - max(backlog_last_success_epoch_seconds) > 7200
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Backlog metrics scan has not completed in 2h"

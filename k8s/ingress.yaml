@@ -1,0 +1,39 @@
+# TLS ingress template. Replace the host, provision a ClusterIssuer named
+# letsencrypt-prod (cert-manager), and apply. Browser-session cookies require
+# HTTPS at the edge (Secure + __Host- prefix in the prod profile); never
+# expose this Service over plain HTTP in production.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bank-app
+  labels:
+    app: bank-app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # The API authenticates with Bearer tokens and SameSite=Strict cookies;
+    # no CORS preflight beyond the configured origins is expected here.
+    nginx.ingress.kubernetes.io/enable-cors: "false"
+    # K1 precondition for PROXY_TRUST_HEADERS=true (see bank-app.yaml): this
+    # ingress must APPEND the downstream peer to X-Forwarded-For (nginx-ingress
+    # default $proxy_add_x_forwarded_for) and never blindly forward a
+    # client-supplied chain. The app trusts the LAST entry only. Do not add a
+    # CDN or second proxy tier in front without revisiting ClientIpResolver.
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - bank.example.com
+      secretName: bank-app-tls
+  rules:
+    - host: bank.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bank-app
+                port:
+                  number: 8080

@@ -1,0 +1,72 @@
+# Flyway migration gate: runs BEFORE the application Deployment rolls out, so
+# schema changes never race application startup across replicas.
+#
+# Operator setup (once per release — migrations live in
+# common/src/main/resources/db/migration):
+#   kubectl create configmap bank-flyway-migrations \
+#     --from-file=common/src/main/resources/db/migration \
+#     --dry-run=client -o yaml | kubectl apply -f -
+# Then apply this file; wait for the Job to succeed before rolling the app:
+#   kubectl apply -f k8s/flyway-migrate-job.yaml
+#   kubectl wait --for=condition=complete job/bank-flyway-migrate --timeout=300s
+#
+# The application keeps Flyway enabled (validate-on-migrate) as a second
+# gate: if this Job did not run, pods fail fast instead of serving traffic
+# against an unexpected schema. baseline-on-migrate is false everywhere, so
+# a non-empty database without Flyway history can never be adopted silently.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bank-flyway-migrate
+  labels:
+    app: bank-app
+    purpose: db-migration
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: bank-app
+        purpose: db-migration
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: flyway
+          image: flyway/flyway:11-alpine
+          args:
+            - -url=jdbc:postgresql://postgres:5432/bank_db
+            - -user=$(FLYWAY_USER)
+            - -locations=filesystem:/flyway/sql
+            - migrate
+          env:
+            - name: FLYWAY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: bank-db-secret
+                  key: username
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bank-db-secret
+                  key: password
+          volumeMounts:
+            - name: migrations
+              mountPath: /flyway/sql
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: migrations
+          configMap:
+            name: bank-flyway-migrations

@@ -1,0 +1,69 @@
+package com.bank.app.account.domain;
+
+import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Money;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@DisplayName("LedgerEntry")
+class LedgerEntryTest {
+
+    private static final Money AMOUNT = Money.of("200.00", Currency.TRY);
+    private static final Money BALANCE = Money.of("800.00", Currency.TRY);
+
+    @Test
+    @DisplayName("debit and credit factories assign direction and timestamp")
+    void shouldBuildLegs() {
+        String ref = LedgerEntry.newTransactionRef();
+        Clock clock = Clock.systemUTC();
+
+        LedgerEntry debit = LedgerEntry.debit(1L, AMOUNT, BALANCE, ref, clock);
+        LedgerEntry credit = LedgerEntry.credit(2L, AMOUNT, BALANCE, ref, clock);
+
+        assertThat(debit.getDirection()).isEqualTo(LedgerDirection.DEBIT);
+        assertThat(credit.getDirection()).isEqualTo(LedgerDirection.CREDIT);
+        assertThat(debit.getTransactionRef()).isEqualTo(ref);
+        assertThat(credit.getTransactionRef()).isEqualTo(ref);
+        assertThat(debit.getId()).isNull();
+        assertThat(debit.getOccurredAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("transaction refs are unique per operation")
+    void shouldGenerateUniqueRefs() {
+        assertThat(LedgerEntry.newTransactionRef()).isNotEqualTo(LedgerEntry.newTransactionRef());
+        assertThatCode(() -> UUID.fromString(LedgerEntry.newTransactionRef())).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("should reject zero amount")
+    void shouldRejectZeroAmount() {
+        assertThatThrownBy(() -> new LedgerEntry(null, "ref", 1L, LedgerDirection.DEBIT,
+                Money.of("0.00", Currency.TRY), BALANCE, LocalDateTime.now()))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("should reject blank transaction ref")
+    void shouldRejectBlankRef() {
+        assertThatThrownBy(() -> new LedgerEntry(null, "  ", 1L, LedgerDirection.DEBIT,
+                AMOUNT, BALANCE, LocalDateTime.now()))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("should reject currency mismatch between amount and balance")
+    void shouldRejectCurrencyMismatch() {
+        assertThatThrownBy(() -> new LedgerEntry(null, "ref", 1L, LedgerDirection.DEBIT,
+                AMOUNT, Money.of("800.00", Currency.USD), LocalDateTime.now()))
+                .hasMessageContaining("cannot be journaled together");
+    }
+}

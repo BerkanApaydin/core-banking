@@ -1,0 +1,57 @@
+name: Release (digest-pinned image)
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository_owner }}/bank-app
+        tags: |
+          type=ref,event=tag
+
+    - name: Build and push
+      id: push
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+
+    - name: Pin manifest to digest
+      env:
+        PINNED: ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        awk -v img="$PINNED" '{ if ($0 ~ /^[[:space:]]*image:/) print "          image: " img; else print }' k8s/bank-app.yaml > k8s/bank-app.yaml.tmp && mv k8s/bank-app.yaml.tmp k8s/bank-app.yaml
+        grep -q "@sha256:" k8s/bank-app.yaml
+        { echo "$PINNED"; echo "pinned_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "git_sha=$(git rev-parse HEAD)"; echo "tag=$TAG"; } > k8s/.image-digest
+
+    - name: Record digest in release notes
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          k8s/bank-app.yaml
+          k8s/.image-digest
+        body: |
+          Pinned image: `ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}`
+          The attached `bank-app.yaml` is already pinned to that digest — apply it directly. See `docs/release.md`.

@@ -1,0 +1,79 @@
+# Default-deny with explicit allows. The application only needs:
+# ingress from the ingress controller on 8080, egress to PostgreSQL (5432),
+# Redis (6379) and the cluster DNS. Everything else (including pod-to-pod)
+# is denied. Adjust namespace selectors to the actual topology.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bank-app-default-deny
+  labels:
+    app: bank-app
+spec:
+  podSelector:
+    matchLabels:
+      app: bank-app
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bank-app-allow
+  labels:
+    app: bank-app
+spec:
+  podSelector:
+    matchLabels:
+      app: bank-app
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Ingress controller -> app.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Prometheus scraper (adjust to the monitoring namespace).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Cluster DNS.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # PostgreSQL.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Redis.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # OTLP collector (tracing export; harmless if absent).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4318

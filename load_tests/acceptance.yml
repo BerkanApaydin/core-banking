@@ -1,0 +1,20 @@
+# Load/smoke acceptance thresholds (CI-enforced, see scripts/check_load_acceptance.py).
+# Change a number here AND in the referenced code together — the checker
+# fails when this file and the implementation disagree.
+rate_limit:
+  requests: 15
+  limit_per_window: 10
+  window_seconds: 10
+  cooldown_seconds: 11
+  require_429_at_least: 1
+  require_post_window_status: 201
+capacity:
+  target_p95_ms: 200.0
+  min_success_pct: 99.0
+concurrency:
+  idempotent_single_effect: true
+  balance_must_reconcile: true
+  balance_never_negative: true
+smoke:
+  health_status_up: true
+  require_probes: true
