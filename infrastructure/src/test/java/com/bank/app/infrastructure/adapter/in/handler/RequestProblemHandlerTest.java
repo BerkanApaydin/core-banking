@@ -88,6 +88,22 @@ class RequestProblemHandlerTest {
     }
 
     @Test
+    void shouldMapNumberFormatExceptionToBadRequest() {
+        // Money.of(String) parses with new BigDecimal(String): malformed
+        // amounts surface as NumberFormatException (an IllegalArgumentException),
+        // which must stay a 400 validation failure — never the 500 fallback.
+        NumberFormatException ex = new NumberFormatException("Character a is neither a decimal digit number");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenReturn("Invalid request argument.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleIllegalArgumentException(ex, null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("INVALID_ARGUMENT", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
     void shouldFallBackToGenericMessageWhenBundleKeyIsMissing() {
         IllegalArgumentException ex = new IllegalArgumentException("SELECT * FROM users");
         when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
@@ -186,7 +202,7 @@ class RequestProblemHandlerTest {
         InvalidFormatException cause = new InvalidFormatException(null, "Invalid value", "VALUE3", DummyEnum.class);
         HttpMessageNotReadableException ex = new HttpMessageNotReadableException("Not readable", cause, null);
         when(messageSource.getMessage(eq("error.invalid_enum_value"), any(), any(Locale.class)))
-                .thenReturn("Invalid value: VALUE3. Accepted values: [VALUE1, VALUE2]");
+                .thenReturn("Invalid value for this field. Accepted values: [VALUE1, VALUE2]");
         when(messageSource.getMessage(eq("error.invalid_format"), isNull(), any(Locale.class)))
                 .thenReturn("Invalid format");
 
@@ -195,7 +211,9 @@ class RequestProblemHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("INVALID_ENUM_VALUE", response.getBody().getProperties().get("code"));
-        assertTrue(((String) response.getBody().getProperties().get("message")).contains("VALUE3"));
+        String message = (String) response.getBody().getProperties().get("message");
+        assertTrue(message.contains("[VALUE1, VALUE2]"));
+        assertFalse(message.contains("VALUE3"));
     }
 
     @Test

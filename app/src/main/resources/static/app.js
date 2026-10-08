@@ -992,12 +992,15 @@ function renderReportResults(report) {
 
 // --- Utility Formatters ---
 // Localized badge metadata for backend TransferStatus values.
+// Unknown values render truthfully (escaped raw status, neutral style):
+// defaulting to "Completed" would mislabel a future/foreign status as settled.
 function transferStatusMeta(status) {
     switch (status) {
         case 'CANCELLED': return { label: __('report.status_cancelled'), cls: 'badge-inactive' };
         case 'PENDING': return { label: __('report.status_pending'), cls: 'badge-pending' };
         case 'FAILED': return { label: __('report.status_failed'), cls: 'badge-failed' };
-        default: return { label: __('report.status_completed'), cls: 'badge-active' };
+        case 'COMPLETED': return { label: __('report.status_completed'), cls: 'badge-active' };
+        default: return { label: escapeHtml(status), cls: 'badge-pending' };
     }
 }
 function escapeHtml(unsafe) {

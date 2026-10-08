@@ -21,6 +21,14 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
 
     private static final Logger log = LoggerFactory.getLogger(DomainEventOutboxAdapter.class);
     private static final int DEFAULT_PARTITION_MODULO = 16;
+    /**
+     * Payload cap: the {@code payload} column is unbounded TEXT (V14). A
+     * runaway handler serializing megabytes would bloat the table and stall
+     * the 2s poller for every partition. Domain events here are small state
+     * transitions (ids, amounts, timestamps); anything above 64 KiB is a bug,
+     * so fail fast instead of persisting it.
+     */
+    static final int MAX_PAYLOAD_CHARS = 64 * 1024;
 
     private final OutboxPort outboxPort;
     private final ObjectMapper objectMapper;
@@ -45,6 +53,13 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
 
     private OutboxPort.EventEntry toOutboxEntry(DomainEvent event) {
         String payload = serialize(event);
+        if (payload.length() > MAX_PAYLOAD_CHARS) {
+            log.error("Outbox payload too large: type={}, chars={}",
+                    event.getClass().getSimpleName(), payload.length());
+            throw new IllegalArgumentException(
+                    "Outbox payload exceeds " + MAX_PAYLOAD_CHARS + " chars for "
+                            + event.getClass().getSimpleName());
+        }
         String eventType = event.getClass().getSimpleName();
         LocalDateTime now = LocalDateTime.now(clockProvider.clock());
         String id = UUID.randomUUID().toString();

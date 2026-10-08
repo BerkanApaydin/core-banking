@@ -26,8 +26,11 @@ Single-boundary adapter methods (`OutboxProcessor`, `IdempotencyGuard`,
 `*PersistenceAdapter`) use declarative `@Transactional` because each owns
 exactly one transaction boundary with its own propagation (typically
 `REQUIRES_NEW` for claim/checkpoint writes that must survive the caller's
-rollback). Every such annotation carries `timeout = 30` to match the use-case
-budget; read-only lookups stay bare `@Transactional(readOnly = true)`.
+rollback). Every such annotation carries
+`timeoutString = "${app.transaction.timeout-seconds:30}"` to follow the
+single-sourced use-case budget (never a hardcoded `timeout = 30`, which
+would drift when the property changes); read-only lookups stay bare
+`@Transactional(readOnly = true)`.
 
 **Rule: never nest a declarative transaction inside `AdvisorySchedulerLock` —
 the guard owns its transaction, and a contended lock marks rollback-only.**

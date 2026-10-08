@@ -7,6 +7,7 @@ import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.bank.app.common.domain.AccountId;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
@@ -35,7 +36,7 @@ class TransferResponseTest {
 
     @Test
     void shouldCreateFromTransferWithFromMethod() {
-        Transfer transfer = new Transfer(1L, 10L, 20L, Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferResponse resp = TransferResponse.from(transfer, "TR111", "TR222");
         assertEquals(1L, resp.id());
         assertEquals(TransferStatus.COMPLETED, resp.status());

@@ -19,6 +19,9 @@ import java.time.LocalDateTime;
  * {@code app.audit.retention-days} (default 365 — an order of magnitude longer
  * than the outbox 30-day window, reflecting its evidentiary role). Runs
  * weekly by default, single-flight across replicas via the advisory lock.
+ * Deletion is batched (1000 rows x at most 10 batches per run): a larger
+ * backlog drains over consecutive schedules instead of exhausting the 30s
+ * scheduler-lock budget in one transaction.
  */
 @Service
 @ConditionalOnProperty(name = "app.audit.retention-enabled", havingValue = "true", matchIfMissing = true)
@@ -33,12 +36,8 @@ public class AuditRetentionScheduler {
     private final AdvisorySchedulerLock schedulerLock;
     private final ClockProviderPort clockProvider;
 
-    public AuditRetentionScheduler(
-            AuditRetentionPort retentionPort,
-            AuditProperties auditProperties) {
-        this(retentionPort, auditProperties, AdvisorySchedulerLock.alwaysRun());
-    }
-
+    // Single canonical constructor for Spring. Tests use the named forTests
+    // factories instead of ambiguous overloads.
     @Autowired
     public AuditRetentionScheduler(
             AuditRetentionPort retentionPort,
@@ -56,6 +55,13 @@ public class AuditRetentionScheduler {
         this.auditProperties = auditProperties;
         this.schedulerLock = schedulerLock;
         this.clockProvider = clockProvider;
+    }
+
+    static AuditRetentionScheduler forTests(
+            AuditRetentionPort retentionPort,
+            AuditProperties auditProperties,
+            AdvisorySchedulerLock schedulerLock) {
+        return new AuditRetentionScheduler(retentionPort, auditProperties, schedulerLock, null);
     }
 
     @Scheduled(cron = "${app.audit.retention-cron:0 0 4 * * 0}")

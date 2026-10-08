@@ -29,15 +29,18 @@ public class TransferViewEnricher {
         return transfers.stream()
                 .map(transfer -> TransferResponse.from(
                         transfer,
-                        ibansByAccountId.get(transfer.getSenderAccountId()),
-                        ibansByAccountId.get(transfer.getReceiverAccountId())))
+                        ibansByAccountId.get(transfer.getSenderAccountId().value()),
+                        ibansByAccountId.get(transfer.getReceiverAccountId().value())))
                 .collect(Collectors.toList());
     }
 
     public Map<Long, String> loadIbans(List<Transfer> transfers) {
         Objects.requireNonNull(transfers, "Transfers must not be null");
+        // Bulk-read utility stays on Long: the published cache language and
+        // the wire map are keyed by raw ids (no positional pair, no swap
+        // hazard). Unwrap at this edge only.
         Set<Long> accountIds = transfers.stream()
-                .flatMap(t -> Stream.of(t.getSenderAccountId(), t.getReceiverAccountId()))
+                .flatMap(t -> Stream.of(t.getSenderAccountId().value(), t.getReceiverAccountId().value()))
                 .collect(Collectors.toSet());
         return accountAclPort.getIbansForAccounts(accountIds);
     }

@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -69,8 +70,8 @@ class PlaceTransferUseCaseImplTest {
 
     private static final String SENDER_IBAN = "TR770006200000000000000111";
     private static final String RECEIVER_IBAN = "TR870006200000000000000222";
-    private static final Long SENDER_ACCOUNT_ID = 1L;
-    private static final Long RECEIVER_ACCOUNT_ID = 2L;
+    private static final AccountId SENDER_ACCOUNT_ID = new AccountId(1L);
+    private static final AccountId RECEIVER_ACCOUNT_ID = new AccountId(2L);
     private static final Long SENDER_USER_ID = 100L;
     private static final Long RECEIVER_USER_ID = 200L;
     private static final BigDecimal AMOUNT = new BigDecimal("250.00");

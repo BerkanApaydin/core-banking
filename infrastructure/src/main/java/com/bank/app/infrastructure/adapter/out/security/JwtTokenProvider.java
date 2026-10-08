@@ -14,6 +14,7 @@ import javax.crypto.SecretKey;
 import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.io.Decoders;
 import java.util.Date;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -45,11 +46,13 @@ public class JwtTokenProvider implements JwtPort {
      *
      * @deprecated Test-only fallback. Production must set {@code JWT_SECRET};
      *             this constant exists so tests and local dev boot without a
-     *             secret manager. Do not log or expose its value.
+     *             secret manager. Do not log or expose its value. The previous
+     *             value was rotated after appearing in git history — treat any
+     *             leaked value as compromised and rotate again on suspicion.
      */
     @Deprecated
     public static final String DEFAULT_JWT_SECRET =
-            "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+            "KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=";
 
     /** Token type claim distinguishing access from refresh tokens. */
     public static final String TOKEN_TYPE_CLAIM = "typ";
@@ -64,6 +67,16 @@ public class JwtTokenProvider implements JwtPort {
     private final boolean allowDefaultSecret;
     private volatile SecretKey signingKey;
     private volatile JwtParser verifiedParser;
+    // Time-strategy seam (docs/decisions/time-strategy.md): jjwt requires
+    // java.util.Date, so the clock is adapted at the boundary via
+    // Date.from(clock.instant()). Production keeps systemUTC; tests pin a
+    // fixed clock for deterministic expiry assertions.
+    private volatile Clock clock = Clock.systemUTC();
+
+    /** Test/simulation clock injection. */
+    public void setClockForTests(Clock testClock) {
+        this.clock = testClock != null ? testClock : Clock.systemUTC();
+    }
 
     // Primary constructor: typed properties (D13/K14) — no @Value scatter.
     @Autowired
@@ -121,7 +134,7 @@ public class JwtTokenProvider implements JwtPort {
             String role = claims.get("role", String.class);
             Date expiration = claims.getExpiration();
             if (username == null || username.isBlank() || userId == null || role == null
-                    || role.isBlank() || expiration == null || !expiration.after(new Date())) {
+                    || role.isBlank() || expiration == null || !expiration.after(Date.from(clock.instant()))) {
                 return null;
             }
             return new VerifiedToken(username, userId.longValue(), role,
@@ -186,8 +199,8 @@ public class JwtTokenProvider implements JwtPort {
                 .claims(extraClaims)
                 .subject(username)
                 .id(UUID.randomUUID().toString())
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + ttlMs))
+                .issuedAt(Date.from(clock.instant()))
+                .expiration(Date.from(clock.instant().plusMillis(ttlMs)))
                 .signWith(getSignInKey())
                 .compact();
     }
@@ -198,8 +211,10 @@ public class JwtTokenProvider implements JwtPort {
             String type = extractClaim(token, claims -> claims.get(TOKEN_TYPE_CLAIM, String.class));
             return (type == null || type.isBlank()) ? TOKEN_TYPE_ACCESS : type;
         } catch (JwtException | IllegalArgumentException invalid) {
-            // Unverifiable tokens have no trustworthy type; callers validate
-            // the signature first (verifyAndDecode) and treat these as access.
+            // Unverifiable tokens have no trustworthy type (SEC-03): fail
+            // toward "access" so the result can never escalate into a refresh
+            // flow. Callers must still verify the signature first
+            // (verifyAndDecode) and never branch on this result alone.
             return TOKEN_TYPE_ACCESS;
         }
     }
@@ -229,7 +244,7 @@ public class JwtTokenProvider implements JwtPort {
     @Override
     public long getRemainingMs(String token) {
         try {
-            long remaining = extractExpiration(token).getTime() - System.currentTimeMillis();
+            long remaining = extractExpiration(token).getTime() - clock.millis();
             return Math.max(remaining, 0);
         } catch (JwtException | IllegalArgumentException e) {
             return 0;

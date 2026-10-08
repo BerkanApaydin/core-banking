@@ -33,9 +33,22 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     // btree range scan). Legacy rows were backfilled in V20/V28, so the direct
     // column predicate keeps the index usable. Ordering stays on the auditing
     // created_at (insert order) by design.
-    @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
-           + "AND t.businessCreatedAt BETWEEN :start AND :end "
-            + "ORDER BY t.createdAt DESC, t.id DESC")
+    //
+    // P-1 (same pattern as summarizeRange below): UNION ALL instead of
+    // {@code sender = :id OR receiver = :id} so each branch range-scans its
+    // own per-side index instead of forcing a bitmap-or. Sound because
+    // {@code chk_transfers_no_self_transfer} guarantees the branches are
+    // disjoint (no duplicates across the union).
+    @Query(value = "SELECT * FROM ("
+            + "SELECT t.* FROM transfers t "
+            + "WHERE t.sender_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end "
+            + "UNION ALL "
+            + "SELECT t.* FROM transfers t "
+            + "WHERE t.receiver_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end) combined "
+            + "ORDER BY combined.created_at DESC, combined.id DESC",
+            nativeQuery = true)
     List<TransferJpaEntity> findHistoryBetween(
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,
@@ -43,15 +56,26 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
             Pageable pageable);
 
     /**
-     * Whole-range aggregates over the same business-time predicate (the V21
-     * business-time index applies; no entity hydration, one scan).
-     * Returns one row {@code [count, sum]}; sum is coalesced to zero when empty.
-     * {@code List} (not scalar) return: same single-row-list convention as
-     * the windowed history query.
+     * Whole-range aggregates over the same business-time predicate (no entity
+     * hydration, one row {@code [count, sum]}; sum is coalesced to zero when
+     * empty). {@code List} (not scalar) return: same single-row-list
+     * convention as the windowed history query.
+     *
+     * <p>P-1: UNION ALL instead of {@code sender = :id OR receiver = :id} so
+     * each branch range-scans its own per-side index
+     * ({@code idx_transfers_sender_business_created} /
+     * {@code idx_transfers_receiver_business_created}, V28) instead of forcing
+     * a bitmap-or. Sound because {@code chk_transfers_no_self_transfer}
+     * guarantees the branches are disjoint (no double-count).
      */
-    @Query(value = "SELECT COUNT(*), COALESCE(SUM(t.amount), 0) FROM transfers t "
-            + "WHERE (t.sender_account_id = :accountId OR t.receiver_account_id = :accountId) "
-            + "AND t.business_created_at BETWEEN :start AND :end", nativeQuery = true)
+    @Query(value = "SELECT COUNT(*), COALESCE(SUM(s.amount), 0) FROM ("
+            + "SELECT t.amount FROM transfers t "
+            + "WHERE t.sender_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end "
+            + "UNION ALL "
+            + "SELECT t.amount FROM transfers t "
+            + "WHERE t.receiver_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end) s", nativeQuery = true)
     List<Object[]> summarizeRange(
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,
@@ -72,11 +96,29 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET so
      * the covering index serves the range without sorting the full match set.
      * Null cursor = first page.
+     *
+     * <p>P-1: UNION ALL per-side branches (same disjointness argument as
+     * {@link #findHistoryBetween}). The {@code CAST(:cursorCreatedAt AS
+     * TIMESTAMP)} guard keeps the null-cursor first page working on the
+     * native path: an untyped null bind would otherwise leave the predicate
+     * type unresolved. The unused {@code :cursorId} null still binds (the
+     * driver infers bigint from the comparison context) but its disjunct is
+     * unreachable while the cursor is null.
      */
-    @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
-            + "AND t.businessCreatedAt BETWEEN :start AND :end "
-            + "AND (:cursorCreatedAt IS NULL OR (t.createdAt < :cursorCreatedAt OR (t.createdAt = :cursorCreatedAt AND t.id < :cursorId))) "
-            + "ORDER BY t.createdAt DESC, t.id DESC")
+    @Query(value = "SELECT * FROM ("
+            + "SELECT t.* FROM transfers t "
+            + "WHERE t.sender_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end "
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR t.created_at < :cursorCreatedAt "
+            + "OR (t.created_at = :cursorCreatedAt AND t.id < :cursorId)) "
+            + "UNION ALL "
+            + "SELECT t.* FROM transfers t "
+            + "WHERE t.receiver_account_id = :accountId "
+            + "AND t.business_created_at BETWEEN :start AND :end "
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR t.created_at < :cursorCreatedAt "
+            + "OR (t.created_at = :cursorCreatedAt AND t.id < :cursorId))) combined "
+            + "ORDER BY combined.created_at DESC, combined.id DESC",
+            nativeQuery = true)
     List<TransferJpaEntity> findHistoryBetweenKeyset(
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,

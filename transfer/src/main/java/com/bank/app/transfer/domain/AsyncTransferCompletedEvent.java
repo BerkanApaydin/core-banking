@@ -23,10 +23,11 @@ public record AsyncTransferCompletedEvent(
     }
 
     public static AsyncTransferCompletedEvent from(Transfer transfer) {
+        // Outbox JSON shape stays on Long; unwrap at this edge.
         return new AsyncTransferCompletedEvent(
             transfer.getId(),
-            transfer.getSenderAccountId(),
-            transfer.getReceiverAccountId(),
+            transfer.getSenderAccountId().value(),
+            transfer.getReceiverAccountId().value(),
             transfer.getAmount(),
             transfer.getStatus(),
             transfer.getCreatedAt()

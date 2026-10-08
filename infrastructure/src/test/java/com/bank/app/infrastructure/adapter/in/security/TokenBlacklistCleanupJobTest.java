@@ -1,6 +1,5 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
-import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +18,7 @@ class TokenBlacklistCleanupJobTest {
 
     @Test
     void shouldDelegateCleanupToBlacklistStore() {
-        var job = new TokenBlacklistCleanupJob(blacklist, AdvisorySchedulerLock.alwaysRun());
+        var job = TokenBlacklistCleanupJob.forTests(blacklist);
 
         job.cleanExpired();
 
@@ -28,7 +27,7 @@ class TokenBlacklistCleanupJobTest {
 
     @Test
     void shouldSwallowStoreFailuresForNextSchedule() {
-        var job = new TokenBlacklistCleanupJob(blacklist, AdvisorySchedulerLock.alwaysRun());
+        var job = TokenBlacklistCleanupJob.forTests(blacklist);
         doThrow(new IllegalStateException("store unavailable")).when(blacklist).cleanExpired();
 
         assertThatNoException().isThrownBy(job::cleanExpired);

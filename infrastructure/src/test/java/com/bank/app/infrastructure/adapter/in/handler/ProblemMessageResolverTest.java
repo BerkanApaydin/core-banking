@@ -126,29 +126,32 @@ class ProblemMessageResolverTest {
     }
 
     @Test
-    @DisplayName("should use exception detail when the key is missing")
-    void shouldUseDetailWhenKeyMissing() {
-        // Arrange
-        BusinessException ex = businessException("error.missing", null, "fallback detail");
+    @DisplayName("should never reflect raw detail when the key is missing (fail-closed catalog)")
+    void shouldUseGenericMessageWhenKeyMissing() {
+        // Arrange — the default message carries PII-like detail that must
+        // never reach the wire; only the server log may keep it.
+        BusinessException ex = businessException("error.missing", null, "Balance: 100.00 TRY, IBAN: TR123");
 
         // Act
         String resolved = resolver.resolveBusinessMessage(ex);
 
         // Assert
-        assertThat(resolved).isEqualTo("fallback detail");
+        assertThat(resolved).isEqualTo("Request could not be completed.");
+        assertThat(resolved).doesNotContain("100.00", "TR123");
     }
 
     @Test
-    @DisplayName("should return empty when both key and detail are missing")
-    void shouldReturnEmptyWhenNothingResolves() {
+    @DisplayName("should prefer the catalog generic message when it exists")
+    void shouldPreferCatalogGenericMessage() {
         // Arrange
+        messageSource.addMessage("error.general_internal_error", LOCALE, "Catalog generic failure.");
         BusinessException ex = businessException("error.missing", null, null);
 
         // Act
         String resolved = resolver.resolveBusinessMessage(ex);
 
         // Assert
-        assertThat(resolved).isEmpty();
+        assertThat(resolved).isEqualTo("Catalog generic failure.");
     }
 
     private static BusinessException businessException(

@@ -13,6 +13,14 @@ package com.bank.app.common.application.aspect;
  * {@code TransactionSynchronizationManager.isActualTransactionActive()} to
  * avoid reusing a rollback-only transaction — that probe is only meaningful
  * while this ordering holds. Covered by {@code AspectOrderingTest}.
+ *
+ * <p>Scope note: this ordering covers the programmatic model only
+ * ({@code UseCaseTransactionAspect}). {@code IdempotencyGuard} is deliberately
+ * outside it — it uses declarative Spring {@code @Transactional} with
+ * {@code REQUIRES_NEW} so the idempotency claim survives the outer
+ * transaction's rollback. Do not "unify" the two without an ADR: merging the
+ * guard into the programmatic model would couple claim durability to business
+ * rollback, which is exactly what the split prevents.
  */
 public final class UseCaseAspectOrders {
 

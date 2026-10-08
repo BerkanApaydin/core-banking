@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -45,11 +46,11 @@ class GetTransferHistoryQueryImplTest {
 
     @Test
     void shouldReturnTransferHistorySuccessfully() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
@@ -73,7 +74,7 @@ class GetTransferHistoryQueryImplTest {
     @Test
     void shouldThrowAccessDeniedExceptionWhenUserIsNotOwnerOfAccount() {
         doThrow(new AuthorizationException("You are not authorized to view this account's transaction history."))
-                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(new AccountId(1L)), anyString());
 
         AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferHistoryUseCase.execute(1L, 0, 20));
         assertEquals("You are not authorized to view this account's transaction history.", exception.getMessage());
@@ -81,9 +82,9 @@ class GetTransferHistoryQueryImplTest {
 
     @Test
     void shouldCapPageSizeAtMaxLimit() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
@@ -97,9 +98,9 @@ class GetTransferHistoryQueryImplTest {
 
     @Test
     void shouldCapNegativePageToZero() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
@@ -113,13 +114,13 @@ class GetTransferHistoryQueryImplTest {
 
     @Test
     void shouldServePageAndTotalFromASinglePortCall() {
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
-        Transfer t2 = new Transfer(11L, 1L, 2L, Money.of("50.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t2 = new Transfer(11L, new AccountId(1L), new AccountId(2L), Money.of("50.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111",
                 2L, "TR870006200000000000000222"));
@@ -147,9 +148,9 @@ class GetTransferHistoryQueryImplTest {
     void shouldFallBackToDefaultPageSizeWhenMisconfigured() {
         GetTransferHistoryQuery misconfigured = new GetTransferHistoryQueryImpl(loadTransferPort,
                 new TransferViewEnricher(accountOperationPort), transferAuthorizationService, 0);
-        AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
         when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(100)))
                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
@@ -157,5 +158,28 @@ class GetTransferHistoryQueryImplTest {
         misconfigured.execute(1L, 0, Integer.MAX_VALUE);
 
         verify(loadTransferPort).findHistoryPage(1L, 0, 100);
+    }
+
+    @Test
+    void shouldRejectDeepOffsetWindow() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> getTransferHistoryUseCase.execute(1L, 200, 100));
+
+        assertTrue(exception.getMessage().contains("keyset"));
+        verifyNoInteractions(loadTransferPort);
+    }
+
+    @Test
+    void shouldAcceptBoundaryOffsetWindow() {
+        AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(loadTransferPort.findHistoryPage(eq(1L), eq(100), eq(100)))
+                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
+
+        getTransferHistoryUseCase.execute(1L, 100, 100);
+
+        verify(loadTransferPort).findHistoryPage(1L, 100, 100);
     }
 }

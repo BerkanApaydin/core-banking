@@ -124,13 +124,34 @@ class OutboxPersistenceAdapterTest {
     }
 
     @Test
-    void shouldDeleteProcessedBeforeCutoff() {
+    void shouldDeleteProcessedBeforeCutoffInBatches() {
         LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
-        when(repository.deleteProcessedBefore(cutoff)).thenReturn(7);
+        when(repository.deleteProcessedBatchBefore(eq(cutoff),
+                eq(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE)))
+                .thenReturn(
+                        OutboxPersistenceAdapter.RETENTION_BATCH_SIZE,
+                        7);
 
         int deleted = adapter.deleteProcessedBefore(cutoff);
 
-        assertThat(deleted).isEqualTo(7);
-        verify(repository).deleteProcessedBefore(cutoff);
+        assertThat(deleted).isEqualTo(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE + 7);
+        verify(repository, times(2)).deleteProcessedBatchBefore(eq(cutoff),
+                eq(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE));
+    }
+
+    @Test
+    void shouldCapRetentionBatchesPerRun() {
+        LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
+        when(repository.deleteProcessedBatchBefore(eq(cutoff),
+                eq(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE)))
+                .thenReturn(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE);
+
+        int deleted = adapter.deleteProcessedBefore(cutoff);
+
+        assertThat(deleted).isEqualTo(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE
+                * OutboxPersistenceAdapter.MAX_BATCHES_PER_RUN);
+        verify(repository, times(OutboxPersistenceAdapter.MAX_BATCHES_PER_RUN))
+                .deleteProcessedBatchBefore(eq(cutoff),
+                        eq(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE));
     }
 }

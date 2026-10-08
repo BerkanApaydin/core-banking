@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -46,13 +47,13 @@ class GenerateTransferReportWithTotalsQueryImplTest {
     void shouldReturnItemsAndWholeRangeTotalsInOneCall() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
-                .thenReturn(new AccountInfo(1L, 100L, "TRY", "ACTIVE"));
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
+                .thenReturn(new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE"));
         when(accountAclPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Currency.TRY),
+        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(1));
-        Transfer t2 = new Transfer(11L, 1L, 2L, Money.of("250.00", Currency.TRY),
+        Transfer t2 = new Transfer(11L, new AccountId(1L), new AccountId(2L), Money.of("250.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(2));
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 100))
                 .thenReturn(List.of(t1, t2));
@@ -75,15 +76,15 @@ class GenerateTransferReportWithTotalsQueryImplTest {
     void shouldServeKeysetCursorWithNextCursor() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
-                .thenReturn(new AccountInfo(1L, 100L, "TRY", "ACTIVE"));
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
+                .thenReturn(new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE"));
         when(accountAclPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
-        Transfer first = new Transfer(10L, 1L, 2L, Money.of("10.00", Currency.TRY),
+        Transfer first = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("10.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(1));
-        Transfer second = new Transfer(11L, 1L, 2L, Money.of("20.00", Currency.TRY),
+        Transfer second = new Transfer(11L, new AccountId(1L), new AccountId(2L), Money.of("20.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(2));
-        Transfer third = new Transfer(12L, 1L, 2L, Money.of("30.00", Currency.TRY),
+        Transfer third = new Transfer(12L, new AccountId(1L), new AccountId(2L), Money.of("30.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(3));
         // Explicit first-page cursor (the null/null pair is rejected by the invariant).
         ReportCriteria keyset = new ReportCriteria(1L, start, end, 0, 2,
@@ -106,13 +107,13 @@ class GenerateTransferReportWithTotalsQueryImplTest {
     void shouldReportNoNextPageWhenExactlyOnePageReturned() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
-                .thenReturn(new AccountInfo(1L, 100L, "TRY", "ACTIVE"));
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
+                .thenReturn(new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE"));
         when(accountAclPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
                 1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
-        Transfer first = new Transfer(10L, 1L, 2L, Money.of("10.00", Currency.TRY),
+        Transfer first = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("10.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(1));
-        Transfer second = new Transfer(11L, 1L, 2L, Money.of("20.00", Currency.TRY),
+        Transfer second = new Transfer(11L, new AccountId(1L), new AccountId(2L), Money.of("20.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusHours(2));
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2))
                 .thenReturn(List.of(first, second));
@@ -137,8 +138,8 @@ class GenerateTransferReportWithTotalsQueryImplTest {
                 transferAuthorizationService, 0);
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
-                .thenReturn(new AccountInfo(1L, 100L, "TRY", "ACTIVE"));
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
+                .thenReturn(new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE"));
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(List.of());
         when(loadTransferPort.summarizeRange(1L, start, end))

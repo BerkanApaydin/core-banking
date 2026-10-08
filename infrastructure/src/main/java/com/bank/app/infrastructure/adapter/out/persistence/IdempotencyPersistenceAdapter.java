@@ -63,6 +63,11 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
     }
 
     @Override
+    public int failStalePending(LocalDateTime threshold) {
+        return repository.failStalePending(threshold);
+    }
+
+    @Override
     public int deleteExpired(LocalDateTime threshold) {
         return repository.deleteExpiredTerminalRequests(threshold);
     }

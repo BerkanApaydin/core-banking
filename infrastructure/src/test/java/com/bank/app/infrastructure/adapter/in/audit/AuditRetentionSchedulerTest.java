@@ -26,7 +26,7 @@ class AuditRetentionSchedulerTest {
     @Test
     @DisplayName("should delete rows older than the retention window")
     void shouldDeleteOlderThanRetentionWindow() {
-        AuditRetentionScheduler scheduler = new AuditRetentionScheduler(
+        AuditRetentionScheduler scheduler = AuditRetentionScheduler.forTests(
                 retentionPort, new AuditProperties(500, true, 365), AdvisorySchedulerLock.alwaysRun());
 
         scheduler.retainHistory();
@@ -39,7 +39,7 @@ class AuditRetentionSchedulerTest {
     void shouldSkipWhenNotLeader() {
         AdvisorySchedulerLock lock = mock(AdvisorySchedulerLock.class);
         when(lock.runIfLeader(anyString(), any())).thenReturn(false);
-        AuditRetentionScheduler scheduler = new AuditRetentionScheduler(
+        AuditRetentionScheduler scheduler = AuditRetentionScheduler.forTests(
                 retentionPort, new AuditProperties(500, true, 365), lock);
 
         scheduler.retainHistory();

@@ -122,6 +122,32 @@ spec:
             severity: ticket
           annotations:
             summary: "Backlog metrics scan has not completed in 2h"
+    - name: database
+      interval: 60s
+      rules:
+        - alert: HikariPoolExhaustion
+          # K3 connection budget: 6 pods x 20 pool = 120 backend connections.
+          # Threads waiting for a connection mean the pool (or the database)
+          # is saturated — check for FOR UPDATE pile-ups and oversized
+          # transactions before raising DB_MAX_POOL_SIZE (raising the pool
+          # without raising max_connections just moves the queue to Postgres).
+          expr: sum(hikaricp_connections_pending) by (pool) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Threads waiting for Hikari connections — pool or DB saturated"
+            runbook_url: "docs/operations.md"
+        - alert: HikariPoolSaturationHigh
+          expr: |
+            sum(hikaricp_connections_active) by (pool)
+            /
+            sum(hikaricp_connections_max) by (pool) > 0.85
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Hikari pool over 85% active for 15m — review capacity model"
     - name: concurrency
       interval: 60s
       rules:

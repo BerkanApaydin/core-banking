@@ -53,10 +53,12 @@ final class IdempotencyRequestResolver {
             scope = "public";
         } else {
             userContextService.getCurrentUsername()
-                    .orElseThrow(() -> new AuthorizationException("You must be logged in."));
+                    .orElseThrow(() -> new AuthorizationException("error.login_required", null,
+                            "You must be logged in."));
             subject = userContextService.getCurrentUserId()
                     .map(String::valueOf)
-                    .orElseThrow(() -> new AuthorizationException("Authenticated user ID is required."));
+                    .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
+                            "Authenticated user ID is required."));
             scope = "user";
         }
 

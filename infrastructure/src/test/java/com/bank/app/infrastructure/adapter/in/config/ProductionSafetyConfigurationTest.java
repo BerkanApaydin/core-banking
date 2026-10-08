@@ -38,7 +38,8 @@ class ProductionSafetyConfigurationTest {
                         "app.security.token-blacklist.backend=database",
                         "app.security.browser-session.secure=true",
                         "app.security.cors.allowed-origins=https://bank.example.com",
-                        "app.security.failed-login.backend=redis", "app.security.rate-limit.backend=redis")
+                        "app.security.failed-login.backend=redis", "app.security.rate-limit.backend=redis",
+                        "app.cache.caffeine.account-info.backend=redis")
                 .withBean("applicationWorker", Object.class, () -> {
                     singletonStarted.set(true);
                     return new Object();

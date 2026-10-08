@@ -196,7 +196,8 @@ class SecurityContextAdapterTest {
         AuthorizationException ex = assertThrows(AuthorizationException.class, () -> {
             securityUtils.checkUserAuthorization(42L, "Error message");
         });
-        assertEquals("Session not found.", ex.getMessage());
+        assertEquals("Session not found. Please log in again.", ex.getMessage());
+        assertEquals("error.session_not_found", ex.getMessageKey());
     }
 
     @Test
@@ -214,6 +215,7 @@ class SecurityContextAdapterTest {
             securityUtils.checkUserAuthorization(42L, "Forbidden access");
         });
         assertEquals("Forbidden access", ex.getMessage());
+        assertEquals("error.not_resource_owner", ex.getMessageKey());
     }
 
     @Test

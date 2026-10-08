@@ -49,11 +49,21 @@ public class ProblemMessageResolver {
         return message;
     }
 
+    /**
+     * Fail-closed business message resolution (ERR-01): a missing or echoed
+     * bundle key must never reflect raw exception detail to the wire — the
+     * default message may carry IBANs, balances or other PII. Unmapped keys
+     * degrade to the generic catalog message; the raw detail stays in the
+     * server log for diagnosis.
+     */
     public String resolveBusinessMessage(BusinessException ex) {
         String message = resolveMessage(ex.getMessageKey(), ex.getArgs());
-        if (message.isEmpty() || message.equals(ex.getMessageKey())) {
-            message = ex.getMessage() != null ? ex.getMessage() : "";
+        if (!message.isEmpty() && !message.equals(ex.getMessageKey())) {
+            return message;
         }
-        return message;
+        log.warn("Missing problem message for key '{}' (code {}); detail: {}",
+                ex.getMessageKey(), ex.getErrorCode(), ex.getMessage());
+        return resolveOrDefault(
+                "error.general_internal_error", "Request could not be completed.");
     }
 }

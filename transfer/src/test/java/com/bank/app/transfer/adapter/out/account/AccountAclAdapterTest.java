@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 import java.util.Set;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -45,9 +46,9 @@ class AccountAclAdapterTest {
             when(accountApi.getSnapshotById(1L))
                     .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
 
-            AccountAclPort.AccountInfo result = adapter.getAccountInfo(1L);
+            AccountAclPort.AccountInfo result = adapter.getAccountInfo(new AccountId(1L));
 
-            assertEquals(1L, result.id());
+            assertEquals(new AccountId(1L), result.id());
             assertEquals(10L, result.userId());
             assertEquals("TRY", result.currency());
             assertEquals("ACTIVE", result.status());
@@ -60,8 +61,8 @@ class AccountAclAdapterTest {
             when(accountApi.getSnapshotById(1L))
                     .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
 
-            adapter.getAccountInfo(1L);
-            adapter.getAccountInfo(1L);
+            adapter.getAccountInfo(new AccountId(1L));
+            adapter.getAccountInfo(new AccountId(1L));
 
             // Mutant (removed putById) serves the second read from the API again.
             verify(accountApi, times(1)).getSnapshotById(1L);
@@ -79,7 +80,7 @@ class AccountAclAdapterTest {
             AccountAclPort.AccountInfo result =
                     adapter.getAccountInfoForTransfer("TR450006100519786456841234");
 
-            assertEquals(1L, result.id());
+            assertEquals(new AccountId(1L), result.id());
             assertEquals("TRY", result.currency());
             verify(accountApi).getSnapshotByIban("TR450006100519786456841234");
         }
@@ -133,10 +134,10 @@ class AccountAclAdapterTest {
                     Money.of("800.00", Currency.TRY), Money.of("1200.00", Currency.TRY));
             when(accountApi.adjustBalances(1L, 2L, amount)).thenReturn(apiResult);
 
-            AccountAclPort.MutationResult result = adapter.debitAndCredit(1L, 2L, amount);
+            AccountAclPort.MutationResult result = adapter.debitAndCredit(new AccountId(1L), new AccountId(2L), amount);
 
-            assertEquals(1L, result.senderAccountId());
-            assertEquals(2L, result.receiverAccountId());
+            assertEquals(new AccountId(1L), result.senderAccountId());
+            assertEquals(new AccountId(2L), result.receiverAccountId());
             assertEquals(Money.of("800.00", Currency.TRY), result.senderNewBalance());
             assertEquals(Money.of("1200.00", Currency.TRY), result.receiverNewBalance());
             verify(accountApi).adjustBalances(1L, 2L, amount);
@@ -145,7 +146,7 @@ class AccountAclAdapterTest {
 
         @Test
         void shouldRejectNullAmount() {
-            assertThrows(NullPointerException.class, () -> adapter.debitAndCredit(1L, 2L, null));
+            assertThrows(NullPointerException.class, () -> adapter.debitAndCredit(new AccountId(1L), new AccountId(2L), null));
             verifyNoInteractions(accountApi);
         }
     }
@@ -160,10 +161,10 @@ class AccountAclAdapterTest {
                     Money.of("1000.00", Currency.TRY), Money.of("1000.00", Currency.TRY));
             when(accountApi.reverseForCancellation(1L, 2L, amount)).thenReturn(apiResult);
 
-            AccountAclPort.MutationResult result = adapter.reverseBalancesForCancellation(1L, 2L, amount);
+            AccountAclPort.MutationResult result = adapter.reverseBalancesForCancellation(new AccountId(1L), new AccountId(2L), amount);
 
-            assertEquals(1L, result.senderAccountId());
-            assertEquals(2L, result.receiverAccountId());
+            assertEquals(new AccountId(1L), result.senderAccountId());
+            assertEquals(new AccountId(2L), result.receiverAccountId());
             verify(accountApi).reverseForCancellation(1L, 2L, amount);
             verifyNoMoreInteractions(accountApi);
         }
@@ -181,7 +182,7 @@ class AccountAclAdapterTest {
                     Money.of("800.00", Currency.TRY), Money.of("1200.00", Currency.TRY));
             when(accountApi.adjustBalances(1L, 2L, amount)).thenReturn(apiResult);
 
-            adapter.debitAndCredit(1L, 2L, amount);
+            adapter.debitAndCredit(new AccountId(1L), new AccountId(2L), amount);
 
             assertTrue(cache.getById(99L).isEmpty());
             verifyNoMoreInteractions(accountApi);

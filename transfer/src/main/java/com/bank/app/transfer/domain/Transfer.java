@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Money;
@@ -15,18 +16,18 @@ import java.util.Objects;
 public class Transfer extends BaseAggregateRoot {
 
     private final Long id;
-    private final Long senderAccountId;
-    private final Long receiverAccountId;
+    private final AccountId senderAccountId;
+    private final AccountId receiverAccountId;
     private final Money amount;
     private TransferStatus status;
     private final LocalDateTime createdAt;
     private final Long version;
 
-    public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
+    public Transfer(Long id, AccountId senderAccountId, AccountId receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
         this(id, senderAccountId, receiverAccountId, amount, status, createdAt, null);
     }
 
-    public Transfer(Long id, Long senderAccountId, Long receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
+    public Transfer(Long id, AccountId senderAccountId, AccountId receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
         this.id = id;
         this.senderAccountId = Objects.requireNonNull(senderAccountId, "Sender account ID must not be null");
         this.receiverAccountId = Objects.requireNonNull(receiverAccountId, "Receiver account ID must not be null");
@@ -43,7 +44,7 @@ public class Transfer extends BaseAggregateRoot {
         this.version = version;
     }
 
-    public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
+    public static Transfer create(AccountId senderAccountId, AccountId receiverAccountId, Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Transfer amount must not be null");
         // D-1 inner guarantee: even a direct Transfer.create caller cannot
         // exceed the ceiling (TransferDomainService is the normal path).
@@ -65,7 +66,7 @@ public class Transfer extends BaseAggregateRoot {
         }
         this.status = TransferStatus.COMPLETED;
         registerEvent(new TransferCompletedEvent(
-                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, LocalDateTime.now(clock)));
     }
 
     private static void requireNonZero(Money amount) {
@@ -78,11 +79,11 @@ public class Transfer extends BaseAggregateRoot {
         return id;
     }
 
-    public Long getSenderAccountId() {
+    public AccountId getSenderAccountId() {
         return senderAccountId;
     }
 
-    public Long getReceiverAccountId() {
+    public AccountId getReceiverAccountId() {
         return receiverAccountId;
     }
 
@@ -121,13 +122,14 @@ public class Transfer extends BaseAggregateRoot {
     }
 
     /**
-     * Marks a pending transfer as failed. Currently no production flow calls
-     * this: the synchronous placement path rolls the transaction back instead
-     * of persisting a FAILED row (see PlaceTransferUseCaseImpl), so a failure
-     * never leaves a half-written transfer behind. Kept for asynchronous
-     * placement flows, where the PENDING row must survive the worker crash and
-     * be reconcilable afterwards — together with {@code TransferStatus.FAILED}
-     * and the report UI that already renders it.
+     * Marks a pending transfer as failed. The synchronous placement path rolls
+     * the transaction back instead of persisting a FAILED row (see
+     * PlaceTransferUseCaseImpl), so a failure never leaves a half-written
+     * transfer behind. The production caller for crash leftovers is
+     * {@code TransferPendingReaper}, which transitions stale PENDING rows
+     * (JVM crash between the two saves) to FAILED through this method —
+     * together with {@code TransferStatus.FAILED} and the report UI that
+     * already renders it.
      */
     public void markFailed(Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
@@ -136,7 +138,7 @@ public class Transfer extends BaseAggregateRoot {
         }
         this.status = TransferStatus.FAILED;
         registerEvent(new TransferFailedEvent(
-                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, LocalDateTime.now(clock)));
     }
 
     public void cancel(Clock clock, Duration cancellationWindow) {
@@ -166,6 +168,6 @@ public class Transfer extends BaseAggregateRoot {
         }
         this.status = TransferStatus.CANCELLED;
         registerEvent(new TransferCancelledEvent(
-                this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, now));
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, now));
     }
 }

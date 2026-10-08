@@ -6,7 +6,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,7 +19,12 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+// NOTE: Method security is intentionally NOT enabled. Role checks live in the
+// application layer (UserContextService.hasRole) to keep it framework-free —
+// see LayeringArchitectureTest.applicationLayerShouldNotDependOnSpringSecurity.
+// The URL-boundary rule below is the only Spring-side authorization layer.
+// Do NOT re-add @EnableMethodSecurity: @PreAuthorize in controllers would
+// split the authorization contract across two frameworks-facing layers.
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;

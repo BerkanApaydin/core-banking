@@ -91,7 +91,7 @@ public class AuthController {
             + "at least one credential (header or refresh body) is required.")
     public ResponseEntity<?> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestBody(required = false) RefreshTokenRequest body,
+            @Valid @RequestBody(required = false) RefreshTokenRequest body,
             HttpServletRequest httpRequest) {
         String refreshToken = body == null ? null : body.refreshToken();
         if ((authHeader == null || authHeader.isBlank())

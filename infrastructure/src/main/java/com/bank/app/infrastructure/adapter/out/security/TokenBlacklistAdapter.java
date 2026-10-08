@@ -7,6 +7,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,6 +27,9 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
     // bloat) nor shorter (revocation bypass when jwtExpiration > 1 day).
     // Bounds come from {@code app.security.token-blacklist.min/max-ttl-ms}.
     private final Cache<String, Long> blacklist;
+    // Time-strategy seam: expiry math uses an injectable clock so tests can
+    // pin time instead of sleeping. Production keeps systemUTC.
+    private volatile Clock clock = Clock.systemUTC();
 
     public TokenBlacklistAdapter(TokenBlacklistProperties properties) {
         this.minTtlMs = properties.minTtlMs();
@@ -36,6 +40,11 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
                 .build();
     }
 
+    /** Test clock injection (time-strategy seam). */
+    void setClockForTests(Clock testClock) {
+        this.clock = testClock != null ? testClock : Clock.systemUTC();
+    }
+
     @Override
     public void blacklist(String token, long expirationMs) {
         if (expirationMs <= 0) {
@@ -44,7 +53,7 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
         long ttl = Math.min(Math.max(expirationMs, minTtlMs), maxTtlMs);
         // Hash-only storage like the Redis/DB backends: a cache read must
         // never yield a usable credential (heap-dump disclosure).
-        blacklist.put(TokenDigest.sha256Hex(token), System.currentTimeMillis() + ttl);
+        blacklist.put(TokenDigest.sha256Hex(token), clock.millis() + ttl);
     }
 
     @Override
@@ -53,7 +62,7 @@ public class TokenBlacklistAdapter implements TokenBlacklistPort {
         if (expiresAt == null) {
             return false;
         }
-        if (System.currentTimeMillis() >= expiresAt) {
+        if (clock.millis() >= expiresAt) {
             blacklist.invalidate(TokenDigest.sha256Hex(token));
             return false;
         }

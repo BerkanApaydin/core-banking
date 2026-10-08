@@ -39,4 +39,9 @@ public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKe
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE idempotency_keys SET status='FAILED' WHERE key_value=:key AND status='PENDING'", nativeQuery=true)
     int failIfPending(@Param("key") String key);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE idempotency_keys SET status='FAILED' "
+            + "WHERE status='PENDING' AND key_kind='HTTP' AND created_at < :threshold", nativeQuery = true)
+    int failStalePending(@Param("threshold") LocalDateTime threshold);
 }

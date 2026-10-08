@@ -44,7 +44,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(TransferController.class)
+@WebMvcTest({TransferCommandController.class, TransferQueryController.class})
 @Import({ ApiVersionConfig.class, GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class })
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("TransferController Web MVC")

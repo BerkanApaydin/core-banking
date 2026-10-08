@@ -16,15 +16,17 @@ public class TokenBlacklistCleanupJob {
     private final TokenBlacklistPort blacklist;
     private final AdvisorySchedulerLock schedulerLock;
 
-    public TokenBlacklistCleanupJob(TokenBlacklistPort blacklist) {
-        this(blacklist, AdvisorySchedulerLock.alwaysRun());
-    }
-
+    // Single canonical constructor for Spring. Tests use the named forTests
+    // factory instead of an ambiguous single-arg overload.
     @Autowired
     public TokenBlacklistCleanupJob(TokenBlacklistPort blacklist,
                                     AdvisorySchedulerLock schedulerLock) {
         this.blacklist = blacklist;
         this.schedulerLock = schedulerLock;
+    }
+
+    static TokenBlacklistCleanupJob forTests(TokenBlacklistPort blacklist) {
+        return new TokenBlacklistCleanupJob(blacklist, AdvisorySchedulerLock.alwaysRun());
     }
 
     @Scheduled(cron = "${app.security.token-blacklist.cleanup-cron:0 */5 * * * *}")

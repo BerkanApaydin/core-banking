@@ -86,11 +86,46 @@ class AuditPersistenceAdapterTest {
     }
 
     @Test
-    void shouldDeleteOlderThanCutoff() {
+    void shouldDeleteOlderThanCutoffInOneBatch() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(365);
-        when(springDataRepo.deleteByTimestampBefore(cutoff)).thenReturn(12);
+        when(springDataRepo.deleteBatchOlderThan(cutoff,
+                AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE)).thenReturn(12);
 
         assertEquals(12, adapter.deleteOlderThan(cutoff));
+        verify(springDataRepo, times(1))
+                .deleteBatchOlderThan(cutoff, AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE);
+    }
+
+    @Test
+    void shouldLoopBatchesUntilShortBatch() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(365);
+        when(springDataRepo.deleteBatchOlderThan(eq(cutoff),
+                eq(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE)))
+                .thenReturn(
+                        AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE,
+                        AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE,
+                        7);
+
+        assertEquals(2 * AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE + 7,
+                adapter.deleteOlderThan(cutoff));
+        verify(springDataRepo, times(3))
+                .deleteBatchOlderThan(eq(cutoff),
+                        eq(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE));
+    }
+
+    @Test
+    void shouldCapBatchesPerRun() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(365);
+        when(springDataRepo.deleteBatchOlderThan(eq(cutoff),
+                eq(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE)))
+                .thenReturn(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE);
+
+        assertEquals(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE
+                        * AuditLogPersistenceAdapter.MAX_BATCHES_PER_RUN,
+                adapter.deleteOlderThan(cutoff));
+        verify(springDataRepo, times(AuditLogPersistenceAdapter.MAX_BATCHES_PER_RUN))
+                .deleteBatchOlderThan(eq(cutoff),
+                        eq(AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE));
     }
 
     @Test

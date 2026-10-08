@@ -59,9 +59,16 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
      * Retention: only acknowledged, non-dead rows. Dead letters stay for
      * investigation; unprocessed rows are the redelivery source.
      * {@code COALESCE} covers rows processed before processed_at was stamped.
+     *
+     * <p>Bounded batch (same pattern as audit retention): the IN-subquery
+     * scopes the DELETE through the retention range so one schedule never
+     * holds the whole tail in a single transaction.
      */
-    @Modifying
-    @Query("DELETE FROM OutboxJpaEntity e WHERE e.processed = true AND e.deadLetter = false "
-            + "AND COALESCE(e.processedAt, e.createdAt) < :cutoff")
-    int deleteProcessedBefore(@Param("cutoff") LocalDateTime cutoff);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM outbox_events WHERE id IN "
+            + "(SELECT id FROM outbox_events WHERE processed = true AND dead_letter = false "
+            + "AND COALESCE(processed_at, created_at) < :cutoff "
+            + "ORDER BY COALESCE(processed_at, created_at), id LIMIT :batch)",
+            nativeQuery = true)
+    int deleteProcessedBatchBefore(@Param("cutoff") LocalDateTime cutoff, @Param("batch") int batch);
 }

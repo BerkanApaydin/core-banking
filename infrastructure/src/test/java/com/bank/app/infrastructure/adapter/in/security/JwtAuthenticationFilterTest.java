@@ -4,8 +4,10 @@ import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.infrastructure.adapter.out.security.HmacCsrfBindingAdapter;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
+import com.bank.app.user.domain.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +43,9 @@ class JwtAuthenticationFilterTest {
     private TokenBlacklistPort tokenBlacklistPort;
 
     @Mock
+    private LoadUserPort loadUserPort;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -58,7 +63,8 @@ class JwtAuthenticationFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, new ObjectMapper());
+        filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
+                new ObjectMapper());
         originalContext = SecurityContextHolder.getContext();
         SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());
     }
@@ -435,7 +441,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void secureBrowserModeIgnoresDevelopmentCookieName() throws Exception {
-        filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort,
+        filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
                 new ObjectMapper(),
                 new JwtAuthenticationFilter.PlainDoubleSubmitCsrfBinding(),
                 new BrowserSessionCookieProperties(true));
@@ -534,7 +540,7 @@ class JwtAuthenticationFilterTest {
         void setUpBound() {
             binding = new HmacCsrfBindingAdapter(
                     "test-only-csrf-mac-key-32bytes!!".getBytes(StandardCharsets.UTF_8));
-            filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort,
+            filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
                     new ObjectMapper(), binding, new BrowserSessionCookieProperties(false));
             // validToken() carries userId 42: mint the cookie for that identity.
             String bound = binding.issueCsrfToken("42");
@@ -599,6 +605,103 @@ class JwtAuthenticationFilterTest {
 
             assertProblemResponse(errorResponse, 403, "ACCESS_DENIED", "Invalid browser CSRF token");
             verifyNoInteractions(filterChain);
+        }
+    }
+
+    @Nested
+    @DisplayName("SEC-01 admin token-version re-validation")
+    class AdminTokenVersion {
+
+        private static final String ADMIN_PATH = "/api/v1/admin/accounts/1/suspend";
+
+        private JwtPort.VerifiedToken adminToken() {
+            return new JwtPort.VerifiedToken("admin", 7L, "ROLE_ADMIN", "jti",
+                    System.currentTimeMillis() + 60_000);
+        }
+
+        private void stubAdminBearer() {
+            when(request.getHeader("Authorization")).thenReturn("Bearer admin-token");
+            when(request.getServletPath()).thenReturn(ADMIN_PATH);
+            when(request.getMethod()).thenReturn("POST");
+            when(JwtTokenProvider.verifyAndDecode("admin-token")).thenReturn(adminToken());
+            when(JwtTokenProvider.extractTokenVersion("admin-token")).thenReturn(3L);
+        }
+
+        private User userAtVersion(long version) {
+            User user = mock(User.class);
+            when(user.getTokenVersion()).thenReturn(version);
+            return user;
+        }
+
+        @Test
+        @DisplayName("allows admin calls when the token generation matches the DB")
+        void allowsAdminWhenVersionMatches() throws Exception {
+            stubAdminBearer();
+            // Build the user double before stubbing: nested when() inside
+            // thenReturn() corrupts the stubbing state (UnfinishedStubbing).
+            User current = userAtVersion(3L);
+            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.of(current));
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(filterChain).doFilter(request, response);
+            assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        }
+
+        @Test
+        @DisplayName("rejects admin calls with a stale (pre-demotion) token generation")
+        void rejectsAdminWhenVersionIsStale() throws Exception {
+            stubAdminBearer();
+            User demoted = userAtVersion(4L);
+            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.of(demoted));
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+            verifyNoInteractions(filterChain);
+            assertNull(SecurityContextHolder.getContext().getAuthentication());
+        }
+
+        @Test
+        @DisplayName("rejects admin calls for deleted users (fail closed)")
+        void rejectsAdminWhenUserIsGone() throws Exception {
+            stubAdminBearer();
+            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.empty());
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+            verifyNoInteractions(filterChain);
+        }
+
+        @Test
+        @DisplayName("returns 503 when the user store is unreadable (fail closed)")
+        void returns503WhenUserStoreIsDown() throws Exception {
+            stubAdminBearer();
+            when(loadUserPort.findById(7L)).thenThrow(new RuntimeException("db down"));
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 503, "SECURITY_BACKEND_UNAVAILABLE",
+                    "Security service temporarily unavailable");
+            verifyNoInteractions(filterChain);
+        }
+
+        @Test
+        @DisplayName("does not touch the user store on non-admin paths (stateless fast path)")
+        void skipsUserStoreOnNonAdminPaths() throws Exception {
+            when(request.getHeader("Authorization")).thenReturn("Bearer admin-token");
+            when(request.getServletPath()).thenReturn("/api/v1/transfers");
+            when(request.getMethod()).thenReturn("GET");
+            when(JwtTokenProvider.verifyAndDecode("admin-token")).thenReturn(adminToken());
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(filterChain).doFilter(request, response);
+            verifyNoInteractions(loadUserPort);
         }
     }
 

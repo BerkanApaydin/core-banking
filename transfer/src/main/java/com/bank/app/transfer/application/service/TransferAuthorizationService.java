@@ -3,6 +3,7 @@ package com.bank.app.transfer.application.service;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.exception.AuthorizationException;
 
 public class TransferAuthorizationService {
@@ -26,14 +27,14 @@ public class TransferAuthorizationService {
         return accountAclPort.getAccountInfoForTransfer(receiverIban);
     }
 
-    public AccountInfo authorizeByAccountId(Long accountId) {
+    public AccountInfo authorizeByAccountId(AccountId accountId) {
         AccountInfo accountInfo = accountAclPort.getAccountInfo(accountId);
         userContextService.checkUserAuthorization(accountInfo.userId(),
                 "You are not authorized to cancel this transfer.");
         return accountInfo;
     }
 
-    public AccountInfo authorizeAccountAccess(Long accountId, String errorMessage) {
+    public AccountInfo authorizeAccountAccess(AccountId accountId, String errorMessage) {
         AccountInfo accountInfo = accountAclPort.getAccountInfo(accountId);
         userContextService.checkUserAuthorization(accountInfo.userId(), errorMessage);
         return accountInfo;
@@ -41,9 +42,10 @@ public class TransferAuthorizationService {
 
     public void authorizeTransferAccess(Long senderUserId, Long receiverUserId, String errorMessage) {
         Long currentUserId = userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("Session not found."));
+                .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
+                        "Session not found. Please log in again."));
         if (!currentUserId.equals(senderUserId) && !currentUserId.equals(receiverUserId)) {
-            throw new AuthorizationException(errorMessage);
+            throw new AuthorizationException("error.not_resource_owner", null, errorMessage);
         }
     }
 

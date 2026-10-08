@@ -29,6 +29,7 @@ public record TransferResponse(
     }
 
     public static TransferResponse from(Transfer transfer, String senderIban, String receiverIban) {
+        // Wire DTO stays on Long; unwrap at this edge.
         return new TransferResponse(
                 transfer.getId(),
                 transfer.getStatus(),
@@ -37,7 +38,7 @@ public record TransferResponse(
                 transfer.getCreatedAt(),
                 senderIban,
                 receiverIban,
-                transfer.getSenderAccountId(),
-                transfer.getReceiverAccountId());
+                transfer.getSenderAccountId().value(),
+                transfer.getReceiverAccountId().value());
     }
 }

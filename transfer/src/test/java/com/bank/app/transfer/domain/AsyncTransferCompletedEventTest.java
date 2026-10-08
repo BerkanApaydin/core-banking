@@ -5,6 +5,7 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.event.DomainEvent;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
+import com.bank.app.common.domain.AccountId;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("null")
@@ -34,7 +35,7 @@ class AsyncTransferCompletedEventTest {
 
     @Test
     void shouldCreateFromTransfer() {
-        Transfer transfer = new Transfer(1L, 10L, 20L, Money.of("500.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("500.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
         AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 

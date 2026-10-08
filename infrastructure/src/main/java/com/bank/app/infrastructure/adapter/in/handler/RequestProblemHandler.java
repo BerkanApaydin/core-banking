@@ -114,9 +114,14 @@ public class RequestProblemHandler {
         ErrorCode code = ErrorCode.INVALID_FORMAT;
         if (ex.getCause() instanceof InvalidFormatException invalidFormatException) {
             if (invalidFormatException.getTargetType() != null && invalidFormatException.getTargetType().isEnum()) {
+                // ERR-02: never reflect the rejected value to the wire (probing
+                // oracle) — only the server-defined accepted-values list is
+                // safe to render. The rejected value goes to the log only.
+                log.warn("Invalid enum value rejected for {}",
+                        invalidFormatException.getTargetType().getSimpleName());
                 message = messages.resolveMessage("error.invalid_enum_value",
-                        new Object[]{invalidFormatException.getValue(),
-                                Arrays.toString(invalidFormatException.getTargetType().getEnumConstants())});
+                        new Object[]{Arrays.toString(
+                                invalidFormatException.getTargetType().getEnumConstants())});
                 code = ErrorCode.INVALID_ENUM_VALUE;
             }
         }

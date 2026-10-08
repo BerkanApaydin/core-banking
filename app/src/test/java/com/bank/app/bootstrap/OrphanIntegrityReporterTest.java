@@ -51,7 +51,7 @@ class OrphanIntegrityReporterTest {
     void shouldRunThreeChecksWhenClean() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
 
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, meterRegistry);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
         assertDoesNotThrow(reporter::reportOrphans);
 
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
@@ -61,7 +61,7 @@ class OrphanIntegrityReporterTest {
     void shouldReportWithoutDeletingWhenOrphansExist() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
 
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, meterRegistry);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
         assertDoesNotThrow(reporter::reportOrphans);
 
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
@@ -72,7 +72,7 @@ class OrphanIntegrityReporterTest {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         var gaugeCaptor = ArgumentCaptor.forClass(AtomicLong.class);
 
-        new OrphanIntegrityReporter(jdbc, meterRegistry).reportOrphans();
+        OrphanIntegrityReporter.forTests(jdbc, meterRegistry).reportOrphans();
 
         verify(meterRegistry, times(3)).gauge(anyString(), any(Iterable.class), gaugeCaptor.capture());
         assertThatCapturedGaugesAre(gaugeCaptor, 2L);
@@ -82,7 +82,7 @@ class OrphanIntegrityReporterTest {
     void shouldTolerateNullCounts() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenAnswer(invocation -> null);
 
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, meterRegistry);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
         assertDoesNotThrow(reporter::reportOrphans);
 
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
@@ -92,7 +92,7 @@ class OrphanIntegrityReporterTest {
     void shouldStartWithoutMeterRegistry() {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
 
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, null);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, null);
         assertDoesNotThrow(reporter::reportOrphans);
 
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
@@ -123,7 +123,7 @@ class OrphanIntegrityReporterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            new OrphanIntegrityReporter(jdbc, meterRegistry,
+            OrphanIntegrityReporter.forTests(jdbc, meterRegistry,
                     new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
         } finally {
             logger.detachAppender(appender);
@@ -144,7 +144,7 @@ class OrphanIntegrityReporterTest {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         var registry = new SimpleMeterRegistry();
 
-        new OrphanIntegrityReporter(jdbc, registry,
+        OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 0)).reportOrphans();
 
         // 2 orphans x 3 checks, all above threshold 0
@@ -156,7 +156,7 @@ class OrphanIntegrityReporterTest {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         var registry = new SimpleMeterRegistry();
 
-        new OrphanIntegrityReporter(jdbc, registry,
+        OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
 
         assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
@@ -169,7 +169,7 @@ class OrphanIntegrityReporterTest {
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(5L);
         var registry = new SimpleMeterRegistry();
 
-        new OrphanIntegrityReporter(jdbc, registry,
+        OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
 
         assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
@@ -179,7 +179,7 @@ class OrphanIntegrityReporterTest {
     void shouldExposeSuccessfulScanTimeOnlyAfterAllQueriesComplete() {
         var registry = new SimpleMeterRegistry();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, registry);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, registry);
         assertEquals(0.0, registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
 
         reporter.reportOrphans();
@@ -195,7 +195,7 @@ class OrphanIntegrityReporterTest {
         when(jdbc.queryForObject(anyString(), eq(Long.class)))
                 .thenReturn(0L, 0L)
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, registry);
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, registry);
 
         assertThrows(
                 DataAccessResourceFailureException.class, reporter::reportOrphans);
@@ -220,7 +220,7 @@ class OrphanIntegrityReporterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            new OrphanIntegrityReporter(jdbc, meterRegistry).reportOrphans();
+            OrphanIntegrityReporter.forTests(jdbc, meterRegistry).reportOrphans();
         } finally {
             logger.detachAppender(appender);
         }

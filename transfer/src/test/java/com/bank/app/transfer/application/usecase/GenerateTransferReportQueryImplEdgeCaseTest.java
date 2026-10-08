@@ -19,6 +19,7 @@ import com.bank.app.common.domain.exception.AuthorizationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -46,7 +47,7 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(999L, start, end);
 
-        when(transferAuthorizationService.authorizeAccountAccess(eq(999L), anyString()))
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(999L)), anyString()))
                 .thenThrow(new AccountNotFoundException(999L));
 
         assertThrows(AccountNotFoundException.class,
@@ -93,8 +94,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime now = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, now, now);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(now), eq(now), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -122,8 +123,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
 
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -137,8 +138,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -159,8 +160,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now().plusDays(10);
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
                 .thenReturn(Collections.emptyList());
@@ -176,7 +177,7 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         doThrow(new AuthorizationException("You are not authorized to generate a report for this account."))
-                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(new AccountId(1L)), anyString());
 
         AuthorizationException ex = assertThrows(AuthorizationException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -190,7 +191,7 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         doThrow(new AuthorizationException("Session not found."))
-                .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
+                .when(transferAuthorizationService).authorizeAccountAccess(eq(new AccountId(1L)), anyString());
 
         assertThrows(AuthorizationException.class,
                 () -> generateTransferReportUseCase.execute(criteria));
@@ -202,8 +203,8 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime end = LocalDateTime.now();
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
-        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
         when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
         when(loadTransferPort.findHistoryBetween(anyLong(), any(LocalDateTime.class), any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());

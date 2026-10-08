@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,8 +37,8 @@ class GenerateTransferReportTotalsQueryImplTest {
     void shouldSummarizeWholeRangeInOneScan() {
         LocalDateTime start = LocalDateTime.now().minusDays(5);
         LocalDateTime end = LocalDateTime.now();
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
-                .thenReturn(new AccountInfo(1L, 100L, "TRY", "ACTIVE"));
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
+                .thenReturn(new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE"));
         when(loadTransferPort.summarizeRange(1L, start, end))
                 .thenReturn(new LoadTransferPort.ReportTotals(7, new BigDecimal("1234.50")));
 
@@ -75,7 +76,7 @@ class GenerateTransferReportTotalsQueryImplTest {
     void shouldPropagateAuthorizationDenial() {
         LocalDateTime start = LocalDateTime.now().minusDays(5);
         LocalDateTime end = LocalDateTime.now();
-        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
                 .thenThrow(new AuthorizationException("Denied."));
 
         assertThrows(AuthorizationException.class,

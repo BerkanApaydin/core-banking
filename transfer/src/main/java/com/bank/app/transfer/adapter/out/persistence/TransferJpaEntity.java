@@ -31,10 +31,13 @@ import org.hibernate.type.SqlTypes;
 @NamedNativeQuery(
         name = "TransferJpaEntity.findHistoryPage",
         query = """
-                SELECT t.*, COUNT(*) OVER() AS total_count
-                FROM transfers t
-                WHERE t.sender_account_id = :accountId OR t.receiver_account_id = :accountId
-                ORDER BY t.created_at DESC, t.id DESC
+                SELECT u.*, COUNT(*) OVER() AS total_count
+                FROM (
+                    SELECT t.* FROM transfers t WHERE t.sender_account_id = :accountId
+                    UNION ALL
+                    SELECT t.* FROM transfers t WHERE t.receiver_account_id = :accountId
+                ) u
+                ORDER BY u.created_at DESC, u.id DESC
                 LIMIT :limit OFFSET :offset
                 """,
         resultSetMapping = "TransferHistoryPageMapping"

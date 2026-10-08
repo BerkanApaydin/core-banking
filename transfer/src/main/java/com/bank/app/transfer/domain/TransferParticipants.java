@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import java.util.Objects;
 
@@ -9,10 +10,10 @@ import java.util.Objects;
  * {@code Iban} value object across the transfer ACL boundary.
  */
 public record TransferParticipants(
-        Long senderId,
+        AccountId senderId,
         String senderIban,
         Currency senderCurrency,
-        Long receiverId,
+        AccountId receiverId,
         String receiverIban,
         Currency receiverCurrency) {
     public TransferParticipants {

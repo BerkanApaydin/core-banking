@@ -3,6 +3,7 @@ package com.bank.app.transfer.application.service;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +33,7 @@ class TransferAuthorizationServiceTest {
 
     private TransferAuthorizationService service;
 
-    private static final Long ACCOUNT_ID = 1L;
+    private static final AccountId ACCOUNT_ID = new AccountId(1L);
     private static final Long SENDER_USER_ID = 100L;
     private static final Long RECEIVER_USER_ID = 200L;
     private static final String IBAN = "TR770006200000000000000111";
@@ -155,7 +156,9 @@ class TransferAuthorizationServiceTest {
 
             assertThatThrownBy(() -> service.authorizeTransferAccess(SENDER_USER_ID, RECEIVER_USER_ID, ERROR_MESSAGE))
                     .isExactlyInstanceOf(AuthorizationException.class)
-                    .hasMessage("Session not found.");
+                    .hasMessage("Session not found. Please log in again.")
+                    .extracting(ex -> ((AuthorizationException) ex).getMessageKey())
+                    .isEqualTo("error.session_not_found");
         }
     }
 

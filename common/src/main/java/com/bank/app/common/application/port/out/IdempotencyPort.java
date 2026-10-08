@@ -11,6 +11,20 @@ public interface IdempotencyPort {
     boolean tryResetFailed(String key, String requestHash, LocalDateTime now);
     void markCompleted(String key, String responseBody, int responseStatus);
     void markFailed(String key);
+
+    /**
+     * Crash-window recovery for HTTP idempotency reservations: a JVM crash
+     * between the REQUIRES_NEW claim commit and the business outcome leaves a
+     * PENDING row whose owner will never complete or fail it. Without this,
+     * the same key retries {@code PENDING} forever (409 CONTENDED) even
+     * though no work is in flight. Transitions stale HTTP PENDING rows
+     * (older than the threshold) to FAILED so the next retry can
+     * {@code tryResetFailed} and re-execute. Backed by
+     * {@code idx_idempotency_pending_http_kind} (V38).
+     *
+     * @return number of rows transitioned to FAILED
+     */
+    int failStalePending(LocalDateTime threshold);
     int deleteExpired(LocalDateTime threshold);
 
     /**

@@ -31,4 +31,7 @@ if [[ -z "$jar" ]]; then
 fi
 
 echo 'Open http://localhost:8080/ (Ctrl+C to stop the app).'
+echo 'NOTE (SEC-06): dev serves plain HTTP with non-Secure session cookies' \
+    '(BROWSER_SESSION_SECURE=false). Session cookies minted here must never' \
+    'be reused outside localhost; production enforces Secure cookies at boot.'
 exec java -jar "$jar"

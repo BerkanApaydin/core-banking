@@ -59,6 +59,13 @@ public class ApplicationStartupValidator {
         }
         requireRedisBackend("app.security.failed-login.backend");
         requireRedisBackend("app.security.rate-limit.backend");
+        // Snapshot cache: Caffeine/InMemory is per-JVM. With HPA running
+        // multiple pods an eviction on one replica never reaches the others,
+        // so account status/currency reads go stale cluster-wide up to the
+        // TTL. Prod pins backend=redis (literal, see application-prod.yml);
+        // fail fast here as well so no env/flag override can silently
+        // reinstate the local backend in production.
+        requireRedisBackend("app.cache.caffeine.account-info.backend");
         requireProdCors();
         requirePositive("app.security.failed-login.max-attempts", 5L);
         requirePositive("app.security.failed-login.window-minutes", 15L);

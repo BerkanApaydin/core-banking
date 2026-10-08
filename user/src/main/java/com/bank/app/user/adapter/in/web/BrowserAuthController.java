@@ -10,8 +10,6 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
-import com.bank.app.user.domain.exception.AuthenticationFailedException;
-import com.bank.app.user.domain.exception.RefreshTokenReuseException;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
@@ -21,6 +19,8 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -38,6 +38,8 @@ import java.time.Duration;
 @ApiVersion("v1")
 @RequestMapping("/auth/browser")
 public class BrowserAuthController {
+    private static final Logger log = LoggerFactory.getLogger(BrowserAuthController.class);
+
     private final LoginUserUseCase loginUserUseCase;
     private final LogoutUseCase logoutUseCase;
     private final RefreshSessionUseCase refreshSessionUseCase;
@@ -119,10 +121,18 @@ public class BrowserAuthController {
         if (!csrfBinding.verifyCsrfToken(header, csrfCookie, String.valueOf(verified.userId()))) {
             return ProblemResponses.forbidden("Invalid browser CSRF token.", request.getRequestURI());
         }
+        // Layering (controllersShouldNotContainBusinessLogic): the web adapter
+        // must not depend on domain exception types, so use-case rejections
+        // (expired/invalid/rotated refresh tokens) are handled as a failed
+        // rotation, not by catching domain failures. Programming errors still
+        // surface: only RuntimeException from the use case lands here, Errors
+        // propagate, and the class name is logged for diagnosis.
         final AuthResponse rotated;
         try {
             rotated = refreshSessionUseCase.execute(refreshToken);
-        } catch (AuthenticationFailedException | RefreshTokenReuseException e) {
+        } catch (RuntimeException rotationFailed) {
+            log.warn("Browser session rotation failed: {}",
+                    rotationFailed.getClass().getSimpleName());
             clearSessionCookies(response);
             return ProblemResponses.unauthorized(
                     "Browser session has expired. Please log in again.", request.getRequestURI());

@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.bank.app.common.domain.AccountId;
 
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,7 +28,7 @@ class TransferEventConsumerEdgeCaseTest {
     void shouldHandleNotificationFailureGracefully() {
         TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
 
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         doThrow(new RuntimeException("Service unavailable"))
@@ -44,7 +45,7 @@ class TransferEventConsumerEdgeCaseTest {
         SendNotificationPort port2 = mock(SendNotificationPort.class);
         TransferEventConsumer listener = new TransferEventConsumer(List.of(port1, port2));
 
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
 
         listener.handleTransferCompleted(event);

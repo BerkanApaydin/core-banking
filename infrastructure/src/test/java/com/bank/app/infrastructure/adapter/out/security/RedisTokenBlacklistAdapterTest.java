@@ -102,6 +102,16 @@ class RedisTokenBlacklistAdapterTest {
             assertThatThrownBy(() -> adapter.isBlacklisted("token-1"))
                     .isInstanceOf(IllegalStateException.class);
         }
+
+        @Test
+        @DisplayName("should skip the legacy raw-token lookup for oversized input (SEC-05)")
+        void shouldSkipLegacyLookupForOversizedToken() {
+            String oversized = "x".repeat(2049);
+            when(redisTemplate.hasKey(anyString())).thenReturn(false);
+
+            assertThat(adapter.isBlacklisted(oversized)).isFalse();
+            verify(redisTemplate, times(1)).hasKey(anyString());
+        }
     }
 
     @Nested

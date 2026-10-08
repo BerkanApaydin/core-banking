@@ -66,11 +66,22 @@ public class UseCaseTransactionAspect {
         return executeWithTransaction(joinPoint, def);
     }
 
-    @Around("auditUseCaseMethod()")
+    @Around("auditUseCaseMethod() && !readOnlyUseCaseMethod()")
     public Object aroundAudit(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
         def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        def.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        def.setTimeout(transactionTimeoutSeconds);
+        return executeWithTransaction(joinPoint, def);
+    }
+
+    @Around("auditUseCaseMethod() && readOnlyUseCaseMethod()")
+    public Object aroundAuditReadOnly(ProceedingJoinPoint joinPoint) throws Throwable {
+        DefaultTransactionDefinition def = new DefaultTransactionDefinition();
+        def.setName(joinPoint.getSignature().toShortString());
+        def.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        def.setReadOnly(true);
         def.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         def.setTimeout(transactionTimeoutSeconds);
         return executeWithTransaction(joinPoint, def);

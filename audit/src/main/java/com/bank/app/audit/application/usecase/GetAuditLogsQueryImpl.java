@@ -63,9 +63,10 @@ public class GetAuditLogsQueryImpl implements GetAuditLogsQuery {
 
     private void requireAdmin() {
         userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("You must be logged in to perform this action."));
+                .orElseThrow(() -> new AuthorizationException("error.login_required", null,
+                        "You must be logged in to perform this action."));
         if (!userContextService.hasRole(ADMIN_ROLE)) {
-            throw new AuthorizationException("Admin role required.");
+            throw new AuthorizationException("error.admin_required", null, "Admin role required.");
         }
     }
 

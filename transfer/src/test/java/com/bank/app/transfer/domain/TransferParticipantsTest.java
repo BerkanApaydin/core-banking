@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,12 +10,12 @@ class TransferParticipantsTest {
 
     @Test
     void shouldCreateWithValidFields() {
-        TransferParticipants p = new TransferParticipants(1L, "TR400006200000000000000001", Currency.TRY,
-                2L, "TR130006200000000000000002", Currency.TRY);
-        assertEquals(1L, p.senderId());
+        TransferParticipants p = new TransferParticipants(new AccountId(1L), "TR400006200000000000000001", Currency.TRY,
+                new AccountId(2L), "TR130006200000000000000002", Currency.TRY);
+        assertEquals(new AccountId(1L), p.senderId());
         assertEquals("TR400006200000000000000001", p.senderIban());
         assertEquals(Currency.TRY, p.senderCurrency());
-        assertEquals(2L, p.receiverId());
+        assertEquals(new AccountId(2L), p.receiverId());
         assertEquals("TR130006200000000000000002", p.receiverIban());
         assertEquals(Currency.TRY, p.receiverCurrency());
     }
@@ -22,36 +23,36 @@ class TransferParticipantsTest {
     @Test
     void shouldThrowWhenSenderIdIsNull() {
         assertThrows(NullPointerException.class, () -> new TransferParticipants(null, "iban", Currency.TRY,
-                2L, "iban2", Currency.TRY));
+                new AccountId(2L), "iban2", Currency.TRY));
     }
 
     @Test
     void shouldThrowWhenSenderIbanIsNull() {
-        assertThrows(NullPointerException.class, () -> new TransferParticipants(1L, null, Currency.TRY,
-                2L, "iban2", Currency.TRY));
+        assertThrows(NullPointerException.class, () -> new TransferParticipants(new AccountId(1L), null, Currency.TRY,
+                new AccountId(2L), "iban2", Currency.TRY));
     }
 
     @Test
     void shouldThrowWhenSenderCurrencyIsNull() {
-        assertThrows(NullPointerException.class, () -> new TransferParticipants(1L, "iban", null,
-                2L, "iban2", Currency.TRY));
+        assertThrows(NullPointerException.class, () -> new TransferParticipants(new AccountId(1L), "iban", null,
+                new AccountId(2L), "iban2", Currency.TRY));
     }
 
     @Test
     void shouldThrowWhenReceiverIdIsNull() {
-        assertThrows(NullPointerException.class, () -> new TransferParticipants(1L, "iban", Currency.TRY,
+        assertThrows(NullPointerException.class, () -> new TransferParticipants(new AccountId(1L), "iban", Currency.TRY,
                 null, "iban2", Currency.TRY));
     }
 
     @Test
     void shouldThrowWhenReceiverIbanIsNull() {
-        assertThrows(NullPointerException.class, () -> new TransferParticipants(1L, "iban", Currency.TRY,
-                2L, null, Currency.TRY));
+        assertThrows(NullPointerException.class, () -> new TransferParticipants(new AccountId(1L), "iban", Currency.TRY,
+                new AccountId(2L), null, Currency.TRY));
     }
 
     @Test
     void shouldThrowWhenReceiverCurrencyIsNull() {
-        assertThrows(NullPointerException.class, () -> new TransferParticipants(1L, "iban", Currency.TRY,
-                2L, "iban2", null));
+        assertThrows(NullPointerException.class, () -> new TransferParticipants(new AccountId(1L), "iban", Currency.TRY,
+                new AccountId(2L), "iban2", null));
     }
 }

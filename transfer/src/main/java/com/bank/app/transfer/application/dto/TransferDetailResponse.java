@@ -26,10 +26,11 @@ public record TransferDetailResponse(
     }
 
     public static TransferDetailResponse from(Transfer transfer) {
+        // Wire DTO stays on Long; unwrap at this edge.
         return new TransferDetailResponse(
             transfer.getId(),
-            transfer.getSenderAccountId(),
-            transfer.getReceiverAccountId(),
+            transfer.getSenderAccountId().value(),
+            transfer.getReceiverAccountId().value(),
             transfer.getAmount().amount(),
             transfer.getAmount().currency().name(),
             transfer.getStatus(),

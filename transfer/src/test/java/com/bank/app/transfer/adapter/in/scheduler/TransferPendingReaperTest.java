@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.bank.app.common.domain.AccountId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -61,7 +62,7 @@ class TransferPendingReaperTest {
     }
 
     private static Transfer pending(Long id) {
-        return new Transfer(id, 10L, 20L, Money.exact(new BigDecimal("100.00"), Currency.TRY),
+        return new Transfer(id, new AccountId(10L), new AccountId(20L), Money.exact(new BigDecimal("100.00"), Currency.TRY),
                 TransferStatus.PENDING, LocalDateTime.now(Clock.systemUTC()));
     }
 
@@ -98,7 +99,7 @@ class TransferPendingReaperTest {
         @DisplayName("treats a concurrently completed row as conflict, not failure")
         void shouldCountConflictWhenAlreadyCompleted() {
             Transfer stale = pending(2L);
-            Transfer completed = new Transfer(2L, 10L, 20L,
+            Transfer completed = new Transfer(2L, new AccountId(10L), new AccountId(20L),
                     Money.exact(new BigDecimal("100.00"), Currency.TRY),
                     TransferStatus.COMPLETED, LocalDateTime.now(Clock.systemUTC()));
             when(loadTransferPort.findStalePending(any(), anyInt())).thenReturn(List.of(stale));

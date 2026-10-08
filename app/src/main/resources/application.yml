@@ -130,6 +130,15 @@ app:
     # Separate from app.transfer.* (transfer's own use-case retry aspect).
     max-attempts: ${IDEMPOTENCY_MAX_ATTEMPTS:3}
     initial-delay-ms: ${IDEMPOTENCY_INITIAL_DELAY_MS:500}
+    reaper:
+      # Crash-window recovery for stale PENDING reservations
+      # (IdempotencyPendingReaper): rows older than older-than are marked
+      # FAILED so the same key can retry via tryResetFailed. Must stay well
+      # above the 30s use-case tx timeout so slow (not dead) requests are
+      # never reaped.
+      enabled: ${IDEMPOTENCY_REAPER_ENABLED:true}
+      cron: ${IDEMPOTENCY_REAPER_CRON:0 */5 * * * *}
+      older-than: ${IDEMPOTENCY_REAPER_OLDER_THAN:PT15M}
   integrity:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}

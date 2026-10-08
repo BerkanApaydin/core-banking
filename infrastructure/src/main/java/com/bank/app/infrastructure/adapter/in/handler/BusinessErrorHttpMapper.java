@@ -59,7 +59,9 @@ public final class BusinessErrorHttpMapper {
         statuses.put(ErrorCode.CONCURRENT_REQUEST, HttpStatus.CONFLICT);
         statuses.put(ErrorCode.RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
         statuses.put(ErrorCode.UNSUPPORTED_MEDIA_TYPE, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        statuses.put(ErrorCode.API_VERSION_MISMATCH, HttpStatus.NOT_ACCEPTABLE);
+        // API-03: 400, not 406 — 406 is content negotiation; a version
+        // mismatch is a malformed request (same code the version filter emits).
+        statuses.put(ErrorCode.API_VERSION_MISMATCH, HttpStatus.BAD_REQUEST);
         return statuses;
     }
 

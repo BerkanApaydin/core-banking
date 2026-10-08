@@ -27,7 +27,8 @@ public class AccountAuthorizationService {
 
     public Long getCurrentUserId() {
         return userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("You must be logged in to perform this action."));
+                .orElseThrow(() -> new AuthorizationException("error.login_required", null,
+                        "You must be logged in to perform this action."));
     }
 
     public String getCurrentUsername() {

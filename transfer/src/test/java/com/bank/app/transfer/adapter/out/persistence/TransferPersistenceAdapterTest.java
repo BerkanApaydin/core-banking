@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import org.mockito.ArgumentCaptor;
+import com.bank.app.common.domain.AccountId;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -58,8 +59,8 @@ class TransferPersistenceAdapterTest {
 
         assertTrue(result.isPresent());
         assertEquals(10L, result.get().getId());
-        assertEquals(1L, result.get().getSenderAccountId());
-        assertEquals(2L, result.get().getReceiverAccountId());
+        assertEquals(new AccountId(1L), result.get().getSenderAccountId());
+        assertEquals(new AccountId(2L), result.get().getReceiverAccountId());
         assertEquals(new BigDecimal("200.00"), result.get().getAmount().amount());
         assertEquals(Currency.TRY, result.get().getAmount().currency());
         assertEquals(TransferStatus.COMPLETED, result.get().getStatus());
@@ -71,7 +72,7 @@ class TransferPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer domainTransfer = new Transfer(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 now);
         TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
@@ -81,8 +82,8 @@ class TransferPersistenceAdapterTest {
 
         assertNotNull(result);
         assertEquals(10L, result.getId());
-        assertEquals(1L, result.getSenderAccountId());
-        assertEquals(2L, result.getReceiverAccountId());
+        assertEquals(new AccountId(1L), result.getSenderAccountId());
+        assertEquals(new AccountId(2L), result.getReceiverAccountId());
         assertEquals(new BigDecimal("200.00"), result.getAmount().amount());
         assertEquals(Currency.TRY, result.getAmount().currency());
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
@@ -92,7 +93,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowExceptionWhenSaveReturnsNull() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer domainTransfer = new Transfer(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(null);
@@ -111,7 +112,7 @@ class TransferPersistenceAdapterTest {
         LocalDateTime now = LocalDateTime.now();
         // The domain carries the version it read; the bulk path issues a single
         // versioned UPDATE (no SELECT) and returns the bumped version.
-        Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
+        Transfer domainTransfer = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
 
         when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED)).thenReturn(1);
 
@@ -119,8 +120,8 @@ class TransferPersistenceAdapterTest {
 
         assertNotNull(result);
         assertEquals(10L, result.getId());
-        assertEquals(1L, result.getSenderAccountId());
-        assertEquals(2L, result.getReceiverAccountId());
+        assertEquals(new AccountId(1L), result.getSenderAccountId());
+        assertEquals(new AccountId(2L), result.getReceiverAccountId());
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
         assertEquals(2L, result.getVersion());
         verify(springDataRepo).updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED);
@@ -129,7 +130,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowWhenUpdatingNonExistentTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(999L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
+        Transfer domainTransfer = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
 
@@ -187,7 +188,7 @@ class TransferPersistenceAdapterTest {
 
         assertEquals(2, result.items().size());
         assertEquals(5L, result.totalElements());
-        assertEquals(100L, result.items().getFirst().getSenderAccountId());
+        assertEquals(new AccountId(100L), result.items().getFirst().getSenderAccountId());
         verify(springDataRepo).findHistoryPage(eq(100L), eq(10), eq(0L));
     }
 
@@ -213,7 +214,7 @@ class TransferPersistenceAdapterTest {
         var result = repository.findHistoryBetween(100L, start, end, 0, 10);
 
         assertEquals(1, result.size());
-        assertEquals(100L, result.getFirst().getSenderAccountId());
+        assertEquals(new AccountId(100L), result.getFirst().getSenderAccountId());
         verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), any());
     }
 
@@ -380,7 +381,7 @@ class TransferPersistenceAdapterTest {
         // Kills the NullReturnVals mutant on lambda$save$1: the 0-row bulk path
         // must distinguish "row gone" (IllegalArgumentException) from conflict.
         LocalDateTime now = LocalDateTime.now();
-        Transfer missing = new Transfer(999L, 1L, 2L, Money.of("200.00", Currency.TRY),
+        Transfer missing = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(999L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);
@@ -394,7 +395,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldRejectStaleVersionOnBulkUpdate() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer stale = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY),
+        Transfer stale = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);

@@ -50,9 +50,10 @@ public class SecurityContextAdapter implements SecurityContextPort {
     @Override
     public void checkUserAuthorization(Long resourceUserId, String errorMessage) {
         Long currentUserId = getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("Session not found."));
+                .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
+                        "Session not found. Please log in again."));
         if (!currentUserId.equals(resourceUserId)) {
-            throw new AuthorizationException(errorMessage);
+            throw new AuthorizationException("error.not_resource_owner", null, errorMessage);
         }
     }
 

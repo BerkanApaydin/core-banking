@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
@@ -26,8 +27,8 @@ class TransferJpaMapperTest {
     private TransferJpaMapper mapper;
 
     private static final Long ID = 1L;
-    private static final Long SENDER_ACCOUNT_ID = 10L;
-    private static final Long RECEIVER_ACCOUNT_ID = 20L;
+    private static final AccountId SENDER_ACCOUNT_ID = new AccountId(10L);
+    private static final AccountId RECEIVER_ACCOUNT_ID = new AccountId(20L);
     private static final BigDecimal AMOUNT_VALUE = new BigDecimal("100.00");
     private static final Currency CURRENCY = Currency.TRY;
     private static final Money AMOUNT = Money.of(AMOUNT_VALUE, CURRENCY);
@@ -52,8 +53,8 @@ class TransferJpaMapperTest {
             TransferJpaEntity entity = mapper.toJpaEntity(transfer);
 
             assertThat(entity.getId()).isEqualTo(ID);
-            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
-            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);
+            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID.value());
+            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID.value());
             assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
             assertThat(entity.getCurrency()).isEqualTo(CURRENCY);
             assertThat(entity.getStatus()).isEqualTo(STATUS);
@@ -77,7 +78,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should map TransferJpaEntity to Transfer")
         void shouldMapToDomain() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
             entity.setBusinessCreatedAt(CREATED_AT);
             entity.setCreatedAt(CREATED_AT.plusHours(1));
@@ -97,7 +98,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should fall back to auditing timestamp for pre-V20 rows")
         void shouldFallBackToAuditingTimestamp() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
             entity.setCreatedAt(CREATED_AT);
 
@@ -122,7 +123,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should update entity fields from transfer")
         void shouldUpdateEntity() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, TransferStatus.COMPLETED, 1L);
             Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
                     TransferStatus.CANCELLED, CREATED_AT, 5L);
@@ -146,7 +147,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should throw when transfer is null")
         void shouldThrowOnNullTransfer() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID,
+            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
 
             assertThatThrownBy(() -> mapper.updateJpaEntity(entity, null))
@@ -197,8 +198,8 @@ class TransferJpaMapperTest {
             assertThat(entity.getStatus()).isEqualTo(TransferStatus.COMPLETED);
             assertThat(entity.getVersion()).isEqualTo(1L);
             assertThat(entity.getId()).isEqualTo(ID);
-            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID);
-            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID);
+            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID.value());
+            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID.value());
             assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
             assertThat(entity.getCurrency()).isEqualTo(CURRENCY);
             assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);

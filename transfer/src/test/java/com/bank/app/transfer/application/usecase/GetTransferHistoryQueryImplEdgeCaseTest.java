@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.common.domain.exception.AuthorizationException;
 
 import java.util.Collections;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -43,8 +44,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
 
         @Test
         void shouldReturnEmptyListWhenNoTransfersFound() {
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), anyInt(), anyInt()))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
@@ -56,8 +57,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
 
         @Test
         void shouldReturnEmptyListWithPaginationWhenNoTransfersFound() {
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(10)))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
@@ -69,7 +70,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
 
         @Test
         void shouldThrowAccountNotFoundExceptionWhenAccountDoesNotExist() {
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString()))
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString()))
                                 .thenThrow(new AccountNotFoundException(1L));
 
                 assertThrows(AccountNotFoundException.class,
@@ -80,7 +81,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         @Test
         void shouldThrowAccessDeniedExceptionWhenUserIsNotOwner() {
                 doThrow(new AuthorizationException("You are not authorized to view this account's transaction history."))
-                        .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
+                        .when(transferAuthorizationService).authorizeAccountAccess(eq(new AccountId(1L)), anyString());
 
                 AuthorizationException ex = assertThrows(AuthorizationException.class,
                                 () -> getTransferHistoryUseCase.execute(1L, 0, 20));
@@ -103,8 +104,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
 
         @Test
         void shouldCallFindHistoryWithCorrectPagination() {
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -116,8 +117,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
 
         @Test
         void shouldServeExplicitPage0AndSize20() {
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
@@ -130,7 +131,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         @Test
         void shouldThrowAccessDeniedExceptionWhenNotLoggedIn() {
                 doThrow(new AuthorizationException("Session not found."))
-                        .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
+                        .when(transferAuthorizationService).authorizeAccountAccess(eq(new AccountId(1L)), anyString());
 
                 assertThrows(AuthorizationException.class,
                                 () -> getTransferHistoryUseCase.execute(1L, 0, 20));
@@ -141,8 +142,8 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                 var capped = new GetTransferHistoryQueryImpl(
                                 loadTransferPort, new TransferViewEnricher(accountAclPort),
                                 transferAuthorizationService, 5);
-                AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
+                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(5)))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());

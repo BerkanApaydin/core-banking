@@ -22,6 +22,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -94,7 +95,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void rejectsMissingVersionForExistingTransfer() {
-        var unversioned = new Transfer(301L, 201L, 202L, Money.of("10", Currency.TRY),
+        var unversioned = new Transfer(301L, new AccountId(201L), new AccountId(202L), Money.of("10", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
         assertThrows(OptimisticLockingFailureException.class, () -> {
             transfers.save(unversioned);

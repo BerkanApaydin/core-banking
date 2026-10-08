@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.Transfer;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,9 @@ public class TransferJpaMapper {
         }
         TransferJpaEntity entity = new TransferJpaEntity(
                 transfer.getId(),
-                transfer.getSenderAccountId(),
-                transfer.getReceiverAccountId(),
+                // Persistence edge: JPA entity stays on Long; unwrap here.
+                transfer.getSenderAccountId().value(),
+                transfer.getReceiverAccountId().value(),
                 transfer.getAmount().amount(),
                 transfer.getAmount().currency(),
                 transfer.getStatus(),
@@ -35,8 +37,9 @@ public class TransferJpaMapper {
                 : entity.getCreatedAt();
         return new Transfer(
                 entity.getId(),
-                entity.getSenderAccountId(),
-                entity.getReceiverAccountId(),
+                // Persistence edge: wrap raw ids into the domain type here.
+                new AccountId(entity.getSenderAccountId()),
+                new AccountId(entity.getReceiverAccountId()),
                 Money.exact(entity.getAmount(), entity.getCurrency()),
                 entity.getStatus(),
                 createdAt,

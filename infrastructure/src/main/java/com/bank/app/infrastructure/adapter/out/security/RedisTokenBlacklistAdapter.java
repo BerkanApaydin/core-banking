@@ -38,6 +38,13 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklistPort {
         }
         // Older instances wrote the bearer token into the key itself. Read those
         // keys until their existing Redis TTL expires, but never create new ones.
+        // SEC-05: skip oversized inputs so an attacker-controlled long string
+        // can neither bloat the keyspace nor land a raw bearer in
+        // monitor/slowlog output via the legacy branch. Remove this branch
+        // entirely once the last legacy TTL has expired (migration window).
+        if (token.length() > 2048) {
+            return false;
+        }
         Boolean legacyPresent = redisTemplate.hasKey(KEY_PREFIX + token);
         if (legacyPresent == null) {
             throw new IllegalStateException("Redis legacy revocation lookup returned no result");

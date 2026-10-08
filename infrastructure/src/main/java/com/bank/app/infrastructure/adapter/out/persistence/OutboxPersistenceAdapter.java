@@ -19,7 +19,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public void save(EventEntry entry) {
         repository.save(new OutboxJpaEntity(
                 entry.id(), entry.aggregateType(), entry.aggregateId(),
@@ -30,7 +30,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public List<EventEntry> findAndLockUnprocessed(int limit, int partition) {
         return repository.findAndLockUnprocessed(partition, PageRequest.of(0, limit))
                 .stream()
@@ -45,33 +45,46 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public Optional<EventEntry> findByIdForUpdateSkipLocked(String id) {
         return repository.findByIdForUpdateSkipLocked(id).map(this::toDomain);
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public void markProcessed(String id) {
         repository.markProcessed(id);
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public void markFailed(String id, String error, int retryCount) {
         repository.markFailed(id, error, retryCount);
     }
 
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public void markDeadLetter(String id, String error, int retryCount) {
         repository.markDeadLetter(id, error, retryCount);
     }
 
+    /** Rows per retention batch; small enough to stay far under the 30s scheduler-lock budget. */
+    static final int RETENTION_BATCH_SIZE = 1000;
+    /** Batches per schedule: larger backlogs drain over consecutive schedules instead of timing out. */
+    static final int MAX_BATCHES_PER_RUN = 10;
+
     @Override
-    @Transactional(timeout = 30)
+    @Transactional(timeoutString = "${app.transaction.timeout-seconds:30}")
     public int deleteProcessedBefore(LocalDateTime cutoff) {
-        return repository.deleteProcessedBefore(cutoff);
+        int total = 0;
+        for (int batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
+            int deleted = repository.deleteProcessedBatchBefore(cutoff, RETENTION_BATCH_SIZE);
+            total += deleted;
+            if (deleted < RETENTION_BATCH_SIZE) {
+                break;
+            }
+        }
+        return total;
     }
 
     private EventEntry toDomain(OutboxJpaEntity entity) {

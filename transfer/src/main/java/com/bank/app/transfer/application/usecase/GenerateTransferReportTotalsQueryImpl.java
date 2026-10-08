@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferReportTotalsResponse;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportTotalsQuery;
@@ -31,7 +32,8 @@ public class GenerateTransferReportTotalsQueryImpl implements GenerateTransferRe
         LocalDateTime startDate = criteria.startDate();
         LocalDateTime endDate = criteria.endDate();
 
-        AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId,
+        AccountInfo account = transferAuthorizationService.authorizeAccountAccess(
+                new AccountId(accountId),
                 "You are not authorized to generate a report for this account.");
 
         LoadTransferPort.ReportTotals totals =

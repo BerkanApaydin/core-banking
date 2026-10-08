@@ -64,8 +64,11 @@ services:
       # equal to the code constant; never use it outside local experimentation.
       # Anything real needs an explicit generated secret:
       #   export JWT_SECRET="$(openssl rand -base64 32)"
-      JWT_SECRET: "${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}"
-      JWT_ALLOW_DEFAULT_SECRET: ${JWT_ALLOW_DEFAULT_SECRET:-true}
+      # NOTE: JWT_ALLOW_DEFAULT_SECRET is intentionally NOT passed through
+      # here. The dev profile enables it via application-dev.yml; wiring it
+      # through compose would let a copied line re-enable the default secret
+      # in a prod-shaped deployment.
+      JWT_SECRET: "${JWT_SECRET:-KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=}"
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-10}

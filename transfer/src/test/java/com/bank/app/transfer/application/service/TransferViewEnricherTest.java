@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -35,9 +36,9 @@ class TransferViewEnricherTest {
 
     @Test
     void shouldBatchLoadIbansForAllParticipants() {
-        Transfer t1 = new Transfer(10L, 1L, 2L, Money.of("100.00", Currency.TRY),
+        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
-        Transfer t2 = new Transfer(11L, 2L, 3L, Money.of("50.00", Currency.TRY),
+        Transfer t2 = new Transfer(11L, new AccountId(2L), new AccountId(3L), Money.of("50.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
         when(accountAclPort.getIbansForAccounts(Set.of(1L, 2L, 3L)))
                 .thenReturn(Map.of(1L, "IBAN-1", 2L, "IBAN-2", 3L, "IBAN-3"));

@@ -64,7 +64,7 @@ class ApiVersionValidationFilterTest {
     }
 
     @Test
-    void shouldReturn406WhenVersionHeaderMismatchesPath() throws IOException, ServletException {
+    void shouldReturn400WhenVersionHeaderMismatchesPath() throws IOException, ServletException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/auth/login");
         request.addHeader("X-API-Version", "v2");
@@ -74,7 +74,7 @@ class ApiVersionValidationFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(chain, never()).doFilter(any(), any());
-        assertEquals(406, response.getStatus());
+        assertEquals(400, response.getStatus());
         assertTrue(response.getContentType().contains("application/problem+json"));
         assertTrue(response.getContentAsString().contains("API version mismatch"));
         assertTrue(response.getContentAsString().contains("API_VERSION_MISMATCH"));
@@ -109,7 +109,7 @@ class ApiVersionValidationFilterTest {
     }
 
     @Test
-    void shouldReturn406ForApiRootPathWithMismatchedVersion() throws IOException, ServletException {
+    void shouldReturn400ForApiRootPathWithMismatchedVersion() throws IOException, ServletException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1");
         request.addHeader("X-API-Version", "v2");
@@ -118,7 +118,7 @@ class ApiVersionValidationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertEquals(406, response.getStatus());
+        assertEquals(400, response.getStatus());
     }
 
     @Test
@@ -136,7 +136,7 @@ class ApiVersionValidationFilterTest {
     }
 
     @Test
-    void shouldReturn406ForInvalidVersionFormat() throws IOException, ServletException {
+    void shouldReturn400ForInvalidVersionFormat() throws IOException, ServletException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/auth/login");
         request.addHeader("X-API-Version", "invalid");
@@ -145,7 +145,7 @@ class ApiVersionValidationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertEquals(406, response.getStatus());
+        assertEquals(400, response.getStatus());
         assertTrue(response.getContentAsString().contains("API version mismatch"));
         assertTrue(response.getContentAsString().contains("API_VERSION_MISMATCH"));
     }
@@ -187,7 +187,7 @@ class ApiVersionValidationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertEquals(406, response.getStatus());
+        assertEquals(400, response.getStatus());
         String body = response.getContentAsString();
         assertFalse(body.contains("<script>"));
         assertTrue(body.contains("invalid"));

@@ -4,6 +4,7 @@ import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -56,8 +57,8 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         Transfer transfer = loadTransferPort.findByIdForUpdate(transferId)
                 .orElseThrow(() -> new TransferNotFoundException(transferId));
 
-        Long senderAccountId = transfer.getSenderAccountId();
-        Long receiverAccountId = transfer.getReceiverAccountId();
+        AccountId senderAccountId = transfer.getSenderAccountId();
+        AccountId receiverAccountId = transfer.getReceiverAccountId();
 
         transferAuthorizationService.authorizeByAccountId(senderAccountId);
 

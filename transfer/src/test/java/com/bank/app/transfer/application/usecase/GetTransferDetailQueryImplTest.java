@@ -10,6 +10,7 @@ import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,8 +48,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldGetTransferDetailSuccessfullyWhenUserIsSenderOwner() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,
@@ -69,8 +70,8 @@ class GetTransferDetailQueryImplTest {
 
         assertNotNull(response);
         assertEquals(transferId, response.id());
-        assertEquals(senderAccountId, response.senderAccountId());
-        assertEquals(receiverAccountId, response.receiverAccountId());
+        assertEquals(senderAccountId.value(), response.senderAccountId());
+        assertEquals(receiverAccountId.value(), response.receiverAccountId());
         assertEquals(new BigDecimal("150.00"), response.amount());
         assertEquals("TRY", response.currency());
         assertEquals(TransferStatus.COMPLETED, response.status());
@@ -79,8 +80,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldGetTransferDetailSuccessfullyWhenUserIsReceiverOwner() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,
@@ -101,8 +102,8 @@ class GetTransferDetailQueryImplTest {
 
         assertNotNull(response);
         assertEquals(transferId, response.id());
-        assertEquals(senderAccountId, response.senderAccountId());
-        assertEquals(receiverAccountId, response.receiverAccountId());
+        assertEquals(senderAccountId.value(), response.senderAccountId());
+        assertEquals(receiverAccountId.value(), response.receiverAccountId());
         assertEquals(new BigDecimal("150.00"), response.amount());
         assertEquals("TRY", response.currency());
         assertEquals(TransferStatus.COMPLETED, response.status());
@@ -111,8 +112,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldThrowAccessDeniedExceptionWhenUserIsNeitherSenderNorReceiver() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,
@@ -152,8 +153,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldThrowAccountNotFoundExceptionWhenSenderAccountDoesNotExist() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,
@@ -165,7 +166,7 @@ class GetTransferDetailQueryImplTest {
 
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId))
-                .thenThrow(new AccountNotFoundException(senderAccountId));
+                .thenThrow(new AccountNotFoundException(senderAccountId.value()));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
@@ -175,8 +176,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldThrowAccountNotFoundExceptionWhenReceiverAccountDoesNotExist() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,
@@ -191,7 +192,7 @@ class GetTransferDetailQueryImplTest {
         when(loadTransferPort.findById(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(senderAccountId)).thenReturn(sender);
         when(accountAclPort.getAccountInfo(receiverAccountId))
-                .thenThrow(new AccountNotFoundException(receiverAccountId));
+                .thenThrow(new AccountNotFoundException(receiverAccountId.value()));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
@@ -201,8 +202,8 @@ class GetTransferDetailQueryImplTest {
     @Test
     void shouldThrowAccessDeniedExceptionWhenNoUserLoggedIn() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
 
         Transfer transfer = new Transfer(
                 transferId,

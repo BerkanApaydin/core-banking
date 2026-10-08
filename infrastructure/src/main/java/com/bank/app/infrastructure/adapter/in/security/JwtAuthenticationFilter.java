@@ -4,8 +4,10 @@ import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
+import com.bank.app.user.domain.User;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import com.bank.app.common.domain.exception.ErrorCode;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.util.Collections;
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -43,31 +46,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     // Single generic message for revoked AND invalid tokens: distinct messages
     // let callers oracle whether a token was revoked (information disclosure).
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
+    // SEC-01: mirrors SecurityConfig's "/api/v1/admin/**" matcher (G-1 outer
+    // layer). Requests under this prefix re-validate the token generation
+    // against the DB (see hasCurrentTokenVersion).
+    private static final String ADMIN_PATH_PREFIX = "/api/v1/admin";
 
     private final JwtPort jwtPort;
     private final TokenBlacklistPort tokenBlacklistPort;
+    private final LoadUserPort loadUserPort;
     private final ObjectMapper objectMapper;
     private final BrowserSessionCookies browserSessionCookies;
     private final CsrfBindingPort csrfBinding;
 
     @Autowired
     public JwtAuthenticationFilter(JwtPort jwtPort,
-            TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper,
+            TokenBlacklistPort tokenBlacklistPort, LoadUserPort loadUserPort,
+            ObjectMapper objectMapper,
             CsrfBindingPort csrfBinding,
             BrowserSessionCookieProperties browserSession) {
         this.jwtPort = jwtPort;
         this.tokenBlacklistPort = tokenBlacklistPort;
+        this.loadUserPort = loadUserPort;
         this.objectMapper = objectMapper;
         this.csrfBinding = csrfBinding;
         this.browserSessionCookies = new BrowserSessionCookies(browserSession.secure());
     }
 
-    // Kept for isolated filter tests and non-Spring construction: falls back
-    // to the plain double-submit check (no server-side binding). Production
-    // wiring always uses the constructor above.
-    public JwtAuthenticationFilter(JwtPort jwtPort,
-            TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper) {
-        this(jwtPort, tokenBlacklistPort, objectMapper, new PlainDoubleSubmitCsrfBinding(),
+    // Isolated filter tests only (same package): falls back to the plain
+    // double-submit check (no server-side binding). Package-private so Spring
+    // can never select it for production wiring — prod must use the
+    // @Autowired constructor above with the HMAC-bound CsrfBindingPort.
+    JwtAuthenticationFilter(JwtPort jwtPort,
+            TokenBlacklistPort tokenBlacklistPort, LoadUserPort loadUserPort,
+            ObjectMapper objectMapper) {
+        this(jwtPort, tokenBlacklistPort, loadUserPort, objectMapper,
+                new PlainDoubleSubmitCsrfBinding(),
                 new BrowserSessionCookieProperties(false));
     }
 
@@ -120,8 +133,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         if (jwt.isBlank()) {
-            ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+            rejectUnauthorized(response, request.getRequestURI());
             return;
         }
 
@@ -131,45 +143,64 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // with arbitrary strings (DoS surface).
             JwtPort.VerifiedToken verified = jwtPort.verifyAndDecode(jwt);
             if (verified == null) {
-                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
             // A previously successful logout may lose its HTTP response. Let
             // only this exact action re-submit a still-valid signed token so
             // revocation can be retried idempotently; every other route must
             // continue enforcing the blacklist.
-            boolean logoutRequest = "POST".equals(request.getMethod())
-                    && (PublicApiPaths.LOGOUT.equals(path)
-                    || PublicApiPaths.BROWSER_LOGOUT.equals(path));
-            if (!logoutRequest && tokenBlacklistPort.isBlacklisted(jwt)) {
-                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+            if (!isLogoutRequest(request, path) && tokenBlacklistPort.isBlacklisted(jwt)) {
+                rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
             // Refresh tokens authenticate only the refresh endpoints: a leaked
             // long-lived token must never pass as API authorization.
             if (JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
                     && !isRefreshRequest(request, path)) {
-                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
             Long userId = verified.userId();
             String role = verified.role();
             // G-2 accepted trade-off (stateless JWT): role and userId come
             // from the verified access token without a per-request DB lookup.
-            // A role demotion therefore takes effect on this path only after
-            // the access token expires (default 15 min); the refresh path
-            // (RefreshSessionUseCaseImpl) compares tokenVersion against the DB
-            // and closes the window there. Short access TTL bounds the delay.
+            // A role demotion therefore takes effect on non-admin paths only
+            // after the access token expires (default 15 min); admin paths
+            // re-validate the token generation below (SEC-01), and the
+            // refresh path (RefreshSessionUseCaseImpl) compares tokenVersion
+            // against the DB and closes the window there. Short access TTL
+            // bounds the residual delay.
             if (userId == null || role == null) {
                 // Stateless JWT requires userId+role claims; legacy tokens without
                 // claims are rejected instead of falling back to a DB lookup.
                 // Clients must re-login to obtain a current token.
-                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                        ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+                rejectUnauthorized(response, request.getRequestURI());
                 return;
+            }
+            // SEC-01: a demoted/suspended admin's pre-change access token
+            // would otherwise stay valid until expiry. Admin calls are rare,
+            // so one indexed PK lookup per admin request is negligible — and
+            // it closes the 15-minute residual-authorization window exactly
+            // where the blast radius is largest (suspend, audit, user admin).
+            if (isAdminRequest(path)) {
+                try {
+                    if (!hasCurrentTokenVersion(jwt, userId)) {
+                        rejectUnauthorized(response, request.getRequestURI());
+                        return;
+                    }
+                } catch (RuntimeException storeUnavailable) {
+                    // Fail closed like the revocation backend: an unreadable
+                    // user store must never silently authorize a possibly
+                    // demoted admin.
+                    log.warn("User store unavailable during admin token-version check");
+                    SecurityContextHolder.clearContext();
+                    reject(response, HttpStatus.SERVICE_UNAVAILABLE,
+                            ErrorCode.SECURITY_BACKEND_UNAVAILABLE.code(),
+                            "Security service temporarily unavailable. Please try again later.",
+                            request.getRequestURI());
+                    return;
+                }
             }
             // K7/D8: CSRF bound to the server-verified user id — a transplanted
             // cookie minted for another user fails even with a matching header.
@@ -180,8 +211,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             request.getHeader(BrowserSessionCookies.CSRF_HEADER),
                             cookieValue(request, browserSessionCookies.csrfCookieName()),
                             String.valueOf(userId))) {
-                ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.FORBIDDEN,
-                        ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token", request.getRequestURI());
+                reject(response, HttpStatus.FORBIDDEN,
+                        ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token",
+                        request.getRequestURI());
                 return;
             }
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -208,15 +240,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (RevocationStoreUnavailableException e) {
             log.warn("JWT revocation backend unavailable; refusing authenticated request");
             SecurityContextHolder.clearContext();
-            ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.SERVICE_UNAVAILABLE,
+            reject(response, HttpStatus.SERVICE_UNAVAILABLE,
                     ErrorCode.SECURITY_BACKEND_UNAVAILABLE.code(),
-                    "Security service temporarily unavailable. Please try again later.", request.getRequestURI());
+                    "Security service temporarily unavailable. Please try again later.",
+                    request.getRequestURI());
             return;
         } catch (Exception e) {
             log.warn("JWT authentication failed: {}", e.getClass().getSimpleName());
             SecurityContextHolder.clearContext();
-            ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
-                    ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, request.getRequestURI());
+            rejectUnauthorized(response, request.getRequestURI());
             return;
         }
         try {
@@ -224,6 +256,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } finally {
             MDC.remove(MDC_USER_KEY);
         }
+    }
+
+    private void rejectUnauthorized(HttpServletResponse response, String path) throws IOException {
+        reject(response, HttpStatus.UNAUTHORIZED,
+                ErrorCode.AUTHENTICATION_FAILED.code(), MSG_TOKEN_INVALID, path);
+    }
+
+    private void reject(HttpServletResponse response, HttpStatus status,
+            String code, String message, String path) throws IOException {
+        ProblemDetailFactory.writeProblem(response, objectMapper, status, code, message, path);
+    }
+
+    private static boolean isAdminRequest(String path) {
+        return ADMIN_PATH_PREFIX.equals(path) || path.startsWith(ADMIN_PATH_PREFIX + "/");
+    }
+
+    /**
+     * Compares the token's {@code ver} claim against the user's current
+     * generation. Pre-versioning tokens present 0 and pre-versioning users
+     * persist 0 (V39 backfill), so rolling deploys never lock admins out. A
+     * deleted user fails closed (empty lookup rejects).
+     */
+    private boolean hasCurrentTokenVersion(String jwt, Long userId) {
+        final long presented = jwtPort.extractTokenVersion(jwt);
+        final Optional<User> user = loadUserPort.findById(userId);
+        return user.map(current -> current.getTokenVersion() == presented).orElse(false);
+    }
+
+    private static boolean isLogoutRequest(HttpServletRequest request, String path) {
+        if (!"POST".equals(request.getMethod())) return false;
+        return PublicApiPaths.LOGOUT.equals(path)
+                || PublicApiPaths.BROWSER_LOGOUT.equals(path);
     }
 
     private static boolean isPublicLogin(HttpServletRequest request, String path) {

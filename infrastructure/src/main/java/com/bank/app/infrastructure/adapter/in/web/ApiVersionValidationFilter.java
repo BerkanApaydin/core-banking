@@ -9,7 +9,6 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -31,7 +30,6 @@ public class ApiVersionValidationFilter implements Filter {
      * ObjectMapper()} fallback — it would silently ignore
      * {@code spring.jackson.*} customization).
      */
-    @Autowired
     public ApiVersionValidationFilter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
@@ -65,8 +63,14 @@ public class ApiVersionValidationFilter implements Filter {
                 // is an XSS vector if ever rendered.
                 String safeHeader = versionHeader.matches("[A-Za-z0-9._-]{1,16}")
                         ? versionHeader : "invalid";
+                // NOTE: string literal (not ErrorCode enum) is intentional:
+                // LayeringArchitectureTest forbids ..adapter.in.web.. -> ..domain.exception..
+                // The literal is pinned by ApiVersionValidationFilterTest.
+                // API-03: 400, not 406 — 406 is content negotiation; a version
+                // mismatch is a malformed request. The code literal stays a
+                // string (see layering note above).
                 ProblemDetailFactory.writeProblem(httpResponse, objectMapper,
-                        HttpStatus.NOT_ACCEPTABLE, "API_VERSION_MISMATCH",
+                        HttpStatus.BAD_REQUEST, "API_VERSION_MISMATCH",
                         "API version mismatch: X-API-Version header '" + safeHeader
                                 + "' does not match requested API version '" + pathVersion + "'",
                         path);

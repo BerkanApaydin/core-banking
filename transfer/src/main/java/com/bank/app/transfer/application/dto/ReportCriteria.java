@@ -13,6 +13,16 @@ public record ReportCriteria(
     LocalDateTime cursorCreatedAt,
     Long cursorId
 ) {
+    /**
+     * Maximum offset window served by offset pagination. OFFSET cost grows
+     * linearly with the skipped row count, so unbounded deep pages can stall
+     * the connection pool. Same budget as the history query
+     * ({@code GetTransferHistoryQueryImpl.MAX_OFFSET_WINDOW}); callers beyond
+     * it must use the keyset cursor. Applies to the offset path only — keyset
+     * pages never pay OFFSET regardless of the page number carried along.
+     */
+    public static final long MAX_OFFSET_WINDOW = 10_000L;
+
     public ReportCriteria {
         Objects.requireNonNull(accountId);
         Objects.requireNonNull(startDate);
@@ -25,6 +35,9 @@ public record ReportCriteria(
             throw new IllegalArgumentException("Report range must not exceed 12 months");
         if ((cursorCreatedAt == null) != (cursorId == null))
             throw new IllegalArgumentException("cursorCreatedAt and cursorId must both be set or both be null");
+        if (cursorCreatedAt == null && (long) page * size > MAX_OFFSET_WINDOW)
+            throw new IllegalArgumentException("Report window exceeds " + MAX_OFFSET_WINDOW
+                    + " rows; use keyset pagination with cursorCreatedAt+cursorId");
     }
 
     public ReportCriteria(Long accountId, LocalDateTime startDate, LocalDateTime endDate) {

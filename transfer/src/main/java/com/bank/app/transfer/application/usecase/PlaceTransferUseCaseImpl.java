@@ -99,6 +99,8 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
 
     private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,
             String receiverIban, Money amount) {
+        // AccountInfo ids are already AccountId: no Long ever crosses this
+        // seam, so sender/receiver order cannot be silently swapped.
         TransferParticipants participants = new TransferParticipants(
                 sender.id(), senderIban, Currency.fromCode(sender.currency()),
                 receiver.id(), receiverIban, Currency.fromCode(receiver.currency()));

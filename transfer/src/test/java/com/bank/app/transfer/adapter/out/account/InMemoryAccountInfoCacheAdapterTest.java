@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.Set;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -96,13 +97,13 @@ class InMemoryAccountInfoCacheAdapterTest {
     @Test
     void shouldValidateMutationResult() {
         var balance = Money.of("100.00", Currency.TRY);
-        var result = new AccountAclPort.MutationResult(1L, 2L, balance, balance);
+        var result = new AccountAclPort.MutationResult(new AccountId(1L), new AccountId(2L), balance, balance);
 
-        assertEquals(1L, result.senderAccountId());
-        assertEquals(2L, result.receiverAccountId());
+        assertEquals(new AccountId(1L), result.senderAccountId());
+        assertEquals(new AccountId(2L), result.receiverAccountId());
         assertThrows(NullPointerException.class,
-                () -> new AccountAclPort.MutationResult(null, 2L, balance, balance));
+                () -> new AccountAclPort.MutationResult(null, new AccountId(2L), balance, balance));
         assertThrows(NullPointerException.class,
-                () -> new AccountAclPort.MutationResult(1L, 2L, null, balance));
+                () -> new AccountAclPort.MutationResult(new AccountId(1L), new AccountId(2L), null, balance));
     }
 }

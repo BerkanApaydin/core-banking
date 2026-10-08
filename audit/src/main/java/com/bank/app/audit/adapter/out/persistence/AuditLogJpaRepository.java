@@ -17,7 +17,17 @@ public interface AuditLogJpaRepository extends JpaRepository<AuditLogJpaEntity, 
     List<AuditLogJpaEntity> findByTimestampBetweenOrderByTimestampDescIdDesc(
             LocalDateTime from, LocalDateTime to, Pageable pageable);
 
-    @Modifying
-    @Query("DELETE FROM AuditLogJpaEntity a WHERE a.timestamp < :cutoff")
-    int deleteByTimestampBefore(@Param("cutoff") LocalDateTime cutoff);
+    /**
+     * Bounded retention batch: Postgres forbids LIMIT directly in DELETE, so
+     * the batch scopes through an IN-subquery over the retention index
+     * ({@code idx_audit_logs_timestamp_id}, V40). One unbounded DELETE would
+     * hold row locks for the whole 365-day tail in a single transaction; the
+     * adapter loops these batches with a per-run cap instead.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM audit_logs WHERE id IN "
+            + "(SELECT id FROM audit_logs WHERE timestamp < :cutoff "
+            + "ORDER BY timestamp, id LIMIT :batch)",
+            nativeQuery = true)
+    int deleteBatchOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("batch") int batch);
 }

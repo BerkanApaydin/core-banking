@@ -48,7 +48,8 @@ class BusinessErrorHttpMapperTest {
             "DB_INTEGRITY_VIOLATION, 409",
             "CONCURRENT_REQUEST, 409",
             "RATE_LIMIT_EXCEEDED, 429",
-            "UNSUPPORTED_MEDIA_TYPE, 415"
+            "UNSUPPORTED_MEDIA_TYPE, 415",
+            "API_VERSION_MISMATCH, 400"
     })
     void shouldPreserveErrorResponseContract(ErrorCode code, int expectedStatus) {
         var response = ProblemDetailFactory.create(code, "Public message", null);
@@ -75,7 +76,9 @@ class BusinessErrorHttpMapperTest {
         mvc.perform(get("/failure"))
                 .andExpect(status().is(expectedStatus))
                 .andExpect(jsonPath("$.code").value(expectedCode))
-                .andExpect(jsonPath("$.message").value(exception.getMessage()));
+                // Fail-closed catalog (ERR-01): unmapped keys never reflect
+                // raw exception detail (which carries ids/IBANs) to the wire.
+                .andExpect(jsonPath("$.message").value("Request could not be completed."));
     }
 
     static Stream<Arguments> businessFailures() {

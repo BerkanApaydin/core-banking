@@ -37,6 +37,11 @@ public interface JwtPort {
     /**
      * {@code "access"} or {@code "refresh"}. Tokens issued before typing
      * default to {@code "access"} so rolling deploys never lock users out.
+     *
+     * <p>SEC-03 contract: callers must pass an already signature-verified
+     * token ({@link #verifyAndDecode} first). An unverifiable token yields
+     * {@code "access"} by convention so it can never escalate into a refresh
+     * flow — never branch on this result alone for untrusted input.
      */
     String extractTokenType(String token);
 

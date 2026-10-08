@@ -18,6 +18,7 @@ class ApplicationStartupValidatorTest {
                 .withProperty("app.security.browser-session.secure", "true")
                 .withProperty("app.security.failed-login.backend", "redis")
                 .withProperty("app.security.rate-limit.backend", "redis")
+                .withProperty("app.cache.caffeine.account-info.backend", "redis")
                 .withProperty("spring.profiles.active", "prod");
     }
 
@@ -43,7 +44,7 @@ class ApplicationStartupValidatorTest {
     @CsvSource(delimiter = '|', value = {
             "jwt.secret | '' | non-default JWT secret",
             "jwt.secret | '   ' | non-default JWT secret",
-            "jwt.secret | 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970 | non-default JWT secret",
+            "jwt.secret | KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE= | non-default JWT secret",
             "spring.datasource.password | '' | database password",
             "spring.datasource.password | bank_password | default database password",
             "app.security.token-blacklist.backend | redis | hybrid or database",
@@ -51,6 +52,7 @@ class ApplicationStartupValidatorTest {
             "app.security.browser-session.secure | false | Secure cookies",
             "app.security.failed-login.backend | caffeine | shared Redis",
             "app.security.rate-limit.backend | caffeine | shared Redis",
+            "app.cache.caffeine.account-info.backend | caffeine | shared Redis",
             "app.security.failed-login.max-attempts | 0 | positive value",
             "app.security.failed-login.window-minutes | -1 | positive value",
             "app.security.rate-limit.max-requests | 0 | positive value",

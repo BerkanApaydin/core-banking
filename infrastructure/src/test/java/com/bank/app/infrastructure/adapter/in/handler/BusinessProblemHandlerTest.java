@@ -74,7 +74,8 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCOUNT_NOT_FOUND", response.getBody().getProperties().get("code"));
-        assertEquals("Account not found. IBAN: TR1", response.getBody().getProperties().get("message"));
+        // Fail-closed catalog (ERR-01): raw detail with PII never reaches the wire.
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -151,7 +152,7 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
-        assertEquals("Authorization error", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -180,7 +181,7 @@ class BusinessProblemHandlerTest {
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("Transaction rejected", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -192,7 +193,7 @@ class BusinessProblemHandlerTest {
         ResponseEntity<ProblemDetail> response = handler.handleAuthorizationException(ex, null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -249,7 +250,7 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("BUSINESS_ERROR", response.getBody().getProperties().get("code"));
-        assertEquals("", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -275,7 +276,7 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("CONCURRENT_REQUEST", response.getBody().getProperties().get("code"));
-        assertEquals("just a message", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -289,7 +290,7 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("CONCURRENT", response.getBody().getProperties().get("code"));
-        assertEquals("fallback message", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -303,7 +304,7 @@ class BusinessProblemHandlerTest {
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("CONCURRENT", response.getBody().getProperties().get("code"));
-        assertEquals("", response.getBody().getProperties().get("message"));
+        assertEquals("Request could not be completed.", response.getBody().getProperties().get("message"));
     }
 
     @Test

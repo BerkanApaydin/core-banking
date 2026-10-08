@@ -10,6 +10,7 @@ import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.infrastructure.adapter.out.persistence.OutboxJpaRepository;
@@ -129,8 +130,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        Long senderId = senderAccountId;
-        Long receiverId = receiverAccountId;
+        AccountId senderId = new AccountId(senderAccountId);
+        AccountId receiverId = new AccountId(receiverAccountId);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
@@ -175,8 +176,8 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        Long senderId = senderAccountId;
-        Long receiverId = receiverAccountId;
+        AccountId senderId = new AccountId(senderAccountId);
+        AccountId receiverId = new AccountId(receiverAccountId);
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {

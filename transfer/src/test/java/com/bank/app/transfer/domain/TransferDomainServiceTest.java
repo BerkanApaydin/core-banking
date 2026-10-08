@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain;
 
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
@@ -27,13 +28,13 @@ class TransferDomainServiceTest {
         @DisplayName("should create transfer successfully")
         void shouldCreateTransferSuccessfully() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                2L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
             Transfer transfer = transferDomainService.validateAndCreateTransfer(participants, Money.of("300.00", Currency.TRY), Clock.systemUTC());
 
             assertThat(transfer).isNotNull();
-            assertThat(transfer.getSenderAccountId()).isEqualTo(1L);
-            assertThat(transfer.getReceiverAccountId()).isEqualTo(2L);
+            assertThat(transfer.getSenderAccountId()).isEqualTo(new AccountId(1L));
+            assertThat(transfer.getReceiverAccountId()).isEqualTo(new AccountId(2L));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.PENDING);
         }
     }
@@ -46,8 +47,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw SameAccountTransferException when IDs are equal")
         void shouldThrowSameAccountTransferExceptionWhenIdsAreEqual() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                1L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(1L), "TR870006200000000000000222", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
@@ -58,8 +59,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw SameAccountTransferException when IBANs are equal ignoring case")
         void shouldThrowSameAccountTransferExceptionWhenIbansAreEqualIgnoringCase() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "tr770006200000000000000111", Currency.TRY,
-                2L, "TR770006200000000000000111", Currency.TRY);
+                new AccountId(1L), "tr770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR770006200000000000000111", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
@@ -70,8 +71,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw NullPointerException when amount is null")
         void shouldThrowNullPointerExceptionWhenAmountIsNull() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                2L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, null, Clock.systemUTC()))
                     .isExactlyInstanceOf(NullPointerException.class)
@@ -90,8 +91,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw CurrencyMismatchException when sender currency mismatches")
         void shouldThrowCurrencyMismatchExceptionWhenSenderCurrencyMismatches() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.USD,
-                2L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.USD,
+                new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isInstanceOf(CurrencyMismatchException.class)
@@ -102,8 +103,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw CurrencyMismatchException when receiver currency mismatches")
         void shouldThrowCurrencyMismatchExceptionWhenReceiverCurrencyMismatches() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                2L, "TR870006200000000000000222", Currency.USD);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000222", Currency.USD);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isInstanceOf(CurrencyMismatchException.class)
@@ -114,8 +115,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw when sender IBAN is null in participants")
         void shouldThrowWhenSenderIbanIsNull() {
             assertThatThrownBy(() -> new TransferParticipants(
-                    1L, null, Currency.TRY,
-                    2L, "TR2", Currency.TRY))
+                    new AccountId(1L), null, Currency.TRY,
+                    new AccountId(2L), "TR2", Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Sender IBAN must not be null");
         }
@@ -124,8 +125,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw when receiver IBAN is null in participants")
         void shouldThrowWhenReceiverIbanIsNull() {
             assertThatThrownBy(() -> new TransferParticipants(
-                    1L, "TR1", Currency.TRY,
-                    2L, null, Currency.TRY))
+                    new AccountId(1L), "TR1", Currency.TRY,
+                    new AccountId(2L), null, Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Receiver IBAN must not be null");
         }
@@ -134,8 +135,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw when sender currency is null in participants")
         void shouldThrowWhenSenderCurrencyIsNull() {
             assertThatThrownBy(() -> new TransferParticipants(
-                    1L, "TR1", null,
-                    2L, "TR2", Currency.TRY))
+                    new AccountId(1L), "TR1", null,
+                    new AccountId(2L), "TR2", Currency.TRY))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Sender currency must not be null");
         }
@@ -144,8 +145,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw when receiver currency is null in participants")
         void shouldThrowWhenReceiverCurrencyIsNull() {
             assertThatThrownBy(() -> new TransferParticipants(
-                    1L, "TR1", Currency.TRY,
-                    2L, "TR2", null))
+                    new AccountId(1L), "TR1", Currency.TRY,
+                    new AccountId(2L), "TR2", null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Receiver currency must not be null");
         }
@@ -154,8 +155,8 @@ class TransferDomainServiceTest {
         @DisplayName("should throw when amount is zero")
         void shouldThrowWhenAmountIsZero() {
             TransferParticipants participants = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                2L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("0.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
@@ -166,11 +167,11 @@ class TransferDomainServiceTest {
         @DisplayName("should reject well-formed IBANs with bad MOD 97-10 check digits")
         void shouldRejectBadChecksumIbans() {
             TransferParticipants badSender = new TransferParticipants(
-                1L, "TR770006200000000000000112", Currency.TRY,
-                2L, "TR870006200000000000000222", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000112", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
             TransferParticipants badReceiver = new TransferParticipants(
-                1L, "TR770006200000000000000111", Currency.TRY,
-                2L, "TR870006200000000000000223", Currency.TRY);
+                new AccountId(1L), "TR770006200000000000000111", Currency.TRY,
+                new AccountId(2L), "TR870006200000000000000223", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(badSender, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(InvalidIbanException.class);

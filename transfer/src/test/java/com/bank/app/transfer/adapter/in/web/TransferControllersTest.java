@@ -49,11 +49,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Slice coverage for the transfer web adapter (PIT: the whole controller was
  * uncovered because the MockMvc tests live in the app module). Standalone
  * MockMvc keeps it in-module and fast; validation edge cases stay in the app
- * WebMvc tests.
+ * WebMvc tests. Both split controllers (command + query) are registered so
+ * route coverage matches the former fat controller.
  */
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
-class TransferControllerTest {
+class TransferControllersTest {
 
     @Mock private PlaceTransferUseCase placeTransferUseCase;
     @Mock private CancelTransferUseCase cancelTransferUseCase;
@@ -68,10 +69,11 @@ class TransferControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(
-                placeTransferUseCase, cancelTransferUseCase, getTransferDetailQuery,
-                getTransferHistoryQuery, generateTransferReportQuery,
-                generateTransferReportTotalsQuery, generateTransferReportWithTotalsQuery)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new TransferCommandController(placeTransferUseCase, cancelTransferUseCase),
+                new TransferQueryController(getTransferDetailQuery,
+                        getTransferHistoryQuery, generateTransferReportQuery,
+                        generateTransferReportTotalsQuery, generateTransferReportWithTotalsQuery)).build();
     }
 
     @Test
@@ -269,5 +271,133 @@ class TransferControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(2))
                 .andExpect(jsonPath("$.totalVolume").value(300.00));
+    }
+
+    @Test
+    void shouldUseCombinedQueryWhenIncludeTotalsTrue() throws Exception {
+        TransferReportResponse combined = new TransferReportResponse(1L, 2,
+                new BigDecimal("300.00"), "TRY", List.of(), false, null, null, 2L,
+                new BigDecimal("300.00"));
+        when(generateTransferReportWithTotalsQuery.execute(any(ReportCriteria.class)))
+                .thenReturn(combined);
+
+        mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00")
+                        .param("includeTotals", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(2));
+
+        verify(generateTransferReportWithTotalsQuery).execute(any(ReportCriteria.class));
+        verify(generateTransferReportQuery, org.mockito.Mockito.never())
+                .execute(any(ReportCriteria.class));
+    }
+
+    @Test
+    void shouldHonorWildcardIfNoneMatch() throws Exception {
+        TransferReportResponse report = new TransferReportResponse(1L, 0, BigDecimal.ZERO,
+                "TRY", List.of(), false, null, null, null, null);
+        when(generateTransferReportQuery.execute(any(ReportCriteria.class))).thenReturn(report);
+
+        mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00")
+                        .header("If-None-Match", "*"))
+                .andExpect(status().isNotModified())
+                .andExpect(header().exists("ETag"));
+    }
+
+    @Test
+    void shouldChangeEtagWhenItemContentDiffersButCountsMatch() throws Exception {
+        // Same account/count/volume/currency/cursor, different transfer IDs:
+        // the old header-only ETag would emit a false 304 (stale content).
+        TransferResponse first = new TransferResponse(10L, TransferStatus.COMPLETED,
+                new BigDecimal("10.00"), "TRY", LocalDateTime.of(2026, 9, 1, 12, 0),
+                "TR770006200000000000000111", "TR870006200000000000000222", 1L, 2L);
+        TransferResponse second = new TransferResponse(11L, TransferStatus.COMPLETED,
+                new BigDecimal("10.00"), "TRY", LocalDateTime.of(2026, 9, 1, 12, 0),
+                "TR770006200000000000000111", "TR870006200000000000000222", 1L, 2L);
+        TransferReportResponse pageOne = new TransferReportResponse(1L, 1, new BigDecimal("10.00"),
+                "TRY", List.of(first), false, null, null, null, null);
+        TransferReportResponse pageTwo = new TransferReportResponse(1L, 1, new BigDecimal("10.00"),
+                "TRY", List.of(second), false, null, null, null, null);
+        when(generateTransferReportQuery.execute(any(ReportCriteria.class)))
+                .thenReturn(pageOne, pageTwo);
+
+        String etagOne = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+        String etagTwo = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+
+        assertThat(etagOne).isNotNull();
+        assertThat(etagTwo).isNotNull().isNotEqualTo(etagOne);
+    }
+
+    @Test
+    void shouldChangeEtagWhenTotalsMoveButPageIsIdentical() throws Exception {
+        // includeTotals/combined responses: same page, different whole-range
+        // aggregates must not share a validator.
+        TransferReportResponse withoutTotalsShift = new TransferReportResponse(1L, 1,
+                new BigDecimal("10.00"), "TRY", List.of(), false, null, null, 1L,
+                new BigDecimal("10.00"));
+        TransferReportResponse withTotalsShift = new TransferReportResponse(1L, 1,
+                new BigDecimal("10.00"), "TRY", List.of(), false, null, null, 2L,
+                new BigDecimal("20.00"));
+        when(generateTransferReportWithTotalsQuery.execute(any(ReportCriteria.class)))
+                .thenReturn(withoutTotalsShift, withTotalsShift);
+
+        String etagOne = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00")
+                        .param("includeTotals", "true"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+        String etagTwo = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00")
+                        .param("includeTotals", "true"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+
+        assertThat(etagOne).isNotNull();
+        assertThat(etagTwo).isNotNull().isNotEqualTo(etagOne);
+    }
+
+    @Test
+    void shouldProduceStableEtagAcrossVolumeScaleVariants() throws Exception {
+        TransferReportResponse scaleOne = new TransferReportResponse(1L, 1, new BigDecimal("10.0"),
+                "TRY", List.of(), false, null, null, null, null);
+        TransferReportResponse scaleTwo = new TransferReportResponse(1L, 1, new BigDecimal("10.00"),
+                "TRY", List.of(), false, null, null, null, null);
+        when(generateTransferReportQuery.execute(any(ReportCriteria.class)))
+                .thenReturn(scaleOne, scaleTwo);
+
+        String first = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+        String second = mockMvc.perform(get("/transfers/report")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("ETag");
+
+        assertThat(first).isNotNull().matches("W/\"report-[0-9a-f]{16}\"");
+        assertThat(second).isEqualTo(first);
     }
 }

@@ -155,4 +155,20 @@ class UseCaseTransactionAspectTest {
         assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
         verify(transactionManager).commit(transactionStatus);
     }
+
+    @Test
+    void shouldProceedOnAroundAuditReadOnly() throws Throwable {
+        when(joinPoint.proceed()).thenReturn("result");
+
+        Object result = aspect.aroundAuditReadOnly(joinPoint);
+
+        assertEquals("result", result);
+        verify(joinPoint).proceed();
+        verify(transactionManager).getTransaction(definitionCaptor.capture());
+        DefaultTransactionDefinition def = definitionCaptor.getValue();
+        assertEquals("testSignature", def.getName());
+        assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
+        assertEquals(true, def.isReadOnly());
+        verify(transactionManager).commit(transactionStatus);
+    }
 }

@@ -100,8 +100,30 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
     }
 
     private static boolean callsEvict(JavaMethod method) {
-        return method.getMethodCallsFromSelf().stream()
-                .anyMatch(CacheInvalidationArchitectureTest::isEvictCall);
+        if (method.getMethodCallsFromSelf().stream()
+                .anyMatch(CacheInvalidationArchitectureTest::isEvictCall)) {
+            return true;
+        }
+        // One-hop helper: public AccountApi mutations may evict through a
+        // private same-class helper (e.g. evictSnapshotsAfterCommit) so the
+        // AFTER_COMMIT boilerplate lives in one place. The helper itself must
+        // still call evictById/evictAll directly (else-branch), which keeps the
+        // invariant structural instead of manual.
+        JavaClass owner = method.getOwner();
+        for (JavaMethodCall call : method.getMethodCallsFromSelf()) {
+            if (!call.getTargetOwner().equals(owner)) {
+                continue;
+            }
+            String helperName = call.getName();
+            boolean helperEvicts = owner.getMethods().stream()
+                    .filter(helper -> helper.getName().equals(helperName))
+                    .anyMatch(helper -> helper.getMethodCallsFromSelf().stream()
+                            .anyMatch(CacheInvalidationArchitectureTest::isEvictCall));
+            if (helperEvicts) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isEvictCall(JavaMethodCall call) {

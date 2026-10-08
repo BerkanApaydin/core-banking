@@ -16,7 +16,7 @@ is the single map: ID → file → one-sentence decision.
 | D14/S12 | `AccountApiAdapter` | Published language is implemented in `adapter.out`. |
 | D22 | `application.yml`, compose | Tracing off by default in prod (no pointless localhost dial). |
 | G-1 | `docs/decisions/authorization-boundary.md` | Admin: URL boundary (`hasRole`) + use-case `hasRole`, two layers. |
-| G-2 | `docs/decisions/token-version.md` | Access stateless (documented 15-min window); refresh DB-checked. |
+| G-2 | `docs/decisions/token-version.md` | Access stateless on non-admin paths (documented 15-min window); admin paths + refresh DB-checked (SEC-01). |
 | DB-1 | `docs/decisions/enum-types.md` | Native enum decision + value-add procedure; VARCHAR+CHECK roadmap for status. |
 | V32 | `docs/release.md` (lock measurement) | Staging lock measurement mandatory before `ALTER TYPE` on large tables. |
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
@@ -33,3 +33,4 @@ is the single map: ID → file → one-sentence decision.
 - `kafka-readiness.md` (long term: OutboxPort → broker migration)
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
 - `pending-reaper.md` (R-1: stale-PENDING crash-window recovery through the domain)
+- `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)

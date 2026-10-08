@@ -58,9 +58,22 @@ public class AuditLogPersistenceAdapter implements SaveAuditLogPort, LoadAuditLo
                 .toList();
     }
 
+    /** Rows per retention batch; small enough to stay far under the 30s scheduler-lock budget. */
+    static final int RETENTION_BATCH_SIZE = 1000;
+    /** Batches per schedule: a 10k-row ceiling per run; larger backlogs drain over consecutive schedules. */
+    static final int MAX_BATCHES_PER_RUN = 10;
+
     @Override
     public int deleteOlderThan(LocalDateTime cutoff) {
-        return repository.deleteByTimestampBefore(cutoff);
+        int total = 0;
+        for (int batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
+            int deleted = repository.deleteBatchOlderThan(cutoff, RETENTION_BATCH_SIZE);
+            total += deleted;
+            if (deleted < RETENTION_BATCH_SIZE) {
+                break;
+            }
+        }
+        return total;
     }
 
     private static int cap(int limit) {

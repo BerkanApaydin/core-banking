@@ -113,6 +113,18 @@ class DomainEventOutboxAdapterTest {
         }
 
         @Test
+        void shouldRejectOversizedPayloadInsteadOfPersistingIt() throws Exception {
+            DomainEvent event = createEvent(AGGREGATE_ID);
+            when(objectMapper.writeValueAsString(event))
+                    .thenReturn("x".repeat(DomainEventOutboxAdapter.MAX_PAYLOAD_CHARS + 1));
+
+            IllegalArgumentException ex =
+                    assertThrows(IllegalArgumentException.class, () -> adapter.publish(event));
+            assertTrue(ex.getMessage().contains("exceeds"));
+            verify(outboxPort, never()).save(any());
+        }
+
+        @Test
         void shouldThrowWhenSerializationFails() throws Exception {
             DomainEvent event = createEvent(AGGREGATE_ID);
             when(objectMapper.writeValueAsString(event)).thenThrow(new JsonProcessingException("serialization error") {});

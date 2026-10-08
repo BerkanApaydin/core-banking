@@ -29,6 +29,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -65,8 +66,8 @@ class CancelTransferUseCaseTest {
     @Test
     void shouldCancelTransferSuccessfully() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Long receiverAccountId = 20L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
 
         Transfer transfer = createCompletedTransfer(transferId, senderAccountId, receiverAccountId, amount);
@@ -103,8 +104,8 @@ class CancelTransferUseCaseTest {
     @Test
     void shouldThrowAuthorizationExceptionWhenUserNotOwner() {
         Long transferId = 1L;
-        Long senderAccountId = 10L;
-        Transfer transfer = createCompletedTransfer(transferId, senderAccountId, 20L,
+        AccountId senderAccountId = new AccountId(10L);
+        Transfer transfer = createCompletedTransfer(transferId, senderAccountId, new AccountId(20L),
                 new Money(new BigDecimal("100.00"), Currency.TRY));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
@@ -120,13 +121,13 @@ class CancelTransferUseCaseTest {
     @Test
     void shouldThrowWhenTransferAlreadyCancelled() {
         Long transferId = 1L;
-        Transfer transfer = createCompletedTransfer(transferId, 10L, 20L,
+        Transfer transfer = createCompletedTransfer(transferId, new AccountId(10L), new AccountId(20L),
                 new Money(new BigDecimal("100.00"), Currency.TRY));
         transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
-        when(accountAclPort.getAccountInfo(10L))
-                .thenReturn(new AccountInfo(10L, 100L, "TRY", "ACTIVE"));
+        when(accountAclPort.getAccountInfo(new AccountId(10L)))
+                .thenReturn(new AccountInfo(new AccountId(10L), 100L, "TRY", "ACTIVE"));
 
         assertThrows(TransferAlreadyCancelledException.class,
                 () -> cancelTransferUseCase.execute(transferId));
@@ -136,17 +137,17 @@ class CancelTransferUseCaseTest {
     void shouldThrowWhenTransferNotCompleted() {
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
-        Transfer transfer = Transfer.create(10L, 20L, amount, Clock.systemUTC());
+        Transfer transfer = Transfer.create(new AccountId(10L), new AccountId(20L), amount, Clock.systemUTC());
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
-        when(accountAclPort.getAccountInfo(10L))
-                .thenReturn(new AccountInfo(10L, 100L, "TRY", "ACTIVE"));
+        when(accountAclPort.getAccountInfo(new AccountId(10L)))
+                .thenReturn(new AccountInfo(new AccountId(10L), 100L, "TRY", "ACTIVE"));
 
         assertThrows(TransferNotCancellableException.class,
                 () -> cancelTransferUseCase.execute(transferId));
     }
 
-    private static Transfer createCompletedTransfer(Long id, Long senderId, Long receiverId, Money amount) {
+    private static Transfer createCompletedTransfer(Long id, AccountId senderId, AccountId receiverId, Money amount) {
         Transfer transfer = new Transfer(id, senderId, receiverId, amount,
                 TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
         return transfer;

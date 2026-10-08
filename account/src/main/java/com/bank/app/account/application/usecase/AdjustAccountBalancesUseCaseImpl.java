@@ -6,6 +6,7 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.MovementDirection;
 import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
@@ -47,35 +48,49 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
 
     @Override
     public AccountAdjustmentResult debitAndCredit(Long senderId, Long receiverId, Money amount) {
-        return move(senderId, receiverId, amount, false);
+        return move(senderId, receiverId, amount, MovementDirection.OUTFLOW);
     }
 
     @Override
     public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
-        return move(senderId, receiverId, amount, true);
+        return move(senderId, receiverId, amount, MovementDirection.REVERSAL);
     }
 
-    private AccountAdjustmentResult move(Long senderId, Long receiverId, Money amount, boolean reverse) {
+    private AccountAdjustmentResult move(Long senderId, Long receiverId, Money amount, MovementDirection direction) {
         Objects.requireNonNull(amount, "Amount must not be null");
+        Objects.requireNonNull(direction, "Direction must not be null");
         requireDistinctAccounts(senderId, receiverId);
         OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId);
         Account sender = resolveSender(pair, senderId, receiverId);
         Account receiver = resolveReceiver(pair, senderId, receiverId);
         Clock clock = clockProvider.clock();
-        if (!reverse) {
+        applyMovement(sender, receiver, amount, direction, clock);
+        // 7.2: keep the saved aggregates — they carry the bumped @Version.
+        Account savedSender = saveAccountPort.save(sender);
+        Account savedReceiver = saveAccountPort.save(receiver);
+        writeLedgerEntries(senderId, receiverId, amount, direction, clock, savedSender, savedReceiver);
+        publishAndAudit(sender, receiver, savedSender, savedReceiver, amount, direction);
+        return new AccountAdjustmentResult(senderId, receiverId,
+                savedSender.getBalance(), savedReceiver.getBalance());
+    }
+
+    private static void applyMovement(Account sender, Account receiver, Money amount,
+            MovementDirection direction, Clock clock) {
+        if (direction.isOutflow()) {
             sender.debit(amount, clock);
             receiver.credit(amount, clock);
         } else {
             sender.credit(amount, clock);
             receiver.debit(amount, clock);
         }
-        // 7.2: keep the saved aggregates — they carry the bumped @Version.
-        Account savedSender = saveAccountPort.save(sender);
-        Account savedReceiver = saveAccountPort.save(receiver);
+    }
+
+    private void writeLedgerEntries(Long senderId, Long receiverId, Money amount,
+            MovementDirection direction, Clock clock, Account savedSender, Account savedReceiver) {
         // Double-entry journal: both legs share one ref and join this
         // transaction, so they net to zero or the money rolls back with them.
         TransactionRef operationRef = LedgerEntry.newTransactionRef();
-        if (!reverse) {
+        if (direction.isOutflow()) {
             ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
                     operationRef, clock));
             ledgerPort.save(LedgerEntry.credit(receiverId, amount, savedReceiver.getBalance(),
@@ -86,17 +101,19 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
             ledgerPort.save(LedgerEntry.debit(receiverId, amount, savedReceiver.getBalance(),
                     operationRef, clock));
         }
+    }
+
+    private void publishAndAudit(Account sender, Account receiver,
+            Account savedSender, Account savedReceiver, Money amount, MovementDirection direction) {
         domainEventPublisherService.publishEvents(sender);
         domainEventPublisherService.publishEvents(receiver);
-        if (!reverse) {
+        if (direction.isOutflow()) {
             auditMovement("ACCOUNT_DEBITED", savedSender, amount);
             auditMovement("ACCOUNT_CREDITED", savedReceiver, amount);
         } else {
             auditMovement("ACCOUNT_CREDITED", savedSender, amount);
             auditMovement("ACCOUNT_DEBITED", savedReceiver, amount);
         }
-        return new AccountAdjustmentResult(senderId, receiverId,
-                savedSender.getBalance(), savedReceiver.getBalance());
     }
 
     /**

@@ -14,6 +14,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.slf4j.LoggerFactory;
+import com.bank.app.common.domain.AccountId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -25,7 +26,7 @@ class EmailNotificationAdapterTest {
 
     @Test
     void shouldLogSuccessfullyOnNotify() {
-        Transfer transfer = new Transfer(1L, 10L, 20L,
+        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L),
                 Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
@@ -66,7 +67,7 @@ class EmailNotificationAdapterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            Transfer transfer = new Transfer(7L, 10L, 20L,
+            Transfer transfer = new Transfer(7L, new AccountId(10L), new AccountId(20L),
                     Money.of("100.00", Currency.TRY),
                     TransferStatus.COMPLETED, LocalDateTime.now());
             adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));

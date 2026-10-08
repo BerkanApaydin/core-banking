@@ -52,18 +52,10 @@ public class OrphanIntegrityReporter {
     private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
     private final Counter alarmCounter;
 
-    public OrphanIntegrityReporter(JdbcTemplate jdbc,
-            @Autowired(required = false) @Nullable MeterRegistry meterRegistry) {
-        this(jdbc, meterRegistry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0),
-                AdvisorySchedulerLock.alwaysRun());
-    }
-
-    public OrphanIntegrityReporter(JdbcTemplate jdbc,
-            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
-            OrphanIntegrityProperties properties) {
-        this(jdbc, meterRegistry, properties, AdvisorySchedulerLock.alwaysRun());
-    }
-
+    // Single canonical constructor for Spring: the scheduler lock and the
+    // bound OrphanIntegrityProperties always come from the container, so
+    // production can never run on a hidden default cron/threshold. Tests use
+    // the named forTests factories below instead of ambiguous overloads.
     @Autowired
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
@@ -85,6 +77,19 @@ public class OrphanIntegrityReporter {
                     .register(meterRegistry);
         }
         this.alarmCounter = counter;
+    }
+
+    static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
+            @Nullable MeterRegistry meterRegistry) {
+        return forTests(jdbc, meterRegistry,
+                new OrphanIntegrityProperties(true, "0 0 3 * * *", 0));
+    }
+
+    static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
+            @Nullable MeterRegistry meterRegistry,
+            OrphanIntegrityProperties properties) {
+        return new OrphanIntegrityReporter(jdbc, meterRegistry, properties,
+                AdvisorySchedulerLock.alwaysRun());
     }
 
     @Scheduled(cron = "${app.integrity.orphan-check-cron:0 0 3 * * *}")

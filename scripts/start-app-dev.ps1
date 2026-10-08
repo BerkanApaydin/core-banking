@@ -48,6 +48,7 @@ try {
     if ($null -eq $jar) { throw 'Executable app JAR was not found.' }
 
     Write-Host 'Open http://localhost:8080/ (Ctrl+C to stop the app).'
+    Write-Host 'NOTE (SEC-06): dev serves plain HTTP with non-Secure session cookies (BROWSER_SESSION_SECURE=false). Session cookies minted here must never be reused outside localhost; production enforces Secure cookies at boot.'
     & java -jar $jar.FullName
     if ($LASTEXITCODE -ne 0) { throw "Application exited with code $LASTEXITCODE." }
 }

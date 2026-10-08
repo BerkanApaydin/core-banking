@@ -4,6 +4,7 @@ import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 
@@ -56,12 +57,15 @@ public class AccountAclAdapter implements AccountAclPort {
     }
 
     @Override
-    public AccountAclPort.AccountInfo getAccountInfo(Long accountId) {
-        AccountSnapshot snapshot = cache.getById(accountId)
-                .orElseGet(() -> singleflight("id-" + accountId,
-                        () -> cache.getById(accountId).orElseGet(() -> {
-                            AccountSnapshot fresh = accountApi.getSnapshotById(accountId);
-                            cache.putById(accountId, fresh);
+    public AccountAclPort.AccountInfo getAccountInfo(AccountId accountId) {
+        // ACL edge: the published language speaks Long; the transfer side
+        // speaks AccountId. Translation happens exactly here, nowhere else.
+        Long rawId = accountId.value();
+        AccountSnapshot snapshot = cache.getById(rawId)
+                .orElseGet(() -> singleflight("id-" + rawId,
+                        () -> cache.getById(rawId).orElseGet(() -> {
+                            AccountSnapshot fresh = accountApi.getSnapshotById(rawId);
+                            cache.putById(rawId, fresh);
                             return fresh;
                         })));
         return toAccountInfo(snapshot);
@@ -90,28 +94,30 @@ public class AccountAclAdapter implements AccountAclPort {
     }
 
     @Override
-    public AccountAclPort.MutationResult debitAndCredit(Long senderId, Long receiverId, Money amount) {
+    public AccountAclPort.MutationResult debitAndCredit(AccountId senderId, AccountId receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        AccountAdjustmentResult result = accountApi.adjustBalances(senderId, receiverId, amount);
+        AccountAdjustmentResult result = accountApi.adjustBalances(
+                senderId.value(), receiverId.value(), amount);
         return toMutationResult(result);
     }
 
     @Override
-    public AccountAclPort.MutationResult reverseBalancesForCancellation(Long senderId, Long receiverId, Money amount) {
+    public AccountAclPort.MutationResult reverseBalancesForCancellation(AccountId senderId, AccountId receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
-        AccountAdjustmentResult result = accountApi.reverseForCancellation(senderId, receiverId, amount);
+        AccountAdjustmentResult result = accountApi.reverseForCancellation(
+                senderId.value(), receiverId.value(), amount);
         return toMutationResult(result);
     }
 
     private static AccountAclPort.AccountInfo toAccountInfo(AccountSnapshot snapshot) {
         return new AccountAclPort.AccountInfo(
-                snapshot.id(), snapshot.userId(), snapshot.currency(), snapshot.status());
+                new AccountId(snapshot.id()), snapshot.userId(), snapshot.currency(), snapshot.status());
     }
 
     private static AccountAclPort.MutationResult toMutationResult(AccountAdjustmentResult result) {
         return new AccountAclPort.MutationResult(
-                result.senderAccountId(),
-                result.receiverAccountId(),
+                new AccountId(result.senderAccountId()),
+                new AccountId(result.receiverAccountId()),
                 result.senderNewBalance(),
                 result.receiverNewBalance());
     }

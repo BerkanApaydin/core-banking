@@ -150,4 +150,15 @@ class IdempotencyPersistenceAdapterTest {
 
         assertThat(deleted).isEqualTo(4);
     }
+
+    @Test
+    void shouldFailStalePending() {
+        var threshold = LocalDateTime.now();
+        when(repository.failStalePending(threshold)).thenReturn(2);
+
+        int reaped = adapter.failStalePending(threshold);
+
+        assertThat(reaped).isEqualTo(2);
+        verify(repository).failStalePending(threshold);
+    }
 }

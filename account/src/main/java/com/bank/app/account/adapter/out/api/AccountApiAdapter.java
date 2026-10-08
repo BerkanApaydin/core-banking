@@ -75,24 +75,7 @@ public class AccountApiAdapter implements AccountApi {
     public AccountAdjustmentResult adjustBalances(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         AccountAdjustmentResult result = adjustAccountBalancesUseCase.debitAndCredit(senderId, receiverId, amount);
-        // Granular invalidation, inline (not via a helper): only the two
-        // mutated accounts, only after the use case succeeds — and inline so
-        // CacheInvalidationArchitectureTest can see the eviction directly.
-        // Eviction deferred to AFTER_COMMIT when a transaction is active so a
-        // rollback never evicts a still-valid snapshot; the else-branch keeps
-        // the direct evictById call visible to CacheInvalidationArchitectureTest.
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    snapshotCache.evictById(senderId);
-                    snapshotCache.evictById(receiverId);
-                }
-            });
-        } else {
-            snapshotCache.evictById(senderId);
-            snapshotCache.evictById(receiverId);
-        }
+        evictSnapshotsAfterCommit(senderId, receiverId);
         return result;
     }
 
@@ -100,7 +83,24 @@ public class AccountApiAdapter implements AccountApi {
     public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         AccountAdjustmentResult result = adjustAccountBalancesUseCase.reverseForCancellation(senderId, receiverId, amount);
-        // Same AFTER_COMMIT rule as adjustBalances: commit wins, then evict.
+        evictSnapshotsAfterCommit(senderId, receiverId);
+        return result;
+    }
+
+    /**
+     * Single invalidation point for every balance mutation (F-04): eviction is
+     * deferred to AFTER_COMMIT when a transaction is active so a rollback never
+     * evicts a still-valid snapshot. Kept in this class (not a separate service)
+     * so the boundary ownership stays obvious, and the direct
+     * {@code evictById} calls live here so
+     * {@code CacheInvalidationArchitectureTest} sees them (directly or through
+     * this one-hop helper).
+     */
+    private void evictSnapshotsAfterCommit(Long senderId, Long receiverId) {
+        // Granular invalidation: only the two mutated accounts, only after the
+        // use case succeeds. Eviction deferred to AFTER_COMMIT when a
+        // transaction is active; the else-branch keeps the direct evictById
+        // call for non-transactional callers (tests, schedulers).
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -113,7 +113,6 @@ public class AccountApiAdapter implements AccountApi {
             snapshotCache.evictById(senderId);
             snapshotCache.evictById(receiverId);
         }
-        return result;
     }
 
     private static AccountSnapshot toSnapshot(AccountInfo info) {
