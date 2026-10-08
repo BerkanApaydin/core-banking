@@ -58,8 +58,10 @@ jobs:
     - name: Guard against mutable image tags (K9/D7)
       # The release workflow pins k8s/bank-app.yaml to a digest; the default
       # must stay a versioned tag so an unpinned apply can never roll :latest.
+      # Match `image:` lines only: the manifest documents the forbidden value
+      # in its own comments, and a bare substring grep false-positives on them.
       run: |
-        if grep -q "bank-app:latest" k8s/bank-app.yaml; then
+        if grep -Eq "^[[:space:]]*image:[[:space:]]+bank-app:latest([[:space:]#]|$)" k8s/bank-app.yaml; then
           echo "::error::k8s/bank-app.yaml must not reference bank-app:latest (K9/D7)"
           exit 1
         fi
