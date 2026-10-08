@@ -32,7 +32,7 @@ A modular simulation of selected core banking workflows—account management and
 ### DevOps & Prerequisites
 
 - **Docker & Docker Compose:** Multi-container orchestration.
-- **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and PostgreSQL/Redis deployments are not included.
+- **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and production PostgreSQL/Redis deployments are not included (throwaway dev-only ones live in `postgres-redis-dev.yaml`).
 - **Maven 3.9.x:** Recommended build system (Maven 3.9.16 wrapper configuration is pre-configured).
 - **Prerequisites:** Java 21 JDK and a running Docker daemon. The local test launcher also needs Python 3.10+ and Node.js.
 - **Environment:** Common local variables are shown in `.env.example`; profile-specific settings and deployment checks are in [operations](docs/operations.md).
@@ -113,16 +113,20 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration and both login endpoints are public. The auth, account-create and transfer paths have rate limits.
+All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints and both refresh endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session). Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create and transfer paths have rate limits.
 
 | Module | Endpoint | Method | Description / notes |
 | :--- | :--- | :--- | :--- |
 | User | `/auth/register` | `POST` | Register; `Idempotency-Key` recommended. |
 | User | `/auth/login` | `POST` | Obtain a bearer JWT for API clients. |
+| User | `/auth/refresh` | `POST` | Rotate tokens with a valid refresh token. |
 | User | `/auth/logout` | `POST` | Revoke the bearer JWT. |
 | User | `/auth/browser/login` | `POST` | Set `HttpOnly` session and readable CSRF cookies; no token in JSON. |
+| User | `/auth/browser/refresh` | `POST` | Same rotation over cookies for the bundled UI. |
 | User | `/auth/browser/session` | `GET` | Restore the browser session. |
 | User | `/auth/browser/logout` | `POST` | Revoke the cookie session; requires CSRF header. |
+| Admin | `/admin/accounts/{id}/suspend` | `POST` | Suspend an account (`ROLE_ADMIN`; re-suspend is idempotent). |
+| Admin | `/admin/audit-logs` | `GET` | Read the audit trail (`ROLE_ADMIN`). |
 | Account | `/accounts/capabilities` | `GET` | Report whether simulated opening funds are enabled. |
 | Account | `/accounts` | `POST` | Open an account for the authenticated user; the server generates a simulation-only Turkish IBAN. `Idempotency-Key` recommended. |
 | Account | `/accounts` | `GET` | List the authenticated user's accounts (paged). |
@@ -132,6 +136,8 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 | Transfer | `/transfers/{id}/cancel` | `POST` | Conditionally reverse a completed transfer; `Idempotency-Key` required. |
 | Transfer | `/transfers/history/{accountId}` | `GET` | Paged transfer history. |
 | Transfer | `/transfers/report` | `GET` | Paged date-range report with `pageTransferCount`, `pageVolume` and `hasNext`; not a full-range export. |
+| Transfer | `/transfers/report/combined` | `GET` | Same page plus whole-range `totalCount`/`totalVolume` in one call. |
+| Transfer | `/transfers/report/totals` | `GET` | Whole-range `totalTransferCount`/`totalVolume` header for the criteria. |
 
 ---
 
@@ -162,16 +168,10 @@ Install and start Docker Desktop (with Docker Compose). Java, Maven, PostgreSQL 
 ```bash
 git clone https://github.com/BerkanApaydin/core-banking.git
 cd core-banking
-# One step per shell (or persist it once in a git-ignored local `.env` file
-# as JWT_SECRET=<output>): the Compose app service deliberately ships with
-# no default signing secret and refuses to start without one.
-export JWT_SECRET="$(openssl rand -base64 32)"
 docker compose up --build --wait
 ```
 
-> Windows PowerShell equivalent: `$env:JWT_SECRET = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))` (Git Bash ships `openssl`, so the `export` line also works there).
-
-Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL is needed for this local development setup. The first run downloads images (~2 GB) and Maven dependencies, so it needs internet access and can take 10–20 minutes; later runs reuse the build cache and start in about a minute. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
+Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL or `.env` file is needed for this local development setup: local dev boots with an insecure default signing key (a warning is logged; production refuses it — set a generated `JWT_SECRET` for anything real: `export JWT_SECRET="$(openssl rand -base64 32)"`). The first run downloads images (~2 GB) and Maven dependencies, so it needs internet access and can take 10–20 minutes; later runs reuse the build cache and start in about a minute. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
 
 Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 

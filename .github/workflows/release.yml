@@ -1,8 +1,14 @@
 name: Release (digest-pinned image)
 
 on:
-  push:
-    tags: ['v*']
+  # Automatic releases are disabled: pushing a tag no longer builds, pushes
+  # or publishes anything. To cut a release, run this workflow manually from
+  # the Actions tab ("Run workflow") and provide the tag to publish.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build, push and pin (e.g. v0.0.2)'
+        required: true
 
 permissions:
   contents: write
@@ -27,7 +33,7 @@ jobs:
       with:
         images: ghcr.io/${{ github.repository_owner }}/bank-app
         tags: |
-          type=ref,event=tag
+          type=raw,value=${{ inputs.tag }}
 
     - name: Build and push
       id: push
@@ -40,7 +46,7 @@ jobs:
     - name: Pin manifest to digest
       env:
         PINNED: ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}
-        TAG: ${{ github.ref_name }}
+        TAG: ${{ inputs.tag }}
       run: |
         awk -v img="$PINNED" '{ if ($0 ~ /^[[:space:]]*image:/) print "          image: " img; else print }' k8s/bank-app.yaml > k8s/bank-app.yaml.tmp && mv k8s/bank-app.yaml.tmp k8s/bank-app.yaml
         grep -q "@sha256:" k8s/bank-app.yaml
@@ -49,6 +55,7 @@ jobs:
     - name: Record digest in release notes
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ inputs.tag }}
         files: |
           k8s/bank-app.yaml
           k8s/.image-digest
