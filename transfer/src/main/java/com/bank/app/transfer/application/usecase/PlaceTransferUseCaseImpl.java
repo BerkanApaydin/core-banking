@@ -62,7 +62,7 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         AccountInfo senderInfo = transferAuthorizationService.authorizeSender(senderIban);
         AccountInfo receiverInfo = transferAuthorizationService.getReceiverInfo(receiverIban);
 
-        Money amount = new Money(request.amount(), request.currency());
+        Money amount = Money.ofTransferAmount(request.amount(), request.currency());
 
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, senderIban,
                 receiverIban, amount);

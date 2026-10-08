@@ -9,6 +9,7 @@ import com.bank.app.account.domain.LedgerEntry;
 import com.bank.app.account.domain.MovementDirection;
 import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
@@ -136,7 +137,7 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
 
     private static void requireDistinctAccounts(Long senderId, Long receiverId) {
         if (Objects.equals(senderId, receiverId)) {
-            throw new IllegalArgumentException("Sender and receiver accounts must be different");
+            throw new DistinctAccountsRequiredException(senderId);
         }
     }
 
@@ -145,6 +146,9 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         Objects.requireNonNull(id2, "id2 must not be null");
         // Lock accounts in stable ID order so concurrent transfers between the same pair
         // always acquire pessimistic locks in the same sequence (deadlock prevention).
+        // T-13: this ordered lock is the PRIMARY guard; the versioned bulk UPDATE
+        // in AccountPersistenceAdapter.save is the cross-check (see
+        // docs/decisions/account-locking.md — drop neither side alone).
         return OrderedPair.from(
                 id1, () -> loadAccountPort.findByIdForUpdate(id1)
                         .orElseThrow(() -> new AccountNotFoundException(id1)),

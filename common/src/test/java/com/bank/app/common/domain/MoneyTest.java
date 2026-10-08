@@ -59,9 +59,9 @@ class MoneyTest {
         @Test
         void shouldRejectImplicitRounding() {
             assertThatThrownBy(() -> Money.of("100.456", Currency.TRY))
-                    .isInstanceOf(ArithmeticException.class);
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> Money.exact(new BigDecimal("100.456"), Currency.TRY))
-                    .isInstanceOf(ArithmeticException.class);
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
         }
 
         @Test

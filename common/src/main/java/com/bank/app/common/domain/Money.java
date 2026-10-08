@@ -58,6 +58,14 @@ public record Money(
         Objects.requireNonNull(amount, "Amount must not be null");
         Objects.requireNonNull(currency, "Currency must not be null");
         requireNonNegative(amount);
+        // Validate BEFORE normalizing: setScale(UNNECESSARY) throws
+        // ArithmeticException (mapped to 500) on excess scale. The domain
+        // contract is IllegalArgumentException (mapped to 400 INVALID_ARGUMENT),
+        // consistent with the canonical constructor below.
+        if (amount.scale() > MAX_SCALE) {
+            throw new IllegalArgumentException(
+                    "Amount can have at most " + MAX_SCALE + " decimal places: " + amount);
+        }
         return new Money(amount.setScale(MAX_SCALE, RoundingMode.UNNECESSARY), currency);
     }
 

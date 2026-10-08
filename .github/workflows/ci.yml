@@ -101,6 +101,11 @@ jobs:
         path: target/bom.json
         if-no-files-found: error
 
+    - name: Dependency review (OSV gate)
+      # Local equivalent of the PR advisory gate (docs/decisions/dependency-review.md):
+      # fails on HIGH/CRITICAL modulo scripts/dependency_allowlist.json.
+      run: python3 scripts/dependency_review.py
+
     - name: Check aggregate coverage for every module
       run: python3 scripts/check_aggregate_coverage.py app/target/site/jacoco-aggregate/jacoco.xml
 
@@ -187,8 +192,21 @@ jobs:
         node --check app/src/main/resources/static/accounts.js
         node --check app/src/main/resources/static/transfers.js
         node --check app/src/main/resources/static/app.js
-        node app/src/test/js/idempotency.test.js
-        node app/src/test/js/frontend_contract.test.js
+        # node:test runner (TAP + non-zero exit on failure); new *.test.js
+        # files under app/src/test/js/ are picked up without editing CI.
+        # Quoted glob (not a bare directory): node expands it internally on
+        # every OS; a bare dir path is treated as a module and fails.
+        node --test "app/src/test/js/*.test.js"
+
+    - name: Frontend XSS guard (H-2)
+      run: |
+        python3 scripts/check_frontend_xss.py
+        python3 scripts/check_frontend_xss.py --self-test
+
+    - name: Frontend lint (ESLint, M-1 slice)
+      run: |
+        npm ci
+        npm run lint
 
     - name: Architecture Tests
       # Wildcard (not an explicit class list): a new *ArchitectureTest must

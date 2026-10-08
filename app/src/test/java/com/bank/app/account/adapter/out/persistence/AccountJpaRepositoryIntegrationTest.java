@@ -165,6 +165,31 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRefreshUpdatedAtOnVersionedBulkUpdate() {
+        // R1: the bulk path bypasses AuditingEntityListener, so the query must
+        // refresh updatedAt explicitly. Seed row has updated_at NULL.
+        assertNull(repo.findById(savedEntityId).orElseThrow().getUpdatedAt());
+
+        int updated = repo.updateIfVersionMatch(savedEntityId, 0L,
+                new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Test User");
+
+        assertEquals(1, updated);
+        AccountJpaEntity reloaded = repo.findById(savedEntityId).orElseThrow();
+        assertEquals(1L, reloaded.getVersion());
+        assertNotNull(reloaded.getUpdatedAt(),
+                "bulk update must refresh updatedAt like the managed-entity path does");
+        assertEquals(0, new BigDecimal("2000.00").compareTo(reloaded.getBalance()));
+    }
+
+    @Test
+    void shouldReturnZeroOnStaleVersionBulkUpdate() {
+        int updated = repo.updateIfVersionMatch(savedEntityId, 999L,
+                new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Test User");
+
+        assertEquals(0, updated);
+    }
+
+    @Test
     void shouldProjectInfoByIdWithoutHydratingBalance() {
         var rows = repo.findInfoById(savedEntityId);
 

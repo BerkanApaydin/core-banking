@@ -64,6 +64,9 @@ public class SecurityConfig {
                 // hasRole check stays as the inner layer; both layers render
                 // the same ACCESS_DENIED problem body.
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                // Runtime log-level changes are ADMIN-only (exposed via
+                // management.endpoints.web.exposure.include=loggers).
+                .requestMatchers("/actuator/loggers/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

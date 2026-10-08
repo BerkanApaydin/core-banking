@@ -54,10 +54,15 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
      * concurrent write; caller disambiguates only on the rare 0 path).
      * Hibernate bumps {@code @Version} automatically for managed-entity writes;
      * here the bump is explicit so the bulk path stays version-consistent.
+     * R1: the bulk path bypasses Hibernate dirty checking AND the
+     * {@code AuditingEntityListener}, so {@code updatedAt} is refreshed
+     * explicitly — otherwise balance mutations would leave a stale audit
+     * timestamp while the managed-entity path updates it.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE AccountJpaEntity a SET a.balance = :balance, a.status = :status, "
-            + "a.ownerName = :ownerName, a.version = a.version + 1 "
+            + "a.ownerName = :ownerName, a.version = a.version + 1, "
+            + "a.updatedAt = CURRENT_TIMESTAMP "
             + "WHERE a.id = :id AND a.version = :version")
     int updateIfVersionMatch(@Param("id") Long id,
             @Param("version") Long version,

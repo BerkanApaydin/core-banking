@@ -3,12 +3,19 @@ package com.bank.app.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 
+import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Iban;
+import com.bank.app.common.domain.Money;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -84,5 +91,72 @@ class CodingRulesArchitectureTest extends ArchitectureTest {
                         "use ZoneOffset.UTC instead"))
                 .allowEmptyShould(false);
         zoneRule.check(importedClasses);
+    }
+
+    @Test
+    void noDirectTransactionalAnnotationInUseCases() {
+        // R7/P5-2: use cases declare transactions via @TransactionalUseCase /
+        // @ReadOnlyUseCase markers (UseCaseTransactionAspect owns isolation +
+        // timeout). A direct @Transactional would silently bypass the aspect's
+        // READ_COMMITTED/timeout contract and split the tx model in two.
+        // Allowed homes for @Transactional: infrastructure (IdempotencyGuard
+        // REQUIRES_NEW isolation, outbox machinery) and tests.
+        ArchRule rule = com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses()
+                .that().resideInAPackage("..application.usecase..")
+                .should().beAnnotatedWith(Transactional.class)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void spendableTransferPathMustEnforceIbanChecksum() {
+        // R8/P4-1: new Iban() is format-only by design (legacy rows stay
+        // readable); the boundary that creates spendable transfers must enforce
+        // MOD 97-10 via Iban.checked — the guard must not be forgettable.
+        ArchRule rule = classes()
+                .that().haveSimpleName("TransferDomainService")
+                .should().callMethod(Iban.class, "checked", String.class)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void accountCreationPathMustEnforceIbanChecksum() {
+        // Same invariant for the account-creation boundary: either checked()
+        // or new Iban() + requireValidChecksum() (CreateAccountUseCaseImpl
+        // spells it out for the seed-vs-generated branch). A future path that
+        // mints spendable IBANs without either call fails here.
+        DescribedPredicate<JavaMethodCall> checksumEnforcement =
+                new DescribedPredicate<JavaMethodCall>("IBAN checksum enforcement") {
+                    @Override
+                    public boolean test(JavaMethodCall call) {
+                        if (!call.getTarget().getOwner().isAssignableTo(Iban.class)) {
+                            return false;
+                        }
+                        String name = call.getTarget().getName();
+                        return "checked".equals(name) || "requireValidChecksum".equals(name);
+                    }
+                };
+        ArchRule rule = classes()
+                .that().haveSimpleName("CreateAccountUseCaseImpl")
+                .should().callMethodWhere(checksumEnforcement)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void moneyInstantiatedOnlyThroughFactories() {
+        // R-1: the canonical constructor cannot be private (records require a
+        // public canonical constructor — javac rejects anything stronger with
+        // "attempting to assign stronger access privileges"), so the
+        // single-factory invariant is pinned here instead: production code
+        // builds Money only via exact/of/ofTransferAmount/rounded, whose
+        // bodies live inside Money itself.
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app..")
+                .and().haveSimpleNameNotContaining("Money")
+                .should().callConstructor(Money.class, BigDecimal.class, Currency.class)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
     }
 }

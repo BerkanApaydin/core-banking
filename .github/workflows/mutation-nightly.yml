@@ -1,0 +1,84 @@
+name: Mutation Nightly (domain 85%)
+
+# R6 follow-up: the main CI mutation gate stays at 80% for speed; this
+# scheduled job enforces the stricter 85% domain-mutation target from the
+# `pitest-domain` profile (root pom) on a weekly cadence plus manual dispatch.
+# Failure notifies without blocking PRs — fix forward within the week.
+on:
+  schedule:
+    - cron: '0 2 * * 1' # Monday 02:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation-domain:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: bank_db
+          POSTGRES_USER: bank_user
+          POSTGRES_PASSWORD: bank_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v5
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    # Same two-phase sequence as the root pom documents: reactor JARs
+    # (including the shared test JAR) must be installed before PIT's
+    # separate invocation can resolve them.
+    - name: Install reactor JARs
+      run: mvn -B -ntp clean install -DskipTests
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
+
+    - name: Domain mutation coverage (85% gate)
+      run: mvn -B -ntp pitest:mutationCoverage -Ppitest-domain -Dpitest.skip=false -T 4
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USERNAME: bank_user
+        DB_PASSWORD: bank_password
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+    - name: Upload domain PIT report
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: pit-domain-nightly
+        path: '**/target/pit-reports/'

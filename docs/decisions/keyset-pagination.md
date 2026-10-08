@@ -18,3 +18,9 @@
 (`size+1`) and derives `hasNext` with no second query.
 
 **Backward compatibility:** `page/size` is still accepted; a supplied cursor wins.
+
+**R6 guard:** pure-offset windows with `page*size > 10_000`
+(`ReportCriteria.MAX_OFFSET_WINDOW`, shared by `GetTransferHistoryQueryImpl`)
+are rejected with 400 — OFFSET cost is bounded by construction, and unbounded
+scrolling must use the cursor. The V43 covering indexes serve both the cursor
+range scan and the surviving shallow-offset path.

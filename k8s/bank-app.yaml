@@ -80,6 +80,18 @@ spec:
               value: redis
             - name: REDIS_PORT
               value: "6379"
+            # Managed-Redis AUTH (S-3): mounted only when bank-redis-secret
+            # exists; optional so AUTH-less clusters keep booting with the
+            # property unset (never an empty string — an empty password would
+            # make Lettuce send AUTH against a no-AUTH broker and fail).
+            # The manual Lettuce factory reads spring.data.redis.password via
+            # Boot relaxed binding (see RedisRateLimitConfiguration).
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bank-redis-secret
+                  key: password
+                  optional: true
             # K1: per-client IP buckets behind ingress. The app defaults to
             # distrusting X-Forwarded-For (TCP peer only), which collapses all
             # external clients into the ingress IP bucket — one abusive client
@@ -179,6 +191,32 @@ spec:
     name: bank-app
   minReplicas: 2
   maxReplicas: 6
+  # M-3 roadmap (not yet wired): CPU/memory scale the stateless web tier, but
+  # the financial bottlenecks are queue-shaped. The signals already exist in
+  # Prometheus (no code change needed): outbox_pending_current +
+  # outbox_oldest_pending_age_seconds (BacklogMetricsReporter),
+  # hikaricp_connections_pending (Hikari), tomcat_threads_busy (Micrometer).
+  # Wiring them needs prometheus-adapter (Custom Metrics API) installed in the
+  # cluster first — adding `type: Pods`/`Object` entries without it turns every
+  # HPA evaluation Unknown and freezes scaling, which is worse than CPU-only.
+  # M-3 ready-to-wire template (uncomment ONLY after the adapter serves the
+  # custom metrics API; verify with `kubectl get --raw
+  # /apis/custom.metrics.k8s.io/v1beta1` first, then calibrate thresholds from
+  # staging baselines — the values below are placeholders, not tuned):
+  #   - type: Pods
+  #     pods:
+  #       metric:
+  #         name: outbox_pending_current
+  #       target:
+  #         type: AverageValue
+  #         averageValue: 200
+  #   - type: Pods
+  #     pods:
+  #       metric:
+  #         name: outbox_oldest_pending_age_seconds
+  #       target:
+  #         type: AverageValue
+  #         averageValue: 120
   metrics:
     - type: Resource
       resource:

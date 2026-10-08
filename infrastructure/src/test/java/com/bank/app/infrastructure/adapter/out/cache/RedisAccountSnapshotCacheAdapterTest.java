@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -89,9 +90,15 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         String ibanKey = AccountSnapshotCache.ibanKey("tr45 0006 1005 1978 6456 8412 34");
         verify(valueOps).set("account-snapshot:iban-" + ibanKey, "1|10|TRY|ACTIVE", 60L, TimeUnit.SECONDS);
-        verify(setOps).add("account-snapshot:idx:ibans-by-id:1", ibanKey);
-        verify(redisTemplate).expire("account-snapshot:idx:ibans-by-id:1", 60L, TimeUnit.SECONDS);
-        verify(valueOps).set("account-snapshot:idx:id-by-iban:" + ibanKey, "1", 60L, TimeUnit.SECONDS);
+        // Single server-side EVAL (SADD + EXPIRE + SETEX): 1 RTT instead of 3.
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of(
+                        "account-snapshot:idx:ibans-by-id:1",
+                        "account-snapshot:idx:id-by-iban:" + ibanKey)),
+                eq("60"), eq(ibanKey), eq("1"));
+        verify(setOps, never()).add(anyString(), anyString());
+        verify(redisTemplate, never()).expire(anyString(), anyLong(), any());
+        verify(valueOps, never()).set(anyString(), eq("1"), anyLong(), any());
     }
 
     @Test
@@ -220,7 +227,7 @@ class RedisAccountSnapshotCacheAdapterTest {
     @Test
     void shouldHonorConfiguredTtl() {
         CacheProperties props = new CacheProperties(
-                new CacheProperties.AccountInfoCache("caffeine", 1000, 10L));
+                new CacheProperties.AccountInfoCache("caffeine", 1000, 10L, 500L));
         var customTtl = new RedisAccountSnapshotCacheAdapter(redisTemplate, props);
 
         customTtl.putById(1L, SNAPSHOT);

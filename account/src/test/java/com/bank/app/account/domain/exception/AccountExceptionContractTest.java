@@ -33,4 +33,12 @@ class AccountExceptionContractTest {
         assertThat(new AccountNotFoundException("TR440006200000000000000123").getFailureKind())
                 .isEqualTo(BusinessFailureKind.NOT_FOUND);
     }
+
+    @Test
+    void distinctAccountsShouldExposeRuleViolation() {
+        var ex = new DistinctAccountsRequiredException(7L);
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.RULE_VIOLATION);
+        assertThat(ex.getErrorCode()).isEqualTo("DISTINCT_ACCOUNTS_REQUIRED");
+        assertThat(ex.getMessageKey()).isEqualTo("error.distinct_accounts_required");
+    }
 }

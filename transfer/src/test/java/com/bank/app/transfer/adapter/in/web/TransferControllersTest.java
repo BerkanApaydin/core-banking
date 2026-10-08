@@ -236,6 +236,8 @@ class TransferControllersTest {
                         .param("cursorCreatedAt", "2026-09-01T00:00:00")
                         .param("cursorId", "10"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Deprecation", "true"))
+                .andExpect(header().exists("Sunset"))
                 .andExpect(jsonPath("$.hasNext").value(true));
 
         var criteriaCaptor = ArgumentCaptor.forClass(ReportCriteria.class);
@@ -269,6 +271,9 @@ class TransferControllersTest {
                         .param("startDate", "2026-09-01T00:00:00")
                         .param("endDate", "2026-09-02T00:00:00"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Deprecation", "true"))
+                .andExpect(header().string("Sunset", "Wed, 30 Jun 2027 23:59:59 GMT"))
+                .andExpect(header().exists("Link"))
                 .andExpect(jsonPath("$.totalCount").value(2))
                 .andExpect(jsonPath("$.totalVolume").value(300.00));
     }

@@ -2,10 +2,17 @@ server:
   shutdown: graceful
   tomcat:
     threads:
-      max: 200
+      # Capped relative to the Hikari pool (20): every request thread can hold
+      # a DB connection for the whole use-case transaction, so threads >> pool
+      # only queues on Hikari (5s connection-timeout -> 500). Keep
+      # threads.max ~= 3x pool; non-DB work (static UI, health) shares the rest.
+      # Raise DB_MAX_POOL_SIZE first if this limit throttles throughput.
+      max: 64
       min-spare: 10
-    accept-count: 500
-    max-connections: 2000
+    # Fail fast under burst: a full queue rejects (caller retries / scales)
+    # instead of parking thousands of sockets behind a saturated pool.
+    accept-count: 100
+    max-connections: 256
     max-swallow-size: 2MB
     max-http-form-post-size: 2MB
   compression:
@@ -43,7 +50,9 @@ spring:
       # with DB_MAX_POOL_SIZE; measure pool-wait before raising.
       maximum-pool-size: ${DB_MAX_POOL_SIZE:20}
       minimum-idle: 10
-      connection-timeout: 5000
+      # Aligned with fail-fast Tomcat queueing above: waiting longer than the
+      # caller's patience only converts a capacity problem into a 500 spike.
+      connection-timeout: 3000
       idle-timeout: 300000
       max-lifetime: 1200000
       keepalive-time: 60000
@@ -185,14 +194,17 @@ app:
         backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
         maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
         expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}
+        # SCAN batch for operational evict-all resets (Redis backend).
+        eviction-batch-size: ${CACHE_ACCOUNT_INFO_EVICTION_BATCH_SIZE:500}
 
 management:
   endpoints:
     web:
       exposure:
-        # info is intentionally NOT exposed: it is not whitelisted and would
-        # be unreachable anyway (K1/D1). Keep the surface to health+prometheus.
-        include: health,prometheus
+        # info stays hidden (not whitelisted, unreachable anyway per K1/D1).
+        # loggers is exposed for restart-free level changes in prod but is NOT
+        # whitelisted: SecurityConfig restricts /actuator/loggers/** to ADMIN.
+        include: health,prometheus,loggers
   endpoint:
     health:
       show-details: when_authorized

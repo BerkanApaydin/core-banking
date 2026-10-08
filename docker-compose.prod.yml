@@ -25,9 +25,14 @@ services:
 
   redis:
     # No published ports (DB/cache reachable only inside the compose network).
-    # No requirepass here: real production uses managed Redis with AUTH (then
-    # set spring.data.redis.password); this file validates the boot contract,
-    # not the network perimeter (see k8s/networkpolicy.yaml for the latter).
+    # No requirepass here: real production uses managed Redis with AUTH. The
+    # app honors spring.data.redis.password via Boot relaxed binding (see
+    # RedisRateLimitConfiguration + RedisRateLimitConfigurationTest), so point
+    # SPRING_DATA_REDIS_PASSWORD at the broker secret when AUTH is enforced —
+    # e.g. uncomment the line below. Kept commented (not empty): an empty
+    # password would make Lettuce send AUTH against a no-AUTH broker and fail.
+    # this file validates the boot contract, not the network perimeter
+    # (see k8s/networkpolicy.yaml for the latter).
     ports: []
 
   app:
@@ -39,6 +44,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?prod requires DB_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Managed-Redis AUTH (S-3): uncomment when the broker enforces AUTH.
+      # SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:?redis AUTH password}
       # Generate with: openssl rand -base64 32 (must decode to >= 32 bytes).
       JWT_SECRET: ${JWT_SECRET:?prod requires JWT_SECRET}
       JWT_ALLOW_DEFAULT_SECRET: "false"

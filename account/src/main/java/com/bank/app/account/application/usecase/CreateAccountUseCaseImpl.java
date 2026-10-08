@@ -72,7 +72,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
         Currency currency = request.currency();
 
-        Money balance = new Money(request.initialBalance(), currency);
+        Money balance = Money.exact(request.initialBalance(), currency);
         Account account = new Account(null, new UserId(request.userId()), iban, request.ownerName(), balance, AccountStatus.ACTIVE);
 
         Account savedAccount = saveAccountPort.save(account);

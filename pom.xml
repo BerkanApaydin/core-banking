@@ -41,7 +41,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.12.0</mockito.version>
-        <byte-buddy.version>1.17.5</byte-buddy.version>
+        <!-- F-01: 1.17.5 -> 1.17.8 minimum. 1.17.8 fixes dynamic attach on
+             Windows ("Fix dynamic attach on Windows when a service user is
+             active"); on <=1.17.7 every surefire JVM falls back to the
+             external attacher child-JVM, which flakes under commit pressure
+             ("Could not self-attach to current VM using external process").
+             Matches Spring Boot 3.5.16's managed byte-buddy (1.17.8). -->
+        <byte-buddy.version>1.17.8</byte-buddy.version>
         <!-- Dependency-review gate (scripts/dependency_review.py, OSV):
              pinned above upstream to close HIGH/CRITICAL advisories. -->
         <jackson-bom.version>2.21.7</jackson-bom.version>

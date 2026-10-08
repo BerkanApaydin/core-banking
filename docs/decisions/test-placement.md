@@ -16,7 +16,7 @@ This is deliberate, not drift:
    scope to depend on `infrastructure` (for `ApiVersionConfig` and
    `GlobalExceptionHandler`), creating test-only module edges that mirror —
    and can silently diverge from — the production edges ArchUnit enforces.
-3. The 26 `*IntegrationTest` classes already run against Testcontainers
+3. The 33 `*IntegrationTest`/`*IT` classes already run against Testcontainers
    PostgreSQL via the shared `TestDatabaseContainer` (fresh database per JVM,
    Flyway-migrated, per-test cleanup in teardowns) — not against a shared
    developer database. Isolation is per-test, not per-module, which is the

@@ -21,6 +21,7 @@ is the single map: ID → file → one-sentence decision.
 | V32 | `docs/release.md` (lock measurement) | Staging lock measurement mandatory before `ALTER TYPE` on large tables. |
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
 | R-1 | `docs/decisions/pending-reaper.md` | Crash-window reaper marks stale PENDING transfers FAILED via the domain; no distributed lock, version conflicts counted. |
+| T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
 
 ## Newly added decisions (this improvement round)
 

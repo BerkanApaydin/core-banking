@@ -19,6 +19,19 @@ measured by the quarterly drill (`ops/restore-drill.sh`), not re-derived here.
 Out of scope for SLOs (no paging): report/history latency (best-effort reads),
 `429` rate-limit responses (client behavior, not service health).
 
+## Security propagation expectations (F-15 — contract, not metric)
+
+- Role/suspension revocation takes effect on admin paths and refresh
+  immediately (DB-checked), but a live non-admin access token stays valid
+  until expiry (15 min default, `JWT_ACCESS_EXPIRATION`). Worst case: a
+  demoted user retains non-admin access for up to 15 minutes.
+- This is an accepted trade-off (stateless verification, see
+  `docs/decisions/token-version.md` G-2), recorded here so support and
+  auditors share one expectation: "revocation within 15 minutes on data
+  paths, immediate on admin paths and next refresh". Tighten only by
+  lowering `JWT_ACCESS_EXPIRATION` (more refresh traffic) — not by
+  re-checking the DB per request.
+
 ## Measurement evidence (long term #5 — added in this round)
 
 - Grafana: `k8s/grafana-dashboard.json` (p50/p95/p99 + backlog + ledger gauge).

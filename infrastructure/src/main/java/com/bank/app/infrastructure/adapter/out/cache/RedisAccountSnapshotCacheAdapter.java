@@ -44,8 +44,6 @@ import java.util.concurrent.TimeUnit;
 public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
-    // TODO: move to CacheProperties + ApplicationStartupValidator.requirePositive.
-    private static final int EVICTION_BATCH_SIZE = 500;
 
     /**
      * Single-round-trip eviction: the SMEMBERS index read and the DEL run
@@ -63,6 +61,18 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         "return redis.call('DEL', unpack(del))";
 
     /**
+     * Single-round-trip index write: the id-to-IBAN reverse entry, its TTL,
+     * and the forward lookup are applied server-side in one EVAL instead of
+     * SADD + EXPIRE + SET (3 RTT). KEYS = [idxKey, idByIbanKey],
+     * ARGV = [ttlSeconds, ibanKey, accountId].
+     */
+    private static final String LUA_TRACK_IBAN =
+        "redis.call('SADD', KEYS[1], ARGV[2])\n" +
+        "redis.call('EXPIRE', KEYS[1], ARGV[1])\n" +
+        "redis.call('SETEX', KEYS[2], ARGV[1], ARGV[3])\n" +
+        "return 1";
+
+    /**
      * Single-round-trip bulk write: N TTL'd id-to-IBAN mappings in one EVAL.
      * KEYS = map keys in ascending id order, ARGV = [ttlSeconds, value...]
      * aligned with KEYS.
@@ -77,15 +87,19 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private final StringRedisTemplate redisTemplate;
     private final long ttlSeconds;
+    private final int evictionBatchSize;
     private final DefaultRedisScript<Long> evictByIdScript;
     private final DefaultRedisScript<Long> putIbansScript;
+    private final DefaultRedisScript<Long> trackIbanScript;
 
     public RedisAccountSnapshotCacheAdapter(StringRedisTemplate redisTemplate,
             CacheProperties cacheProperties) {
         this.redisTemplate = redisTemplate;
         this.ttlSeconds = cacheProperties.accountInfo().expireAfterWrite();
+        this.evictionBatchSize = Math.toIntExact(cacheProperties.accountInfo().evictionBatchSize());
         this.evictByIdScript = new DefaultRedisScript<>(LUA_EVICT_BY_ID, Long.class);
         this.putIbansScript = new DefaultRedisScript<>(LUA_PUT_IBANS, Long.class);
+        this.trackIbanScript = new DefaultRedisScript<>(LUA_TRACK_IBAN, Long.class);
     }
 
     @Override
@@ -186,13 +200,13 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     public void evictAll() {
         ScanOptions options = ScanOptions.scanOptions()
                 .match(SnapshotKeys.scanPattern())
-                .count(EVICTION_BATCH_SIZE)
+                .count(evictionBatchSize)
                 .build();
         try (Cursor<String> cursor = redisTemplate.scan(options)) {
-            Collection<String> batch = new ArrayList<>(EVICTION_BATCH_SIZE);
+            Collection<String> batch = new ArrayList<>(evictionBatchSize);
             while (cursor.hasNext()) {
                 batch.add(cursor.next());
-                if (batch.size() == EVICTION_BATCH_SIZE) {
+                if (batch.size() == evictionBatchSize) {
                     redisTemplate.delete(batch);
                     batch.clear();
                 }
@@ -241,15 +255,11 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         }
     }
 
-    // TODO: single-RTT Lua (SADD + EXPIRE + SET in one EVAL); 3 RTT today.
     private void trackIban(Long accountId, String ibanKey) {
         try {
             String idxKey = SnapshotKeys.ibansByIdIndex(accountId);
-            redisTemplate.opsForSet().add(idxKey, ibanKey);
-            redisTemplate.expire(idxKey, ttlSeconds, TimeUnit.SECONDS);
-            redisTemplate.opsForValue().set(
-                    SnapshotKeys.idByIbanIndex(ibanKey),
-                    String.valueOf(accountId), ttlSeconds, TimeUnit.SECONDS);
+            redisTemplate.execute(trackIbanScript, List.of(idxKey, SnapshotKeys.idByIbanIndex(ibanKey)),
+                    String.valueOf(ttlSeconds), ibanKey, String.valueOf(accountId));
         } catch (RuntimeException e) {
             log.warn("Redis snapshot index write failed: {}", e.getClass().getSimpleName());
         }

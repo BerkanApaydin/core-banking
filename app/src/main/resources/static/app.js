@@ -1,4 +1,5 @@
 // --- Configuration ---
+/* exported sanitizeIban, lookupManualIban, activeTab, fundingMode, accountPager */
 const API_BASE = '/api/v1';
 
 // --- Theme (dark default, preference persisted) ---
@@ -847,8 +848,9 @@ async function lookupManualIban(iban) {
     lastIbanLookup = v;
     try {
         // GET /accounts/iban/{iban}: backend only returns the caller's OWN
-        // accounts (403 otherwise), so a hit means "one of my accounts".
-        // Anything else stays silent by design — no existence oracle.
+        // accounts (other-owned and missing share one 404, G-5), so a hit
+        // means "one of my accounts". Anything else stays silent by design
+        // — no existence oracle.
         const acc = await fetchApi(`/accounts/iban/${encodeURIComponent(v)}`);
         note.classList.remove('d-none');
         note.innerHTML = `${__('transfer.own_iban_note', escapeHtml(acc.ownerName))}`;

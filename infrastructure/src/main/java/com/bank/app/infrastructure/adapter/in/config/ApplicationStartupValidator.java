@@ -73,6 +73,8 @@ public class ApplicationStartupValidator {
         requirePositive("app.security.rate-limit.time-window-ms", 10_000L);
         requirePositive("app.security.rate-limit.resource-max-requests", 120L);
         requirePositive("app.security.rate-limit.resource-time-window-ms", 60_000L);
+        // Snapshot-cache SCAN batch: zero would make evict-all a no-op loop.
+        requirePositive("app.cache.caffeine.account-info.eviction-batch-size", 500L);
         // Outbox poller misconfiguration silently stops money-movement
         // callbacks: a zero batch/negative retry count must fail fast at
         // startup, not as a stalled outbox in production.

@@ -1,4 +1,5 @@
 // --- Accounts Operations ---
+/* exported loadAccountCapabilities, initModal */
 function renderPortfolioSummary() {
     const summaryEl = document.getElementById('portfolio-summary');
     const heroTotal = document.getElementById('hero-total');

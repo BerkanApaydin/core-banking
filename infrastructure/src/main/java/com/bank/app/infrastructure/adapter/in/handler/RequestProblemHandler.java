@@ -18,12 +18,15 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -81,8 +84,32 @@ public class RequestProblemHandler {
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ProblemDetail> handleMethodValidation(
             HandlerMethodValidationException ex, WebRequest request) {
-        return ProblemDetailFactory.createValidationError(
-                Map.of("request", "Invalid request parameters"), request);
+        // Method-parameter validation (e.g. @Min/@Max on @RequestParam): report
+        // the offending parameter.field with its constraint message instead of
+        // a fixed blob, so clients know which query value to fix. Never echo
+        // rejected values — only names and catalog messages.
+        Map<String, String> errors = new LinkedHashMap<>();
+        ex.getParameterValidationResults().forEach(result -> {
+            String param = result.getMethodParameter().getParameterName();
+            result.getResolvableErrors().forEach(error -> {
+                String field;
+                if (error instanceof FieldError fieldError) {
+                    field = fieldError.getField();
+                } else if (error instanceof ObjectError objectError) {
+                    field = objectError.getObjectName();
+                } else {
+                    field = "request";
+                }
+                String key = param != null ? param + "." + field : field;
+                String message = error.getDefaultMessage();
+                errors.putIfAbsent(key, message != null ? message : "Invalid value");
+            });
+        });
+        if (errors.isEmpty()) {
+            return ProblemDetailFactory.createValidationError(
+                    Map.of("request", "Invalid request parameters"), request);
+        }
+        return ProblemDetailFactory.createValidationError(errors, request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -104,6 +131,16 @@ public class RequestProblemHandler {
         // Never echo raw exception messages: they may carry SQL fragments,
         // paths, or validation internals. Log the detail, return a generic key.
         log.warn("Invalid argument rejected: {}", ex.getClass().getSimpleName());
+        String message = messages.resolveOrDefault("error.invalid_argument", "Invalid request argument.");
+        return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
+    }
+
+    @ExceptionHandler(ArithmeticException.class)
+    public ResponseEntity<ProblemDetail> handleArithmeticException(ArithmeticException ex, WebRequest request) {
+        // Safety net for numeric paths that bypass the Money factories
+        // (BigDecimal divide/remainder/setScale with UNNECESSARY). A decimal
+        // shape failure is a client input error (400), never a 500.
+        log.warn("Arithmetic rejected: {}", ex.getClass().getSimpleName());
         String message = messages.resolveOrDefault("error.invalid_argument", "Invalid request argument.");
         return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
     }

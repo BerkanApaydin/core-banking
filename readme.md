@@ -136,7 +136,7 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 | Transfer | `/transfers/{id}/cancel` | `POST` | Conditionally reverse a completed transfer; `Idempotency-Key` required. |
 | Transfer | `/transfers/history/{accountId}` | `GET` | Paged transfer history. |
 | Transfer | `/transfers/report` | `GET` | Paged date-range report with `pageTransferCount`, `pageVolume` and `hasNext`; not a full-range export. |
-| Transfer | `/transfers/report/combined` | `GET` | Same page plus whole-range `totalCount`/`totalVolume` in one call. |
+| Transfer | `/transfers/report/combined` | `GET` | **Deprecated, sunset 2027-06-30** (still served with `Deprecation: true` + `Sunset` headers and a `Link: rel="successor-version"` to `/transfers/report?includeTotals=true`): same page plus whole-range `totalCount`/`totalVolume` in one call. New clients use `/transfers/report?includeTotals=true`. |
 | Transfer | `/transfers/report/totals` | `GET` | Whole-range `totalTransferCount`/`totalVolume` header for the criteria. |
 
 ---

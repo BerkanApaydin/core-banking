@@ -1,8 +1,8 @@
 // --- Transfer Page Operations ---
+/* exported populateTransferDropdowns, initTransferForm */
 function populateTransferDropdowns() {
     const senderSelect = document.getElementById('sender-account-select');
     const receiverSelect = document.getElementById('receiver-account-select');
-    const currencySelect = document.getElementById('transfer-currency');
     const balanceIndicator = document.getElementById('sender-balance-indicator');
 
     const prevSender = senderSelect.value;

@@ -13,7 +13,6 @@ import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,6 +27,16 @@ import java.util.List;
 
 /**
  * Seeds sample data through domain use cases — JPA entity bypass removed.
+ *
+ * <p>R4: this class is a plain domain-service bean (no {@code @Bean} methods —
+ * lite-mode {@code @Bean} in a {@code @Component} skips full
+ * {@code @Configuration} proxying). The {@code CommandLineRunner} wiring lives
+ * in {@link DataSeederRunnerConfig}.
+ *
+ * <p>The profile expression is intentional: {@code (dev | demo) & !prod} keeps
+ * seeding off even when {@code dev} is accidentally combined with {@code prod}
+ * (e.g. {@code prod,dev}), whereas {@code {"dev","demo"}} would fire. Never
+ * simplify it to a plain name list.
  */
 @Component
 @Profile("(dev | demo) & !prod")
@@ -50,8 +59,12 @@ public class DataSeeder {
         this.loadAccountPort = loadAccountPort;
     }
 
-    @Bean
-    CommandLineRunner seedData() {
+    /**
+     * Factory for the startup runner. Plain method (not a {@code @Bean}):
+     * {@link DataSeederRunnerConfig} exposes it to the context, which keeps
+     * this class unit-testable without Spring ({@code new DataSeeder(...).seedData()}).
+     */
+    public CommandLineRunner seedData() {
         return args -> {
             seedUser("ahmet", "Ahmet12345678");
             seedUser("ayse", "Ayse12345678");

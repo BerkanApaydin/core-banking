@@ -8,14 +8,15 @@ public record CacheProperties(AccountInfoCache accountInfo) {
 
     public CacheProperties {
         if (accountInfo == null) {
-            accountInfo = new AccountInfoCache("caffeine", 1000, 60);
+            accountInfo = new AccountInfoCache("caffeine", 1000, 60, 500);
         }
     }
 
     public record AccountInfoCache(
             @DefaultValue("caffeine") String backend,
             @DefaultValue("1000") long maximumSize,
-            @DefaultValue("60") long expireAfterWrite
+            @DefaultValue("60") long expireAfterWrite,
+            @DefaultValue("500") long evictionBatchSize
     ) {
         /**
          * Snapshot-cache backend selector.

@@ -1,0 +1,12 @@
+{
+  "name": "clean-architecture-bank-frontend-lint",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ESLint gate for the vanilla-JS browser UI (no bundler by design).",
+  "scripts": {
+    "lint": "eslint \"app/src/main/resources/static/*.js\" \"app/src/test/js/*.test.js\""
+  },
+  "devDependencies": {
+    "eslint": "10.12.0"
+  }
+}

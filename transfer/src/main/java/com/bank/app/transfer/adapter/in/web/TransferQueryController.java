@@ -104,10 +104,19 @@ public class TransferQueryController {
         return ResponseEntity.ok().eTag(etag).body(body);
     }
 
+    /**
+     * Sunset for the deprecated combined endpoint (RFC 8594 {@code Deprecation}
+     * + RFC 8594 {@code Sunset}). Kept in code — not config — so the removal
+     * date is visible at the deprecation site and greppable in reviews.
+     */
+    static final String COMBINED_SUNSET_HTTP_DATE = "Wed, 30 Jun 2027 23:59:59 GMT";
+
     @GetMapping("/report/combined")
     @Operation(summary = "Items + whole-range totals in one call",
             description = "API-2: single authorization and read transaction; avoids the two-request skew between /report and /report/totals. "
+                    + "Deprecated: sunset 2027-06-30. "
                     + "New clients should prefer GET /report?includeTotals=true, which serves the same payload from the primary endpoint.")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<TransferReportResponse> getReportCombined(
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
@@ -119,7 +128,12 @@ public class TransferQueryController {
         ReportCriteria criteria = ReportCriteria.criteriaOf(
                 accountId, startDate, endDate, page, size, cursorCreatedAt, cursorId);
         TransferReportResponse body = generateTransferReportWithTotalsQuery.execute(criteria);
-        return ResponseEntity.ok().eTag(TransferReportEtagService.etagFor(body)).body(body);
+        return ResponseEntity.ok()
+                .eTag(TransferReportEtagService.etagFor(body))
+                .header("Deprecation", "true")
+                .header("Sunset", COMBINED_SUNSET_HTTP_DATE)
+                .header("Link", "</api/v1/transfers/report?includeTotals=true>; rel=\"successor-version\"")
+                .body(body);
     }
 
     @GetMapping("/report/totals")

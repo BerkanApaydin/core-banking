@@ -1,4 +1,5 @@
 // --- Idempotency Key Helpers ---
+/* exported getIdempotencyKey, markIdempotencyStarted, markIdempotencyFailed, idempotencyErrorMessage, clearIdempotencyKey, clearAllIdempotencyKeys */
 // crypto.randomUUID() exists only in secure contexts (HTTPS/localhost).
 // Fallback keeps money-movement endpoints working over plain-HTTP LAN URLs:
 // output is hex+hyphens (36 chars), satisfying the backend SAFE_KEY charset

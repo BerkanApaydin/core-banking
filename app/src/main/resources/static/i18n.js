@@ -1,4 +1,5 @@
 // --- i18n Translations ---
+/* exported setLanguage, getLanguage, locale */
 const translations = {
     en: {
         'app.title': 'X Bank — Corporate Digital Banking',

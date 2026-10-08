@@ -14,22 +14,24 @@ class CachePropertiesTest {
         assertEquals("caffeine", cache.backend());
         assertEquals(1000, cache.maximumSize());
         assertEquals(60, cache.expireAfterWrite());
+        assertEquals(500, cache.evictionBatchSize());
     }
 
     @Test
     void shouldKeepCustomValues() {
         CacheProperties.AccountInfoCache cache =
-                new CacheProperties.AccountInfoCache("redis", 5000, 120);
+                new CacheProperties.AccountInfoCache("redis", 5000, 120, 250);
 
         assertEquals("redis", cache.backend());
         assertEquals(5000, cache.maximumSize());
         assertEquals(120, cache.expireAfterWrite());
+        assertEquals(250, cache.evictionBatchSize());
     }
 
     @Test
     void shouldFallBackToCaffeineOnBlankBackend() {
         CacheProperties.AccountInfoCache cache =
-                new CacheProperties.AccountInfoCache("  ", 5000, 120);
+                new CacheProperties.AccountInfoCache("  ", 5000, 120, 500);
 
         assertEquals("caffeine", cache.backend());
     }

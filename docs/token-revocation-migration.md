@@ -74,3 +74,23 @@ re-login wave).
    clients caching the old token).
 5. Alternative without rotation: bump per-user `tokenVersion` (role/password
    flows already do) to retire one identity's sessions at next refresh.
+
+## R2: git-history secret hygiene (P10-1)
+
+A previous default signing key was committed to git history and Docker images
+(`JwtTokenProvider.DEFAULT_JWT_SECRET`; the value was rotated after discovery,
+but history is immutable). Treat **every value that ever appeared in the
+repository as compromised**:
+
+1. Production must already run a generated `JWT_SECRET` (boot refuses the
+   default twice: `JwtTokenProvider` with `allow-default-secret=false` and
+   `ApplicationStartupValidator`). If any environment was ever started with a
+   history value, rotate per the procedure above — the code guards prevent
+   *new* prod boots on it, but they cannot retroactively invalidate tokens
+   minted elsewhere.
+2. Never "clean" this by rewriting history: the value is also baked into
+   published images. Rotation, not erasure, is the fix.
+3. `docker-compose.yml` still ships a dev default for local boot; the pin
+   script (`scripts/check_compose_jwt_default.py`) keeps it equal to the code
+   constant so drift fails loudly. That default is local-only by construction
+   (prod refuses it); do not copy it into any real deployment.

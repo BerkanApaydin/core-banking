@@ -32,6 +32,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.MapBindingResult;
+import org.springframework.validation.method.MethodValidationResult;
+import org.springframework.validation.method.ParameterValidationResult;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -101,6 +104,69 @@ class RequestProblemHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("INVALID_ARGUMENT", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldMapArithmeticExceptionToBadRequest() {
+        // Safety net for numeric paths that bypass the Money factories
+        // (BigDecimal UNNECESSARY rounding, divide): a decimal shape failure
+        // is client input error (400), never the 500 fallback.
+        ArithmeticException ex = new ArithmeticException("Rounding necessary");
+        when(messageSource.getMessage(eq("error.invalid_argument"), any(), any(Locale.class)))
+                .thenReturn("Invalid request argument.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleArithmeticException(ex, null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("INVALID_ARGUMENT", response.getBody().getProperties().get("code"));
+    }
+
+    @SuppressWarnings("unused")
+    static void dummyEndpoint(int size) {
+    }
+
+    private static HandlerMethodValidationException methodValidationFailure() throws Exception {
+        MethodParameter param = new MethodParameter(
+                RequestProblemHandlerTest.class.getDeclaredMethod("dummyEndpoint", int.class), 0);
+        param.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
+        FieldError fieldError = new FieldError("size", "size", 200, false, null, null,
+                "must be less than or equal to 100");
+        ParameterValidationResult result = new ParameterValidationResult(param, 200, List.of(fieldError),
+                null, null, null, (resolvable, type) -> null);
+        MethodValidationResult validationResult = mock(MethodValidationResult.class);
+        when(validationResult.getParameterValidationResults()).thenReturn(List.of(result));
+        return new HandlerMethodValidationException(validationResult);
+    }
+
+    @Test
+    void shouldReportParameterFieldOnMethodValidation() throws Exception {
+        ResponseEntity<ProblemDetail> response = handler.handleMethodValidation(methodValidationFailure(), null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("VALIDATION_FAILED", response.getBody().getProperties().get("code"));
+        @SuppressWarnings("unchecked")
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertNotNull(errors);
+        assertEquals("must be less than or equal to 100", errors.get("size.size"));
+    }
+
+    @Test
+    void shouldFallBackToRequestKeyWhenMethodValidationHasNoResults() {
+        MethodValidationResult empty = mock(MethodValidationResult.class);
+        when(empty.getParameterValidationResults()).thenReturn(List.of());
+
+        ResponseEntity<ProblemDetail> response =
+                handler.handleMethodValidation(new HandlerMethodValidationException(empty), null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        @SuppressWarnings("unchecked")
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertNotNull(errors);
+        assertEquals("Invalid request parameters", errors.get("request"));
     }
 
     @Test

@@ -59,6 +59,7 @@ class ApplicationStartupValidatorTest {
             "app.security.rate-limit.time-window-ms | -1 | positive value",
             "app.security.rate-limit.resource-max-requests | 0 | positive value",
             "app.security.rate-limit.resource-time-window-ms | -1 | positive value",
+            "app.cache.caffeine.account-info.eviction-batch-size | 0 | positive value",
             "app.outbox.max-retries | 0 | positive value",
             "app.outbox.batch-size | -1 | positive value",
             "app.outbox.poll-delay-ms | 0 | positive value",

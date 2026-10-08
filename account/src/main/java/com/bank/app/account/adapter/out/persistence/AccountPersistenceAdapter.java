@@ -128,6 +128,9 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         // Perf-1/P-1: happy path is a single versioned UPDATE (no SELECT).
         // Only the rare 0-row path falls back to a load to distinguish
         // not-found (AccountNotFoundException) from conflict (409).
+        // T-13: the version check is the cross-check, not the primary guard —
+        // rows arrive locked via loadOrderedPair (see
+        // docs/decisions/account-locking.md).
         AccountJpaEntity entity;
         if (account.getId() == null) {
             entity = mapper.toJpaEntity(account);

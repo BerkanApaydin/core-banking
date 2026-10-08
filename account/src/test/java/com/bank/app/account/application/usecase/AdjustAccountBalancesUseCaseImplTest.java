@@ -8,6 +8,7 @@ import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.LedgerDirection;
 import com.bank.app.account.domain.LedgerEntry;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -17,7 +18,6 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
-import com.bank.app.common.domain.event.DomainEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -139,7 +139,9 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldRejectSameAccount() {
             Money amount = Money.of("200.00", Currency.TRY);
 
-            assertThrows(IllegalArgumentException.class, () -> useCase.debitAndCredit(1L, 1L, amount));
+            DistinctAccountsRequiredException ex = assertThrows(DistinctAccountsRequiredException.class,
+                    () -> useCase.debitAndCredit(1L, 1L, amount));
+            assertEquals("DISTINCT_ACCOUNTS_REQUIRED", ex.getErrorCode());
             verifyNoInteractions(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort,
                     ledgerPort);
         }
@@ -210,7 +212,8 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldRejectSameAccount() {
             Money amount = Money.of("200.00", Currency.TRY);
 
-            assertThrows(IllegalArgumentException.class, () -> useCase.reverseForCancellation(2L, 2L, amount));
+            assertThrows(DistinctAccountsRequiredException.class,
+                    () -> useCase.reverseForCancellation(2L, 2L, amount));
             verifyNoInteractions(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort,
                     ledgerPort);
         }
