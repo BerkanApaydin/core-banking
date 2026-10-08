@@ -120,6 +120,18 @@ jobs:
         test -f k8s/grafana-dashboard.json
         echo "migration-soak + keyset index + dashboard present"
 
+    - name: Contract checks (secret pin, test DI, autoscaling, prod compose, partition scripts)
+      run: |
+        python3 scripts/check_compose_jwt_default.py
+        python3 scripts/check_test_injection.py
+        grep -q "kind: HorizontalPodAutoscaler" k8s/bank-app.yaml
+        grep -q "kind: PodDisruptionBudget" k8s/bank-app.yaml
+        test -f docker-compose.prod.yml
+        test -f scripts/audit_partition_cutover.sql
+        test -f scripts/ensure_audit_partition.sql
+        test -f scripts/audit_partition_finalize.sql
+        echo "contracts present"
+
     - name: Live rate-limit smoke (real app + runner)
       # Boots the packaged jar against the CI postgres/redis services and runs
       # the deterministic rate-limit profile (15 registrations -> 429, then

@@ -147,6 +147,15 @@ app:
     # S7/S8: binds to a Duration (hours for plain numbers); the env name is
     # unchanged so existing deployments keep working.
     cancellation-window: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
+    reaper:
+      # Crash-window recovery for PENDING leftovers (TransferPendingReaper):
+      # rows older than older-than are marked FAILED through the domain.
+      # Must stay well above the 30s use-case tx timeout so slow (not dead)
+      # placements are never reaped.
+      enabled: ${TRANSFER_REAPER_ENABLED:true}
+      cron: ${TRANSFER_REAPER_CRON:0 */5 * * * *}
+      older-than: ${TRANSFER_REAPER_OLDER_THAN:PT15M}
+      batch-size: ${TRANSFER_REAPER_BATCH_SIZE:50}
   notification:
     email-enabled: ${NOTIFICATION_EMAIL_ENABLED:true}
     sms-enabled: ${NOTIFICATION_SMS_ENABLED:true}

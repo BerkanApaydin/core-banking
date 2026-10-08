@@ -45,4 +45,13 @@ public interface LoadTransferPort {
     }
 
     ReportTotals summarizeRange(Long accountId, LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Crash-window recovery: PENDING rows older than {@code cutoff} whose money
+     * movement rolled back with the crashed transaction. Ordered oldest first;
+     * bounded by {@code limit} so one schedule never scans the whole table.
+     * Backs {@code TransferPendingReaper}, which transitions each row to FAILED
+     * via the domain (never by raw SQL).
+     */
+    List<Transfer> findStalePending(LocalDateTime cutoff, int limit);
 }

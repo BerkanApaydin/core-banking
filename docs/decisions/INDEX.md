@@ -20,6 +20,7 @@ is the single map: ID → file → one-sentence decision.
 | DB-1 | `docs/decisions/enum-types.md` | Native enum decision + value-add procedure; VARCHAR+CHECK roadmap for status. |
 | V32 | `docs/release.md` (lock measurement) | Staging lock measurement mandatory before `ALTER TYPE` on large tables. |
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
+| R-1 | `docs/decisions/pending-reaper.md` | Crash-window reaper marks stale PENDING transfers FAILED via the domain; no distributed lock, version conflicts counted. |
 
 ## Newly added decisions (this improvement round)
 
@@ -31,3 +32,4 @@ is the single map: ID → file → one-sentence decision.
 - `keyset-pagination.md` (DB-2: cursor contract)
 - `kafka-readiness.md` (long term: OutboxPort → broker migration)
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
+- `pending-reaper.md` (R-1: stale-PENDING crash-window recovery through the domain)

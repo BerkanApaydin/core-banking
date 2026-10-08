@@ -2,6 +2,7 @@ package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.LedgerDirection;
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ class LedgerJpaMapperTest {
     private final LedgerJpaMapper mapper = new LedgerJpaMapper();
 
     private LedgerEntry entry() {
-        return new LedgerEntry(42L, "ref-1", 7L, LedgerDirection.DEBIT,
+        return new LedgerEntry(42L, new TransactionRef("ref-1"), 7L, LedgerDirection.DEBIT,
                 Money.of("200.00", Currency.TRY), Money.of("800.00", Currency.TRY),
                 LocalDateTime.of(2026, 9, 1, 12, 0));
     }
@@ -33,7 +34,7 @@ class LedgerJpaMapperTest {
         LedgerEntry back = mapper.toDomain(entity);
 
         assertThat(back.getId()).isEqualTo(42L);
-        assertThat(back.getTransactionRef()).isEqualTo("ref-1");
+        assertThat(back.getTransactionRef()).isEqualTo(new TransactionRef("ref-1"));
         assertThat(back.getAccountId()).isEqualTo(7L);
         assertThat(back.getDirection()).isEqualTo(LedgerDirection.DEBIT);
         assertThat(back.getAmount()).isEqualTo(Money.of("200.00", Currency.TRY));

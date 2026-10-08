@@ -3,8 +3,11 @@
 ## Status
 
 Accepted — `Transfer.markFailed()`, `TransferStatus.FAILED`, the `chk_transfers_status`
-values and the report UI's FAILED rendering stay, although no production flow
-calls `markFailed()` today.
+values and the report UI's FAILED rendering stay. Update (R-1): `markFailed()`
+now HAS a production caller — `TransferPendingReaper` transitions crash-window
+PENDING leftovers to FAILED through the domain (see `pending-reaper.md`).
+The async-placement rationale below still holds, but the method is no longer
+dead code.
 
 ## Context
 

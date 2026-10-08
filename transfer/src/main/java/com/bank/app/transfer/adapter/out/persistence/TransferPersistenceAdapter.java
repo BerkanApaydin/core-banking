@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.out.persistence;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
+import com.bank.app.transfer.domain.TransferStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -120,6 +121,18 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
                 : row[1] instanceof Number n ? new BigDecimal(n.toString())
                 : BigDecimal.ZERO;
         return new LoadTransferPort.ReportTotals(count, volume);
+    }
+
+    @Override
+    public List<Transfer> findStalePending(LocalDateTime cutoff, int limit) {
+        // Hard cap: one schedule must never page the whole table; the next
+        // schedule continues where this one stopped (oldest-first order).
+        int safeLimit = Math.min(Math.max(limit, 1), 200);
+        Pageable pageable = PageRequest.of(0, safeLimit, Sort.unsorted());
+        return repository.findStalePending(TransferStatus.PENDING, cutoff, pageable)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     /**

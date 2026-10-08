@@ -1,6 +1,7 @@
 package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import org.springframework.stereotype.Component;
@@ -14,7 +15,7 @@ public class LedgerJpaMapper {
         }
         LedgerEntryJpaEntity entity = new LedgerEntryJpaEntity();
         entity.setId(entry.getId());
-        entity.setTransactionRef(entry.getTransactionRef());
+        entity.setTransactionRef(entry.getTransactionRef().value());
         entity.setAccountId(entry.getAccountId());
         entity.setDirection(entry.getDirection());
         entity.setAmount(entry.getAmount().amount());
@@ -31,7 +32,7 @@ public class LedgerJpaMapper {
         Currency currency = entity.getCurrency();
         return new LedgerEntry(
                 entity.getId(),
-                entity.getTransactionRef(),
+                new TransactionRef(entity.getTransactionRef()),
                 entity.getAccountId(),
                 entity.getDirection(),
                 Money.exact(entity.getAmount(), currency),

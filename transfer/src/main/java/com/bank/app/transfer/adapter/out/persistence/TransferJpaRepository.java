@@ -84,4 +84,18 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorId") Long cursorId,
             Pageable pageable);
+
+    /**
+     * Crash-window scan for the pending reaper: PENDING rows whose business
+     * time predates the cutoff, oldest first. The reaper locks each row
+     * individually ({@code findByIdForUpdate}) and transitions it through the
+     * versioned bulk UPDATE, so concurrent reaper replicas (or a racing
+     * completion) surface as version conflicts, never as double marks.
+     */
+    @Query("SELECT t FROM TransferJpaEntity t WHERE t.status = :status "
+            + "AND t.businessCreatedAt < :cutoff ORDER BY t.businessCreatedAt ASC, t.id ASC")
+    List<TransferJpaEntity> findStalePending(
+            @Param("status") TransferStatus status,
+            @Param("cutoff") LocalDateTime cutoff,
+            Pageable pageable);
 }

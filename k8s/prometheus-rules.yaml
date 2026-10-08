@@ -99,6 +99,18 @@ spec:
             severity: ticket
           annotations:
             summary: "Audit events are persisted but never observed after commit"
+        - alert: AuditDefaultPartitionNonEmpty
+          # Partition-drift guard (partitioning.md step 5): rows in the DEFAULT
+          # partition fell outside every pre-created range because
+          # ensure_audit_partition.sql was missed. Pre-cutover the gauge reads
+          # 0 (table absent), so this is quiet until partitioning lands.
+          expr: max(audit_default_partition_rows) > 0
+          for: 30m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Audit rows landing in DEFAULT partition — run ensure_audit_partition.sql"
+            runbook_url: "docs/decisions/partitioning.md"
     - name: idempotency-backlog
       interval: 60s
       rules:
@@ -123,3 +135,27 @@ spec:
             severity: ticket
           annotations:
             summary: "Optimistic-lock conflicts above 0.5/sec — investigate hot accounts"
+    - name: transfers
+      interval: 60s
+      rules:
+        - alert: TransferPendingReaped
+          # Crash-window reaper activity (R-1): a sustained reaped rate means
+          # placements keep crashing between the PENDING save and completion —
+          # investigate pod OOMKills/restarts, not the reaper itself.
+          expr: sum(rate(transfer_pending_reaped_total[15m])) > 0
+          for: 30m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Stale PENDING transfers are being reaped — check for crashing pods"
+            runbook_url: "docs/decisions/pending-reaper.md"
+        - alert: TransferPendingReapConflictsRising
+          # Reaper-vs-completion races are normal in small numbers; a high rate
+          # means the reaper threshold is too close to live traffic (older-than
+          # below real placement latency) — raise app.transfer.reaper.older-than.
+          expr: sum(rate(transfer_pending_reap_conflicts_total[5m])) > 0.1
+          for: 30m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Pending-reaper conflicts above 0.1/sec — reaper may be racing live traffic"

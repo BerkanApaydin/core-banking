@@ -15,3 +15,27 @@ cutover runs in a maintenance window with `pg_partman`.
 
 **Alternative (rejected):** Continuous DELETE retention — table bloat +
 VACUUM load; unsustainable past 1 year of audit data.
+
+## Activation (O-2)
+
+The cutover is scripted (no pg_partman dependency):
+
+- `scripts/audit_partition_cutover.sql` — one-time maintenance-window swap:
+  partitioned parent + history/half-year partitions + DEFAULT catch-all,
+  backfill, atomic rename, identity restart, index recreation, verification
+  queries. Requires Flyway V46 (TIMESTAMPTZ key). Keeps `audit_logs_legacy`
+  until post-swap reads are green.
+- `scripts/audit_partition_finalize.sql` — second half: row-count guard,
+  legacy drop, `_new` → canonical index renames. Run once, after green reads.
+- `scripts/ensure_audit_partition.sql` — quarterly idempotent pre-creation of
+  the current + next half-year partitions (runbook diary entry). All three
+  scripts are executed end-to-end against real PostgreSQL 15 before merge
+  (cutover/ensure/finalize + partition routing verified).
+- Drift signal: `BacklogMetricsReporter` exposes
+  `audit.default_partition.rows`; `AuditDefaultPartitionNonEmpty` pages when
+  rows accumulate in DEFAULT (missed ensure-job). Pre-cutover the gauge reads
+  0 and the alert is quiet.
+
+Remaining follow-up (still open): switch `AuditRetentionScheduler` from
+cross-partition DELETE to DROP PARTITION (instant) once the oldest live
+partition is fully outside retention.

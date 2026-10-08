@@ -22,7 +22,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("debit and credit factories assign direction and timestamp")
     void shouldBuildLegs() {
-        String ref = LedgerEntry.newTransactionRef();
+        TransactionRef ref = LedgerEntry.newTransactionRef();
         Clock clock = Clock.systemUTC();
 
         LedgerEntry debit = LedgerEntry.debit(1L, AMOUNT, BALANCE, ref, clock);
@@ -40,13 +40,23 @@ class LedgerEntryTest {
     @DisplayName("transaction refs are unique per operation")
     void shouldGenerateUniqueRefs() {
         assertThat(LedgerEntry.newTransactionRef()).isNotEqualTo(LedgerEntry.newTransactionRef());
-        assertThatCode(() -> UUID.fromString(LedgerEntry.newTransactionRef())).doesNotThrowAnyException();
+        assertThatCode(() -> UUID.fromString(LedgerEntry.newTransactionRef().value())).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("transaction ref value object rejects blank and oversized refs")
+    void shouldValidateRef() {
+        assertThatThrownBy(() -> new TransactionRef("  "))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TransactionRef("r".repeat(37)))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        assertThat(new TransactionRef("ref-1").value()).isEqualTo("ref-1");
     }
 
     @Test
     @DisplayName("should reject zero amount")
     void shouldRejectZeroAmount() {
-        assertThatThrownBy(() -> new LedgerEntry(null, "ref", 1L, LedgerDirection.DEBIT,
+        assertThatThrownBy(() -> new LedgerEntry(null, new TransactionRef("ref"), 1L, LedgerDirection.DEBIT,
                 Money.of("0.00", Currency.TRY), BALANCE, LocalDateTime.now()))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
@@ -54,7 +64,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("should reject blank transaction ref")
     void shouldRejectBlankRef() {
-        assertThatThrownBy(() -> new LedgerEntry(null, "  ", 1L, LedgerDirection.DEBIT,
+        assertThatThrownBy(() -> new LedgerEntry(null, new TransactionRef("  "), 1L, LedgerDirection.DEBIT,
                 AMOUNT, BALANCE, LocalDateTime.now()))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
@@ -62,7 +72,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("should reject currency mismatch between amount and balance")
     void shouldRejectCurrencyMismatch() {
-        assertThatThrownBy(() -> new LedgerEntry(null, "ref", 1L, LedgerDirection.DEBIT,
+        assertThatThrownBy(() -> new LedgerEntry(null, new TransactionRef("ref"), 1L, LedgerDirection.DEBIT,
                 AMOUNT, Money.of("800.00", Currency.USD), LocalDateTime.now()))
                 .hasMessageContaining("cannot be journaled together");
     }
@@ -71,7 +81,7 @@ class LedgerEntryTest {
     @DisplayName("debitFromBefore derives balanceAfter by subtraction")
     void shouldDeriveDebitBalanceAfter() {
         Money before = Money.of("1000.00", Currency.TRY);
-        LedgerEntry leg = LedgerEntry.debitFromBefore(1L, AMOUNT, before, "ref-1", Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.debitFromBefore(1L, AMOUNT, before, new TransactionRef("ref-1"), Clock.systemUTC());
 
         assertThat(leg.getDirection()).isEqualTo(LedgerDirection.DEBIT);
         assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("800.00", Currency.TRY));
@@ -82,7 +92,7 @@ class LedgerEntryTest {
     @DisplayName("creditFromBefore derives balanceAfter by addition")
     void shouldDeriveCreditBalanceAfter() {
         Money before = Money.of("500.00", Currency.TRY);
-        LedgerEntry leg = LedgerEntry.creditFromBefore(2L, AMOUNT, before, "ref-2", Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.creditFromBefore(2L, AMOUNT, before, new TransactionRef("ref-2"), Clock.systemUTC());
 
         assertThat(leg.getDirection()).isEqualTo(LedgerDirection.CREDIT);
         assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("700.00", Currency.TRY));
@@ -91,7 +101,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("toString renders entry fields")
     void shouldRenderToString() {
-        LedgerEntry leg = LedgerEntry.debit(1L, AMOUNT, BALANCE, "ref-9", Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.debit(1L, AMOUNT, BALANCE, new TransactionRef("ref-9"), Clock.systemUTC());
 
         assertThat(leg.toString())
                 .contains("account=1")

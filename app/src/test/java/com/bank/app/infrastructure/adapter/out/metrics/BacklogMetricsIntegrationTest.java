@@ -53,6 +53,9 @@ class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
         assertTrue(gauge(registry, "outbox.oldest_pending.age_seconds") >= 7199);
         assertTrue(gauge(registry, "idempotency.http.oldest_pending.age_seconds") >= 7199);
         assertTrue(gauge(registry, "backlog.last_success_epoch_seconds") > 0);
+        // Pre-cutover the default partition does not exist: the drift gauge
+        // must read 0, not fail the scan (see AUDIT_DEFAULT_PARTITION_SQL).
+        assertEquals(0, gauge(registry, "audit.default_partition.rows"));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
                 + "WHERE tablename = 'idempotency_keys' "
                 + "AND indexname = 'idx_idempotency_pending_http_created_at'", Integer.class));

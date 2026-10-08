@@ -5,6 +5,7 @@ import com.bank.app.user.domain.EmailAddress;
 import com.bank.app.user.domain.PhoneNumber;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -73,7 +74,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map user with null id")
         void shouldMapUserWithNullId() {
-            User user = User.create("newuser", "rawpass");
+            User user = UserTestFactory.newUser("newuser");
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
 
@@ -172,7 +173,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should throw when entity is null")
         void shouldThrowWhenEntityIsNull() {
-            User user = User.create("testuser", "$2a$12$testpasshash00000000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasshash00000000000000000000000001");
             assertThatThrownBy(() -> mapper.updateJpaEntity(null, user))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Entity and User must not be null");

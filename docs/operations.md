@@ -70,14 +70,16 @@ The repository provides instrumented counters and JSON logs, not a running alert
 | `outbox.event.processed`, `outbox.event.failed`, `outbox.event.dead_letter` | These outcome counters now increment only after their outbox state transaction commits. Investigate new failures and dead letters; a healthy HTTP endpoint does not prove delivery. Use the [outbox runbook](outbox-operations.md). Persisted rows remain the recovery source; counters alone are not a delivery ledger. |
 | `db.orphan.current`, `db.orphan.alarm`, `db.orphan.last_success_epoch_seconds` | Investigate any orphan. The last-success gauge is zero until all three queries finish, then records Unix seconds. Maintenance scans are single-flight across replicas via PostgreSQL advisory locks (`AdvisorySchedulerLock`), so only the leader's gauges move — aggregate staleness alerts with `max()` across instances (see `k8s/prometheus-rules.yaml`). With V24 foreign keys in force, a nonzero orphan count signals broken enforcement or corrupted/restored data, not normal application behavior. |
 | HTTP response status/latency and DB pool/lock waits | Capture a staging baseline, then choose alert thresholds and minimum traffic windows from the service SLO. A status-only health check cannot establish latency or capacity. |
-| `outbox.pending.current`, `outbox.oldest_pending.age_seconds`, `idempotency.http.pending.current`, `idempotency.http.oldest_pending.age_seconds`, `backlog.last_success_epoch_seconds` | A read-only scan runs every 60 seconds by default, single-flight across replicas via advisory locks (only the leader scans). The HTTP gauges exclude retained `outbox_handler_` dedup records (discriminated by `key_kind` since V38). Empty backlogs report zero; a zero last-success value means no scan has completed. Alert only after choosing a policy from staging traffic and scan cadence; investigate stalled items without automatic deletion. The timestamp column is currently offset-free, so compare age across replicas only when their clock/timezone configuration is consistent. |
+| `outbox.pending.current`, `outbox.oldest_pending.age_seconds`, `idempotency.http.pending.current`, `idempotency.http.oldest_pending.age_seconds`, `backlog.last_success_epoch_seconds` | A read-only scan runs every 60 seconds by default, single-flight across replicas via advisory locks (only the leader scans). The HTTP gauges exclude retained `outbox_handler_` dedup records (discriminated by `key_kind` since V38). Empty backlogs report zero; a zero last-success value means no scan has completed. Alert only after choosing a policy from staging traffic and scan cadence; investigate stalled items without automatic deletion. Since V46 all timestamp columns are TIMESTAMPTZ, age math is zone-safe. |
+| `transfer.pending.reaped`, `transfer.pending.reap-conflicts` | Crash-window reaper activity (R-1, every 5 min by default). Sustained reaping means placements keep crashing between the PENDING save and completion — investigate pod restarts/OOMKills, not the reaper. Rising conflicts mean the reaper threshold races live traffic: raise `TRANSFER_REAPER_OLDER_THAN`. |
+| `audit.default_partition.rows`, `ledger.nonzero_transaction_refs` | Partition-drift and money-invariant gauges (same scan). Any nonzero `ledger.nonzero_transaction_refs` pages immediately. Nonzero default-partition rows mean timestamps fell outside pre-created ranges — run `scripts/ensure_audit_partition.sql`. Pre-cutover the drift gauge reads 0. |
 | Correlation IDs in JSON logs | Search request-local logs. Distributed tracing is wired (Micrometer + OTLP) but disabled by default; see [tracing](tracing.md) for collector setup. Until then, trace-looking IDs do not establish a cross-service trace. |
 
 ## Shutdown and rolling deployment drill
 
 Use a staging release with PostgreSQL/Redis and a known set of synthetic accounts. Record the initial per-currency account totals, transfer IDs, idempotency keys, audit entries and pending outbox IDs. Generate bounded authenticated transfer traffic with stable keys, then terminate one application instance through the deployment platform while requests are in flight. The Docker entry point now uses `exec java`, allowing the JVM to receive SIGTERM.
 
-Capture shutdown logs, readiness removal time, request outcomes, container exit reason and elapsed drain time. The application has a 30-second shutdown-phase limit and a 30-second use-case transaction timeout; outbox executor shutdown waits up to five seconds. The Kubernetes template has a startup probe and 60-second termination grace, but no explicit preStop/routing-drain hook. Validate that the platform removes traffic and finishes context shutdown within that measured budget; configured timeouts alone do not establish it.
+Capture shutdown logs, readiness removal time, request outcomes, container exit reason and elapsed drain time. The application has a 30-second shutdown-phase limit and a 30-second use-case transaction timeout; outbox executor shutdown waits up to five seconds. The Kubernetes template has a startup probe, a preStop sleep for endpoint drain and 60-second termination grace. Validate that the platform removes traffic and finishes context shutdown within that measured budget; configured timeouts alone do not establish it.
 
 After the replacement instance is ready, rerun the smoke check against each replica as well as the service route. Replay uncertain requests with their original keys and compare persisted transfer/account/audit outcomes. Success requires no unexplained balance change, duplicate successful operation or missing required audit record; pending outbox entries must resume or reach an investigated dead letter. Record failures instead of inferring success from an exit code. Partition-count changes need the separate quiesce/drain procedure in the [outbox runbook](outbox-operations.md); they are not ordinary rolling changes.
 
@@ -94,3 +96,25 @@ No PostgreSQL backup/PITR configuration, Redis persistence/HA policy or proven r
 5. Run the HTTP smoke check, inspect dead letters/backlog and replay only designated synthetic uncertain requests with original keys. Compare record-level outcomes and record achieved data-loss interval and time to recovery against RPO/RTO.
 
 Save the commands actually used, anonymized assertions, measured times and failed checks with the release record. Until this drill and alert/rolling-deployment acceptance have been performed, F20 remains partially remediated.
+
+## Error responses (ProblemDetail map)
+
+All failures render as RFC 7807 `application/problem+json` via
+`ProblemDetailFactory`. Domain failures map through `BusinessErrorHttpMapper`
+(exhaustiveness enforced at class-load: every `BusinessFailureKind` and every
+`ErrorCode` has an entry); persistence/security/request failures have their
+own handlers. Operator cheat-sheet:
+
+| Failure kind (`BusinessFailureKind`) | HTTP | Typical `ErrorCode` |
+|---|---|---|
+| `RULE_VIOLATION` | 400 | `VALIDATION_FAILED`, `INVALID_ARGUMENT`, `INVALID_FORMAT`, `INVALID_ENUM_VALUE` |
+| `NOT_FOUND` | 404 | `RESOURCE_NOT_FOUND` (also used for other-owned IDs/IBANs: no IDOR oracle) |
+| `CONFLICT` | 409 | `OPTIMISTIC_LOCK_CONFLICT`, `UNIQUE_CONSTRAINT_VIOLATION`, `DB_INTEGRITY_VIOLATION`, `CONCURRENT_REQUEST` |
+| `AUTHENTICATION_FAILED` | 401 | `AUTHENTICATION_FAILED` |
+| `ACCESS_DENIED` | 403 | `ACCESS_DENIED` |
+| `RATE_LIMITED` | 429 (+ `Retry-After`) | `RATE_LIMIT_EXCEEDED` |
+
+Infrastructure signals outside the domain map: revocation-store outage →
+503 `SECURITY_BACKEND_UNAVAILABLE` (fail-closed); unknown throwables → 500
+`GENERAL_INTERNAL_ERROR` (logged with correlation ID, body carries no stack).
+Unique-violation detection keys on SQLState `23505` down the cause chain.

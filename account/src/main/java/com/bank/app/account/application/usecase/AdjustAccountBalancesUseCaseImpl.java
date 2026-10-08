@@ -6,6 +6,7 @@ import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
@@ -73,7 +74,7 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         Account savedReceiver = saveAccountPort.save(receiver);
         // Double-entry journal: both legs share one ref and join this
         // transaction, so they net to zero or the money rolls back with them.
-        String operationRef = LedgerEntry.newTransactionRef();
+        TransactionRef operationRef = LedgerEntry.newTransactionRef();
         if (!reverse) {
             ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
                     operationRef, clock));

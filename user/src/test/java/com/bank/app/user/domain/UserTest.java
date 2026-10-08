@@ -45,7 +45,7 @@ class UserTest {
         @Test
         @DisplayName("should record registration only after persistence assigns an ID")
         void shouldCreateViaStaticFactory() {
-            User user = User.create("testuser", "$2a$12$testrawpasswordhash00000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testrawpasswordhash00000000000000000001");
             assertThat(user.getId()).isNull();
             assertThat(user.getUsername()).isEqualTo("testuser");
             assertThat(user.getPassword()).isEqualTo("$2a$12$testrawpasswordhash00000000000000000001");
@@ -72,7 +72,7 @@ class UserTest {
         @Test
         @DisplayName("should create with email and phone via static factory")
         void shouldCreateViaStaticFactoryWithEmailAndPhone() {
-            User user = User.create("testuser", "$2a$12$testpasshash00000000000000000000000001", new EmailAddress("test@example.com"),
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasshash00000000000000000000000001", new EmailAddress("test@example.com"),
                     new PhoneNumber("555-0100"));
             assertThat(user.getId()).isNull();
             assertThat(user.getUsername()).isEqualTo("testuser");
@@ -142,7 +142,7 @@ class UserTest {
         @Test
         @DisplayName("should change password")
         void shouldChangePassword() {
-            User user = User.create("testuser", "old_password");
+            User user = UserTestFactory.newUser("testuser");
             assertThat(user.getTokenVersion()).isZero();
             user.changePassword("$2a$12$testnewencodedpasswordhash00000000000001");
             assertThat(user.getPassword()).isEqualTo("$2a$12$testnewencodedpasswordhash00000000000001");
@@ -152,7 +152,7 @@ class UserTest {
         @Test
         @DisplayName("should reject null password on change")
         void shouldRejectNullPassword() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThatThrownBy(() -> user.changePassword((String) null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("New password must not be null");
@@ -161,7 +161,7 @@ class UserTest {
         @Test
         @DisplayName("should reject blank password on change")
         void shouldRejectBlankPassword() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThatThrownBy(() -> user.changePassword("   "))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Password must not be empty");
@@ -172,7 +172,7 @@ class UserTest {
         void shouldBumpVersionOnEncodedChange() {
             // Kills the MATH mutant (tokenVersion++ vs --) on the
             // EncodedPassword overload: only the increment retires sessions.
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThat(user.getTokenVersion()).isZero();
             user.changePassword(EncodedPassword
                     .of("$2a$12$testnewencodedpasswordhash00000000000001"));
@@ -182,7 +182,7 @@ class UserTest {
         @Test
         @DisplayName("should update email")
         void shouldUpdateEmail() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             user.updateEmail(new EmailAddress("new@example.com"));
             assertThat(user.getEmail().value()).isEqualTo("new@example.com");
         }
@@ -190,7 +190,7 @@ class UserTest {
         @Test
         @DisplayName("should reject null email")
         void shouldRejectNullEmail() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThatThrownBy(() -> user.updateEmail(null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Email must not be null");
@@ -199,7 +199,7 @@ class UserTest {
         @Test
         @DisplayName("should update phone")
         void shouldUpdatePhone() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             user.updatePhone(new PhoneNumber("555-0200"));
             assertThat(user.getPhone().value()).isEqualTo("555-0200");
         }
@@ -207,7 +207,7 @@ class UserTest {
         @Test
         @DisplayName("should reject null phone")
         void shouldRejectNullPhone() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThatThrownBy(() -> user.updatePhone(null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Phone must not be null");
@@ -216,7 +216,7 @@ class UserTest {
         @Test
         @DisplayName("should assign role")
         void shouldAssignRole() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThat(user.getTokenVersion()).isZero();
             user.assignRole(Role.ROLE_ADMIN);
             assertThat(user.getRole()).isEqualTo(Role.ROLE_ADMIN);
@@ -226,7 +226,7 @@ class UserTest {
         @Test
         @DisplayName("should reject null role")
         void shouldRejectNullRole() {
-            User user = User.create("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
             assertThatThrownBy(() -> user.assignRole(null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Role must not be null");
@@ -292,15 +292,15 @@ class UserTest {
         @Test
         @DisplayName("equals should return false when id is null")
         void notEqualsWhenIdNull() {
-            User user1 = User.create("newuser", "$2a$12$testpasshash00000000000000000000000001");
-            User user2 = User.create("newuser", "$2a$12$testpasshash00000000000000000000000001");
+            User user1 = UserTestFactory.newUser("newuser", "$2a$12$testpasshash00000000000000000000000001");
+            User user2 = UserTestFactory.newUser("newuser", "$2a$12$testpasshash00000000000000000000000001");
             assertThat(user1).isNotEqualTo(user2);
         }
 
         @Test
         @DisplayName("hashCode should return 0 when id is null")
         void hashCodeWhenIdNull() {
-            User user = User.create("newuser", "$2a$12$testpasshash00000000000000000000000001");
+            User user = UserTestFactory.newUser("newuser", "$2a$12$testpasshash00000000000000000000000001");
             assertThat(user.hashCode()).isZero();
         }
     }

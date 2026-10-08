@@ -123,9 +123,8 @@ public class TransferController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursorCreatedAt,
             @RequestParam(required = false) Long cursorId,
             @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
-        ReportCriteria criteria = (cursorCreatedAt != null || cursorId != null)
-                ? new ReportCriteria(accountId, startDate, endDate, 0, size, cursorCreatedAt, cursorId)
-                : new ReportCriteria(accountId, startDate, endDate, page, size);
+        ReportCriteria criteria = ReportCriteria.criteriaOf(
+                accountId, startDate, endDate, page, size, cursorCreatedAt, cursorId);
         TransferReportResponse body = generateTransferReportQuery.execute(criteria);
         String etag = etagFor(body);
         if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
@@ -145,9 +144,8 @@ public class TransferController {
             @RequestParam(defaultValue = "100") @Min(1) @Max(100) int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursorCreatedAt,
             @RequestParam(required = false) Long cursorId) {
-        ReportCriteria criteria = (cursorCreatedAt != null || cursorId != null)
-                ? new ReportCriteria(accountId, startDate, endDate, 0, size, cursorCreatedAt, cursorId)
-                : new ReportCriteria(accountId, startDate, endDate, page, size);
+        ReportCriteria criteria = ReportCriteria.criteriaOf(
+                accountId, startDate, endDate, page, size, cursorCreatedAt, cursorId);
         TransferReportResponse body = generateTransferReportWithTotalsQuery.execute(criteria);
         return ResponseEntity.ok().eTag(etagFor(body)).body(body);
     }

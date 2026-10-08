@@ -37,6 +37,19 @@ public class BacklogMetricsReporter {
     static final String LEDGER_NONZERO_SQL = "SELECT count(*) FROM (SELECT transaction_ref FROM ledger_entries "
             + "GROUP BY transaction_ref HAVING SUM(CASE WHEN direction = 'CREDIT' "
             + "THEN amount ELSE -amount END) <> 0) t";
+    /**
+     * Partition-drift guard (partitioning.md step 5): rows landing in the
+     * DEFAULT partition mean timestamps fell outside every pre-created range,
+     * i.e. ensure_audit_partition.sql was missed. Pre-cutover the table does
+     * not exist and the gauge reads 0: the existence check below runs first
+     * because PostgreSQL resolves every table reference at plan time, so a
+     * CASE-guarded single query would still fail with "relation does not
+     * exist" on the untaken branch.
+     */
+    static final String TABLE_EXISTS_SQL =
+            "SELECT count(*) FROM pg_class WHERE relname = ? "
+            + "AND relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p', 'm', 'f')";
+    static final String AUDIT_DEFAULT_PARTITION_COUNT_SQL = "SELECT count(*) FROM audit_logs_default";
 
     private final JdbcTemplate jdbc;
     private final AdvisorySchedulerLock schedulerLock;
@@ -46,6 +59,7 @@ public class BacklogMetricsReporter {
     private final AtomicLong httpPending = new AtomicLong();
     private final AtomicLong httpOldestAgeSeconds = new AtomicLong();
     private final AtomicLong ledgerNonzeroRefs = new AtomicLong();
+    private final AtomicLong auditDefaultPartitionRows = new AtomicLong();
     private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
 
     public BacklogMetricsReporter(JdbcTemplate jdbc, MeterRegistry meterRegistry) {
@@ -69,6 +83,7 @@ public class BacklogMetricsReporter {
         meterRegistry.gauge("idempotency.http.pending.current", httpPending);
         meterRegistry.gauge("idempotency.http.oldest_pending.age_seconds", httpOldestAgeSeconds);
         meterRegistry.gauge("ledger.nonzero_transaction_refs", ledgerNonzeroRefs);
+        meterRegistry.gauge("audit.default_partition.rows", auditDefaultPartitionRows);
         meterRegistry.gauge("backlog.last_success_epoch_seconds", lastSuccessfulScanEpochSeconds);
     }
 
@@ -82,6 +97,9 @@ public class BacklogMetricsReporter {
             Backlog outbox = read(OUTBOX_SQL);
             Backlog http = read(HTTP_PENDING_SQL);
             long nonzeroRefs = readCount(LEDGER_NONZERO_SQL);
+            long defaultPartitionRows = tableExists("audit_logs_default")
+                    ? readCount(AUDIT_DEFAULT_PARTITION_COUNT_SQL)
+                    : 0;
             Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
             LocalDateTime now = LocalDateTime.now(clock);
             long completedAt = Instant.now(clock).getEpochSecond();
@@ -90,6 +108,7 @@ public class BacklogMetricsReporter {
             httpPending.set(http.count());
             httpOldestAgeSeconds.set(ageSeconds(http, now));
             ledgerNonzeroRefs.set(nonzeroRefs);
+            auditDefaultPartitionRows.set(defaultPartitionRows);
             lastSuccessfulScanEpochSeconds.set(completedAt);
         } catch (RuntimeException e) {
             // Keep the preceding snapshot and its timestamp. A zero-valued gauge
@@ -100,8 +119,15 @@ public class BacklogMetricsReporter {
     }
 
     private Backlog read(String sql) {
-        Backlog result = jdbc.queryForObject(sql, (rs, rowNum) ->
-                new Backlog(rs.getLong(1), rs.getObject(2, LocalDateTime.class)));
+        // V46 stores these columns as TIMESTAMPTZ, which pgjdbc refuses to
+        // hand over as LocalDateTime directly ("Cannot convert the column of
+        // type TIMESTAMPTZ to requested type java.time.LocalDateTime").
+        // Read the instant type (OffsetDateTime) and drop to the UTC wall
+        // clock the rest of the codebase reasons in.
+        Backlog result = jdbc.queryForObject(sql, (rs, rowNum) -> {
+            java.time.OffsetDateTime oldest = rs.getObject(2, java.time.OffsetDateTime.class);
+            return new Backlog(rs.getLong(1), oldest == null ? null : oldest.toLocalDateTime());
+        });
         if (result == null) {
             throw new IllegalStateException("Backlog aggregate query returned no row");
         }
@@ -114,6 +140,11 @@ public class BacklogMetricsReporter {
             throw new IllegalStateException("Ledger reconcile query returned no row");
         }
         return result;
+    }
+
+    private boolean tableExists(String table) {
+        Integer result = jdbc.queryForObject(TABLE_EXISTS_SQL, Integer.class, table);
+        return result != null && result > 0;
     }
 
     private static long ageSeconds(Backlog backlog, LocalDateTime now) {

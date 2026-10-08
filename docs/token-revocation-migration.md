@@ -49,3 +49,28 @@ cleanup lag, read latency, and 503 counts. Back up and restore this table with
 the application database; restoring an older database snapshot can lose later
 revocations, so a restore procedure must also invalidate all tokens issued
 after the snapshot (for example by signing-key rotation) before traffic resumes.
+
+## JWT signing-key rotation
+
+Rotation retires every outstanding session at once: all users log in again.
+There is no dual-key overlap (single `jwt.secret`), so rotate in a
+maintenance-light window, not mid-incident, unless the key is compromised
+(compromise outranks convenience: rotate immediately, then handle the
+re-login wave).
+
+1. Generate: `JWT_SECRET="$(openssl rand -base64 32)"` — 32 bytes minimum
+   when base64-decoded; anything shorter fails fast at boot with the exact
+   bit count in the message.
+2. Publish the new value to the secret manager (`bank-jwt-secret` in k8s;
+   `JWT_SECRET` env in Compose). Never commit it; the dev default in
+   `docker-compose.yml` is local-boot only and CI-pinned to the code constant
+   (`scripts/check_compose_jwt_default.py`) precisely so drift fails loudly.
+3. Rolling restart all pods. Mixed-version window is safe: old pods accept
+   old-signed tokens, new pods accept new-signed ones; no shared revocation
+   state depends on the key.
+4. After the rollout, force re-login is automatic (old signatures no longer
+   verify → 401 → login). Confirm `transfer.pending.reaped` and login rates
+   return to baseline; watch for a 401 spike that does not decay (stuck
+   clients caching the old token).
+5. Alternative without rotation: bump per-user `tokenVersion` (role/password
+   flows already do) to retire one identity's sessions at next refresh.

@@ -2,6 +2,7 @@ package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.LedgerDirection;
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import java.math.BigDecimal;
@@ -45,7 +46,7 @@ class LedgerPersistenceAdapterTest {
         var adapter = new LedgerPersistenceAdapter(repository, new LedgerJpaMapper());
         Money amount = Money.of("200.00", Currency.TRY);
         Money balance = Money.of("800.00", Currency.TRY);
-        LedgerEntry entry = LedgerEntry.debit(1L, amount, balance, "ref-1", Clock.systemUTC());
+        LedgerEntry entry = LedgerEntry.debit(1L, amount, balance, new TransactionRef("ref-1"), Clock.systemUTC());
         LedgerEntryJpaEntity persisted = new LedgerEntryJpaEntity();
         persisted.setId(5L);
         persisted.setTransactionRef("ref-1");
@@ -60,7 +61,7 @@ class LedgerPersistenceAdapterTest {
         LedgerEntry result = adapter.save(entry);
 
         assertThat(result.getId()).isEqualTo(5L);
-        assertThat(result.getTransactionRef()).isEqualTo("ref-1");
+        assertThat(result.getTransactionRef()).isEqualTo(new TransactionRef("ref-1"));
         assertThat(result.getDirection()).isEqualTo(LedgerDirection.DEBIT);
         verify(repository).save(any());
     }

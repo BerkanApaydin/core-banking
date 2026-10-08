@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * BCrypt-hashed password value object. Prevents accidental use of raw input
  * where a hash is required: {@link #of(String)} rejects anything that does
- * not look like a BCrypt hash, so {@code User.create(username, raw)} fails
+ * not look like a BCrypt hash, so the {@code User} constructors fail
  * fast instead of persisting a reversible secret.
  *
  * <p>{@link #ofTrusted(String)} wraps hashes read from a trusted store

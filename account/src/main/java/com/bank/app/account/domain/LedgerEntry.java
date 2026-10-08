@@ -5,7 +5,6 @@ import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * One leg of a double-entry operation. Immutable: journal rows are
@@ -16,21 +15,17 @@ import java.util.UUID;
 public final class LedgerEntry {
 
     private final Long id;
-    private final String transactionRef;
+    private final TransactionRef transactionRef;
     private final Long accountId;
     private final LedgerDirection direction;
     private final Money amount;
     private final Money balanceAfter;
     private final LocalDateTime occurredAt;
 
-    public LedgerEntry(Long id, String transactionRef, Long accountId, LedgerDirection direction,
+    public LedgerEntry(Long id, TransactionRef transactionRef, Long accountId, LedgerDirection direction,
                        Money amount, Money balanceAfter, LocalDateTime occurredAt) {
         this.id = id;
-        Objects.requireNonNull(transactionRef, "Transaction ref must not be null");
-        if (transactionRef.isBlank()) {
-            throw new IllegalArgumentException("Transaction ref must not be blank");
-        }
-        this.transactionRef = transactionRef;
+        this.transactionRef = Objects.requireNonNull(transactionRef, "Transaction ref must not be null");
         this.accountId = Objects.requireNonNull(accountId, "Account ID must not be null");
         this.direction = Objects.requireNonNull(direction, "Direction must not be null");
         this.amount = Objects.requireNonNull(amount, "Amount must not be null");
@@ -46,19 +41,19 @@ public final class LedgerEntry {
     }
 
     /** Groups the legs of one business operation (debit + credit share it). */
-    public static String newTransactionRef() {
-        return UUID.randomUUID().toString();
+    public static TransactionRef newTransactionRef() {
+        return TransactionRef.newRef();
     }
 
     public static LedgerEntry debit(Long accountId, Money amount, Money balanceAfter,
-                                    String transactionRef, Clock clock) {
+                                    TransactionRef transactionRef, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         return new LedgerEntry(null, transactionRef, accountId, LedgerDirection.DEBIT,
                 amount, balanceAfter, LocalDateTime.now(clock));
     }
 
     public static LedgerEntry credit(Long accountId, Money amount, Money balanceAfter,
-                                     String transactionRef, Clock clock) {
+                                     TransactionRef transactionRef, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         return new LedgerEntry(null, transactionRef, accountId, LedgerDirection.CREDIT,
                 amount, balanceAfter, LocalDateTime.now(clock));
@@ -71,13 +66,13 @@ public final class LedgerEntry {
      * overloads are kept for backward compatibility (mappers, replays).
      */
     public static LedgerEntry debitFromBefore(Long accountId, Money amount, Money balanceBefore,
-                                              String transactionRef, Clock clock) {
+                                              TransactionRef transactionRef, Clock clock) {
         Objects.requireNonNull(balanceBefore, "Balance before must not be null");
         return debit(accountId, amount, balanceBefore.subtract(amount), transactionRef, clock);
     }
 
     public static LedgerEntry creditFromBefore(Long accountId, Money amount, Money balanceBefore,
-                                               String transactionRef, Clock clock) {
+                                               TransactionRef transactionRef, Clock clock) {
         Objects.requireNonNull(balanceBefore, "Balance before must not be null");
         return credit(accountId, amount, balanceBefore.add(amount), transactionRef, clock);
     }
@@ -86,7 +81,7 @@ public final class LedgerEntry {
         return id;
     }
 
-    public String getTransactionRef() {
+    public TransactionRef getTransactionRef() {
         return transactionRef;
     }
 

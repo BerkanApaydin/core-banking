@@ -54,6 +54,9 @@ class BacklogMetricsReporterTest {
                         new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
                 .thenReturn(0L, 0L);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0, 0);
 
         reporter.scan();
 
@@ -62,6 +65,7 @@ class BacklogMetricsReporterTest {
         assertEquals(1, gauge("idempotency.http.pending.current"));
         assertTrue(gauge("idempotency.http.oldest_pending.age_seconds") >= 119);
         assertEquals(0, gauge("ledger.nonzero_transaction_refs"));
+        assertEquals(0, gauge("audit.default_partition.rows"));
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
 
         reporter.scan();
@@ -81,10 +85,34 @@ class BacklogMetricsReporterTest {
                 .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
                 .thenReturn(3L);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0);
 
         reporter.scan();
 
         assertEquals(3, gauge("ledger.nonzero_transaction_refs"));
+        assertEquals(0, gauge("audit.default_partition.rows"));
+        assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
+    }
+
+    @Test
+    void publishesDefaultPartitionDriftForAlerting() {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
+                .thenReturn(0L);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(1);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_COUNT_SQL), eq(Long.class)))
+                .thenReturn(7L);
+
+        reporter.scan();
+
+        assertEquals(7, gauge("audit.default_partition.rows"));
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
     }
 
@@ -98,6 +126,9 @@ class BacklogMetricsReporterTest {
                 .thenThrow(new IllegalStateException("database unavailable"));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
                 .thenReturn(0L);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0);
 
         reporter.scan();
         double previousSuccess = gauge("backlog.last_success_epoch_seconds");

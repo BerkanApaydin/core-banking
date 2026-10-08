@@ -50,16 +50,9 @@ public class User extends BaseAggregateRoot {
      */
     public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
                 PhoneNumber phone, Long version, long tokenVersion) {
-        this(id, username, encodedPassword, role, email, phone, version, tokenVersion, false);
-    }
-
-    private User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
-                 PhoneNumber phone, Long version, long tokenVersion, boolean trustedTestOnly) {
         Objects.requireNonNull(encodedPassword, "Password must not be null");
-        if (!trustedTestOnly) {
-            // BCrypt shape check: rejects raw input, never stores it.
-            EncodedPassword.of(encodedPassword);
-        }
+        // BCrypt shape check: rejects raw input, never stores it.
+        EncodedPassword.of(encodedPassword);
         this.id = id;
         this.username = validateUsername(username);
         this.password = encodedPassword;
@@ -86,41 +79,10 @@ public class User extends BaseAggregateRoot {
     }
 
     /**
-     * @deprecated Test-only. Takes a raw password without hashing or BCrypt
-     *             validation at this layer — sadece test, prod yolu
-     *             {@code EncodedPassword.of}. Kept only to avoid breaking
-     *             existing tests; do not use in production code.
-     */
-    @Deprecated
-    public static User create(String username, String password) {
-        return create(username, password, null, null, Clock.systemUTC());
-    }
-
-    /**
-     * @deprecated Test-only. Takes a raw password without hashing — sadece test,
-     *             prod yolu {@code EncodedPassword.of}. Kept only to avoid
-     *             breaking existing tests; do not use in production code.
-     */
-    @Deprecated
-    public static User create(String username, String password, EmailAddress email, PhoneNumber phone) {
-        return create(username, password, email, phone, Clock.systemUTC());
-    }
-
-    /**
-     * @deprecated Test-only. Takes a raw password without hashing — sadece test,
-     *             prod yolu {@code EncodedPassword.of}. Kept only to avoid
-     *             breaking existing tests; do not use in production code.
-     */
-    @Deprecated
-    public static User create(String username, String password, EmailAddress email, PhoneNumber phone, Clock clock) {
-        Objects.requireNonNull(clock, "Clock must not be null");
-        return new User(null, username, password, Role.ROLE_USER, email, phone, null, 0L, true);
-    }
-
-    /**
      * Preferred factory: the hash is already validated by
      * {@link EncodedPassword#of(String)}, so raw input cannot reach the
-     * aggregate through this path.
+     * aggregate through this path. Tests use {@code UserTestFactory} in test
+     * sources for transient (unpersisted) users.
      */
     public static User create(String username, EncodedPassword encodedPassword, EmailAddress email,
                               PhoneNumber phone, Clock clock) {
