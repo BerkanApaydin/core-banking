@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import java.util.Locale;
 
 public class ApplicationStartupValidator {
 
@@ -72,6 +73,7 @@ public class ApplicationStartupValidator {
         requirePositive("app.outbox.batch-size", 50L);
         requirePositive("app.outbox.poll-delay-ms", 2000L);
         requirePositive("app.outbox.retention-days", 30L);
+        requirePositive("app.audit.retention-days", 365L);
         // partition-count 0 is the legal unpartitioned mode (single thread);
         // only negatives (typos) are rejected.
         requireNonNegative("app.outbox.partition-count", 2L);
@@ -90,7 +92,7 @@ public class ApplicationStartupValidator {
         // calls from any localhost page (e.g. a malicious site opened in the
         // same browser as the banking UI). Fail fast instead of serving them.
         String origins = environment.getProperty("app.security.cors.allowed-origins", "");
-        String lowered = origins == null ? "" : origins.toLowerCase(java.util.Locale.ROOT);
+        String lowered = origins == null ? "" : origins.toLowerCase(Locale.ROOT);
         if (lowered.contains("localhost") || lowered.contains("127.0.0.1")) {
             throw new IllegalStateException(
                     "Production must not allow localhost CORS origins. "

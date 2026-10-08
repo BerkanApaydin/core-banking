@@ -8,10 +8,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -118,9 +120,9 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .executeUpdate();
 
         var first = repo.findByUserIdOrderByCreatedAtDescIdDesc(100L,
-                org.springframework.data.domain.PageRequest.of(0, 1));
+                PageRequest.of(0, 1));
         var second = repo.findByUserIdOrderByCreatedAtDescIdDesc(100L,
-                org.springframework.data.domain.PageRequest.of(1, 1));
+                PageRequest.of(1, 1));
 
         assertEquals(3L, first.getContent().getFirst().getId());
         assertEquals(2L, second.getContent().getFirst().getId());
@@ -184,7 +186,7 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldProjectIbansByIds() {
-        var rows = repo.findIbansByIds(java.util.List.of(2L));
+        var rows = repo.findIbansByIds(List.of(2L));
 
         assertEquals(1, rows.size());
         assertEquals(2L, rows.get(0)[0]);

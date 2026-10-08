@@ -16,6 +16,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class ResilientTokenBlacklistAdapterTest {
@@ -68,7 +69,7 @@ class ResilientTokenBlacklistAdapterTest {
         assertThat(local.isBlacklisted("revoked")).isFalse();
         adapter.blacklist("revoked", 60_000L);
         assertThat(local.isBlacklisted("revoked")).isTrue();
-        verify(redis, org.mockito.Mockito.times(2)).blacklist("revoked", 60_000L);
+        verify(redis, times(2)).blacklist("revoked", 60_000L);
     }
 
     @Test

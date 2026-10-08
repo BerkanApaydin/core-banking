@@ -13,10 +13,3 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-
-management:
-  endpoint:
-    health:
-      status:
-        http-mapping:
-          down: 200

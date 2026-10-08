@@ -1,7 +1,9 @@
 package com.bank.app.common.adapter.in.security;
 
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -108,7 +110,7 @@ public record BrowserSessionCookies(boolean secure) {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
             return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
-        } catch (java.security.NoSuchAlgorithmException | java.security.InvalidKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             // HmacSHA256 is mandatory in every JDK; InvalidKeyException cannot
             // happen for non-empty raw keys. Fail closed, never fall back.
             throw new IllegalStateException("HMAC-SHA256 unavailable", e);

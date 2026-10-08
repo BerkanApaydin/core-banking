@@ -113,6 +113,13 @@ jobs:
     - name: Check restore-drill contract (script, template, ledger gauge)
       run: python3 scripts/check_restore_drill.py
 
+    - name: Migration-soak presence (O-1/DB-1 large-table guard)
+      run: |
+        test -f scripts/migration_soak.sh
+        test -f common/src/main/resources/db/migration/V43__transfer_history_keyset_covering_indexes.sql
+        test -f k8s/grafana-dashboard.json
+        echo "migration-soak + keyset index + dashboard present"
+
     - name: Live rate-limit smoke (real app + runner)
       # Boots the packaged jar against the CI postgres/redis services and runs
       # the deterministic rate-limit profile (15 registrations -> 429, then

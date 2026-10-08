@@ -1,5 +1,7 @@
 package com.bank.app.transfer.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.account.domain.AccountStatus;
@@ -37,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // existence leak); transfer-scoped reads/writes fail closed with 403.
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class TransferAccountAuthorizationIT extends AbstractSpringBootIntegrationTest {
 
@@ -180,14 +182,14 @@ class TransferAccountAuthorizationIT extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
-    @DisplayName("third party cannot read transfer details")
+    @DisplayName("third party cannot read transfer details (404, G-5 existence-oracle fix)")
     void shouldForbidDetailForThirdParty() throws Exception {
         long transferId = placeBobToAliceTransfer();
 
         mockMvc.perform(get("/api/v1/transfers/" + transferId)
                         .header("Authorization", "Bearer " + charlieToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
     }
 
     @Test

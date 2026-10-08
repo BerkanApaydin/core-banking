@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 import java.util.Set;
@@ -147,6 +149,56 @@ class AccountApiAdapterTest {
         verify(snapshotCache).evictById(1L);
         verify(snapshotCache).evictById(2L);
         verify(snapshotCache, never()).evictAll();
+    }
+
+    @Test
+    void shouldDeferEvictionUntilAfterCommitInsideTransaction() {
+        // AFTER_COMMIT rule: a rollback must never evict a still-valid
+        // snapshot. Kills the registerSynchronization + afterCommit mutants.
+        Money amount = Money.of("50.00", Currency.TRY);
+        AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
+                Money.of("950.00", Currency.TRY), Money.of("550.00", Currency.TRY));
+        when(adjustAccountBalancesUseCase.debitAndCredit(1L, 2L, amount)).thenReturn(expected);
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertSame(expected, adapter.adjustBalances(1L, 2L, amount));
+
+            // No eviction before commit.
+            verify(snapshotCache, never()).evictById(anyLong());
+            for (TransactionSynchronization sync :
+                    TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+            verify(snapshotCache).evictById(1L);
+            verify(snapshotCache).evictById(2L);
+            verify(snapshotCache, never()).evictAll();
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+    }
+
+    @Test
+    void shouldDeferReversalEvictionUntilAfterCommitInsideTransaction() {
+        Money amount = Money.of("50.00", Currency.TRY);
+        AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
+                Money.of("1000.00", Currency.TRY), Money.of("500.00", Currency.TRY));
+        when(adjustAccountBalancesUseCase.reverseForCancellation(1L, 2L, amount)).thenReturn(expected);
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertSame(expected, adapter.reverseForCancellation(1L, 2L, amount));
+
+            verify(snapshotCache, never()).evictById(anyLong());
+            for (TransactionSynchronization sync :
+                    TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+            verify(snapshotCache).evictById(1L);
+            verify(snapshotCache).evictById(2L);
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
     }
 
     @Test

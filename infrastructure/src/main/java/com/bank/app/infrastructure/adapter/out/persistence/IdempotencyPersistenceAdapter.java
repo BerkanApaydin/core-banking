@@ -46,25 +46,20 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
 
     @Override
     public void markCompleted(String key, String responseBody, int responseStatus) {
-        var entity = repository.findById(key)
-                .orElseThrow(() -> new IllegalStateException("Idempotency reservation is missing"));
-        if (!"PENDING".equals(entity.getStatus())) {
-            throw new IllegalStateException("Idempotency reservation is not pending");
+        int affected = repository.completeIfPending(key, responseBody, responseStatus);
+        if (affected == 0) {
+            // Not PENDING anymore: missing reservation is a bug, already-completed
+            // is an idempotent replay (first-wins preserved) — return silently.
+            var current = repository.findById(key);
+            if (current.isEmpty()) {
+                throw new IllegalStateException("Idempotency reservation is missing");
+            }
         }
-        entity.setStatus("COMPLETED");
-        entity.setResponseBody(responseBody);
-        entity.setResponseStatus(responseStatus);
-        repository.save(entity);
     }
 
     @Override
     public void markFailed(String key) {
-        repository.findById(key).ifPresent(entity -> {
-            if ("PENDING".equals(entity.getStatus())) {
-                entity.setStatus("FAILED");
-                repository.save(entity);
-            }
-        });
+        repository.failIfPending(key);
     }
 
     @Override

@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -160,6 +163,19 @@ class OrphanIntegrityReporterTest {
     }
 
     @Test
+    void shouldNotAlarmWhenOrphansEqualThreshold() {
+        // Kills the ConditionalsBoundary mutant (> vs >=): exactly-at-
+        // threshold is a warning, not an alarm.
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(5L);
+        var registry = new SimpleMeterRegistry();
+
+        new OrphanIntegrityReporter(jdbc, registry,
+                new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
+
+        assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
+    }
+
+    @Test
     void shouldExposeSuccessfulScanTimeOnlyAfterAllQueriesComplete() {
         var registry = new SimpleMeterRegistry();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
@@ -169,7 +185,7 @@ class OrphanIntegrityReporterTest {
         reporter.reportOrphans();
 
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
-        org.junit.jupiter.api.Assertions.assertTrue(
+        assertTrue(
                 registry.get("db.orphan.last_success_epoch_seconds").gauge().value() > 0);
     }
 
@@ -178,11 +194,11 @@ class OrphanIntegrityReporterTest {
         var registry = new SimpleMeterRegistry();
         when(jdbc.queryForObject(anyString(), eq(Long.class)))
                 .thenReturn(0L, 0L)
-                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("database unavailable"));
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
         OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(jdbc, registry);
 
-        org.junit.jupiter.api.Assertions.assertThrows(
-                org.springframework.dao.DataAccessResourceFailureException.class, reporter::reportOrphans);
+        assertThrows(
+                DataAccessResourceFailureException.class, reporter::reportOrphans);
         assertEquals(0.0, registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
     }
 

@@ -158,4 +158,18 @@ class TransferAuthorizationServiceTest {
                     .hasMessage("Session not found.");
         }
     }
+
+    @Nested
+    @DisplayName("getCurrentUsername")
+    class GetCurrentUsername {
+
+        @Test
+        @DisplayName("should pass through the contextual username")
+        void shouldPassThroughUsername() {
+            when(userContextService.getCurrentUsernameOrSystem()).thenReturn("alice");
+
+            assertThat(service.getCurrentUsername()).isEqualTo("alice");
+            verify(userContextService).getCurrentUsernameOrSystem();
+        }
+    }
 }

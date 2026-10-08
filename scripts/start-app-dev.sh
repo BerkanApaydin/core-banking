@@ -5,13 +5,16 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-docker compose stop app
-docker compose up -d --wait postgres redis
-
 export SPRING_PROFILES_ACTIVE=dev
 export DB_HOST=localhost DB_PORT=5432 DB_USERNAME=bank_user DB_PASSWORD=bank_password
 export REDIS_HOST=localhost REDIS_PORT=6389 SERVER_ADDRESS=127.0.0.1
+# Fresh secret first: docker compose interpolates the whole file (including
+# the unused `app` service, whose JWT_SECRET is mandatory), so the secret
+# must exist before any compose call, not just java.
 export JWT_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\r\n')"
+
+docker compose stop app
+docker compose up -d --wait postgres redis
 
 ./mvnw -pl app -am package -DskipTests
 

@@ -26,16 +26,16 @@ data:
         endpoint: 0.0.0.0:13133
     exporters:
       # Replace with your backend (jaeger/tempo/otlphttp) for retention;
-      # logging alone keeps nothing queryable.
-      logging:
-        loglevel: warn
+      # debug alone keeps nothing queryable.
+      debug:
+        verbosity: basic
     service:
       extensions: [health_check]
       pipelines:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [logging]
+          exporters: [debug]
 ---
 apiVersion: apps/v1
 kind: Deployment

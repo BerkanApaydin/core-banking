@@ -1,6 +1,7 @@
 package com.bank.app.user.adapter.in.web.support;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,16 @@ public final class ProblemResponses {
 
     private ProblemResponses() {}
 
+    // Time-strategy seam (same pattern as ProblemDetailFactory): error-body
+    // timestamps must be UTC, never server-zone. Static because this helper is
+    // dependency-free by design (see class Javadoc); tests pin a fixed clock.
+    private static volatile Clock clock = Clock.systemUTC();
+
+    /** Test-only clock injection. */
+    public static void setClockForTests(Clock testClock) {
+        clock = testClock != null ? testClock : Clock.systemUTC();
+    }
+
     public static ResponseEntity<ProblemDetail> unauthorized(String message, String path) {
         return problem(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", message, path);
     }
@@ -32,7 +43,8 @@ public final class ProblemResponses {
     private static ResponseEntity<ProblemDetail> problem(HttpStatus status, String code,
             String message, String path) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, message);
-        detail.setTitle(status.getReasonPhrase());
+        // No explicit setTitle: forStatusAndDetail already carries the reason
+        // phrase, so a duplicate call would be an equivalent mutant.
         if (path != null) {
             try {
                 detail.setInstance(URI.create(path));
@@ -42,7 +54,7 @@ public final class ProblemResponses {
         }
         detail.setProperty("code", code);
         detail.setProperty("message", message);
-        detail.setProperty("timestamp", LocalDateTime.now().toString());
+        detail.setProperty("timestamp", LocalDateTime.now(clock).toString());
         String correlationId = MDC.get("correlationId");
         if (correlationId != null && !correlationId.isBlank()) {
             detail.setProperty("correlationId", correlationId);

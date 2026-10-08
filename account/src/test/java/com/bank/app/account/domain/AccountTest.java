@@ -151,7 +151,7 @@ class AccountTest {
         @DisplayName("should debit when active and has sufficient balance")
         void shouldDebitSuccessfully() {
             Account account = activeAccount(1000);
-            account.debit(Money.of("200.00", Currency.TRY), Clock.systemDefaultZone());
+            account.debit(Money.of("200.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("800.00");
         }
 
@@ -159,7 +159,7 @@ class AccountTest {
         @DisplayName("should debit to exactly zero balance")
         void shouldDebitToZero() {
             Account account = activeAccount(100);
-            account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone());
+            account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo(BigDecimal.ZERO.setScale(2));
         }
 
@@ -167,9 +167,9 @@ class AccountTest {
         @DisplayName("should handle multiple consecutive debits")
         void shouldHandleMultipleDebits() {
             Account account = activeAccount(1000);
-            account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone());
-            account.debit(Money.of("200.00", Currency.TRY), Clock.systemDefaultZone());
-            account.debit(Money.of("50.50", Currency.TRY), Clock.systemDefaultZone());
+            account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC());
+            account.debit(Money.of("200.00", Currency.TRY), Clock.systemUTC());
+            account.debit(Money.of("50.50", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("649.50");
         }
 
@@ -177,7 +177,7 @@ class AccountTest {
         @DisplayName("should preserve original balance after operation")
         void shouldPreserveBalance() {
             Account account = activeAccount(1000);
-            account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone());
+            account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("900.00");
         }
 
@@ -185,7 +185,7 @@ class AccountTest {
         @DisplayName("should throw InsufficientBalanceException when amount exceeds balance")
         void shouldThrowOnOverdraft() {
             Account account = activeAccount(100);
-            assertThatThrownBy(() -> account.debit(Money.of("101.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(Money.of("101.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(InsufficientBalanceException.class)
                     .hasMessage("Insufficient balance. Current: 100.00 TRY, Requested: 101.00 TRY");
         }
@@ -195,7 +195,7 @@ class AccountTest {
         void shouldThrowOnSuspendedAccount() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
-            assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
         }
 
@@ -204,7 +204,7 @@ class AccountTest {
         void shouldThrowOnClosedAccount() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
-            assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
         }
 
@@ -212,7 +212,7 @@ class AccountTest {
         @DisplayName("should throw CurrencyMismatchException when currency differs")
         void shouldThrowOnCurrencyMismatch() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.debit(Money.of("50.00", Currency.USD), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(Money.of("50.00", Currency.USD), Clock.systemUTC()))
                     .isExactlyInstanceOf(CurrencyMismatchException.class);
         }
 
@@ -220,7 +220,7 @@ class AccountTest {
         @DisplayName("should throw NullPointerException when amount is null")
         void shouldThrowOnNullAmount() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.debit(null, Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(null, Clock.systemUTC()))
                     .isExactlyInstanceOf(NullPointerException.class);
         }
 
@@ -228,7 +228,7 @@ class AccountTest {
         @DisplayName("should throw when debit amount is zero")
         void shouldThrowOnZeroDebit() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Debit amount must not be zero");
         }
@@ -258,7 +258,7 @@ class AccountTest {
         @DisplayName("should credit when active")
         void shouldCreditSuccessfully() {
             Account account = activeAccount(1000);
-            account.credit(Money.of("500.00", Currency.TRY), Clock.systemDefaultZone());
+            account.credit(Money.of("500.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("1500.00");
         }
 
@@ -266,9 +266,9 @@ class AccountTest {
         @DisplayName("should handle multiple consecutive credits")
         void shouldHandleMultipleCredits() {
             Account account = activeAccount(1000);
-            account.credit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone());
-            account.credit(Money.of("200.00", Currency.TRY), Clock.systemDefaultZone());
-            account.credit(Money.of("50.50", Currency.TRY), Clock.systemDefaultZone());
+            account.credit(Money.of("100.00", Currency.TRY), Clock.systemUTC());
+            account.credit(Money.of("200.00", Currency.TRY), Clock.systemUTC());
+            account.credit(Money.of("50.50", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("1350.50");
         }
 
@@ -276,9 +276,9 @@ class AccountTest {
         @DisplayName("should handle mixed debit and credit sequence")
         void shouldHandleMixedSequence() {
             Account account = activeAccount(500);
-            account.credit(Money.of("200.00", Currency.TRY), Clock.systemDefaultZone());
-            account.debit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone());
-            account.credit(Money.of("50.00", Currency.TRY), Clock.systemDefaultZone());
+            account.credit(Money.of("200.00", Currency.TRY), Clock.systemUTC());
+            account.debit(Money.of("100.00", Currency.TRY), Clock.systemUTC());
+            account.credit(Money.of("50.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("650.00");
         }
 
@@ -287,7 +287,7 @@ class AccountTest {
         void shouldThrowOnSuspendedAccount() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
-            assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
         }
 
@@ -296,7 +296,7 @@ class AccountTest {
         void shouldThrowOnClosedAccount() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
-            assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
         }
 
@@ -304,7 +304,7 @@ class AccountTest {
         @DisplayName("should throw CurrencyMismatchException when currency differs")
         void shouldThrowOnCurrencyMismatch() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.credit(Money.of("50.00", Currency.USD), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(Money.of("50.00", Currency.USD), Clock.systemUTC()))
                     .isExactlyInstanceOf(CurrencyMismatchException.class);
         }
 
@@ -312,7 +312,7 @@ class AccountTest {
         @DisplayName("should throw NullPointerException when amount is null")
         void shouldThrowOnNullAmount() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.credit(null, Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(null, Clock.systemUTC()))
                     .isExactlyInstanceOf(NullPointerException.class);
         }
 
@@ -320,7 +320,7 @@ class AccountTest {
         @DisplayName("should throw when credit amount is zero")
         void shouldThrowOnZeroCredit() {
             Account account = activeAccount(1000);
-            assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Credit amount must not be zero");
         }
@@ -330,7 +330,7 @@ class AccountTest {
         void shouldRejectCreditAboveMaxBalance() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
-            assertThatThrownBy(() -> account.credit(Money.of("2.00", Currency.TRY), Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.credit(Money.of("2.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountBalanceLimitExceededException.class)
                     .hasMessageContaining("maximum balance");
             // Failed credit must not mutate balance or publish events.
@@ -343,7 +343,7 @@ class AccountTest {
         void shouldAllowCreditLandingExactlyOnMaxBalance() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
-            account.credit(Money.of("1.00", Currency.TRY), Clock.systemDefaultZone());
+            account.credit(Money.of("1.00", Currency.TRY), Clock.systemUTC());
             assertThat(account.getBalance().amount()).isEqualByComparingTo("1000000000.00");
         }
 
@@ -427,7 +427,7 @@ class AccountTest {
         void shouldThrowWhenClosed() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
-            assertThatThrownBy(() -> account.suspend(Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.suspend(Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountClosedException.class);
         }
 
@@ -435,7 +435,7 @@ class AccountTest {
         @DisplayName("should suspend with default clock")
         void shouldSuspendWithDefaultClock() {
             Account account = activeAccount(1000);
-            account.suspend(Clock.systemDefaultZone());
+            account.suspend(Clock.systemUTC());
             assertThat(account.getStatus()).isEqualTo(AccountStatus.SUSPENDED);
             assertThat(account.getDomainEvents())
                     .hasSize(1)
@@ -468,7 +468,7 @@ class AccountTest {
         void shouldThrowWhenAlreadyClosed() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
-            assertThatThrownBy(() -> account.close(Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.close(Clock.systemUTC()))
                     .isExactlyInstanceOf(AccountClosedException.class);
         }
 
@@ -477,7 +477,7 @@ class AccountTest {
         void shouldThrowWhenBalanceNotZero() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("100.00", Currency.TRY),
                     AccountStatus.ACTIVE);
-            assertThatThrownBy(() -> account.close(Clock.systemDefaultZone()))
+            assertThatThrownBy(() -> account.close(Clock.systemUTC()))
                     .isExactlyInstanceOf(InsufficientBalanceException.class);
         }
 
@@ -510,7 +510,7 @@ class AccountTest {
         void shouldCloseWithDefaultClock() {
             Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
                     AccountStatus.ACTIVE);
-            account.close(Clock.systemDefaultZone());
+            account.close(Clock.systemUTC());
             assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
             assertThat(account.getDomainEvents())
                     .hasSize(1)

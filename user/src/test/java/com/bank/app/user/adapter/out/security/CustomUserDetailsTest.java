@@ -14,11 +14,11 @@ class CustomUserDetailsTest {
     @Test
     void shouldCreateWithAllFields() {
         var authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
-        CustomUserDetails user = new CustomUserDetails(42L, "testuser", "password", authorities);
+        CustomUserDetails user = new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities);
 
         assertEquals(42L, user.getId());
         assertEquals("testuser", user.getUsername());
-        assertEquals("password", user.getPassword());
+        assertEquals("$2a$12$testpasswordhash00000000000000000000001", user.getPassword());
         assertTrue(user.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_USER")));
     }
 
@@ -33,7 +33,7 @@ class CustomUserDetailsTest {
 
     @Test
     void shouldHandleEmptyAuthorities() {
-        CustomUserDetails user = new CustomUserDetails(1L, "user", "pass", Collections.emptyList());
+        CustomUserDetails user = new CustomUserDetails(1L, "user", "$2a$12$testpasshash00000000000000000000000001", Collections.emptyList());
 
         assertTrue(user.getAuthorities().isEmpty());
     }
@@ -41,7 +41,7 @@ class CustomUserDetailsTest {
     @Test
     void shouldExposeFrameworkFreePrincipalView() {
         var authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
-        CustomUserDetails user = new CustomUserDetails(42L, "testuser", "password", authorities);
+        CustomUserDetails user = new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities);
 
         AuthenticatedPrincipalPort principal = user;
 
@@ -53,7 +53,7 @@ class CustomUserDetailsTest {
     void shouldDefaultTokenVersionToZeroAndAcceptExplicitVersion() {
         var authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
 
-        assertEquals(0L, new CustomUserDetails(42L, "testuser", "password", authorities).getTokenVersion());
-        assertEquals(9L, new CustomUserDetails(42L, "testuser", "password", authorities, 9L).getTokenVersion());
+        assertEquals(0L, new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities).getTokenVersion());
+        assertEquals(9L, new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities, 9L).getTokenVersion());
     }
 }

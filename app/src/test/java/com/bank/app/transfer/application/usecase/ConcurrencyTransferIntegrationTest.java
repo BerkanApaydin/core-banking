@@ -1,5 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
+import com.bank.app.BankApplication;
+
 
 
 import com.bank.app.user.domain.Role;
@@ -38,7 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 
 @SuppressWarnings("null")
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @MockitoBean

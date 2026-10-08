@@ -42,7 +42,12 @@ public class JwtTokenProvider implements JwtPort {
      * so the two can never silently diverge. Never use in production
      * ({@code jwt.allow-default-secret=false} fails fast; rotate immediately
      * if this value ever leaks — it lives in git history and images).
+     *
+     * @deprecated Test-only fallback. Production must set {@code JWT_SECRET};
+     *             this constant exists so tests and local dev boot without a
+     *             secret manager. Do not log or expose its value.
      */
+    @Deprecated
     public static final String DEFAULT_JWT_SECRET =
             "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
@@ -88,7 +93,14 @@ public class JwtTokenProvider implements JwtPort {
                 "Default JWT secret is not allowed (jwt.allow-default-secret=false). "
                 + "Set JWT_SECRET environment variable.");
         }
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        final byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secretKey);
+        } catch (IllegalArgumentException invalidBase64) {
+            throw new IllegalStateException(
+                "JWT secret must be valid Base64 (generate: openssl rand -base64 32).",
+                invalidBase64);
+        }
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
                 "JWT secret must be at least 256 bits (32 bytes) when base64-decoded. " +

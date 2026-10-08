@@ -66,4 +66,36 @@ class LedgerEntryTest {
                 AMOUNT, Money.of("800.00", Currency.USD), LocalDateTime.now()))
                 .hasMessageContaining("cannot be journaled together");
     }
+
+    @Test
+    @DisplayName("debitFromBefore derives balanceAfter by subtraction")
+    void shouldDeriveDebitBalanceAfter() {
+        Money before = Money.of("1000.00", Currency.TRY);
+        LedgerEntry leg = LedgerEntry.debitFromBefore(1L, AMOUNT, before, "ref-1", Clock.systemUTC());
+
+        assertThat(leg.getDirection()).isEqualTo(LedgerDirection.DEBIT);
+        assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("800.00", Currency.TRY));
+        assertThat(leg.getAmount()).isEqualTo(AMOUNT);
+    }
+
+    @Test
+    @DisplayName("creditFromBefore derives balanceAfter by addition")
+    void shouldDeriveCreditBalanceAfter() {
+        Money before = Money.of("500.00", Currency.TRY);
+        LedgerEntry leg = LedgerEntry.creditFromBefore(2L, AMOUNT, before, "ref-2", Clock.systemUTC());
+
+        assertThat(leg.getDirection()).isEqualTo(LedgerDirection.CREDIT);
+        assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("700.00", Currency.TRY));
+    }
+
+    @Test
+    @DisplayName("toString renders entry fields")
+    void shouldRenderToString() {
+        LedgerEntry leg = LedgerEntry.debit(1L, AMOUNT, BALANCE, "ref-9", Clock.systemUTC());
+
+        assertThat(leg.toString())
+                .contains("account=1")
+                .contains("direction=DEBIT")
+                .contains("ref-9");
+    }
 }

@@ -15,6 +15,7 @@ import org.springframework.web.context.request.WebRequest;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,7 +25,21 @@ public final class ProblemDetailFactory {
 
     private static final Logger log = LoggerFactory.getLogger(ProblemDetailFactory.class);
 
+    // E-2: deterministic-time seam. Production keeps systemUTC; tests pin a
+    // fixed clock so error-body timestamps are assertable. Volatile for safe
+    // publication without synchronization on the hot error path.
+    private static volatile Clock clock = Clock.systemUTC();
+
     private ProblemDetailFactory() {}
+
+    /** Test/simulation clock injection (E-2). */
+    public static void setClockForTests(Clock testClock) {
+        clock = testClock != null ? testClock : Clock.systemUTC();
+    }
+
+    private static LocalDateTime now() {
+        return LocalDateTime.now(clock);
+    }
 
     public static ResponseEntity<ProblemDetail> create(ErrorCode code, String message, WebRequest request) {
         HttpStatus status = BusinessErrorHttpMapper.toStatus(code);
@@ -41,7 +56,7 @@ public final class ProblemDetailFactory {
         setInstanceFromRequest(problemDetail, request);
         problemDetail.setProperty("code", ErrorCode.VALIDATION_FAILED.code());
         problemDetail.setProperty("message", "Validation failed");
-        problemDetail.setProperty("timestamp", LocalDateTime.now());
+        problemDetail.setProperty("timestamp", now());
         problemDetail.setProperty("errors", new HashMap<>(fieldErrors));
         setCorrelationId(problemDetail);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -57,7 +72,8 @@ public final class ProblemDetailFactory {
     public static void writeProblem(HttpServletResponse response, ObjectMapper objectMapper,
             HttpStatus status, String code, String message, @Nullable String path) throws IOException {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, message);
-        problemDetail.setTitle(status.getReasonPhrase());
+        // No explicit setTitle: forStatusAndDetail already carries the reason
+        // phrase (pinned by title assertions below).
         if (path != null) {
             try {
                 problemDetail.setInstance(URI.create(path));
@@ -69,7 +85,7 @@ public final class ProblemDetailFactory {
         problemDetail.setProperty("message", message);
         // ISO-8601 string (not LocalDateTime) so this writer works with any ObjectMapper,
         // including ones without the JSR-310 module. Same shape Spring Boot renders by default.
-        problemDetail.setProperty("timestamp", LocalDateTime.now().toString());
+        problemDetail.setProperty("timestamp", now().toString());
         setCorrelationId(problemDetail);
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
@@ -82,11 +98,11 @@ public final class ProblemDetailFactory {
             throw new IllegalArgumentException("HttpStatus must not be null");
         }
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, message);
-        problemDetail.setTitle(status.getReasonPhrase());
+        // No explicit setTitle: forStatusAndDetail already carries the reason phrase.
         setInstanceFromRequest(problemDetail, request);
         problemDetail.setProperty("code", code);
         problemDetail.setProperty("message", message);
-        problemDetail.setProperty("timestamp", LocalDateTime.now());
+        problemDetail.setProperty("timestamp", now());
         setCorrelationId(problemDetail);
         return ResponseEntity.status(status)
                 .contentType(Objects.requireNonNull(MediaType.APPLICATION_PROBLEM_JSON))

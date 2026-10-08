@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /**
@@ -24,6 +26,7 @@ public class RefreshTokenCleanupJob {
 
     private final RefreshTokenPort refreshTokens;
     private final AdvisorySchedulerLock schedulerLock;
+    private final ClockProviderPort clockProvider;
 
     public RefreshTokenCleanupJob(RefreshTokenPort refreshTokens) {
         this(refreshTokens, AdvisorySchedulerLock.alwaysRun());
@@ -32,8 +35,15 @@ public class RefreshTokenCleanupJob {
     @Autowired
     public RefreshTokenCleanupJob(RefreshTokenPort refreshTokens,
                                   AdvisorySchedulerLock schedulerLock) {
+        this(refreshTokens, schedulerLock, null);
+    }
+
+    public RefreshTokenCleanupJob(RefreshTokenPort refreshTokens,
+                                  AdvisorySchedulerLock schedulerLock,
+                                  ClockProviderPort clockProvider) {
         this.refreshTokens = refreshTokens;
         this.schedulerLock = schedulerLock;
+        this.clockProvider = clockProvider;
     }
 
     @Scheduled(cron = "${app.security.refresh-token.cleanup-cron:0 0 4 * * *}")
@@ -42,7 +52,8 @@ public class RefreshTokenCleanupJob {
         // idempotent, but N pods must not all scan).
         schedulerLock.runIfLeader("refresh-token-cleanup", () -> {
             try {
-                int deleted = refreshTokens.deleteExpiredBefore(LocalDateTime.now());
+                Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
+                int deleted = refreshTokens.deleteExpiredBefore(LocalDateTime.now(clock));
                 log.info("Refresh token cleanup completed: expiredRowsDeleted={}", deleted);
             } catch (RuntimeException e) {
                 // Expired records are rejected by expiry checks; a missed cleanup

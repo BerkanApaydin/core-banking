@@ -32,6 +32,7 @@ try {
     Invoke-Checked 'Load-test runner unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'load_tests.test_runner', '-v'))
     Invoke-Checked 'Load acceptance thresholds pinned' $python ($pythonPrefix + @('scripts/check_load_acceptance.py'))
     Invoke-Checked 'Health-smoke unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'ops.test_health_smoke', '-v'))
+    Invoke-Checked 'Restore-drill contract' $python ($pythonPrefix + @('scripts/check_restore_drill.py'))
 
     foreach ($script in @('i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js')) {
         Invoke-Checked "JavaScript syntax: $script" 'node' @('--check', "app/src/main/resources/static/$script")

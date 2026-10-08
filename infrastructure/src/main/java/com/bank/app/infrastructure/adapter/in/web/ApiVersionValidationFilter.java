@@ -24,10 +24,13 @@ public class ApiVersionValidationFilter implements Filter {
 
     private final ObjectMapper objectMapper;
 
-    public ApiVersionValidationFilter() {
-        this(new ObjectMapper());
-    }
-
+    /**
+     * Single constructor: the Spring-configured {@link ObjectMapper} is always
+     * injected, so version-mismatch bodies serialize with the same Jackson
+     * settings and modules as every other error body (no {@code new
+     * ObjectMapper()} fallback — it would silently ignore
+     * {@code spring.jackson.*} customization).
+     */
     @Autowired
     public ApiVersionValidationFilter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;

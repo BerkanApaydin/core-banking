@@ -67,17 +67,23 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         Transfer transfer = createAndValidateTransfer(senderInfo, receiverInfo, senderIban,
                 receiverIban, amount);
 
-        Transfer savedTransfer = saveTransferPort.save(transfer);
-
-        // Balance mutation joins this use-case's local transaction (REQUIRED):
-        // atomic in the modular monolith (single DataSource). If the Account
-        // context ever moves to a separate service, this needs a Saga.
+        // PENDING save first: the ID is needed for the COMPLETED domain event
+        // (TransferCompletedEvent requires non-null transferId). Both saves join
+        // this use-case's local transaction (REQUIRED): atomic in the modular
+        // monolith (single DataSource). If the Account context ever moves to a
+        // separate service, this needs a Saga.
+        Transfer pendingTransfer = saveTransferPort.save(transfer);
         accountAclPort.debitAndCredit(senderInfo.id(), receiverInfo.id(), amount);
 
-        savedTransfer.complete(clockProvider.clock());
-        saveTransferPort.save(savedTransfer);
-
-        domainEventPublisherService.publishEvents(savedTransfer);
+        pendingTransfer.complete(clockProvider.clock());
+        // Perf-1 note: the bulk UPDATE path returns a fresh aggregate without
+        // domain events (BaseAggregateRoot.registerEvent is protected), so the
+        // COMPLETED event is published from pendingTransfer — which carries the
+        // event with the assigned ID — not from the reloaded copy. Publish
+        // AFTER the second save so a publish failure still leaves both writes
+        // behind (existing failure-handling contract: no compensation).
+        Transfer savedTransfer = saveTransferPort.save(pendingTransfer);
+        domainEventPublisherService.publishEvents(pendingTransfer);
         auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
                 "Transfer completed. Transfer ID: " + savedTransfer.getId(),
                 LocalDateTime.now(clockProvider.clock()),
@@ -94,8 +100,8 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
     private Transfer createAndValidateTransfer(AccountInfo sender, AccountInfo receiver, String senderIban,
             String receiverIban, Money amount) {
         TransferParticipants participants = new TransferParticipants(
-                sender.id(), senderIban, Currency.valueOf(sender.currency()),
-                receiver.id(), receiverIban, Currency.valueOf(receiver.currency()));
+                sender.id(), senderIban, Currency.fromCode(sender.currency()),
+                receiver.id(), receiverIban, Currency.fromCode(receiver.currency()));
         return transferDomainService.validateAndCreateTransfer(participants, amount, clockProvider.clock());
     }
 

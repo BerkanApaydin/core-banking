@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 /**
@@ -57,7 +59,7 @@ public class HmacCsrfBindingAdapter implements CsrfBindingPort {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
             return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
-        } catch (java.security.NoSuchAlgorithmException | java.security.InvalidKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA256 unavailable", e);
         }
     }

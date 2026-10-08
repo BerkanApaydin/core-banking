@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,7 +89,7 @@ class AuditLogTest {
     @DisplayName("should create with custom clock")
     void shouldCreateWithClock() {
         LocalDateTime fixedTime = LocalDateTime.of(2026, 6, 24, 12, 30);
-        Clock clock = Clock.fixed(fixedTime.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        Clock clock = Clock.fixed(fixedTime.atZone(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
         AuditLog log = AuditLog.create("testuser", AuditAction.ACCOUNT_CREATED, "details", clock);
         assertEquals(fixedTime, log.getTimestamp());
     }

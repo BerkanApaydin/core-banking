@@ -3,6 +3,11 @@ package com.bank.app.transfer.domain;
 import com.bank.app.common.domain.Currency;
 import java.util.Objects;
 
+/**
+ * Normalized IBAN strings (see {@code Iban.normalize}); checksum validated in
+ * {@code TransferDomainService}. Kept as strings to avoid leaking the
+ * {@code Iban} value object across the transfer ACL boundary.
+ */
 public record TransferParticipants(
         Long senderId,
         String senderIban,

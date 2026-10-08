@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SuppressWarnings("null")
@@ -43,5 +49,49 @@ class SmsNotificationAdapterTest {
     @Test
     void shouldHandleNullCancelGracefully() {
         assertDoesNotThrow(() -> adapter.notifyTransferCancelled(null));
+    }
+
+    @Test
+    void shouldExposeSmsChannel() {
+        assertThat(adapter.channel()).isEqualTo("SMS");
+    }
+
+    @Test
+    void shouldLogCompletedNotificationWithChannel() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(SmsNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            Transfer transfer = new Transfer(7L, 10L, 20L,
+                    Money.of("100.00", Currency.TRY),
+                    TransferStatus.COMPLETED, LocalDateTime.now());
+            adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains("SMS").contains("7"));
+    }
+
+    @Test
+    void shouldLogCancelledNotificationWithChannel() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(SmsNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            adapter.notifyTransferCancelled(new AsyncTransferCancelledEvent(
+                    9L, 10L, 20L, Money.of("50.00", Currency.TRY),
+                    TransferStatus.CANCELLED, LocalDateTime.now()));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains("SMS").contains("9"));
     }
 }

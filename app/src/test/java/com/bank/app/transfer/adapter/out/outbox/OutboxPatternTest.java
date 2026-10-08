@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +105,7 @@ class OutboxPatternTest {
 
         when(idempotencyPort.tryCreate(anyString(), any())).thenReturn(true);
 
-        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort);
+        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort, Clock::systemUTC);
         OutboxProcessor processor = new OutboxProcessor(outboxPort, List.of(handler));
         outboxPoller = new OutboxPoller(outboxPort, processor, defaultOutboxProperties);
     }

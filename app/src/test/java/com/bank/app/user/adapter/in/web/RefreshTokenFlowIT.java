@@ -1,5 +1,7 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // detection (family kill) and logout revocation.
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
 

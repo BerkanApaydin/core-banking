@@ -1,5 +1,7 @@
 package com.bank.app.account.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 
 
 
@@ -46,7 +48,7 @@ import com.bank.app.common.application.port.out.EventPublisherPort;
 @SuppressWarnings("null")
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @DisplayName("AccountController Integration")
 class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 

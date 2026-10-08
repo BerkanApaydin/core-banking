@@ -125,22 +125,41 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         if (account == null) {
             throw new IllegalArgumentException("Account must not be null");
         }
-        // 7.1: load-then-mutate like TransferPersistenceAdapter — the managed
-        // entity is dirty-checked at flush, so no detached merge() and no
-        // implicit pre-update SELECT per save.
+        // Perf-1/P-1: happy path is a single versioned UPDATE (no SELECT).
+        // Only the rare 0-row path falls back to a load to distinguish
+        // not-found (AccountNotFoundException) from conflict (409).
         AccountJpaEntity entity;
         if (account.getId() == null) {
             entity = mapper.toJpaEntity(account);
-        } else {
-            entity = repository.findById(account.getId())
-                    .orElseThrow(() -> new AccountNotFoundException(account.getId()));
-            // Loading a managed entity must not discard the caller's expected version.
-            if (account.getVersion() == null || !account.getVersion().equals(entity.getVersion())) {
-                throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
-            }
-            mapper.updateJpaEntity(entity, account);
+            AccountJpaEntity saved = repository.save(entity);
+            return mapper.toDomain(saved);
         }
-        AccountJpaEntity saved = repository.save(entity);
-        return mapper.toDomain(saved);
+        if (account.getVersion() != null) {
+            int updated = repository.updateIfVersionMatch(
+                    account.getId(),
+                    account.getVersion(),
+                    account.getBalance().amount(),
+                    account.getStatus(),
+                    account.getOwnerName());
+            if (updated == 1) {
+                // No re-read: the bulk UPDATE already applied the state; the
+                // caller-held aggregate plus a bumped version is the truth.
+                // Saves 1 SELECT per account write (2 per transfer).
+                Long bumped = account.getVersion() + 1;
+                return new Account(account.getId(), account.getUserId(), account.getIban(),
+                        account.getOwnerName(), account.getBalance(), account.getStatus(), bumped);
+            }
+            // 0 rows: distinguish missing row vs concurrent write with one load.
+            repository.findById(account.getId())
+                    .orElseThrow(() -> new AccountNotFoundException(account.getId()));
+            throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
+        }
+        // Legacy path (version null): same contract as transfer — a missing row
+        // reports not-found, an existing row rejects the blind write with an
+        // optimistic failure. Callers always carry the version they read, so
+        // this load runs only on the exceptional path.
+        repository.findById(account.getId())
+                .orElseThrow(() -> new AccountNotFoundException(account.getId()));
+        throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
     }
 }

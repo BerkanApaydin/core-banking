@@ -1,9 +1,8 @@
 package com.bank.app.transfer.adapter.in.event;
 
-import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
+import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -15,79 +14,91 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class TransferEventConsumerTest {
 
-    @Mock
-    private SendNotificationPort notificationPort;
+    @Mock private SendNotificationPort email;
+    @Mock private SendNotificationPort sms;
 
-    @Mock
-    private SendNotificationPort failingPort;
-
-    @Test
-    void shouldSendNotificationWhenTransferCompletedEventIsTriggered() {
-        TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
-
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
-
-        listener.handleTransferCompleted(event);
-
-        verify(notificationPort).notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+    private AsyncTransferCompletedEvent completedEvent() {
+        return new AsyncTransferCompletedEvent(1L, 10L, 20L,
+                Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
     }
 
     @Test
-    void shouldSendNotificationWhenTransferCancelledEventIsTriggered() {
-        TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
+    void shouldFanOutCompletedToEveryChannel() {
+        new TransferEventConsumer(List.of(email, sms)).handleTransferCompleted(completedEvent());
 
-        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
-                1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
-
-        listener.handleTransferCancelled(event);
-
-        verify(notificationPort).notifyTransferCancelled(event);
+        verify(email).notifyTransferCompleted(any());
+        verify(sms).notifyTransferCompleted(any());
     }
 
     @Test
-    void shouldContinueWithOtherPortsWhenOnePortFailsOnCompleted() {
-        TransferEventConsumer listener = new TransferEventConsumer(List.of(failingPort, notificationPort));
+    void shouldFanOutCancelledToEveryChannel() {
+        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(2L, 10L, 20L,
+                Money.of("50.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
 
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
-        doThrow(new RuntimeException("smtp down")).when(failingPort).notifyTransferCompleted(event);
+        new TransferEventConsumer(List.of(email, sms)).handleTransferCancelled(event);
 
-        assertThrows(RuntimeException.class, () -> listener.handleTransferCompleted(event));
-
-        verify(notificationPort).notifyTransferCompleted(event);
+        verify(email).notifyTransferCancelled(event);
+        verify(sms).notifyTransferCancelled(event);
     }
 
     @Test
-    void shouldContinueWithOtherPortsWhenOnePortFailsOnCancelled() {
-        TransferEventConsumer listener = new TransferEventConsumer(List.of(failingPort, notificationPort));
+    void shouldRethrowFirstFailureAfterTryingEveryChannel() {
+        RuntimeException first = new RuntimeException("smtp down");
+        doThrow(first).when(email).notifyTransferCompleted(any());
 
-        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
-                1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
-        doThrow(new RuntimeException("sms down")).when(failingPort).notifyTransferCancelled(event);
-
-        assertThrows(RuntimeException.class, () -> listener.handleTransferCancelled(event));
-
-        verify(notificationPort).notifyTransferCancelled(event);
+        assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
+                .handleTransferCompleted(completedEvent()))
+                .isSameAs(first);
+        verify(sms).notifyTransferCompleted(any());
     }
 
     @Test
-    void shouldDoNothingWhenNoPortsConfigured() {
-        TransferEventConsumer listener = new TransferEventConsumer(List.of());
+    void shouldSuppressLaterFailuresIntoTheFirst() {
+        RuntimeException first = new RuntimeException("smtp down");
+        RuntimeException second = new RuntimeException("sms down");
+        doThrow(first).when(email).notifyTransferCancelled(any());
+        doThrow(second).when(sms).notifyTransferCancelled(any());
+        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(3L, 10L, 20L,
+                Money.of("10.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
 
-        Transfer transfer = new Transfer(1L, 100L, 200L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
+                .handleTransferCancelled(event))
+                .isSameAs(first)
+                .hasSuppressedException(second);
+        verify(email).notifyTransferCancelled(any());
+    }
 
-        listener.handleTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+    @Test
+    void shouldSuppressLaterCompletedFailuresIntoTheFirst() {
+        // Mirrors the cancelled-path suppressed test: kills the
+        // addSuppressed VoidMethodCall mutant on handleTransferCompleted.
+        RuntimeException first = new RuntimeException("smtp down");
+        RuntimeException second = new RuntimeException("sms down");
+        doThrow(first).when(email).notifyTransferCompleted(any());
+        doThrow(second).when(sms).notifyTransferCompleted(any());
 
-        verifyNoInteractions(notificationPort);
+        assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
+                .handleTransferCompleted(completedEvent()))
+                .isSameAs(first)
+                .hasSuppressedException(second);
+    }
+
+    @Test
+    void shouldDeliverNothingWhenNoChannelsRegistered() {
+        new TransferEventConsumer(List.of()).handleTransferCompleted(completedEvent());
+        new TransferEventConsumer(List.of()).handleTransferCancelled(
+                new AsyncTransferCancelledEvent(4L, 10L, 20L,
+                        Money.of("10.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now()));
+
+        verify(email, never()).notifyTransferCompleted(any());
     }
 }

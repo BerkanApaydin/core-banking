@@ -328,6 +328,80 @@ class MoneyTest {
     }
 
     @Nested
+    @DisplayName("transfer amount ceiling")
+    class TransferAmount {
+
+        @Test
+        @DisplayName("should accept amounts up to the ceiling")
+        void shouldAcceptUpToCeiling() {
+            assertThat(Money.ofTransferAmount(new BigDecimal("1000000000.00"), Currency.TRY).amount())
+                    .isEqualByComparingTo("1000000000.00");
+            assertThat(Money.ofTransferAmount("0.00", Currency.TRY).amount())
+                    .isEqualByComparingTo("0.00");
+            assertThat(Money.ofTransferAmount(new BigDecimal("999999999.99"), Currency.USD).amount())
+                    .isEqualByComparingTo("999999999.99");
+        }
+
+        @Test
+        @DisplayName("should reject amounts above the ceiling")
+        void shouldRejectAboveCeiling() {
+            assertThatThrownBy(() -> Money.ofTransferAmount(new BigDecimal("1000000000.01"), Currency.TRY))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Transfer amount exceeds maximum");
+            assertThatThrownBy(() -> Money.ofTransferAmount("1000000000.01", Currency.TRY))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should never return null")
+        void shouldNeverReturnNull() {
+            assertThat(Money.ofTransferAmount(new BigDecimal("10.00"), Currency.TRY)).isNotNull();
+            assertThat(Money.ofTransferAmount("10.00", Currency.TRY)).isNotNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("trySubtract")
+    class TrySubtract {
+
+        @Test
+        @DisplayName("should return difference when funds suffice")
+        void shouldReturnDifference() {
+            var result = Money.of("100.00", Currency.TRY)
+                    .trySubtract(Money.of("30.00", Currency.TRY));
+            assertThat(result).isPresent();
+            assertThat(result.get().amount()).isEqualByComparingTo("70.00");
+        }
+
+        @Test
+        @DisplayName("should return zero when amounts are equal")
+        void shouldReturnZeroWhenEqual() {
+            var result = Money.of("100.00", Currency.TRY)
+                    .trySubtract(Money.of("100.00", Currency.TRY));
+            assertThat(result).isPresent();
+            assertThat(result.get().isZero()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should be empty when funds are insufficient")
+        void shouldBeEmptyWhenInsufficient() {
+            assertThat(Money.of("50.00", Currency.TRY)
+                    .trySubtract(Money.of("100.00", Currency.TRY))).isEmpty();
+            // Boundary: one cent short must still be empty.
+            assertThat(Money.of("99.99", Currency.TRY)
+                    .trySubtract(Money.of("100.00", Currency.TRY))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should be empty for null or foreign currency")
+        void shouldBeEmptyForNullOrForeignCurrency() {
+            Money money = Money.of("100.00", Currency.TRY);
+            assertThat(money.trySubtract(null)).isEmpty();
+            assertThat(money.trySubtract(Money.of("10.00", Currency.USD))).isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("equality")
     class Equality {
 

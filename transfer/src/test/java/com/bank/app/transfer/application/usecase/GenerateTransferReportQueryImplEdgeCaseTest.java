@@ -82,11 +82,10 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
     void shouldThrowWhenStartDateIsAfterEndDate() {
         LocalDateTime start = LocalDateTime.now().plusDays(1);
         LocalDateTime end = LocalDateTime.now();
-        ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Start date must not be after end date.", ex.getMessage());
+                () -> new ReportCriteria(1L, start, end));
+        assertEquals("Start date must not be after end date", ex.getMessage());
     }
 
     @Test
@@ -110,11 +109,9 @@ class GenerateTransferReportQueryImplEdgeCaseTest {
         LocalDateTime start = LocalDateTime.now().minusMonths(12).minusDays(1);
         LocalDateTime end = LocalDateTime.now();
 
-        ReportCriteria criteria = new ReportCriteria(1L, start, end);
-
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Report range must be at most 12 months.", ex.getMessage());
+                () -> new ReportCriteria(1L, start, end));
+        assertEquals("Report range must not exceed 12 months", ex.getMessage());
     }
 
     @Test

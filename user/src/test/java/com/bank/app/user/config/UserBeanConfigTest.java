@@ -1,6 +1,7 @@
 package com.bank.app.user.config;
 
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +35,7 @@ class UserBeanConfigTest {
     @Mock private TokenBlacklistPort tokenBlacklistPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private ClockProviderPort clockProvider;
-    @Mock private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
+    @Mock private AuditEventPort auditEventPort;
 
     @Test
     void shouldCreateRegisterUserUseCaseBean() {
@@ -61,5 +63,14 @@ class UserBeanConfigTest {
         UserBeanConfig config = new UserBeanConfig();
         assertNotNull(config.logoutUseCase(tokenBlacklistPort, jwtPort, refreshTokenPort,
                 clockProvider, auditEventPort));
+    }
+
+    @Test
+    void shouldExposePasswordPolicyBean() {
+        UserBeanConfig config = new UserBeanConfig();
+        var policy = config.passwordPolicy(
+                new PasswordPolicyProperties(12, true, true, true));
+        assertNotNull(policy);
+        assertThat(policy.minLength()).isEqualTo(12);
     }
 }

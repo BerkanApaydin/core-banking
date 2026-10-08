@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,9 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.WebRequest;
 
 import java.net.URI;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,6 +74,47 @@ class ProblemDetailFactoryTest {
 
             assertThat(response.getBody().getInstance()).isNull();
         }
+
+        @Test
+        @DisplayName("should mirror MDC correlation id into the body")
+        void shouldMirrorCorrelationId() {
+            MDC.put("correlationId", "corr-9");
+            try {
+                ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
+                        ErrorCode.RESOURCE_NOT_FOUND, "Not found", null);
+
+                assertThat(response.getBody().getProperties()).containsEntry("correlationId", "corr-9");
+            } finally {
+                MDC.remove("correlationId");
+            }
+        }
+
+        @Test
+        @DisplayName("should omit correlation id without MDC")
+        void shouldOmitCorrelationIdWithoutMdc() {
+            MDC.remove("correlationId");
+
+            ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
+                    ErrorCode.RESOURCE_NOT_FOUND, "Not found", null);
+
+            assertThat(response.getBody().getProperties()).doesNotContainKey("correlationId");
+        }
+
+        @Test
+        @DisplayName("null clock resets to system UTC")
+        void shouldResetClockOnNull() {
+            ProblemDetailFactory.setClockForTests(Clock.fixed(
+                    Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC));
+            ProblemDetailFactory.setClockForTests(null);
+
+            ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
+                    ErrorCode.RESOURCE_NOT_FOUND, "Not found", null);
+
+            // System clock: any 2026 timestamp proves the fixed clock is gone
+            // without coupling to the wall clock.
+            assertThat(response.getBody().getProperties().get("timestamp").toString())
+                    .startsWith("2026");
+        }
     }
 
     @Nested
@@ -123,6 +168,20 @@ class ProblemDetailFactoryTest {
 
             assertThat(response.getBody().getInstance()).isEqualTo(URI.create("/api/test/validation"));
         }
+
+        @Test
+        @DisplayName("should mirror MDC correlation id into validation errors")
+        void shouldMirrorCorrelationId() {
+            MDC.put("correlationId", "corr-7");
+            try {
+                ResponseEntity<ProblemDetail> response = ProblemDetailFactory.createValidationError(
+                        Map.of("name", "required"), null);
+
+                assertThat(response.getBody().getProperties()).containsEntry("correlationId", "corr-7");
+            } finally {
+                MDC.remove("correlationId");
+            }
+        }
     }
 
     @Nested
@@ -139,10 +198,31 @@ class ProblemDetailFactoryTest {
 
             assertThat(response.getStatus()).isEqualTo(401);
             assertThat(response.getContentType()).startsWith("application/problem+json");
+            // Exact "message" key kills the setProperty(message) mutant (the
+            // "detail" field would still contain the text without it).
             assertThat(response.getContentAsString())
                     .contains("\"code\":\"AUTHENTICATION_FAILED\"")
-                    .contains("Unauthorized")
+                    .contains("\"message\":\"Unauthorized\"")
+                    .contains("\"timestamp\":")
                     .contains("/api/v1/accounts");
+            // Kills the setCharacterEncoding mutant.
+            assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
+        }
+
+        @Test
+        @DisplayName("should mirror MDC correlation id into written problems")
+        void shouldMirrorCorrelationId() throws Exception {
+            MDC.put("correlationId", "corr-5");
+            try {
+                MockHttpServletResponse response = new MockHttpServletResponse();
+
+                ProblemDetailFactory.writeProblem(response, new ObjectMapper(), HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AUTHENTICATION_FAILED.code(), "Unauthorized", "/api/v1/accounts");
+
+                assertThat(response.getContentAsString()).contains("\"correlationId\":\"corr-5\"");
+            } finally {
+                MDC.remove("correlationId");
+            }
         }
 
         @Test

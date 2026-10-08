@@ -61,7 +61,7 @@ services:
       # tokens with a publicly known key. Generate one with:
       #   openssl rand -base64 32
       # then `export JWT_SECRET=<output>` (or add it to a local .env file).
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET first - generate one with: openssl rand -base64 32}
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET first - generate one with: openssl rand -base64 32}"
       JWT_ALLOW_DEFAULT_SECRET: ${JWT_ALLOW_DEFAULT_SECRET:-true}
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis

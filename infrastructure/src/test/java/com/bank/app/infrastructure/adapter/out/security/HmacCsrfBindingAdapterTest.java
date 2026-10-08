@@ -4,6 +4,8 @@ import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("HmacCsrfBindingAdapter")
@@ -42,7 +44,7 @@ class HmacCsrfBindingAdapterTest {
                 new HmacCsrfBindingAdapter(new JwtProperties(SECRET, 900000L, 604800000L, true));
         HmacCsrfBindingAdapter second =
                 new HmacCsrfBindingAdapter("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".getBytes(
-                        java.nio.charset.StandardCharsets.UTF_8));
+                        StandardCharsets.UTF_8));
 
         String token = first.issueCsrfToken("42");
 

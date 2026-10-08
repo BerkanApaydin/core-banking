@@ -36,32 +36,31 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
     @Override
     public TransferReportResponse execute(ReportCriteria criteria) {
         Objects.requireNonNull(criteria, "Criteria must not be null");
-        Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID must not be null");
-        LocalDateTime startDate = Objects.requireNonNull(criteria.startDate(), "Start date must not be null");
-        LocalDateTime endDate = Objects.requireNonNull(criteria.endDate(), "End date must not be null");
-
-        if (startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Start date must not be after end date.");
-        }
-        if (startDate.plusMonths(12).isBefore(endDate)) {
-            throw new IllegalArgumentException("Report range must be at most 12 months.");
-        }
+        // Date-range invariants live in ReportCriteria's compact constructor
+        // (single source); no duplicate validation here.
+        Long accountId = criteria.accountId();
+        LocalDateTime startDate = criteria.startDate();
+        LocalDateTime endDate = criteria.endDate();
 
         int page = Math.max(criteria.page(), 0);
         int size = Math.max(Math.min(criteria.size(), maxPageSize), 1);
 
         AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId, "You are not authorized to generate a report for this account.");
 
-        // The port over-fetches one row beyond the logical page (see
-        // TransferPersistenceAdapter): a single range scan decides both the
-        // content and hasNext, with no second query for page+1.
-        List<Transfer> fetched = loadTransferPort.findHistoryBetween(
-            accountId,
-            startDate,
-            endDate,
-            page,
-            size
-        );
+        // DB-2/Perf-3: keyset cursor when supplied (no OFFSET/sort of the full
+        // match set); legacy offset path otherwise. Both over-fetch one row so
+        // content and hasNext come from a single range scan.
+        List<Transfer> fetched = criteria.isKeyset()
+            ? loadTransferPort.findHistoryBetweenKeyset(
+                accountId, startDate, endDate,
+                criteria.cursorCreatedAt(), criteria.cursorId(), size)
+            : loadTransferPort.findHistoryBetween(
+                accountId,
+                startDate,
+                endDate,
+                page,
+                size
+            );
         boolean hasNext = fetched.size() > size;
         List<Transfer> transfers = hasNext ? fetched.subList(0, size) : fetched;
 
@@ -74,13 +73,29 @@ public class GenerateTransferReportQueryImpl implements GenerateTransferReportQu
             .map(t -> t.getAmount().amount())
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Keyset cursor for the next page: last row's (createdAt,id).
+        String nextCursorCreatedAt = null;
+        Long nextCursorId = null;
+        // hasNext implies a non-empty page (size >= 1, so the trimmed subList
+        // cannot be empty): no defensive isEmpty check — dead conditions hide
+        // real branches from mutation testing.
+        if (hasNext) {
+            Transfer last = transfers.get(transfers.size() - 1);
+            nextCursorCreatedAt = last.getCreatedAt().toString();
+            nextCursorId = last.getId();
+        }
+
         return new TransferReportResponse(
             criteria.accountId(),
             transfers.size(),
             pageVolume,
             account.currency(),
             responseList,
-            hasNext
+            hasNext,
+            nextCursorCreatedAt,
+            nextCursorId,
+            null,
+            null
         );
     }
 }

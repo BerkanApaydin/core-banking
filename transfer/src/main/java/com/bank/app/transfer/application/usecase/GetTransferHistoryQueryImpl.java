@@ -31,11 +31,6 @@ public class GetTransferHistoryQueryImpl implements GetTransferHistoryQuery {
     }
 
     @Override
-    public PageResponse<TransferResponse> execute(Long accountId) {
-        return execute(accountId, 0, 20);
-    }
-
-    @Override
     public PageResponse<TransferResponse> execute(Long accountId, int page, int size) {
         Objects.requireNonNull(accountId, "Account ID must not be null");
 

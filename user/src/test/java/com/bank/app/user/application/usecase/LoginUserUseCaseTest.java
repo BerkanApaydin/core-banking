@@ -1,6 +1,8 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
@@ -41,11 +44,11 @@ class LoginUserUseCaseTest {
     @Mock private LoginAttemptPort loginAttemptPort;
     @Mock private RefreshTokenPort refreshTokenPort;
     @Mock private ClockProviderPort clockProvider;
-    @Mock private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
+    @Mock private AuditEventPort auditEventPort;
     private LoginUserUseCase loginUserUseCase;
 
     private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "password";
+    private static final String PASSWORD = "$2a$12$testpasswordhash00000000000000000000001";
     private static final String CLIENT_IP = "192.168.1.1";
 
 
@@ -247,17 +250,39 @@ class LoginUserUseCaseTest {
         }
 
         @Test
-        @DisplayName("should throw when user not found")
+        @DisplayName("should map unknown user to generic 401 (no enumeration)")
         void shouldThrowWhenUserNotFound() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
 
             doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request))
-                    .isExactlyInstanceOf(UserNotFoundException.class)
-                    .hasMessage("User not found");
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             verify(authenticationPort).authenticate(anyString(), anyString());
+            // Kills the auditLogin VoidMethodCall mutant on the unknown-user path.
+            var captor = ArgumentCaptor.forClass(AuditEvent.class);
+            verify(auditEventPort).publish(captor.capture());
+            assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
+            // No IP: no failure counting must happen (kills the recordFailure
+            // Negate mutant for the null-IP branch).
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+        }
+
+        @Test
+        @DisplayName("should record failure for unknown user when IP is present")
+        void shouldRecordFailureForUnknownUserWithIp() {
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+            when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
         }
 
         @Test
@@ -352,9 +377,9 @@ class LoginUserUseCaseTest {
     @DisplayName("authentication audit (K11/D4)")
     class AuthenticationAudit {
 
-        private org.mockito.ArgumentCaptor<com.bank.app.common.domain.event.AuditEvent> auditCaptor() {
-            return org.mockito.ArgumentCaptor
-                    .forClass(com.bank.app.common.domain.event.AuditEvent.class);
+        private ArgumentCaptor<AuditEvent> auditCaptor() {
+            return ArgumentCaptor
+                    .forClass(AuditEvent.class);
         }
 
         @Test
@@ -376,6 +401,32 @@ class LoginUserUseCaseTest {
             verify(auditEventPort).publish(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_SUCCEEDED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
+            // Kills the Negate mutant on (clientIp != null): without IP the
+            // detail must not mention an IP.
+            assertThat(captor.getValue().details()).doesNotContain("from IP");
+        }
+
+        @Test
+        @DisplayName("should include client IP in success audit when present")
+        void shouldIncludeIpInSuccessAudit() {
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
+
+            when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
+            when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
+            when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
+            when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+            when(jwtPort.getExpirationMs()).thenReturn(900000L);
+            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+
+            loginUserUseCase.execute(request, CLIENT_IP);
+
+            var captor = auditCaptor();
+            verify(auditEventPort).publish(captor.capture());
+            assertThat(captor.getValue().action()).isEqualTo("LOGIN_SUCCEEDED");
+            assertThat(captor.getValue().details()).contains("from IP " + CLIENT_IP);
         }
 
         @Test
@@ -408,7 +459,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
             doThrow(new RuntimeException("audit down")).when(auditEventPort)
-                    .publish(any(com.bank.app.common.domain.event.AuditEvent.class));
+                    .publish(any(AuditEvent.class));
 
             var response = loginUserUseCase.execute(request);
 

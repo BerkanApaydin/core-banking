@@ -1,5 +1,7 @@
 package com.bank.app.transfer.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.account.adapter.out.persistence.AccountJpaEntity;
 import com.bank.app.account.adapter.out.persistence.AccountJpaRepository;
 import com.bank.app.account.domain.AccountStatus;
@@ -44,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class TransferDetailAuthorizationIT extends AbstractSpringBootIntegrationTest {
 
@@ -116,12 +118,12 @@ class TransferDetailAuthorizationIT extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
-    @DisplayName("stranger gets 403 with ACCESS_DENIED")
+    @DisplayName("stranger gets 404 with TRANSFER_NOT_FOUND (G-5 existence-oracle fix)")
     void shouldForbidStranger() throws Exception {
         mockMvc.perform(get("/api/v1/transfers/" + transferId)
                         .header("Authorization", "Bearer " + bobToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("TRANSFER_NOT_FOUND")));
     }
 
     @Test

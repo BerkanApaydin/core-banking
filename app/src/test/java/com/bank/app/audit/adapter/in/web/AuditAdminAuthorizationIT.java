@@ -1,5 +1,7 @@
 package com.bank.app.audit.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.user.domain.Role;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
@@ -28,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // directly, mirrored here by repository insert.
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class AuditAdminAuthorizationIT extends AbstractSpringBootIntegrationTest {
 

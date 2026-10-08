@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.out.persistence;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -28,22 +29,36 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         if (transfer == null) {
             throw new IllegalArgumentException("Transfer must not be null");
         }
-        TransferJpaEntity entity;
         if (transfer.getId() == null) {
-            entity = mapper.toJpaEntity(transfer);
-        } else {
-            entity = repository.findById(transfer.getId())
+            TransferJpaEntity entity = mapper.toJpaEntity(transfer);
+            TransferJpaEntity saved = repository.save(entity);
+            return mapper.toDomain(saved);
+        }
+        // Perf-1: status-transition writes (COMPLETED/CANCELLED) are a single
+        // versioned UPDATE with no preceding SELECT. Only the rare 0-row path
+        // loads once to distinguish not-found from conflict. A missing expected
+        // version is rejected outright: blind writes without an OCC precondition
+        // are never allowed (pinned by rejectsMissingVersionForExistingTransfer).
+        if (transfer.getVersion() == null) {
+            // Exceptional path only (callers always carry the version they read):
+            // one load distinguishes a missing row from a blind write.
+            repository.findById(transfer.getId())
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Transfer not found: " + transfer.getId()));
-            // Loading a managed entity must not discard the caller's expected version.
-            // Hibernate still detects a concurrent write after this comparison at flush.
-            if (transfer.getVersion() == null || !transfer.getVersion().equals(entity.getVersion())) {
-                throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
-            }
-            mapper.updateJpaEntity(entity, transfer);
+            throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
         }
-        TransferJpaEntity saved = repository.save(entity);
-        return mapper.toDomain(saved);
+        int updated = repository.updateStatusIfVersionMatch(
+                transfer.getId(), transfer.getVersion(), transfer.getStatus());
+        if (updated == 1) {
+            Long bumped = transfer.getVersion() + 1;
+            return new Transfer(transfer.getId(), transfer.getSenderAccountId(),
+                    transfer.getReceiverAccountId(), transfer.getAmount(),
+                    transfer.getStatus(), transfer.getCreatedAt(), bumped);
+        }
+        repository.findById(transfer.getId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Transfer not found: " + transfer.getId()));
+        throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
     }
 
     @Override
@@ -79,16 +94,31 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
     }
 
     @Override
+    public List<Transfer> findHistoryBetweenKeyset(Long accountId, LocalDateTime start, LocalDateTime end,
+            LocalDateTime cursorCreatedAt, Long cursorId, int size) {
+        int safeSize = Math.max(size, 1);
+        // size+1 over-fetch: same hasNext-without-second-query contract.
+        Pageable limit = PageRequest.of(0, safeSize + 1, Sort.unsorted());
+        return repository.findHistoryBetweenKeyset(accountId, start, end, cursorCreatedAt, cursorId, limit)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public LoadTransferPort.ReportTotals summarizeRange(Long accountId, LocalDateTime start, LocalDateTime end) {
         List<Object[]> rows = repository.summarizeRange(accountId, start, end);
         if (rows.isEmpty() || rows.get(0) == null || rows.get(0).length < 2) {
-            return new LoadTransferPort.ReportTotals(0, java.math.BigDecimal.ZERO);
+            return new LoadTransferPort.ReportTotals(0, BigDecimal.ZERO);
         }
         Object[] row = rows.get(0);
         long count = row[0] instanceof Number n ? n.longValue() : 0L;
-        java.math.BigDecimal volume = row[1] instanceof java.math.BigDecimal v ? v
-                : row[1] instanceof Number n ? java.math.BigDecimal.valueOf(n.doubleValue())
-                : java.math.BigDecimal.ZERO;
+        // Never funnel a monetary sum through double: BigDecimal.valueOf(double)
+        // would silently lose cents if the driver ever returns Double/Float.
+        // Number.toString preserves the decimal representation (K-2/P-2).
+        BigDecimal volume = row[1] instanceof BigDecimal v ? v
+                : row[1] instanceof Number n ? new BigDecimal(n.toString())
+                : BigDecimal.ZERO;
         return new LoadTransferPort.ReportTotals(count, volume);
     }
 

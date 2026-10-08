@@ -32,6 +32,13 @@ class TransferCompletedEventTest {
     }
 
     @Test
+    void shouldExposeAggregateIdentity() {
+        TransferCompletedEvent event = new TransferCompletedEvent(42L, 10L, 20L, Money.of("100", Currency.TRY), TransferStatus.COMPLETED, FIXED_TIME);
+        assertEquals("Transfer", event.aggregateType());
+        assertEquals("42", event.aggregateId());
+    }
+
+    @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
         assertThrows(NullPointerException.class,
                 () -> new TransferCompletedEvent(null, 10L, 20L, Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, FIXED_TIME));

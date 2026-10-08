@@ -5,9 +5,15 @@ import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/**
+ * Simulation SMS channel: logs instead of delivering. See
+ * {@link EmailNotificationAdapter} for the replacement contract.
+ */
 @Component
+@ConditionalOnProperty(name = "app.notification.sms-enabled", havingValue = "true", matchIfMissing = true)
 public class SmsNotificationAdapter extends AbstractLoggingNotificationAdapter implements SendNotificationPort {
 
     @Override

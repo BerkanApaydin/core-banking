@@ -1,9 +1,11 @@
 package com.bank.app.transfer.adapter.in.web.dto;
 
+import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Currency;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.DecimalMax;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -114,8 +116,8 @@ class TransferWebRequestTest {
     @Test
     void decimalMaxShouldMirrorSharedBalanceCeiling() throws Exception {
         var annotation = TransferWebRequest.class.getDeclaredField("amount")
-                .getAnnotation(jakarta.validation.constraints.DecimalMax.class);
+                .getAnnotation(DecimalMax.class);
         assertNotNull(annotation);
-        assertEquals(com.bank.app.common.domain.BalanceLimits.MAX_BALANCE, annotation.value());
+        assertEquals(BalanceLimits.MAX_BALANCE, annotation.value());
     }
 }

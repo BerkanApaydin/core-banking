@@ -34,17 +34,35 @@ public class User extends BaseAggregateRoot {
      * @param encodedPassword BCrypt-hashed password, NEVER raw input. Raw passwords
      *                        must pass {@code PasswordPolicy.validate} BEFORE encoding
      *                        (see {@code RegisterUserUseCaseImpl}); the domain cannot
-     *                        validate policy rules against a hash.
+     *                        validate policy rules against a hash. The BCrypt shape is
+     *                        enforced via {@link EncodedPassword#of(String)} — raw input
+     *                        fails fast instead of being persisted.
      */
     public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email, PhoneNumber phone, Long version) {
         this(id, username, encodedPassword, role, email, phone, version, 0L);
     }
 
+    /**
+     * Full constructor. {@code encodedPassword} must be a BCrypt hash: validated
+     * via {@link EncodedPassword#of(String)} (NOT {@code ofTrusted}), so any
+     * non-BCrypt value fails fast. Kept for backward compatibility; new code
+     * should prefer the {@link EncodedPassword} overload.
+     */
     public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
                 PhoneNumber phone, Long version, long tokenVersion) {
+        this(id, username, encodedPassword, role, email, phone, version, tokenVersion, false);
+    }
+
+    private User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
+                 PhoneNumber phone, Long version, long tokenVersion, boolean trustedTestOnly) {
+        Objects.requireNonNull(encodedPassword, "Password must not be null");
+        if (!trustedTestOnly) {
+            // BCrypt shape check: rejects raw input, never stores it.
+            EncodedPassword.of(encodedPassword);
+        }
         this.id = id;
         this.username = validateUsername(username);
-        this.password = Objects.requireNonNull(encodedPassword, "Password must not be null");
+        this.password = encodedPassword;
         this.role = role != null ? role : Role.ROLE_USER;
         this.email = email;
         this.phone = phone;
@@ -55,17 +73,60 @@ public class User extends BaseAggregateRoot {
         this.tokenVersion = tokenVersion;
     }
 
+    /**
+     * Preferred constructor: takes an already-validated {@link EncodedPassword}.
+     * No re-validation needed — {@code EncodedPassword.of} enforced the BCrypt
+     * shape at creation time.
+     */
+    public User(UserId id, String username, EncodedPassword encodedPassword, Role role, EmailAddress email,
+                PhoneNumber phone, Long version, long tokenVersion) {
+        this(id, username,
+                Objects.requireNonNull(encodedPassword, "Encoded password must not be null").value(),
+                role, email, phone, version, tokenVersion);
+    }
+
+    /**
+     * @deprecated Test-only. Takes a raw password without hashing or BCrypt
+     *             validation at this layer — sadece test, prod yolu
+     *             {@code EncodedPassword.of}. Kept only to avoid breaking
+     *             existing tests; do not use in production code.
+     */
+    @Deprecated
     public static User create(String username, String password) {
         return create(username, password, null, null, Clock.systemUTC());
     }
 
+    /**
+     * @deprecated Test-only. Takes a raw password without hashing — sadece test,
+     *             prod yolu {@code EncodedPassword.of}. Kept only to avoid
+     *             breaking existing tests; do not use in production code.
+     */
+    @Deprecated
     public static User create(String username, String password, EmailAddress email, PhoneNumber phone) {
         return create(username, password, email, phone, Clock.systemUTC());
     }
 
+    /**
+     * @deprecated Test-only. Takes a raw password without hashing — sadece test,
+     *             prod yolu {@code EncodedPassword.of}. Kept only to avoid
+     *             breaking existing tests; do not use in production code.
+     */
+    @Deprecated
     public static User create(String username, String password, EmailAddress email, PhoneNumber phone, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
-        return new User(null, username, password, Role.ROLE_USER, email, phone);
+        return new User(null, username, password, Role.ROLE_USER, email, phone, null, 0L, true);
+    }
+
+    /**
+     * Preferred factory: the hash is already validated by
+     * {@link EncodedPassword#of(String)}, so raw input cannot reach the
+     * aggregate through this path.
+     */
+    public static User create(String username, EncodedPassword encodedPassword, EmailAddress email,
+                              PhoneNumber phone, Clock clock) {
+        Objects.requireNonNull(clock, "Clock must not be null");
+        Objects.requireNonNull(encodedPassword, "Encoded password must not be null");
+        return new User(null, username, encodedPassword.value(), Role.ROLE_USER, email, phone);
     }
 
     public void recordRegistration(Clock clock) {
@@ -87,12 +148,29 @@ public class User extends BaseAggregateRoot {
         return username.trim();
     }
 
+    /**
+     * Replaces the stored hash. {@code newEncodedPassword} must be a BCrypt hash:
+     * validated via {@link EncodedPassword#of(String)} (NOT {@code ofTrusted}),
+     * so raw input fails fast. Prefer {@link #changePassword(EncodedPassword)}.
+     */
     public void changePassword(String newEncodedPassword) {
         Objects.requireNonNull(newEncodedPassword, "New password must not be null");
         if (newEncodedPassword.isBlank()) {
             throw new IllegalArgumentException("Password must not be empty");
         }
+        // BCrypt shape check: rejects raw input, never stores it.
+        EncodedPassword.of(newEncodedPassword);
         this.password = newEncodedPassword;
+        // A new secret retires every outstanding session at its next refresh.
+        this.tokenVersion++;
+    }
+
+    /**
+     * Preferred password change: takes an already-validated {@link EncodedPassword}.
+     */
+    public void changePassword(EncodedPassword next) {
+        Objects.requireNonNull(next, "New password must not be null");
+        this.password = next.value();
         // A new secret retires every outstanding session at its next refresh.
         this.tokenVersion++;
     }

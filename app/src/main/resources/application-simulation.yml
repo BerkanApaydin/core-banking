@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: simulation
+# Hosted simulation with production security posture: prod mirror + tracing on.
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+app:
+  simulation:
+    enabled: true

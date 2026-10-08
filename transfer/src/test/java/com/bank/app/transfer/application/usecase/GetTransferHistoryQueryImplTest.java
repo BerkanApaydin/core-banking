@@ -56,7 +56,7 @@ class GetTransferHistoryQueryImplTest {
         when(loadTransferPort.findHistoryPage(eq(1L), anyInt(), anyInt()))
                 .thenReturn(new LoadTransferPort.HistoryPage(Arrays.asList(t1), 1L));
 
-        PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
+        PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 20);
 
         assertNotNull(history);
         assertEquals(1, history.content().size());
@@ -75,7 +75,7 @@ class GetTransferHistoryQueryImplTest {
         doThrow(new AuthorizationException("You are not authorized to view this account's transaction history."))
                 .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
-        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferHistoryUseCase.execute(1L));
+        AuthorizationException exception = assertThrows(AuthorizationException.class, () -> getTransferHistoryUseCase.execute(1L, 0, 20));
         assertEquals("You are not authorized to view this account's transaction history.", exception.getMessage());
     }
 
@@ -139,7 +139,7 @@ class GetTransferHistoryQueryImplTest {
 
     @Test
     void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
-        NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null));
+        NullPointerException exception = assertThrows(NullPointerException.class, () -> getTransferHistoryUseCase.execute(null, 0, 20));
         assertEquals("Account ID must not be null", exception.getMessage());
     }
 

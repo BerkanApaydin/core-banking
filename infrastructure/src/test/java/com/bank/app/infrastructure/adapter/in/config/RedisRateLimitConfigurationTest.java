@@ -7,6 +7,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("null")
@@ -90,7 +92,7 @@ class RedisRateLimitConfigurationTest {
                     assertThat(factory.getPassword()).isEqualTo("secret");
                     assertThat(factory.getClientConfiguration().isUseSsl()).isTrue();
                     assertThat(factory.getClientConfiguration().getCommandTimeout())
-                            .isEqualTo(java.time.Duration.ofSeconds(2));
+                            .isEqualTo(Duration.ofSeconds(2));
                 });
     }
 

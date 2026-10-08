@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -62,7 +63,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
         assertEquals("evt-1", result.getFirst().getId());
@@ -77,7 +78,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
         assertEquals("evt-2", result.getFirst().getId());
@@ -104,7 +105,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
         assertEquals("evt-2", result.getFirst().getId());
@@ -119,7 +120,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now().minusMinutes(5), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(2, result.size());
         assertEquals("evt-earlier", result.get(0).getId());
@@ -135,7 +136,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 1));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
         assertEquals("evt-2", result.getFirst().getId());
@@ -170,7 +171,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         }
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 3));
+                PageRequest.of(0, 3));
 
         assertEquals(3, result.size());
     }
@@ -194,7 +195,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
             new Thread(() -> {
                 List<OutboxJpaEntity> batch = tx.execute(status -> {
                     List<OutboxJpaEntity> locked = outboxJpaRepository.findAndLockUnprocessed(-1,
-                            org.springframework.data.domain.PageRequest.of(0, 5));
+                            PageRequest.of(0, 5));
                     for (OutboxJpaEntity e : locked) {
                         e.setProcessed(true);
                         e.setProcessedAt(LocalDateTime.now());
@@ -225,7 +226,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
         List<OutboxJpaEntity> firstBatch = tx.execute(status ->
                 outboxJpaRepository.findAndLockUnprocessed(-1,
-                        org.springframework.data.domain.PageRequest.of(0, 10)));
+                        PageRequest.of(0, 10)));
         assertEquals(3, firstBatch.size());
 
         for (OutboxJpaEntity e : firstBatch) {
@@ -236,7 +237,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
         List<OutboxJpaEntity> secondBatch = tx.execute(status ->
                 outboxJpaRepository.findAndLockUnprocessed(-1,
-                        org.springframework.data.domain.PageRequest.of(0, 10)));
+                        PageRequest.of(0, 10)));
         assertTrue(secondBatch.isEmpty(),
                 "Processed events should not be returned");
     }
@@ -257,7 +258,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         outboxJpaRepository.save(toProcess);
 
         List<OutboxJpaEntity> remaining = outboxJpaRepository.findAndLockUnprocessed(-1,
-                org.springframework.data.domain.PageRequest.of(0, 10));
+                PageRequest.of(0, 10));
 
         assertEquals(4, remaining.size());
         assertTrue(remaining.stream().noneMatch(e -> e.getId().equals(toProcess.getId())));

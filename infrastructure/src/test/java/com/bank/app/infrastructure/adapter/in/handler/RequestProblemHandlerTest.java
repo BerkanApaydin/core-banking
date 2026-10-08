@@ -11,7 +11,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -244,12 +246,12 @@ class RequestProblemHandlerTest {
     @Test
     void shouldResolveMethodNotAllowedFromCatalogWhenPresent() {
         when(messageSource.getMessage(eq("error.method_not_allowed"), isNull(), any(Locale.class)))
-                .thenReturn("Katalog mesajı.");
+                .thenReturn("Catalog message.");
         HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("PATCH", List.of("GET", "POST"));
 
         ResponseEntity<ProblemDetail> response = handler.handleMethodNotSupportedException(ex, null);
 
-        assertEquals("Katalog mesajı.", response.getBody().getProperties().get("message"));
+        assertEquals("Catalog message.", response.getBody().getProperties().get("message"));
     }
 
     @Test
@@ -295,14 +297,14 @@ class RequestProblemHandlerTest {
     @Test
     @SuppressWarnings({"unchecked", "rawtypes"})
     void shouldHandleJakartaConstraintViolationAsBadRequest() {
-        jakarta.validation.ConstraintViolation violation = mock(jakarta.validation.ConstraintViolation.class);
-        jakarta.validation.Path path = mock(jakarta.validation.Path.class);
+        ConstraintViolation violation = mock(ConstraintViolation.class);
+        Path path = mock(Path.class);
         when(path.toString()).thenReturn("getHistory.size");
         when(violation.getPropertyPath()).thenReturn(path);
         when(violation.getMessage()).thenReturn("must be less than or equal to 100");
         Set violations = new HashSet(List.of(violation));
-        jakarta.validation.ConstraintViolationException ex =
-                new jakarta.validation.ConstraintViolationException("validation failed", violations);
+        ConstraintViolationException ex =
+                new ConstraintViolationException("validation failed", violations);
 
         ResponseEntity<ProblemDetail> response = handler.handleConstraintViolationException(ex, null);
 

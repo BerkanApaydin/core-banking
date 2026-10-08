@@ -64,6 +64,24 @@ public final class LedgerEntry {
                 amount, balanceAfter, LocalDateTime.now(clock));
     }
 
+    /**
+     * Preferred factories: derive {@code balanceAfter} from
+     * {@code balanceBefore} inside the journal, so callers cannot persist an
+     * inconsistent {@code balanceAfter}. Existing {@code balanceAfter}
+     * overloads are kept for backward compatibility (mappers, replays).
+     */
+    public static LedgerEntry debitFromBefore(Long accountId, Money amount, Money balanceBefore,
+                                              String transactionRef, Clock clock) {
+        Objects.requireNonNull(balanceBefore, "Balance before must not be null");
+        return debit(accountId, amount, balanceBefore.subtract(amount), transactionRef, clock);
+    }
+
+    public static LedgerEntry creditFromBefore(Long accountId, Money amount, Money balanceBefore,
+                                               String transactionRef, Clock clock) {
+        Objects.requireNonNull(balanceBefore, "Balance before must not be null");
+        return credit(accountId, amount, balanceBefore.add(amount), transactionRef, clock);
+    }
+
     public Long getId() {
         return id;
     }

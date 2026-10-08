@@ -31,7 +31,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account.domain..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -42,7 +42,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -52,7 +52,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.account..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.transfer..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -65,7 +65,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.infrastructure..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.transfer..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -79,7 +79,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
                         "com.bank.app.accountapi..",
                         "com.bank.app.common..",
                         "java..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -117,7 +117,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
                         "com.bank.app.transfer.adapter..",
                         "com.bank.app.user.adapter..",
                         "com.bank.app.audit.adapter..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -135,7 +135,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
                         "com.bank.app.transfer.adapter.out.persistence..",
                         "com.bank.app.user.adapter.out.persistence..",
                         "com.bank.app.audit.adapter.out.persistence..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -146,7 +146,7 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.springframework.cache..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }

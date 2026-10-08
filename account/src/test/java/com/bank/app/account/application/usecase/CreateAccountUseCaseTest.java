@@ -120,6 +120,37 @@ class CreateAccountUseCaseTest {
     }
 
     @Test
+    void shouldRejectChecksumInvalidGeneratedIban() {
+        // Kills the VoidMethodCall mutant (removed requireValidChecksum on the
+        // generated path): without the guard the colliding/invalid IBAN would
+        // be accepted instead of rejected.
+        Iban checksumInvalid = new Iban("TR340006100519786457841326");
+        when(ibanGeneratorPort.generate()).thenReturn(checksumInvalid);
+
+        assertThatThrownBy(() -> createAccountUseCase.execute(
+                new CreateAccountRequest(USER_ID, OWNER, BigDecimal.ZERO, Currency.TRY)))
+                .isExactlyInstanceOf(InvalidIbanException.class);
+        verify(saveAccountPort, never()).save(any(Account.class));
+    }
+
+    @Test
+    void shouldFailAfterFiveCollidingGenerations() {
+        // Kills the ConditionalsBoundary mutant (attempt < 5 vs <= 5):
+        // exactly five generations must be attempted before giving up.
+        Iban colliding = Iban.fromTurkishBban("0000001234567890123456");
+        Account existing = new Account(7L, new UserId(USER_ID), colliding, OWNER,
+                new Money(BigDecimal.ZERO, Currency.TRY), AccountStatus.ACTIVE);
+        when(ibanGeneratorPort.generate()).thenReturn(colliding);
+        when(loadAccountPort.findByIban(colliding)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> createAccountUseCase.execute(
+                new CreateAccountRequest(USER_ID, OWNER, BigDecimal.ZERO, Currency.TRY)))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("five attempts");
+        verify(ibanGeneratorPort, times(5)).generate();
+    }
+
+    @Test
     void nonDemoOpeningCannotMintBalance() {
         var productionUseCase = new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, ibanGeneratorPort,
                 domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider, false);
@@ -177,9 +208,8 @@ class CreateAccountUseCaseTest {
             verify(saveAccountPort).save(accountCaptor.capture());
             assertThat(accountCaptor.getValue().getIban().value()).isEqualTo(VALID_IBAN);
 
-            verify(domainEventPublisherService).publish(any());
-            verify(domainEventPublisherService).publish(eventCaptor.capture());
-            verify(auditEventPort).publish(any());
+            verify(domainEventPublisherService, times(1)).publish(eventCaptor.capture());
+            verify(auditEventPort, times(1)).publish(any());
             AccountCreatedEvent publishedEvent = eventCaptor.getValue();
             assertThat(publishedEvent.accountId()).isEqualTo(1L);
             assertThat(publishedEvent.userId().value()).isEqualTo(USER_ID);

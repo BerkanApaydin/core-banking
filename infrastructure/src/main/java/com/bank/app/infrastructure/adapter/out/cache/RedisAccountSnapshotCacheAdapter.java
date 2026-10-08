@@ -44,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
+    // TODO: move to CacheProperties + ApplicationStartupValidator.requirePositive.
     private static final int EVICTION_BATCH_SIZE = 500;
 
     /**
@@ -176,6 +177,11 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         }
     }
 
+    /**
+     * Full-region scan + batched delete. Prefer {@link #evictById(Long)} for
+     * balance mutations (O(1) Lua); reserve this for operational resets only —
+     * on a populated production cache it scans the whole keyspace.
+     */
     @Override
     public void evictAll() {
         ScanOptions options = ScanOptions.scanOptions()
@@ -235,6 +241,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         }
     }
 
+    // TODO: single-RTT Lua (SADD + EXPIRE + SET in one EVAL); 3 RTT today.
     private void trackIban(Long accountId, String ibanKey) {
         try {
             String idxKey = SnapshotKeys.ibansByIdIndex(accountId);

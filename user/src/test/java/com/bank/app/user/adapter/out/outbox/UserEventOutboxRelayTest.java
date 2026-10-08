@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,7 +44,7 @@ class UserEventOutboxRelayTest {
         objectMapper = new ObjectMapper();
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.findAndRegisterModules();
-        handler = new UserEventOutboxRelay(objectMapper, eventPublisher, idempotencyPort);
+        handler = new UserEventOutboxRelay(objectMapper, eventPublisher, idempotencyPort, Clock::systemUTC);
     }
 
     @Nested
@@ -147,6 +148,25 @@ class UserEventOutboxRelayTest {
             handler.handle(event);
 
             verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("should fall back to system clock when no clock provider is wired")
+        void shouldFallBackToSystemClock() throws Exception {
+            UserEventOutboxRelay nullClockHandler = new UserEventOutboxRelay(
+                    objectMapper, eventPublisher, idempotencyPort, null);
+            String json = objectMapper.writeValueAsString(new UserRegisteredEvent(
+                    "1", "testuser", "ROLE_USER", LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-9", "User",
+                    "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_UserEventOutboxHandler_evt-9"),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            nullClockHandler.handle(event);
+
+            verify(eventPublisher).publishEvent(any(UserRegisteredEvent.class));
         }
 
         @Test

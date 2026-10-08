@@ -95,6 +95,8 @@ class SuspendAccountUseCaseImplTest {
             verify(auditEventPort).publish(auditEventCaptor.capture());
             assertEquals("ACCOUNT_SUSPENDED", auditEventCaptor.getValue().action());
             assertTrue(auditEventCaptor.getValue().details().contains("1"));
+            // Kills the PrimitiveReturns mutant (0L vs actual admin id).
+            assertEquals(99L, auditEventCaptor.getValue().actorUserId());
             // F-04: the same class that mutates the status evicts the snapshot.
             verify(snapshotCache).evictById(1L);
             verify(snapshotCache, never()).evictAll();

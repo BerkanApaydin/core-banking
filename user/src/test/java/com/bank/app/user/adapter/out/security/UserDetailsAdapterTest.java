@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,7 +32,7 @@ class UserDetailsAdapterTest {
     @Test
     void shouldLoadUserSuccessfully() {
         service = new UserDetailsAdapter(loadUserPort);
-        User user = new User(new UserId(100L), "john", "pass", Role.ROLE_USER,
+        User user = new User(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                 new EmailAddress("john@test.com"), new PhoneNumber("+905551234567"));
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));
@@ -39,15 +41,15 @@ class UserDetailsAdapterTest {
 
         assertNotNull(details);
         assertEquals("john", details.getUsername());
-        assertEquals("pass", details.getPassword());
-        assertEquals(java.util.List.of("ROLE_USER"), details.getAuthorities().stream()
-                .map(org.springframework.security.core.GrantedAuthority::getAuthority).toList());
+        assertEquals("$2a$12$testpasshash00000000000000000000000001", details.getPassword());
+        assertEquals(List.of("ROLE_USER"), details.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).toList());
     }
 
     @Test
     void shouldCarryTokenVersionFromUser() {
         service = new UserDetailsAdapter(loadUserPort);
-        User user = new User(new UserId(100L), "john", "pass", Role.ROLE_USER,
+        User user = new User(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                 null, null, null, 6L);
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));

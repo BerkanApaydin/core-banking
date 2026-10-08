@@ -51,9 +51,12 @@ class UserJpaAdapterTest {
         existingEntity.setRole(Role.ROLE_USER);
         when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-        User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER, null, null, 0L);
-        adapter.save(user);
+        User user = new User(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 0L);
+        // Kills the NullReturnVals mutant: the saved aggregate must come back.
+        var result = adapter.save(user);
 
+        assertNotNull(result);
+        assertEquals("testuser", result.getUsername());
         verify(userJpaRepository).save(any(UserJpaEntity.class));
     }
 
@@ -62,7 +65,7 @@ class UserJpaAdapterTest {
         UserJpaEntity entity = new UserJpaEntity();
         entity.setId(1L);
         entity.setUsername("testuser");
-        entity.setPassword("password");
+        entity.setPassword("$2a$12$testpasswordhash00000000000000000000001");
         entity.setRole(Role.ROLE_USER);
         when(userJpaRepository.findByUsername("testuser")).thenReturn(Optional.of(entity));
 
@@ -99,7 +102,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should create new entity when id is null")
         void shouldCreateNewEntityWhenIdIsNull() {
-            User user = new User(null, "newuser", "hashed", Role.ROLE_USER);
+            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             adapter.save(user);
 
@@ -114,7 +117,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should map email and phone when present")
         void shouldMapEmailAndPhoneWhenPresent() {
-            User user = new User(null, "newuser", "hashed", Role.ROLE_USER,
+            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"));
 
             adapter.save(user);
@@ -128,7 +131,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should leave email and phone null when not present")
         void shouldLeaveEmailAndPhoneNullWhenNotPresent() {
-            User user = new User(null, "newuser", "hashed", Role.ROLE_USER);
+            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             adapter.save(user);
 
@@ -154,7 +157,7 @@ class UserJpaAdapterTest {
             existingEntity.setRole(Role.ROLE_USER);
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User user = new User(new UserId(1L), "testuser", "newpassword", Role.ROLE_USER,
+            User user = new User(new UserId(1L), "testuser", "$2a$12$testnewpasswordhash000000000000000000001", Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"), 0L);
             adapter.save(user);
 
@@ -162,7 +165,7 @@ class UserJpaAdapterTest {
             verify(userJpaRepository).save(captor.capture());
             UserJpaEntity saved = captor.getValue();
             assertEquals("testuser", saved.getUsername());
-            assertEquals("newpassword", saved.getPassword());
+            assertEquals("$2a$12$testnewpasswordhash000000000000000000001", saved.getPassword());
             assertEquals("test@example.com", saved.getEmail());
             assertEquals("+905551234567", saved.getPhone());
         }
@@ -172,7 +175,7 @@ class UserJpaAdapterTest {
         void shouldThrowWhenNotFound() {
             when(userJpaRepository.findById(99L)).thenReturn(Optional.empty());
 
-            User user = new User(new UserId(99L), "nonexistent", "password", Role.ROLE_USER);
+            User user = new User(new UserId(99L), "nonexistent", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
             assertThrows(IllegalArgumentException.class, () -> adapter.save(user));
         }
 
@@ -186,7 +189,7 @@ class UserJpaAdapterTest {
             existingEntity.setPhone("+901234567890");
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User user = new User(new UserId(1L), "testuser", "password", Role.ROLE_USER, null, null, 0L);
+            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 0L);
             adapter.save(user);
 
             ArgumentCaptor<UserJpaEntity> captor = ArgumentCaptor.forClass(UserJpaEntity.class);
@@ -206,7 +209,7 @@ class UserJpaAdapterTest {
             UserJpaEntity entity = new UserJpaEntity();
             entity.setId(1L);
             entity.setUsername("testuser");
-            entity.setPassword("password");
+            entity.setPassword("$2a$12$testpasswordhash00000000000000000000001");
             entity.setRole(Role.ROLE_USER);
             entity.setEmail("test@example.com");
             entity.setPhone("+905551234567");

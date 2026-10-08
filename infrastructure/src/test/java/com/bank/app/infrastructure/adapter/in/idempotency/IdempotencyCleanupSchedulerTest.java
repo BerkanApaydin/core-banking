@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +12,10 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -27,13 +31,19 @@ class IdempotencyCleanupSchedulerTest {
     private IdempotencyProperties idempotencyProperties;
 
     private IdempotencyCleanupScheduler scheduler;
+    // E-2/Short-10: fixed UTC clock — threshold assertions are deterministic
+    // and zone-consistent with the production ClockProviderPort (UTC).
+    private static final Clock FIXED =
+            Clock.fixed(Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC);
 
     @Captor
     private ArgumentCaptor<LocalDateTime> thresholdCaptor;
 
     @BeforeEach
     void setUp() {
-        scheduler = new IdempotencyCleanupScheduler(idempotencyPort, idempotencyProperties);
+        scheduler = new IdempotencyCleanupScheduler(idempotencyPort, idempotencyProperties,
+                AdvisorySchedulerLock.alwaysRun(),
+                () -> FIXED);
     }
 
     @Test
@@ -47,8 +57,7 @@ class IdempotencyCleanupSchedulerTest {
         verify(idempotencyPort).deleteExpired(thresholdCaptor.capture());
         LocalDateTime threshold = thresholdCaptor.getValue();
         assertNotNull(threshold);
-        assertTrue(threshold.isBefore(LocalDateTime.now()));
-        assertTrue(threshold.isAfter(LocalDateTime.now().minusHours(25)));
+        assertEquals(LocalDateTime.of(2026, 4, 30, 12, 0), threshold);
     }
 
     @Test
@@ -72,7 +81,6 @@ class IdempotencyCleanupSchedulerTest {
 
         verify(idempotencyPort).deleteExpired(thresholdCaptor.capture());
         LocalDateTime threshold = thresholdCaptor.getValue();
-        assertTrue(threshold.isBefore(LocalDateTime.now().minusHours(47)));
-        assertTrue(threshold.isAfter(LocalDateTime.now().minusHours(49)));
+        assertEquals(LocalDateTime.of(2026, 4, 29, 12, 0), threshold);
     }
 }

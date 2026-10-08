@@ -29,10 +29,10 @@ class AuthRequestTest {
 
     @Test
     void shouldHandleNullEmailAndPhone() {
-        AuthRequest request = new AuthRequest("user", "pass", null, null);
+        AuthRequest request = new AuthRequest("user", "$2a$12$testpasshash00000000000000000000000001", null, null);
 
         assertEquals("user", request.username());
-        assertEquals("pass", request.password());
+        assertEquals("$2a$12$testpasshash00000000000000000000000001", request.password());
         assertNull(request.email());
         assertNull(request.phone());
     }

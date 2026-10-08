@@ -14,6 +14,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -96,7 +97,7 @@ public class OrphanIntegrityReporter {
             check(ACCOUNTS_WITHOUT_USER, ACCOUNTS_SQL, accountsWithoutUser);
             check(TRANSFERS_WITHOUT_SENDER, SENDERS_SQL, transfersWithoutSender);
             check(TRANSFERS_WITHOUT_RECEIVER, RECEIVERS_SQL, transfersWithoutReceiver);
-            lastSuccessfulScanEpochSeconds.set(java.time.Instant.now().getEpochSecond());
+            lastSuccessfulScanEpochSeconds.set(Instant.now().getEpochSecond());
         });
     }
 

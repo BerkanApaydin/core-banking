@@ -6,6 +6,7 @@ import com.bank.app.accountapi.AccountSnapshotCache;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
@@ -37,7 +38,7 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
         ArchRule rule = classes()
                 .that(callAccountStatusMutator())
                 .should(evictSnapshots())
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -66,7 +67,7 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
                                 });
                     }
                 })
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -103,7 +104,7 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
                 .anyMatch(CacheInvalidationArchitectureTest::isEvictCall);
     }
 
-    private static boolean isEvictCall(com.tngtech.archunit.core.domain.JavaMethodCall call) {
+    private static boolean isEvictCall(JavaMethodCall call) {
         return call.getTargetOwner().isAssignableTo(AccountSnapshotCache.class)
                 && (call.getName().equals("evictById") || call.getName().equals("evictAll"));
     }

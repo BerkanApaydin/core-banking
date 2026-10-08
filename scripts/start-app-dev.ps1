@@ -21,6 +21,14 @@ foreach ($name in $names) {
 try {
     Push-Location $repoRoot
 
+    # Fresh secret first: docker compose interpolates the whole file
+    # (including the unused `app` service, whose JWT_SECRET is mandatory),
+    # so the secret must exist before any compose call, not just java.
+    $secretBytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
+    $env:JWT_SECRET = [Convert]::ToBase64String($secretBytes)
+
     # Free port 8080 when switching from the all-in-Docker workflow.
     & docker compose stop app
     if ($LASTEXITCODE -ne 0) { throw 'Could not stop the Compose app container.' }
@@ -30,10 +38,6 @@ try {
     foreach ($name in $settings.Keys) {
         [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process')
     }
-    $secretBytes = New-Object byte[] 32
-    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
-    $env:JWT_SECRET = [Convert]::ToBase64String($secretBytes)
 
     & (Join-Path $repoRoot 'mvnw.cmd') -pl app -am package '-DskipTests'
     if ($LASTEXITCODE -ne 0) { throw 'Maven build failed.' }

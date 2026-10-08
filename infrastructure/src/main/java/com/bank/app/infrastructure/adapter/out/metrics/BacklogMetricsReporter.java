@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.metrics;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,6 +40,7 @@ public class BacklogMetricsReporter {
 
     private final JdbcTemplate jdbc;
     private final AdvisorySchedulerLock schedulerLock;
+    private final ClockProviderPort clockProvider;
     private final AtomicLong outboxPending = new AtomicLong();
     private final AtomicLong outboxOldestAgeSeconds = new AtomicLong();
     private final AtomicLong httpPending = new AtomicLong();
@@ -52,8 +55,15 @@ public class BacklogMetricsReporter {
     @Autowired
     public BacklogMetricsReporter(JdbcTemplate jdbc, MeterRegistry meterRegistry,
                                   AdvisorySchedulerLock schedulerLock) {
+        this(jdbc, meterRegistry, schedulerLock, null);
+    }
+
+    public BacklogMetricsReporter(JdbcTemplate jdbc, MeterRegistry meterRegistry,
+                                  AdvisorySchedulerLock schedulerLock,
+                                  ClockProviderPort clockProvider) {
         this.jdbc = jdbc;
         this.schedulerLock = schedulerLock;
+        this.clockProvider = clockProvider;
         meterRegistry.gauge("outbox.pending.current", outboxPending);
         meterRegistry.gauge("outbox.oldest_pending.age_seconds", outboxOldestAgeSeconds);
         meterRegistry.gauge("idempotency.http.pending.current", httpPending);
@@ -72,8 +82,9 @@ public class BacklogMetricsReporter {
             Backlog outbox = read(OUTBOX_SQL);
             Backlog http = read(HTTP_PENDING_SQL);
             long nonzeroRefs = readCount(LEDGER_NONZERO_SQL);
-            LocalDateTime now = LocalDateTime.now();
-            long completedAt = Instant.now().getEpochSecond();
+            Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
+            LocalDateTime now = LocalDateTime.now(clock);
+            long completedAt = Instant.now(clock).getEpochSecond();
             outboxPending.set(outbox.count());
             outboxOldestAgeSeconds.set(ageSeconds(outbox, now));
             httpPending.set(http.count());

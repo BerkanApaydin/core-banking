@@ -18,3 +18,18 @@ measured by the quarterly drill (`ops/restore-drill.sh`), not re-derived here.
 
 Out of scope for SLOs (no paging): report/history latency (best-effort reads),
 `429` rate-limit responses (client behavior, not service health).
+
+## Measurement evidence (long term #5 — added in this round)
+
+- Grafana: `k8s/grafana-dashboard.json` (p50/p95/p99 + backlog + ledger gauge).
+- Recording rule: every release attaches `ops/health_smoke.py --json` plus the
+  k6 rate-limit log to the release tag; p95/p99 are read from these logs (the
+  2s p99 above is a starting point, re-derived from the first month of staging
+  traffic).
+- Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG
+  ≥200 or PgBouncer (`k8s/bank-app.yaml:94-100`, `docs/operations.md`).
+  Post-parallelization outbox ceiling is ~100-200 ev/s (partitions × workers);
+  beyond that, the `docs/decisions/kafka-readiness.md` trigger applies.
+- Reconciliation: `LedgerReconciliationJob` (03:30 cron) + `ledger.nonzero`
+  counter; nonzero pages (critical), drill procedure in
+  `docs/disaster-recovery.md`.

@@ -4,7 +4,9 @@ import com.bank.app.common.application.port.out.SecurityContextPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,7 +87,7 @@ class UserContextServiceTest {
         Long lastCheckedUserId;
         String lastCheckedMessage;
         boolean throwOnCheck;
-        final java.util.Set<String> roles = new java.util.HashSet<>();
+        final Set<String> roles = new HashSet<>();
 
         @Override
         public Optional<Long> getCurrentUserId() {

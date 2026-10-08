@@ -32,4 +32,16 @@ class PasswordPolicyPropertiesTest {
         assertThatThrownBy(() -> new PasswordPolicyProperties(100, true, true, true).toDomain())
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void shouldEnforceExactBoundaries() {
+        // Kills the ConditionalsBoundary mutants on (minLength < 12) and
+        // (minLength > 72): 11/73 reject, 12/72 accept.
+        assertThatThrownBy(() -> new PasswordPolicyProperties(11, true, true, true).toDomain())
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        assertThat(new PasswordPolicyProperties(72, true, true, true).toDomain().minLength())
+                .isEqualTo(72);
+        assertThatThrownBy(() -> new PasswordPolicyProperties(73, true, true, true).toDomain())
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+    }
 }

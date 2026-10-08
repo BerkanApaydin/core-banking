@@ -13,6 +13,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Component
 // Runs before every other filter (including the rate limiter): a rejected
@@ -31,7 +32,7 @@ public class CorrelationIdFilter implements Filter {
     // can never reach the MDC (every log line) or the reflected headers.
     // Anything else falls back to a generated UUID.
     private static final int MAX_ID_LENGTH = 64;
-    private static final java.util.regex.Pattern SAFE_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]+");
+    private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9_-]+");
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

@@ -1,11 +1,14 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.user.domain.Role;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
+import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,7 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @AutoConfigureMockMvc
 @Transactional
 @SuppressWarnings("null")
@@ -84,7 +88,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .cookie(new Cookie("BANK_SESSION", "expired-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new com.bank.app.user.adapter.in.web.dto.AuthWebRequest(username, "BrowserPass12"))))
+                                new AuthWebRequest(username, "BrowserPass12"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value(username))
                 .andExpect(jsonPath("$.token").doesNotExist())
@@ -116,7 +120,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .header(BrowserSessionCookies.CSRF_HEADER, csrf.getValue())
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                        .content(objectMapper.writeValueAsString(Map.of(
                                 "ownerName", "Browser Test", "initialBalance", 100,
                                 "currency", "TRY"))))
                 .andExpect(status().isCreated())
@@ -150,7 +154,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/browser/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new com.bank.app.user.adapter.in.web.dto.AuthWebRequest(username, "BrowserPass12"))))
+                                new AuthWebRequest(username, "BrowserPass12"))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -190,7 +194,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/browser/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new com.bank.app.user.adapter.in.web.dto.AuthWebRequest("ghost", "GhostPass1234"))))
+                                new AuthWebRequest("ghost", "GhostPass1234"))))
                 .andReturn();
         // Unknown user: login itself fails, but the refresh path shape is the point.
         // Use any refresh cookie value: missing CSRF must 403 before token checks.

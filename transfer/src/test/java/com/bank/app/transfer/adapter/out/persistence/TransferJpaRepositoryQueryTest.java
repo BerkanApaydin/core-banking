@@ -1,6 +1,8 @@
 package com.bank.app.transfer.adapter.out.persistence;
 
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,8 +21,8 @@ class TransferJpaRepositoryQueryTest {
     void findHistoryBetweenShouldFilterBusinessTime() throws Exception {
         Query query = TransferJpaRepository.class
                 .getMethod("findHistoryBetween", Long.class,
-                        java.time.LocalDateTime.class, java.time.LocalDateTime.class,
-                        org.springframework.data.domain.Pageable.class)
+                        LocalDateTime.class, LocalDateTime.class,
+                        Pageable.class)
                 .getAnnotation(Query.class);
 
         assertThat(query).isNotNull();

@@ -15,11 +15,9 @@ import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
 import com.bank.app.common.domain.event.AuditEvent;
-import com.bank.app.common.domain.event.DomainEvent;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 @TransactionalUseCase
@@ -48,51 +46,54 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
 
     @Override
     public AccountAdjustmentResult debitAndCredit(Long senderId, Long receiverId, Money amount) {
+        return move(senderId, receiverId, amount, false);
+    }
+
+    @Override
+    public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
+        return move(senderId, receiverId, amount, true);
+    }
+
+    private AccountAdjustmentResult move(Long senderId, Long receiverId, Money amount, boolean reverse) {
         Objects.requireNonNull(amount, "Amount must not be null");
         requireDistinctAccounts(senderId, receiverId);
         OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId);
         Account sender = resolveSender(pair, senderId, receiverId);
         Account receiver = resolveReceiver(pair, senderId, receiverId);
-        sender.debit(amount, clockProvider.clock());
-        receiver.credit(amount, clockProvider.clock());
+        Clock clock = clockProvider.clock();
+        if (!reverse) {
+            sender.debit(amount, clock);
+            receiver.credit(amount, clock);
+        } else {
+            sender.credit(amount, clock);
+            receiver.debit(amount, clock);
+        }
         // 7.2: keep the saved aggregates — they carry the bumped @Version.
-        // Re-saving the pre-save instances later would fail on a stale version
-        // that looks like a real concurrency conflict.
         Account savedSender = saveAccountPort.save(sender);
         Account savedReceiver = saveAccountPort.save(receiver);
         // Double-entry journal: both legs share one ref and join this
         // transaction, so they net to zero or the money rolls back with them.
         String operationRef = LedgerEntry.newTransactionRef();
-        ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
-                operationRef, clockProvider.clock()));
-        ledgerPort.save(LedgerEntry.credit(receiverId, amount, savedReceiver.getBalance(),
-                operationRef, clockProvider.clock()));
-        publishCollectedEvents(sender, receiver);
-        auditMovement("ACCOUNT_DEBITED", savedSender, amount);
-        auditMovement("ACCOUNT_CREDITED", savedReceiver, amount);
-        return new AccountAdjustmentResult(senderId, receiverId,
-                savedSender.getBalance(), savedReceiver.getBalance());
-    }
-
-    @Override
-    public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
-        Objects.requireNonNull(amount, "Amount must not be null");
-        requireDistinctAccounts(senderId, receiverId);
-        OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId);
-        Account sender = resolveSender(pair, senderId, receiverId);
-        Account receiver = resolveReceiver(pair, senderId, receiverId);
-        sender.credit(amount, clockProvider.clock());
-        receiver.debit(amount, clockProvider.clock());
-        Account savedSender = saveAccountPort.save(sender);
-        Account savedReceiver = saveAccountPort.save(receiver);
-        String operationRef = LedgerEntry.newTransactionRef();
-        ledgerPort.save(LedgerEntry.credit(senderId, amount, savedSender.getBalance(),
-                operationRef, clockProvider.clock()));
-        ledgerPort.save(LedgerEntry.debit(receiverId, amount, savedReceiver.getBalance(),
-                operationRef, clockProvider.clock()));
-        publishCollectedEvents(sender, receiver);
-        auditMovement("ACCOUNT_CREDITED", savedSender, amount);
-        auditMovement("ACCOUNT_DEBITED", savedReceiver, amount);
+        if (!reverse) {
+            ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
+                    operationRef, clock));
+            ledgerPort.save(LedgerEntry.credit(receiverId, amount, savedReceiver.getBalance(),
+                    operationRef, clock));
+        } else {
+            ledgerPort.save(LedgerEntry.credit(senderId, amount, savedSender.getBalance(),
+                    operationRef, clock));
+            ledgerPort.save(LedgerEntry.debit(receiverId, amount, savedReceiver.getBalance(),
+                    operationRef, clock));
+        }
+        domainEventPublisherService.publishEvents(sender);
+        domainEventPublisherService.publishEvents(receiver);
+        if (!reverse) {
+            auditMovement("ACCOUNT_DEBITED", savedSender, amount);
+            auditMovement("ACCOUNT_CREDITED", savedReceiver, amount);
+        } else {
+            auditMovement("ACCOUNT_CREDITED", savedSender, amount);
+            auditMovement("ACCOUNT_DEBITED", savedReceiver, amount);
+        }
         return new AccountAdjustmentResult(senderId, receiverId,
                 savedSender.getBalance(), savedReceiver.getBalance());
     }
@@ -113,15 +114,6 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
                         verb, amount, account.getId(), account.getBalance()),
                 LocalDateTime.now(clockProvider.clock()),
                 "system", account.getUserId().value()));
-    }
-
-    private void publishCollectedEvents(Account sender, Account receiver) {
-        List<DomainEvent> events = new ArrayList<>();
-        events.addAll(sender.getDomainEvents());
-        events.addAll(receiver.getDomainEvents());
-        sender.clearDomainEvents();
-        receiver.clearDomainEvents();
-        events.forEach(domainEventPublisherService::publish);
     }
 
     private static void requireDistinctAccounts(Long senderId, Long receiverId) {

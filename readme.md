@@ -162,10 +162,16 @@ Install and start Docker Desktop (with Docker Compose). Java, Maven, PostgreSQL 
 ```bash
 git clone https://github.com/BerkanApaydin/core-banking.git
 cd core-banking
+# One step per shell (or persist it once in a git-ignored local `.env` file
+# as JWT_SECRET=<output>): the Compose app service deliberately ships with
+# no default signing secret and refuses to start without one.
+export JWT_SECRET="$(openssl rand -base64 32)"
 docker compose up --build --wait
 ```
 
-Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL or `.env` file is needed for this local development setup. The first run downloads images and Maven dependencies, so it needs internet access and can take longer. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
+> Windows PowerShell equivalent: `$env:JWT_SECRET = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))` (Git Bash ships `openssl`, so the `export` line also works there).
+
+Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL is needed for this local development setup. The first run downloads images (~2 GB) and Maven dependencies, so it needs internet access and can take 10–20 minutes; later runs reuse the build cache and start in about a minute. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
 
 Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 

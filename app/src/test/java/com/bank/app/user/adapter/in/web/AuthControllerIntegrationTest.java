@@ -1,5 +1,7 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.user.domain.Role;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.application.port.out.EventPublisherPort;
@@ -31,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class AuthControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 

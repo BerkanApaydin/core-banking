@@ -25,6 +25,14 @@ public interface LoadTransferPort {
     List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size);
 
     /**
+     * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET.
+     * Null cursor = first page. Limit is the logical page size; the adapter
+     * over-fetches one row to derive hasNext without a second query.
+     */
+    List<Transfer> findHistoryBetweenKeyset(Long accountId, LocalDateTime start, LocalDateTime end,
+            LocalDateTime cursorCreatedAt, Long cursorId, int size);
+
+    /**
      * Whole-range aggregates in one indexed scan (COUNT + SUM over the same
      * business-time predicate the paged queries use). Backs the report-totals
      * endpoint so dashboards never page through history to sum it.

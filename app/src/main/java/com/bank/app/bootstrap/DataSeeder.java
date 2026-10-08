@@ -53,7 +53,7 @@ public class DataSeeder {
     @Bean
     CommandLineRunner seedData() {
         return args -> {
-            seedUser("ahmet", "Ahmet123456");
+            seedUser("ahmet", "Ahmet12345678");
             seedUser("ayse", "Ayse12345678");
 
             var ahmet = loadUserPort.findByUsername("ahmet")

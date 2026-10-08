@@ -1,6 +1,7 @@
 package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.BaseAggregateRoot;
+import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
@@ -37,17 +38,20 @@ public class Transfer extends BaseAggregateRoot {
         // Zero is rejected for every status, not just PENDING: the factory
         // already enforces this, and the constructor must be equally strict so
         // rehydrated/legacy rows can never materialize a zero transfer.
-        if (amount.isZero()) {
-            throw new IllegalArgumentException("Transfer amount must not be zero");
-        }
+        requireNonZero(amount);
         this.createdAt = Objects.requireNonNull(createdAt, "Created date must not be null");
         this.version = version;
     }
 
     public static Transfer create(Long senderAccountId, Long receiverAccountId, Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Transfer amount must not be null");
-        if (amount.isZero()) {
-            throw new IllegalArgumentException("Transfer amount must not be zero");
+        // D-1 inner guarantee: even a direct Transfer.create caller cannot
+        // exceed the ceiling (TransferDomainService is the normal path).
+        // Zero rejection lives in the constructor (single enforcement point):
+        // a duplicate requireNonZero here would be an equivalent mutant.
+        if (amount.amount().compareTo(BalanceLimits.MAX_BALANCE_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                    "Transfer amount exceeds maximum of " + BalanceLimits.MAX_BALANCE);
         }
         if (Objects.equals(senderAccountId, receiverAccountId)) {
             throw new SameAccountTransferException(String.valueOf(senderAccountId));
@@ -62,6 +66,12 @@ public class Transfer extends BaseAggregateRoot {
         this.status = TransferStatus.COMPLETED;
         registerEvent(new TransferCompletedEvent(
                 this.id, this.senderAccountId, this.receiverAccountId, this.amount, this.status, LocalDateTime.now(clock)));
+    }
+
+    private static void requireNonZero(Money amount) {
+        if (amount.isZero()) {
+            throw new IllegalArgumentException("Transfer amount must not be zero");
+        }
     }
 
     public Long getId() {

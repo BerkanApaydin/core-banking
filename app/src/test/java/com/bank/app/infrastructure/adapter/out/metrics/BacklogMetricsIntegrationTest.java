@@ -1,12 +1,16 @@
 package com.bank.app.infrastructure.adapter.out.metrics;
 
 import com.bank.app.common.AbstractIntegrationTest;
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,12 +27,16 @@ class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void scansOnlyActiveOutboxEventsAndPendingHttpRequestsOnMigratedPostgres() {
+        // UTC clock matches production ClockProviderPort; fixture timestamps are
+        // UTC-based so age math is zone-consistent (same fix as the unit test).
+        Clock fixed = Clock.fixed(Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        BacklogMetricsReporter reporter = new BacklogMetricsReporter(jdbc, registry);
+        BacklogMetricsReporter reporter = new BacklogMetricsReporter(jdbc, registry,
+                AdvisorySchedulerLock.alwaysRun(), () -> fixed);
         reporter.scan();
         double priorOutbox = gauge(registry, "outbox.pending.current");
         double priorHttp = gauge(registry, "idempotency.http.pending.current");
-        LocalDateTime old = LocalDateTime.now().minusHours(2);
+        LocalDateTime old = LocalDateTime.now(fixed).minusHours(2);
         String suffix = UUID.randomUUID().toString();
 
         insertOutbox(UUID.randomUUID().toString(), old, false, false);

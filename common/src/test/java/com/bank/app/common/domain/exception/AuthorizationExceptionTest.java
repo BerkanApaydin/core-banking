@@ -41,4 +41,11 @@ class AuthorizationExceptionTest {
         assertInstanceOf(RuntimeException.class, ex);
         assertEquals(BusinessFailureKind.ACCESS_DENIED, ex.getFailureKind());
     }
+
+    @Test
+    void shouldExposeAccessDeniedErrorCode() {
+        assertEquals("ACCESS_DENIED", new AuthorizationException("test").getErrorCode());
+        assertEquals("ACCESS_DENIED",
+                new AuthorizationException("error.auth", new Object[]{}, "default").getErrorCode());
+    }
 }

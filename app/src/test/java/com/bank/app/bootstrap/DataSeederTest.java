@@ -19,8 +19,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,23 +54,23 @@ class DataSeederTest {
 
     @Test
     void shouldSeedUsersAndAccountsViaUseCases() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.empty()).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.empty()).thenReturn(Optional.of(ayse));
 
         CommandLineRunner runner = dataSeeder.seedData();
         runner.run();
 
-        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet123456"));
+        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet12345678"));
         verify(registerUserUseCase).execute(new AuthRequest("ayse", "Ayse12345678"));
         verify(createAccountPort, atLeastOnce()).execute(any(CreateAccountRequest.class));
     }
 
     @Test
     void shouldSkipExistingUsers() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
 
@@ -80,8 +82,8 @@ class DataSeederTest {
 
     @Test
     void shouldSkipDuplicateAccounts() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
         doThrow(new DuplicateIbanException("exists")).when(createAccountPort)
@@ -105,12 +107,12 @@ class DataSeederTest {
         assertEquals("User Ahmet not found.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ahmet", "Ahmet123456"));
+                .execute(new AuthRequest("ahmet", "Ahmet12345678"));
     }
 
     @Test
     void shouldThrowWhenAyseCannotBeLoadedAfterRegistration() {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
 
         when(loadUserPort.findByUsername("ahmet"))
                 .thenReturn(Optional.empty()).thenReturn(Optional.of(ahmet));
@@ -132,8 +134,8 @@ class DataSeederTest {
 
     @Test
     void shouldClearSecurityContextAfterExecution() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
 
         when(loadUserPort.findByUsername("ahmet"))
                 .thenReturn(Optional.of(ahmet));
@@ -150,8 +152,8 @@ class DataSeederTest {
 
     @Test
     void shouldSetAuthenticationOnRunAsUser() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
 
         when(loadUserPort.findByUsername("ahmet"))
                 .thenReturn(Optional.of(ahmet));
@@ -170,8 +172,8 @@ class DataSeederTest {
 
     @Test
     void shouldContinueWhenOnlySomeAccountsAlreadyExist() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
         AccountResponse response = mock(AccountResponse.class);
 
         when(loadUserPort.findByUsername("ahmet"))
@@ -197,9 +199,18 @@ class DataSeederTest {
     }
 
     @Test
+    void seedPrincipalShouldExposeIdentity() {
+        var principal = new DataSeeder.SeedPrincipal(7L, "seed",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        assertEquals(7L, principal.getAuthenticatedUserId());
+        assertEquals("seed", principal.getAuthenticatedUsername());
+    }
+
+    @Test
     void shouldNotCreateASecondFundedAccountForLegacyDemoIban() throws Exception {
-        User ahmet = new User(new UserId(1L), "ahmet", "encoded", Role.ROLE_USER);
-        User ayse = new User(new UserId(2L), "ayse", "encoded", Role.ROLE_USER);
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
         when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
         when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
         when(loadAccountPort.findByIban(new Iban("TR123456789012345678901234")))

@@ -48,7 +48,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                 when(loadTransferPort.findHistoryPage(eq(1L), anyInt(), anyInt()))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
 
-                PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L);
+                PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 20);
 
                 assertNotNull(history);
                 assertTrue(history.content().isEmpty());
@@ -73,7 +73,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                                 .thenThrow(new AccountNotFoundException(1L));
 
                 assertThrows(AccountNotFoundException.class,
-                                () -> getTransferHistoryUseCase.execute(1L));
+                                () -> getTransferHistoryUseCase.execute(1L, 0, 20));
                 verifyNoInteractions(loadTransferPort);
         }
 
@@ -83,7 +83,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                         .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
                 AuthorizationException ex = assertThrows(AuthorizationException.class,
-                                () -> getTransferHistoryUseCase.execute(1L));
+                                () -> getTransferHistoryUseCase.execute(1L, 0, 20));
                 assertEquals("You are not authorized to view this account's transaction history.", ex.getMessage());
                 verifyNoInteractions(loadTransferPort);
         }
@@ -91,7 +91,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         @Test
         void shouldThrowNullPointerExceptionWhenAccountIdIsNull() {
                 NullPointerException ex = assertThrows(NullPointerException.class,
-                                () -> getTransferHistoryUseCase.execute(null));
+                                () -> getTransferHistoryUseCase.execute(null, 0, 20));
                 assertEquals("Account ID must not be null", ex.getMessage());
         }
 
@@ -115,14 +115,14 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         }
 
         @Test
-        void shouldDefaultToPage0AndSize20() {
+        void shouldServeExplicitPage0AndSize20() {
                 AccountInfo account = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(account);
                 when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
 
-                getTransferHistoryUseCase.execute(1L);
+                getTransferHistoryUseCase.execute(1L, 0, 20);
 
                 verify(loadTransferPort).findHistoryPage(1L, 0, 20);
         }
@@ -133,7 +133,7 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                         .when(transferAuthorizationService).authorizeAccountAccess(eq(1L), anyString());
 
                 assertThrows(AuthorizationException.class,
-                                () -> getTransferHistoryUseCase.execute(1L));
+                                () -> getTransferHistoryUseCase.execute(1L, 0, 20));
         }
 
         @Test

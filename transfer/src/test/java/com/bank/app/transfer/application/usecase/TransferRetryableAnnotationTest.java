@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.retry.annotation.Retryable;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,7 +30,7 @@ class TransferRetryableAnnotationTest {
         @Test
         void aspectShouldRetryOnOptimisticLockingFailure() {
                 TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                        new TransferProperties(java.time.Duration.ofHours(24), 3, 500, 2000, 100));
+                        new TransferProperties(Duration.ofHours(24), 3, 500, 2000, 100));
                 assertNotNull(aspect);
         }
 }

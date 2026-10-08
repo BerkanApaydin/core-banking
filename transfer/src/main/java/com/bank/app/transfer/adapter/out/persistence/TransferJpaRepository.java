@@ -7,8 +7,10 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import com.bank.app.transfer.domain.TransferStatus;
 
 public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, Long> {
 
@@ -54,4 +56,32 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
             @Param("accountId") Long accountId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    /**
+     * Perf-1: single UPDATE ... WHERE id AND version for COMPLETED/CANCELLED
+     * transitions — no preceding SELECT on the happy path.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TransferJpaEntity t SET t.status = :status, t.version = t.version + 1 "
+            + "WHERE t.id = :id AND t.version = :version")
+    int updateStatusIfVersionMatch(@Param("id") Long id,
+            @Param("version") Long version,
+            @Param("status") TransferStatus status);
+
+    /**
+     * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET so
+     * the covering index serves the range without sorting the full match set.
+     * Null cursor = first page.
+     */
+    @Query("SELECT t FROM TransferJpaEntity t WHERE (t.senderAccountId = :accountId OR t.receiverAccountId = :accountId) "
+            + "AND t.businessCreatedAt BETWEEN :start AND :end "
+            + "AND (:cursorCreatedAt IS NULL OR (t.createdAt < :cursorCreatedAt OR (t.createdAt = :cursorCreatedAt AND t.id < :cursorId))) "
+            + "ORDER BY t.createdAt DESC, t.id DESC")
+    List<TransferJpaEntity> findHistoryBetweenKeyset(
+            @Param("accountId") Long accountId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
 }

@@ -10,6 +10,7 @@ import com.bank.app.infrastructure.adapter.out.security.SecurityContextAdapter;
 import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -235,7 +236,7 @@ class SecurityContextAdapterTest {
     void shouldMatchGrantedRoleExactly() {
         var principal = new SimpleAuthenticatedPrincipal(1L, "alice",
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+        var auth = new UsernamePasswordAuthenticationToken(
                 principal, null, principal.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(auth);
 

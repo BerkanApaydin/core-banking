@@ -11,6 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,7 +29,7 @@ import static org.mockito.Mockito.when;
 class TransferUseCaseRetryAspectTest {
 
     private final TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-            new TransferProperties(java.time.Duration.ofHours(24), 3, 50, 500, 100));
+            new TransferProperties(Duration.ofHours(24), 3, 50, 500, 100));
 
     @Mock
     private ProceedingJoinPoint joinPoint;
@@ -126,7 +131,7 @@ class TransferUseCaseRetryAspectTest {
             // L35 mutant (attempt <= maxAttempts → attempt < maxAttempts) skips the loop entirely,
             // leaving lastException=null and throwing IllegalStateException instead.
             TransferUseCaseRetryAspect aspect1 = new TransferUseCaseRetryAspect(
-                    new TransferProperties(java.time.Duration.ofHours(24), 1, 100, 1000, 100));
+                    new TransferProperties(Duration.ofHours(24), 1, 100, 1000, 100));
             OptimisticLockingFailureException original = new OptimisticLockingFailureException("conflict");
             when(joinPoint.proceed()).thenThrow(original);
 
@@ -144,7 +149,7 @@ class TransferUseCaseRetryAspectTest {
             // L42 delay/2: sleep(1000) + sleep(500) = ~1500ms (< 2000 assertion fails)
             // L41 removed sleep: ~0ms (< 2000 assertion fails)
             TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
-                    new TransferProperties(java.time.Duration.ofHours(24), 3, 1000, 10000, 100));
+                    new TransferProperties(Duration.ofHours(24), 3, 1000, 10000, 100));
             when(joinPoint.proceed())
                     .thenThrow(new OptimisticLockingFailureException("1"))
                     .thenThrow(new OptimisticLockingFailureException("2"))
@@ -158,6 +163,61 @@ class TransferUseCaseRetryAspectTest {
             // Original takes ~3000ms; any sleep/delay mutant takes < 2000ms
             assertThat(elapsedMs).isGreaterThan(2000L);
             verify(joinPoint, times(3)).proceed();
+        }
+
+        @Test
+        @DisplayName("should never sleep with maxAttempts=1 (boundary)")
+        void shouldNeverSleepWhenOnlyOneAttemptAllowed() throws Throwable {
+            List<Long> slept = new ArrayList<>();
+            TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
+                    new TransferProperties(Duration.ofHours(24), 1, 50, 500, 100),
+                    slept::add);
+            when(joinPoint.proceed())
+                    .thenThrow(new OptimisticLockingFailureException("conflict"));
+
+            assertThatThrownBy(() -> aspect.around(joinPoint))
+                    .isExactlyInstanceOf(OptimisticLockingFailureException.class);
+            // Mutant (attempt <= maxAttempts) would sleep once before giving up.
+            assertThat(slept).isEmpty();
+            verify(joinPoint, times(1)).proceed();
+        }
+
+        @Test
+        @DisplayName("should bypass retry inside an existing transaction")
+        void shouldBypassRetryInsideTransaction() throws Throwable {
+            // Kills the NegateConditionals mutant on isActualTransactionActive:
+            // inside a transaction the join point must run exactly once with
+            // no retry, even for lock failures.
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            try {
+                when(joinPoint.proceed()).thenReturn("success");
+                assertThat(aspect.around(joinPoint)).isEqualTo("success");
+                verify(joinPoint, times(1)).proceed();
+            } finally {
+                TransactionSynchronizationManager.clear();
+            }
+        }
+
+        @Test
+        @DisplayName("should restore interrupt flag when injected sleep is interrupted")
+        void shouldRestoreInterruptFlagOnInjectedSleepInterruption() throws Throwable {
+            TransferUseCaseRetryAspect aspect = new TransferUseCaseRetryAspect(
+                    new TransferProperties(Duration.ofHours(24), 3, 50, 500, 100),
+                    delay -> { throw new InterruptedException("woken"); });
+            when(joinPoint.proceed())
+                    .thenThrow(new OptimisticLockingFailureException("conflict"));
+
+            try {
+                assertThatThrownBy(() -> aspect.around(joinPoint))
+                        .isExactlyInstanceOf(InterruptedException.class)
+                        .hasMessage("woken");
+                // Mutant (removed interrupt()) leaves the flag clear.
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                // Never leak the test thread's interrupt flag into other tests.
+                Thread.interrupted();
+            }
         }
     }
 }

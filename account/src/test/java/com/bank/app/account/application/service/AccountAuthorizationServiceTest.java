@@ -53,6 +53,14 @@ class AccountAuthorizationServiceTest {
     }
 
     @Test
+    void shouldExposeCurrentUsername() {
+        // Kills the EmptyObjectReturn mutant on getCurrentUsername.
+        when(userContextService.getCurrentUsernameOrSystem()).thenReturn("alice");
+
+        assertThat(authorizationService.getCurrentUsername()).isEqualTo("alice");
+    }
+
+    @Test
     void shouldCheckQueryOwnershipWithoutExposingAnotherAccount() {
         Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
                 "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);

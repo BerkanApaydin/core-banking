@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SuppressWarnings("null")
@@ -43,5 +49,52 @@ class EmailNotificationAdapterTest {
     @Test
     void shouldHandleNullCancelGracefully() {
         assertDoesNotThrow(() -> adapter.notifyTransferCancelled(null));
+    }
+
+    @Test
+    void shouldExposeEmailChannel() {
+        // Kills the EmptyObjectReturn mutant ("" vs "Email").
+        assertThat(adapter.channel()).isEqualTo("Email");
+    }
+
+    @Test
+    void shouldLogCompletedNotificationWithChannel() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(EmailNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            Transfer transfer = new Transfer(7L, 10L, 20L,
+                    Money.of("100.00", Currency.TRY),
+                    TransferStatus.COMPLETED, LocalDateTime.now());
+            adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        // Kills the VoidMethodCall mutant (removed super call): without the
+        // delegation no log line is produced at all.
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains("Email").contains("7"));
+    }
+
+    @Test
+    void shouldLogCancelledNotificationWithChannel() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(EmailNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            adapter.notifyTransferCancelled(new AsyncTransferCancelledEvent(
+                    9L, 10L, 20L, Money.of("50.00", Currency.TRY),
+                    TransferStatus.CANCELLED, LocalDateTime.now()));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains("Email").contains("9"));
     }
 }

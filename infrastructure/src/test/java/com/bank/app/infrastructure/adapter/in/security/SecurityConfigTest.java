@@ -31,13 +31,15 @@ class SecurityConfigTest {
     private CorsConfigurationSource corsConfigurationSource;
     @Mock
     private ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
+    @Mock
+    private ProblemDetailAccessDeniedHandler accessDeniedHandler;
     private SecurityConfig securityConfig;
     private SecurityProperties securityProperties;
 
     @BeforeEach
     void setUp() {
         securityProperties = new SecurityProperties(null);
-        securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService, securityProperties, authenticationEntryPoint);
+        securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService, securityProperties, authenticationEntryPoint, accessDeniedHandler);
     }
 
     @Test

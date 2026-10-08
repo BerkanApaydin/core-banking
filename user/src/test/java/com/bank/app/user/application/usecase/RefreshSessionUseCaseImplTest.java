@@ -1,6 +1,8 @@
 package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,7 +50,7 @@ class RefreshSessionUseCaseImplTest {
     @Mock private RefreshTokenPort refreshTokenPort;
     @Mock private LoadUserPort loadUserPort;
     @Mock private ClockProviderPort clockProvider;
-    @Mock private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
+    @Mock private AuditEventPort auditEventPort;
 
     private RefreshSessionUseCase useCase;
 
@@ -196,8 +199,8 @@ class RefreshSessionUseCaseImplTest {
         assertThatThrownBy(() -> useCase.execute(REFRESH))
                 .isExactlyInstanceOf(RefreshTokenReuseException.class);
 
-        var captor = org.mockito.ArgumentCaptor
-                .forClass(com.bank.app.common.domain.event.AuditEvent.class);
+        var captor = ArgumentCaptor
+                .forClass(AuditEvent.class);
         verify(auditEventPort).publish(captor.capture());
         assertThat(captor.getValue().action()).isEqualTo("TOKEN_REVOKED");
         assertThat(captor.getValue().username()).isEqualTo("alice");
@@ -221,11 +224,11 @@ class RefreshSessionUseCaseImplTest {
     }
 
     private static User freshUser() {
-        return new User(new UserId(7L), "alice", "encoded", Role.ROLE_USER);
+        return new User(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
     }
 
     private static User versionedUser(long tokenVersion) {
-        return new User(new UserId(7L), "alice", "encoded", Role.ROLE_USER, null, null, null, tokenVersion);
+        return new User(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER, null, null, null, tokenVersion);
     }
 
     @Test
@@ -263,6 +266,11 @@ class RefreshSessionUseCaseImplTest {
         verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
         verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
         verify(jwtPort, never()).generateRefreshToken(anyLong(), anyString(), anyString(), anyLong());
+        // Kills the audit-publish VoidMethodCall mutant on the stale-generation
+        // path: the rejection must leave a TOKEN_REVOKED audit row.
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().action()).isEqualTo("TOKEN_REVOKED");
     }
 
     @Test

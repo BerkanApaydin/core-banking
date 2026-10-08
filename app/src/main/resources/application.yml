@@ -121,6 +121,9 @@ app:
       min-ttl-ms: ${TOKEN_BLACKLIST_MIN_TTL_MS:1000}
       max-ttl-ms: ${TOKEN_BLACKLIST_MAX_TTL_MS:2592000000}
   idempotency:
+    # Cron single-source: this yml is authoritative. Code @Scheduled defaults
+    # (e.g. OrphanIntegrityReporter, AuditRetentionScheduler) must stay in sync
+    # but are only fallbacks for when the property is unresolved.
     cleanup-cron: ${IDEMPOTENCY_CLEANUP_CRON:0 0 * * * *}
     expiration-hours: ${IDEMPOTENCY_EXPIRATION_HOURS:24}
     # Retry policy for the generic @Idempotent guard (all annotated endpoints).
@@ -131,6 +134,11 @@ app:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
     orphan-alarm-threshold: ${ORPHAN_ALARM_THRESHOLD:0}
+  audit:
+    max-query-limit: ${AUDIT_MAX_QUERY_LIMIT:500}
+    retention-enabled: ${AUDIT_RETENTION_ENABLED:true}
+    retention-days: ${AUDIT_RETENTION_DAYS:365}
+    retention-cron: ${AUDIT_RETENTION_CRON:0 0 4 * * 0}
   observability:
     backlog:
       enabled: ${BACKLOG_METRICS_ENABLED:true}
@@ -139,6 +147,9 @@ app:
     # S7/S8: binds to a Duration (hours for plain numbers); the env name is
     # unchanged so existing deployments keep working.
     cancellation-window: ${TRANSFER_CANCELLATION_WINDOW_HOURS:24}
+  notification:
+    email-enabled: ${NOTIFICATION_EMAIL_ENABLED:true}
+    sms-enabled: ${NOTIFICATION_SMS_ENABLED:true}
   transaction:
     timeout-seconds: ${TRANSACTION_TIMEOUT_SECONDS:30}
   outbox:

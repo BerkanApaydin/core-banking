@@ -19,11 +19,24 @@ public record TransferReportResponse(
     BigDecimal pageVolume,
     String currency,
     List<TransferResponse> transfers,
-    boolean hasNext
+    boolean hasNext,
+    // DB-2 keyset cursor for the next page (null when hasNext=false).
+    String nextCursorCreatedAt,
+    Long nextCursorId,
+    // API-2: whole-range aggregates in the same response so items+totals are
+    // computed from one criteria without a second round trip. Null when the
+    // caller used the paged-only query.
+    Long totalCount,
+    BigDecimal totalVolume
 ) {
     public TransferReportResponse(Long accountId, long pageTransferCount, BigDecimal pageVolume,
                                   String currency, List<TransferResponse> transfers) {
-        this(accountId, pageTransferCount, pageVolume, currency, transfers, false);
+        this(accountId, pageTransferCount, pageVolume, currency, transfers, false, null, null, null, null);
+    }
+
+    public TransferReportResponse(Long accountId, long pageTransferCount, BigDecimal pageVolume,
+                                  String currency, List<TransferResponse> transfers, boolean hasNext) {
+        this(accountId, pageTransferCount, pageVolume, currency, transfers, hasNext, null, null, null, null);
     }
 
     public TransferReportResponse {

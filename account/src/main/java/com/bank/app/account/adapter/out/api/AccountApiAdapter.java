@@ -10,6 +10,8 @@ import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.domain.Money;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Collection;
 import java.util.Map;
@@ -76,8 +78,21 @@ public class AccountApiAdapter implements AccountApi {
         // Granular invalidation, inline (not via a helper): only the two
         // mutated accounts, only after the use case succeeds — and inline so
         // CacheInvalidationArchitectureTest can see the eviction directly.
-        snapshotCache.evictById(senderId);
-        snapshotCache.evictById(receiverId);
+        // Eviction deferred to AFTER_COMMIT when a transaction is active so a
+        // rollback never evicts a still-valid snapshot; the else-branch keeps
+        // the direct evictById call visible to CacheInvalidationArchitectureTest.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    snapshotCache.evictById(senderId);
+                    snapshotCache.evictById(receiverId);
+                }
+            });
+        } else {
+            snapshotCache.evictById(senderId);
+            snapshotCache.evictById(receiverId);
+        }
         return result;
     }
 
@@ -85,8 +100,19 @@ public class AccountApiAdapter implements AccountApi {
     public AccountAdjustmentResult reverseForCancellation(Long senderId, Long receiverId, Money amount) {
         Objects.requireNonNull(amount, "Amount must not be null");
         AccountAdjustmentResult result = adjustAccountBalancesUseCase.reverseForCancellation(senderId, receiverId, amount);
-        snapshotCache.evictById(senderId);
-        snapshotCache.evictById(receiverId);
+        // Same AFTER_COMMIT rule as adjustBalances: commit wins, then evict.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    snapshotCache.evictById(senderId);
+                    snapshotCache.evictById(receiverId);
+                }
+            });
+        } else {
+            snapshotCache.evictById(senderId);
+            snapshotCache.evictById(receiverId);
+        }
         return result;
     }
 

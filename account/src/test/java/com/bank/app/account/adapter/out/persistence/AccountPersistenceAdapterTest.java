@@ -2,6 +2,7 @@ package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -59,20 +61,19 @@ class AccountPersistenceAdapterTest {
     void shouldSaveExistingAccount() {
         Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
-        AccountJpaEntity managedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 1L);
-        AccountJpaEntity savedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("2000.00"), Currency.TRY, AccountStatus.ACTIVE, 2L);
 
-        when(springDataRepo.findById(1L)).thenReturn(Optional.of(managedEntity));
-        when(springDataRepo.save(any(AccountJpaEntity.class))).thenReturn(savedEntity);
+        // Perf-1 bulk path: single versioned UPDATE, no SELECT, bumped version returned.
+        when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
+                .thenReturn(1);
 
         Account result = repository.save(domainAccount);
 
         assertNotNull(result);
         assertEquals("Ahmet", result.getOwnerName());
         assertEquals(new BigDecimal("2000.00"), result.getBalance().amount());
-        // 7.1: the managed entity is mutated in place, not re-merged detached.
-        assertEquals(new BigDecimal("2000.00"), managedEntity.getBalance());
-        verify(springDataRepo).save(managedEntity);
+        assertEquals(2L, result.getVersion());
+        verify(springDataRepo).updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet");
+        verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
     }
 
     @Test
@@ -82,9 +83,11 @@ class AccountPersistenceAdapterTest {
         Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
         AccountJpaEntity managedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 2L);
 
+        when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
+                .thenReturn(0);
         when(springDataRepo.findById(1L)).thenReturn(Optional.of(managedEntity));
 
-        assertThrows(org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+        assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> repository.save(domainAccount));
         verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
     }
@@ -95,9 +98,11 @@ class AccountPersistenceAdapterTest {
         Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
 
+        when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
+                .thenReturn(0);
         when(springDataRepo.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(com.bank.app.account.domain.exception.AccountNotFoundException.class,
+        assertThrows(AccountNotFoundException.class,
                 () -> repository.save(domainAccount));
         verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
     }
@@ -106,6 +111,34 @@ class AccountPersistenceAdapterTest {
     void shouldNotSaveWhenAccountIsNull() {
         assertThrows(IllegalArgumentException.class, () -> repository.save(null));
         verifyNoInteractions(springDataRepo);
+    }
+
+    @Test
+    @DisplayName("legacy path: should throw not-found for version-less missing row")
+    void shouldThrowNotFoundForVersionLessMissingRow() {
+        // Kills the NullReturnVals mutant on the legacy orElseThrow lambda.
+        Iban iban = new Iban("TR770006200000000000000111");
+        Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
+                Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
+        when(springDataRepo.findById(9L)).thenReturn(Optional.empty());
+
+        assertThrows(AccountNotFoundException.class, () -> repository.save(domainAccount));
+        verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
+    }
+
+    @Test
+    @DisplayName("legacy path: should reject blind write for version-less existing row")
+    void shouldRejectBlindWriteForVersionLessExistingRow() {
+        Iban iban = new Iban("TR770006200000000000000111");
+        Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
+                Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
+        AccountJpaEntity managed = new AccountJpaEntity(9L, 100L, iban.value(), "Ahmet",
+                new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 2L);
+        when(springDataRepo.findById(9L)).thenReturn(Optional.of(managed));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> repository.save(domainAccount));
+        verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
     }
 
     @Nested
@@ -201,6 +234,23 @@ class AccountPersistenceAdapterTest {
         void shouldReturnEmptyForNullId() {
             assertTrue(repository.findInfoById(null).isEmpty());
             verifyNoInteractions(springDataRepo);
+        }
+
+        @Test
+        @DisplayName("should map string-labeled enum projections")
+        void shouldMapStringLabeledProjections() {
+            // Kills the enumName mutants: Hibernate may materialize projected
+            // native enums as labels (String) instead of enum constants. A
+            // negated instanceof mutant throws ClassCastException here; an
+            // EmptyObject mutant returns "" instead of the label.
+            when(springDataRepo.findInfoById(1L)).thenReturn(List.<Object[]>of(
+                    new Object[]{1L, 100L, "TRY", "SUSPENDED"}));
+
+            var info = repository.findInfoById(1L);
+
+            assertTrue(info.isPresent());
+            assertEquals("TRY", info.get().currency());
+            assertEquals("SUSPENDED", info.get().status());
         }
 
         @Test

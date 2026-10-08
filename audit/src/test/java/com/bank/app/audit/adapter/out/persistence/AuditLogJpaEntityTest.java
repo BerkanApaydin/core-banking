@@ -34,4 +34,21 @@ class AuditLogJpaEntityTest {
         assertEquals("details2", empty.getDetails());
         assertEquals(now, empty.getTimestamp());
     }
+
+    @Test
+    void shouldExposeActorUserId() {
+        // Kills the PrimitiveReturns mutant (0L vs actual id): a non-zero id
+        // must round-trip, and null must stay null (not 0).
+        LocalDateTime now = LocalDateTime.now();
+        AuditLogJpaEntity withActor = new AuditLogJpaEntity(1L, "user",
+                AuditAction.ACCOUNT_CREATED, "details", now, 42L);
+        assertEquals(42L, withActor.getActorUserId());
+
+        AuditLogJpaEntity withoutActor = new AuditLogJpaEntity(2L, "user",
+                AuditAction.ACCOUNT_CREATED, "details", now);
+        assertNull(withoutActor.getActorUserId());
+
+        withoutActor.setActorUserId(7L);
+        assertEquals(7L, withoutActor.getActorUserId());
+    }
 }

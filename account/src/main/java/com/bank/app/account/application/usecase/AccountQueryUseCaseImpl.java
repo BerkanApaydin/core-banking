@@ -8,6 +8,8 @@ import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 @ReadOnlyUseCase
 public class AccountQueryUseCaseImpl implements AccountQueryUseCase {
@@ -33,8 +35,8 @@ public class AccountQueryUseCaseImpl implements AccountQueryUseCase {
                 () -> new AccountNotFoundException(ibanValue));
     }
 
-    private AccountInfo findOrThrow(java.util.Optional<AccountInfo> lookup,
-                                    java.util.function.Supplier<AccountNotFoundException> missing) {
+    private AccountInfo findOrThrow(Optional<AccountInfo> lookup,
+                                    Supplier<AccountNotFoundException> missing) {
         return lookup.orElseThrow(missing);
     }
 

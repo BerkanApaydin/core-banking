@@ -121,6 +121,64 @@ class LoadRunnerTest(unittest.TestCase):
             status, _, endpoint = runner.make_worker([user])(0)
         self.assertEqual(("SKIP", "POST /transfers"), (status, endpoint))
 
+    def _transfer_user(self, ibans, cancellable=()):
+        return {"token": "token", "account_ids": [1, 2], "account_ibans": list(ibans),
+                "transfer_ids": [], "cancellable_transfer_ids": list(cancellable),
+                "transfer_ids_lock": threading.Lock()}
+
+    def test_transfer_worker_sends_idempotency_key(self):
+        # Backend rejects transfer placement without Idempotency-Key (409);
+        # the load worker must always send one.
+        user = self._transfer_user(["TR1", "TR2"])
+        response = types.SimpleNamespace(status_code=201, json=lambda: {"id": 9})
+        transfer_roll = (runner.THRESHOLDS[7] + runner.THRESHOLDS[8]) / 2
+        with patch.object(runner.random, "random", return_value=transfer_roll), \
+                patch.object(runner.requests, "request", return_value=response, create=True) as request:
+            status, _, endpoint = runner.make_worker([user])(0)
+        self.assertEqual((201, "POST /transfers"), (status, endpoint))
+        body = request.call_args.kwargs["json"]
+        self.assertEqual("TR1", body["senderIban"])
+        self.assertEqual("TR2", body["receiverIban"])
+        self.assertEqual("TRY", body["currency"])
+        self.assertGreater(body["amount"], 0)
+        headers = request.call_args.kwargs["headers"]
+        self.assertIn("Idempotency-Key", headers)
+        self.assertTrue(headers["Authorization"].startswith("Bearer "))
+        self.assertEqual([9], user["transfer_ids"])
+        self.assertEqual([9], user["cancellable_transfer_ids"])
+
+    def test_transfer_worker_skips_without_two_ibans(self):
+        user = self._transfer_user(["only-one"])
+        transfer_roll = (runner.THRESHOLDS[7] + runner.THRESHOLDS[8]) / 2
+        with patch.object(runner.random, "random", return_value=transfer_roll), \
+                patch.object(runner.requests, "request", create=True) as request:
+            status, _, endpoint = runner.make_worker([user])(0)
+        self.assertEqual(("SKIP", "POST /transfers"), (status, endpoint))
+        request.assert_not_called()
+
+    def test_cancel_worker_sends_idempotency_key(self):
+        # Backend rejects cancellation without Idempotency-Key (409); the load
+        # worker must always send one, and a 204 consumes the cancellable id.
+        user = self._transfer_user(["TR1", "TR2"], cancellable=[5])
+        response = types.SimpleNamespace(status_code=204)
+        cancel_roll = (runner.THRESHOLDS[9] + runner.THRESHOLDS[10]) / 2
+        with patch.object(runner.random, "random", return_value=cancel_roll), \
+                patch.object(runner.requests, "request", return_value=response, create=True) as request:
+            status, _, endpoint = runner.make_worker([user])(0)
+        self.assertEqual((204, "POST /transfers/{id}/cancel"), (status, endpoint))
+        self.assertTrue(request.call_args.args[1].endswith("/api/v1/transfers/5/cancel"))
+        self.assertIn("Idempotency-Key", request.call_args.kwargs["headers"])
+        self.assertEqual([], user["cancellable_transfer_ids"])
+
+    def test_cancel_worker_skips_without_cancellable_transfer(self):
+        user = self._transfer_user(["TR1", "TR2"])
+        cancel_roll = (runner.THRESHOLDS[9] + runner.THRESHOLDS[10]) / 2
+        with patch.object(runner.random, "random", return_value=cancel_roll), \
+                patch.object(runner.requests, "request", create=True) as request:
+            status, _, endpoint = runner.make_worker([user])(0)
+        self.assertEqual(("SKIP", "POST /transfers/{id}/cancel"), (status, endpoint))
+        request.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

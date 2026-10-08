@@ -121,5 +121,111 @@ class BrowserSessionCookiesTest {
             assertThatThrownBy(() -> BrowserSessionCookies.boundToken(random32(), MAC_KEY, " "))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
+
+        @Test
+        @DisplayName("should reject bound pairs with wrong length")
+        void shouldRejectWrongLengthBoundPair() {
+            String token = BrowserSessionCookies.boundToken(random32(), MAC_KEY, "42");
+            String shortToken = token.substring(0, 86);
+            String longToken = token + "A";
+
+            assertThat(BrowserSessionCookies.validBoundPair(shortToken, shortToken, "42", MAC_KEY)).isFalse();
+            assertThat(BrowserSessionCookies.validBoundPair(longToken, longToken, "42", MAC_KEY)).isFalse();
+            assertThat(BrowserSessionCookies.validBoundPair(token, shortToken, "42", MAC_KEY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("should reject bound pair whose dot is misplaced")
+        void shouldRejectMisplacedDot() {
+            // 87 chars with equal header/cookie but no dot at index 43:
+            // the length guard passes, the dot guard must still fail closed.
+            String noDot = "d".repeat(87);
+            assertThat(BrowserSessionCookies.validBoundPair(noDot, noDot, "42", MAC_KEY)).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("cookie names")
+    class CookieNames {
+
+        @Test
+        @DisplayName("should use __Host- prefix when secure")
+        void shouldUseHostPrefixWhenSecure() {
+            BrowserSessionCookies cookies = new BrowserSessionCookies(true);
+            assertThat(cookies.sessionCookieName()).isEqualTo("__Host-BANK_SESSION");
+            assertThat(cookies.refreshCookieName()).isEqualTo("__Host-BANK_REFRESH");
+            assertThat(cookies.csrfCookieName()).isEqualTo("__Host-BANK_CSRF");
+        }
+
+        @Test
+        @DisplayName("should use plain names when not secure")
+        void shouldUsePlainNamesWhenNotSecure() {
+            BrowserSessionCookies cookies = new BrowserSessionCookies(false);
+            assertThat(cookies.sessionCookieName()).isEqualTo("BANK_SESSION");
+            assertThat(cookies.refreshCookieName()).isEqualTo("BANK_REFRESH");
+            assertThat(cookies.csrfCookieName()).isEqualTo("BANK_CSRF");
+        }
+    }
+
+    @Nested
+    @DisplayName("CSRF requirement")
+    class RequiresCsrf {
+
+        @Test
+        @DisplayName("should not require CSRF for safe methods")
+        void shouldNotRequireCsrfForSafeMethods() {
+            assertThat(BrowserSessionCookies.requiresCsrf("GET")).isFalse();
+            assertThat(BrowserSessionCookies.requiresCsrf("HEAD")).isFalse();
+            assertThat(BrowserSessionCookies.requiresCsrf("OPTIONS")).isFalse();
+            assertThat(BrowserSessionCookies.requiresCsrf("TRACE")).isFalse();
+        }
+
+        @Test
+        @DisplayName("should require CSRF for mutating methods")
+        void shouldRequireCsrfForMutatingMethods() {
+            assertThat(BrowserSessionCookies.requiresCsrf("POST")).isTrue();
+            assertThat(BrowserSessionCookies.requiresCsrf("PUT")).isTrue();
+            assertThat(BrowserSessionCookies.requiresCsrf("DELETE")).isTrue();
+            assertThat(BrowserSessionCookies.requiresCsrf("PATCH")).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("double-submit CSRF pairs")
+    class CsrfPairs {
+
+        @Test
+        @DisplayName("should accept equal 43-char pairs")
+        void shouldAcceptEqualPairs() {
+            String token = "A".repeat(43);
+            assertThat(BrowserSessionCookies.validCsrfPair(token, token)).isTrue();
+        }
+
+        @Test
+        @DisplayName("should reject null or wrong-length inputs")
+        void shouldRejectNullOrWrongLength() {
+            String token = "A".repeat(43);
+            assertThat(BrowserSessionCookies.validCsrfPair(null, token)).isFalse();
+            assertThat(BrowserSessionCookies.validCsrfPair(token, null)).isFalse();
+            assertThat(BrowserSessionCookies.validCsrfPair("A".repeat(42), "A".repeat(42))).isFalse();
+            assertThat(BrowserSessionCookies.validCsrfPair("A".repeat(44), "A".repeat(44))).isFalse();
+            assertThat(BrowserSessionCookies.validCsrfPair("", "")).isFalse();
+        }
+
+        @Test
+        @DisplayName("should reject mismatched pairs")
+        void shouldRejectMismatchedPairs() {
+            String header = "A".repeat(43);
+            String cookie = "B".repeat(43);
+            assertThat(BrowserSessionCookies.validCsrfPair(header, cookie)).isFalse();
+        }
+
+        @Test
+        @DisplayName("should reject tampered single-char pairs in constant time")
+        void shouldRejectSingleCharDifference() {
+            String header = "A".repeat(43);
+            String cookie = "A".repeat(42) + "B";
+            assertThat(BrowserSessionCookies.validCsrfPair(header, cookie)).isFalse();
+        }
     }
 }

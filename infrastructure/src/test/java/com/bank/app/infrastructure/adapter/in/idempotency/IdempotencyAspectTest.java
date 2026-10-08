@@ -13,11 +13,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -65,7 +69,7 @@ class IdempotencyAspectTest {
                 clientIpResolver,
                 transactionManager,
                 new TransactionProperties(30),
-                new com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties(
+                new IdempotencyProperties(
                         24, "0 0 * * * *", 3, 0));
         lenient().when(transactionManager.getTransaction(any())).thenAnswer(
                 ignored -> new SimpleTransactionStatus());
@@ -584,7 +588,7 @@ class IdempotencyAspectTest {
     @Test
     void interruptedRetryReleasesReservationOnlyAfterRollbackAndRestoresInterrupt() throws Throwable {
         reserveNewRequest();
-        when(joinPoint.proceed()).thenThrow(new org.springframework.dao.OptimisticLockingFailureException("stale"));
+        when(joinPoint.proceed()).thenThrow(new OptimisticLockingFailureException("stale"));
         try {
             Thread.currentThread().interrupt();
             assertThrows(InterruptedException.class, () -> aspect.handleIdempotency(joinPoint, annotation()));
@@ -616,7 +620,7 @@ class IdempotencyAspectTest {
     @Test
     void interruptionIsPreservedEvenWhenCleanupFails() throws Throwable {
         reserveNewRequest();
-        when(joinPoint.proceed()).thenThrow(new org.springframework.dao.PessimisticLockingFailureException("busy"));
+        when(joinPoint.proceed()).thenThrow(new PessimisticLockingFailureException("busy"));
         var cleanup = new IllegalStateException("database unavailable");
         doThrow(cleanup).when(idempotencyGuard).failRequest(userKey());
         try {
@@ -634,10 +638,10 @@ class IdempotencyAspectTest {
     void ambiguousCommitFailureMustRetainReservation() throws Throwable {
         reserveNewRequest();
         when(joinPoint.proceed()).thenReturn(ResponseEntity.ok().build());
-        var commitFailure = new org.springframework.transaction.TransactionSystemException("commit acknowledgement lost");
+        var commitFailure = new TransactionSystemException("commit acknowledgement lost");
         doThrow(commitFailure).when(transactionManager).commit(any());
 
-        assertSame(commitFailure, assertThrows(org.springframework.transaction.TransactionSystemException.class,
+        assertSame(commitFailure, assertThrows(TransactionSystemException.class,
                 () -> aspect.handleIdempotency(joinPoint, annotation())));
         verify(idempotencyGuard, never()).failRequest(anyString());
         verify(joinPoint).proceed();
@@ -647,10 +651,10 @@ class IdempotencyAspectTest {
     void uncertainRollbackFailureMustRetainReservation() throws Throwable {
         reserveNewRequest();
         when(joinPoint.proceed()).thenThrow(new IllegalArgumentException("business failure"));
-        var rollbackFailure = new org.springframework.transaction.TransactionSystemException("rollback failed");
+        var rollbackFailure = new TransactionSystemException("rollback failed");
         doThrow(rollbackFailure).when(transactionManager).rollback(any());
 
-        assertSame(rollbackFailure, assertThrows(org.springframework.transaction.TransactionSystemException.class,
+        assertSame(rollbackFailure, assertThrows(TransactionSystemException.class,
                 () -> aspect.handleIdempotency(joinPoint, annotation())));
         verify(idempotencyGuard, never()).failRequest(anyString());
     }
@@ -659,7 +663,7 @@ class IdempotencyAspectTest {
     void retriesOnlyAfterRollbackUsingANewTransaction() throws Throwable {
         reserveNewRequest();
         when(joinPoint.proceed())
-                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("stale"))
+                .thenThrow(new OptimisticLockingFailureException("stale"))
                 .thenReturn(ResponseEntity.ok().build());
 
         aspect.handleIdempotency(joinPoint, annotation());

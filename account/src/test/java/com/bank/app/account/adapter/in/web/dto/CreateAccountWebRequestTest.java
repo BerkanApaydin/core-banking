@@ -1,13 +1,16 @@
 package com.bank.app.account.adapter.in.web.dto;
 
+import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Currency;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.DecimalMax;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,7 +46,7 @@ class CreateAccountWebRequestTest {
     @Test
     void shouldNotExposeClientSelectedUserIdOrIban() {
         assertThat(CreateAccountWebRequest.class.getRecordComponents())
-                .extracting(java.lang.reflect.RecordComponent::getName)
+                .extracting(RecordComponent::getName)
                 .doesNotContain("userId", "iban");
     }
 
@@ -103,8 +106,8 @@ class CreateAccountWebRequestTest {
     @Test
     void decimalMaxShouldMirrorSharedBalanceCeiling() throws Exception {
         var annotation = CreateAccountWebRequest.class.getDeclaredField("initialBalance")
-                .getAnnotation(jakarta.validation.constraints.DecimalMax.class);
+                .getAnnotation(DecimalMax.class);
         assertThat(annotation).isNotNull();
-        assertThat(annotation.value()).isEqualTo(com.bank.app.common.domain.BalanceLimits.MAX_BALANCE);
+        assertThat(annotation.value()).isEqualTo(BalanceLimits.MAX_BALANCE);
     }
 }

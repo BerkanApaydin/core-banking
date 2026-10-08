@@ -2,11 +2,14 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
+import com.bank.app.common.application.port.out.ClockProviderPort;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,17 +18,33 @@ import java.util.Optional;
 public class IdempotencyGuard {
 
     private final IdempotencyPort idempotencyPort;
+    private final ClockProviderPort clockProvider;
 
+    @Autowired
     public IdempotencyGuard(IdempotencyPort idempotencyPort) {
-        this.idempotencyPort = idempotencyPort;
+        this(idempotencyPort, Clock::systemUTC);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
+    public IdempotencyGuard(IdempotencyPort idempotencyPort,
+            ClockProviderPort clockProvider) {
+        this.idempotencyPort = idempotencyPort;
+        this.clockProvider = clockProvider != null ? clockProvider : Clock::systemUTC;
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clockProvider.clock());
+    }
+
+    // Timeout is a placeholder (not a hardcoded literal) so the idempotency
+    // layer follows the same single source of truth as every other
+    // transaction (app.transaction.timeout-seconds, see TransactionProperties
+    // and UseCaseTransactionAspect). A-1: previously hardcoded timeout = 30.
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeoutString = "${app.transaction.timeout-seconds:30}")
     public IdempotencyResult startRequest(String key) {
         return startRequest(key, null);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeoutString = "${app.transaction.timeout-seconds:30}")
     public IdempotencyResult startRequest(String key, String requestHash) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         Optional<Entry> existing = idempotencyPort.findById(key);
@@ -33,8 +52,8 @@ public class IdempotencyGuard {
             return claimOrReadExisting(key, requestHash, existing.get());
         }
         boolean created = requestHash == null
-                ? idempotencyPort.tryCreate(key, LocalDateTime.now())
-                : idempotencyPort.tryCreate(key, requestHash, LocalDateTime.now());
+                ? idempotencyPort.tryCreate(key, now())
+                : idempotencyPort.tryCreate(key, requestHash, now());
         if (created) {
             return IdempotencyResult.newRequest();
         }
@@ -55,8 +74,8 @@ public class IdempotencyGuard {
             case "COMPLETED" -> IdempotencyResult.completed(entry.responseBody(), entry.responseStatus());
             case "FAILED" -> {
                 boolean claimed = requestHash == null
-                        ? idempotencyPort.tryResetFailed(key, LocalDateTime.now())
-                        : idempotencyPort.tryResetFailed(key, requestHash, LocalDateTime.now());
+                        ? idempotencyPort.tryResetFailed(key, now())
+                        : idempotencyPort.tryResetFailed(key, requestHash, now());
                 if (claimed) {
                     yield IdempotencyResult.newRequest();
                 }
@@ -74,13 +93,13 @@ public class IdempotencyGuard {
 
     // The successful outcome must commit with the business mutation. The
     // controller aspect opens that transaction before invoking the use case.
-    @Transactional(propagation = Propagation.REQUIRED, timeout = 30)
+    @Transactional(propagation = Propagation.REQUIRED, timeoutString = "${app.transaction.timeout-seconds:30}")
     public void completeRequest(String key, String responseBody, int responseStatus) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markCompleted(key, responseBody, responseStatus);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 30)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeoutString = "${app.transaction.timeout-seconds:30}")
     public void failRequest(String key) {
         Objects.requireNonNull(key, "Idempotency key must not be null");
         idempotencyPort.markFailed(key);

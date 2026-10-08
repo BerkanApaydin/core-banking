@@ -113,6 +113,38 @@ test('account creation sends no IBAN and displays the server-generated value', a
     assert.equal(alerts[0], 'account.created:TR440006200000000000000123');
 });
 
+test('transfer cancel posts Idempotency-Key (backend rejects without it)', async () => {
+    const calls = [];
+    const context = vm.createContext({
+        userId: 7,
+        cancellationsInFlight: new Set(),
+        confirmDialog: async () => true,
+        __: key => key,
+        getIdempotencyKey: async () => 'cancel-key-1',
+        markIdempotencyStarted() {},
+        markIdempotencyFailed() {},
+        idempotencyErrorMessage: error => error.message,
+        clearIdempotencyKey() {},
+        fetchApi: async (url, options) => {
+            calls.push({ url, options });
+            return {};
+        },
+        showAlert() {},
+        loadAccounts: async () => {},
+        loadAccountHistory() {}
+    });
+    const functionSource = 'async function cancelTransfer(transferId, accountId) {'
+        + source.split('async function cancelTransfer(transferId, accountId) {')[1]
+            .split('// --- Detail surfaces')[0];
+    vm.runInContext(functionSource, context);
+    await vm.runInContext('cancelTransfer(19, 7)', context);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, '/transfers/19/cancel');
+    assert.equal(calls[0].options.method, 'POST');
+    assert.equal(calls[0].options.headers['Idempotency-Key'], 'cancel-key-1');
+});
+
 test('history cancel action uses a click listener accepted by the CSP', async () => {
     const items = [];
     const calls = [];
@@ -285,19 +317,22 @@ test('concurrent 401s share one silent refresh (theft-safe coalescing)', async (
     assert.equal(vm.runInContext('userId', context), 7);
 });
 
-test('password gate mirrors backend policy (min 12 + upper/lower/digit)', () => {
+test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () => {
     const functions = 'function meetsPasswordPolicy(pw) {'
         + source.split('function meetsPasswordPolicy(pw) {')[1].split('function initUxEnhancements')[0];
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
-    // Backend PasswordPolicy.DEFAULT is (12, upper, lower, digit); the
+    // Backend PasswordPolicy.DEFAULT is (12, upper, lower, digit) and
+    // RegisterWebRequest caps at 72 chars (BCrypt truncation guard); the
     // client gate must reject everything the backend would reject.
     assert.equal(vm.runInContext("meetsPasswordPolicy('Short123456')", context), false);
     assert.equal(vm.runInContext("meetsPasswordPolicy('alllowercase12')", context), false);
     assert.equal(vm.runInContext("meetsPasswordPolicy('ALLUPPERCASE12')", context), false);
     assert.equal(vm.runInContext("meetsPasswordPolicy('NoDigitsHereAA')", context), false);
     assert.equal(vm.runInContext("meetsPasswordPolicy('ValidPass1234')", context), true);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "x".repeat(69) + "')", context), true);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "x".repeat(70) + "')", context), false);
 });
 
 test('failed silent refresh keeps the session logged out', async () => {

@@ -3,10 +3,14 @@ package com.bank.app.persistence;
 import com.bank.app.common.AbstractIntegrationTest;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.UserId;
 import com.bank.app.transfer.adapter.out.persistence.TransferJpaMapper;
 import com.bank.app.transfer.adapter.out.persistence.TransferPersistenceAdapter;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
+import com.bank.app.user.domain.EmailAddress;
+import com.bank.app.user.domain.Role;
+import com.bank.app.user.domain.User;
 import com.bank.app.user.adapter.out.persistence.UserJpaMapper;
 import com.bank.app.user.adapter.out.persistence.UserPersistenceAdapter;
 import jakarta.persistence.EntityManager;
@@ -47,7 +51,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
         entityManager.createNativeQuery("DELETE FROM users").executeUpdate();
         entityManager.createNativeQuery("""
                 INSERT INTO users (id, username, password, role, version, created_at)
-                VALUES (101, 'version-test', 'encoded', 'ROLE_USER', 0, NOW())
+                VALUES (101, 'version-test', '$2a$12$testencodedhash000000000000000000000001', 'ROLE_USER', 0, NOW())
                 """).executeUpdate();
         entityManager.createNativeQuery("""
                 INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at)
@@ -80,7 +84,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
         entityManager.createNativeQuery("UPDATE users SET email = 'new@example.com', version = 1 WHERE id = 101")
                 .executeUpdate();
         entityManager.clear();
-        stale.changePassword("new-encoded-password");
+        stale.changePassword("$2a$12$testencodedhash000000000000000000000002");
 
         assertThrows(OptimisticLockingFailureException.class, () -> {
             users.save(stale);
@@ -100,16 +104,16 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void rejectsMissingVersionForExistingUser() {
-        var unversioned = new com.bank.app.user.domain.User(
-                new com.bank.app.common.domain.UserId(101L), "version-test", "encoded",
-                com.bank.app.user.domain.Role.ROLE_USER);
+        var unversioned = new User(
+                new UserId(101L), "version-test", "$2a$12$testencodedhash000000000000000000000001",
+                Role.ROLE_USER);
         assertThrows(OptimisticLockingFailureException.class, () -> users.save(unversioned));
     }
 
     @Test
     void matchingUserVersionPreservesContactDetailsAndAdvancesVersion() {
         var user = users.findByUsername("version-test").orElseThrow();
-        user.updateEmail(new com.bank.app.user.domain.EmailAddress("new@example.com"));
+        user.updateEmail(new EmailAddress("new@example.com"));
         users.save(user);
         entityManager.flush();
         entityManager.clear();

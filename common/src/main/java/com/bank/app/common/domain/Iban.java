@@ -59,6 +59,17 @@ public record Iban(String value) {
         }
     }
 
+    /**
+     * Spendable-path factory: format + MOD 97-10 checksum in one call.
+     * Prefer this over {@code new Iban(..)} at money-movement boundaries so
+     * the checksum guard cannot be forgotten (see TransferDomainService).
+     */
+    public static Iban checked(String iban) {
+        Iban parsed = new Iban(iban);
+        parsed.requireValidChecksum();
+        return parsed;
+    }
+
     @Override
     public String toString() {
         // Length is always 26 (validated above): no short-value branch needed.

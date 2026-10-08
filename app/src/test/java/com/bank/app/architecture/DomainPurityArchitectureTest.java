@@ -27,7 +27,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                 .that().resideInAnyPackage("..domain..")
                 .should(ArchConditions.dependOnClassesThat(forbiddenPackages))
                 .as("no domain classes should depend on Spring (except org.springframework.lang) or infrastructure")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -67,7 +67,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                         "jakarta.validation..",
                         "org.springframework.transaction..",
                         "org.springframework.retry..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -81,7 +81,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                         "jakarta..",
                         "org.springframework..",
                         "com.fasterxml.jackson..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -104,7 +104,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                         "com.bank.app.common.adapter..",
                         "org.springframework..",
                         "jakarta..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -118,7 +118,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                         "com.bank.app.transfer..",
                         "com.bank.app.user..",
                         "com.bank.app.audit..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -133,7 +133,7 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
                 .that().resideInAnyPackage("com.bank.app..")
                 .and().resideOutsideOfPackage("com.bank.app.user.domain..")
                 .should().callMethod(User.class, "assignRole", Role.class)
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }

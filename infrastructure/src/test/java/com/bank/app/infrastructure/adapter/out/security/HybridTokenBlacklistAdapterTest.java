@@ -67,4 +67,23 @@ class HybridTokenBlacklistAdapterTest {
                 .isInstanceOf(RevocationStoreUnavailableException.class);
         verify(redis, never()).isBlacklisted("token");
     }
+
+    @Test
+    void shouldFailClosedWhenRedisReadFailsAfterDurableMiss() {
+        when(database.isBlacklisted("token")).thenReturn(false);
+        when(redis.isBlacklisted("token"))
+                .thenThrow(new RedisConnectionFailureException("down"));
+
+        assertThatThrownBy(() -> adapter.isBlacklisted("token"))
+                .isInstanceOf(RevocationStoreUnavailableException.class);
+    }
+
+    @Test
+    void shouldFanOutCleanupToAllThreeBackends() {
+        adapter.cleanExpired();
+
+        verify(database).cleanExpired();
+        verify(redis).cleanExpired();
+        assertThat(local.isBlacklisted("anything")).isFalse();
+    }
 }

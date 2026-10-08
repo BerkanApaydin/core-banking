@@ -7,6 +7,7 @@ import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportTotalsQuery;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotalsQuery;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
@@ -22,6 +23,7 @@ import com.bank.app.transfer.application.service.TransferViewEnricher;
 import com.bank.app.transfer.application.usecase.CancelTransferUseCaseImpl;
 import com.bank.app.transfer.application.usecase.GenerateTransferReportQueryImpl;
 import com.bank.app.transfer.application.usecase.GenerateTransferReportTotalsQueryImpl;
+import com.bank.app.transfer.application.usecase.GenerateTransferReportWithTotalsQueryImpl;
 import com.bank.app.transfer.application.usecase.GetTransferDetailQueryImpl;
 import com.bank.app.transfer.application.usecase.GetTransferHistoryQueryImpl;
 import com.bank.app.transfer.application.usecase.PlaceTransferUseCaseImpl;
@@ -130,6 +132,15 @@ public class TransferBeanConfig {
     public GenerateTransferReportTotalsQuery generateTransferReportTotalsQuery(LoadTransferPort loadTransferPort,
                                                                               TransferAuthorizationService transferAuthorizationService) {
         return new GenerateTransferReportTotalsQueryImpl(loadTransferPort, transferAuthorizationService);
+    }
+
+    @Bean
+    public GenerateTransferReportWithTotalsQuery generateTransferReportWithTotalsQuery(
+            LoadTransferPort loadTransferPort,
+            TransferViewEnricher viewEnricher,
+            TransferAuthorizationService transferAuthorizationService) {
+        return new GenerateTransferReportWithTotalsQueryImpl(
+                loadTransferPort, viewEnricher, transferAuthorizationService, transferProperties.maxPageSize());
     }
 
     @Bean

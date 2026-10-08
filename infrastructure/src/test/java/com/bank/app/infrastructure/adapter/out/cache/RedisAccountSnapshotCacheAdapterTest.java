@@ -15,6 +15,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -112,7 +114,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         // One EVAL with the base keys + key prefixes: 1 round trip on the
         // mutation hot path instead of SMEMBERS + DEL.
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
-                eq(java.util.List.of(
+                eq(List.of(
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",
                         "account-snapshot:idx:ibans-by-id:1")),
@@ -125,22 +127,22 @@ class RedisAccountSnapshotCacheAdapterTest {
     void shouldPutAndGetIbansBatchPerId() {
         var ids = Set.of(1L, 2L);
         var ibans = Map.of(1L, "TR1", 2L, "TR2");
-        when(valueOps.multiGet(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
-                .thenReturn(java.util.List.of("TR1", "TR2"));
+        when(valueOps.multiGet(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
+                .thenReturn(List.of("TR1", "TR2"));
 
         assertEquals(ibans, adapter.getIbans(ids).orElseThrow());
 
         adapter.putIbans(ids, ibans);
         // One EVAL with KEYS/ARGV aligned in ascending id order (TTL + values).
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
-                eq(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")),
+                eq(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")),
                 eq("60"), eq("TR1"), eq("TR2"));
     }
 
     @Test
     void shouldMissBulkReadOnPartialHit() {
-        when(valueOps.multiGet(java.util.List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
-                .thenReturn(java.util.Arrays.asList("TR1", null));
+        when(valueOps.multiGet(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
+                .thenReturn(Arrays.asList("TR1", null));
 
         assertTrue(adapter.getIbans(Set.of(1L, 2L)).isEmpty());
     }
@@ -153,7 +155,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         adapter.evictAll();
 
-        verify(redisTemplate).delete(java.util.List.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
+        verify(redisTemplate).delete(List.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
         verify(redisTemplate, never()).keys(anyString());
         verify(cursor).close();
     }
@@ -163,7 +165,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         adapter.evictById(1L);
 
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
-                eq(java.util.List.of(
+                eq(List.of(
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",
                         "account-snapshot:idx:ibans-by-id:1")),

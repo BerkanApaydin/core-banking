@@ -21,6 +21,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -144,7 +145,7 @@ public class BrowserAuthController {
             return ProblemResponses.unauthorized("No active browser session.", request.getRequestURI());
         }
         return ResponseEntity.ok()
-                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .cacheControl(CacheControl.noStore())
                 .body(new BrowserUser(userId, username));
     }
 

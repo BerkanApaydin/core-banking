@@ -55,7 +55,7 @@ class CancelTransferUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
@@ -122,7 +122,7 @@ class CancelTransferUseCaseTest {
         Long transferId = 1L;
         Transfer transfer = createCompletedTransfer(transferId, 10L, 20L,
                 new Money(new BigDecimal("100.00"), Currency.TRY));
-        transfer.cancel(Clock.systemDefaultZone(), Duration.ofHours(24));
+        transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))
@@ -136,7 +136,7 @@ class CancelTransferUseCaseTest {
     void shouldThrowWhenTransferNotCompleted() {
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
-        Transfer transfer = Transfer.create(10L, 20L, amount, Clock.systemDefaultZone());
+        Transfer transfer = Transfer.create(10L, 20L, amount, Clock.systemUTC());
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(10L))

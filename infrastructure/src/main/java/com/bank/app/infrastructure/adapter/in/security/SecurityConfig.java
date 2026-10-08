@@ -6,6 +6,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,21 +20,25 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final SecurityProperties securityProperties;
     private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
+    private final ProblemDetailAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                           UserDetailsService userDetailsService,
                           SecurityProperties securityProperties,
-                          ProblemDetailAuthenticationEntryPoint authenticationEntryPoint) {
+                          ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
+                          ProblemDetailAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.securityProperties = securityProperties;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
@@ -49,13 +54,20 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(securityProperties.whitelistPaths().toArray(new String[0]))
                 .permitAll()
+                // G-1 outer layer (defense in depth): admin paths require the
+                // role at the URL boundary, so a future endpoint that forgets
+                // the use-case role check is still closed. The use-case
+                // hasRole check stays as the inner layer; both layers render
+                // the same ACCESS_DENIED problem body.
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(authenticationEntryPoint))
+                .authenticationEntryPoint(authenticationEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler))
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
                 .httpStrictTransportSecurity(hsts -> hsts

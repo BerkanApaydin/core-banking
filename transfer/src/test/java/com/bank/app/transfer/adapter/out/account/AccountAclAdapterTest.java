@@ -54,6 +54,18 @@ class AccountAclAdapterTest {
             verify(accountApi).getSnapshotById(1L);
             verifyNoMoreInteractions(accountApi);
         }
+
+        @Test
+        void shouldWriteThroughCacheSoSecondReadSkipsAccountApi() {
+            when(accountApi.getSnapshotById(1L))
+                    .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
+
+            adapter.getAccountInfo(1L);
+            adapter.getAccountInfo(1L);
+
+            // Mutant (removed putById) serves the second read from the API again.
+            verify(accountApi, times(1)).getSnapshotById(1L);
+        }
     }
 
     @Nested
@@ -71,6 +83,17 @@ class AccountAclAdapterTest {
             assertEquals("TRY", result.currency());
             verify(accountApi).getSnapshotByIban("TR450006100519786456841234");
         }
+
+        @Test
+        void shouldWriteThroughIbanCacheSoSecondReadSkipsAccountApi() {
+            when(accountApi.getSnapshotByIban("TR450006100519786456841234"))
+                    .thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
+
+            adapter.getAccountInfoForTransfer("TR450006100519786456841234");
+            adapter.getAccountInfoForTransfer("TR450006100519786456841234");
+
+            verify(accountApi, times(1)).getSnapshotByIban("TR450006100519786456841234");
+        }
     }
 
     @Nested
@@ -86,6 +109,17 @@ class AccountAclAdapterTest {
             assertEquals("TR450006100519786456841234", result.get(1L));
             assertEquals("TR180006100519786456841235", result.get(2L));
             verify(accountApi).getIbansForAccounts(Set.of(1L, 2L));
+        }
+
+        @Test
+        void shouldWriteThroughIbanMapSoSecondReadSkipsAccountApi() {
+            when(accountApi.getIbansForAccounts(Set.of(1L, 2L)))
+                    .thenReturn(Map.of(1L, "TR450006100519786456841234", 2L, "TR180006100519786456841235"));
+
+            adapter.getIbansForAccounts(Set.of(1L, 2L));
+            adapter.getIbansForAccounts(Set.of(1L, 2L));
+
+            verify(accountApi, times(1)).getIbansForAccounts(Set.of(1L, 2L));
         }
     }
 

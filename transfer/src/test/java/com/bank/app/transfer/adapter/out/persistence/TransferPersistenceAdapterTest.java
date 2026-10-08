@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.out.persistence;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,9 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -105,13 +109,11 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldUpdateExistingTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        // The domain carries the version it read; only Hibernate advances it at flush.
+        // The domain carries the version it read; the bulk path issues a single
+        // versioned UPDATE (no SELECT) and returns the bumped version.
         Transfer domainTransfer = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
-        TransferJpaEntity existingEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, 1L, now);
-        TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, 2L, now);
 
-        when(springDataRepo.findById(10L)).thenReturn(Optional.of(existingEntity));
-        when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(savedEntity);
+        when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED)).thenReturn(1);
 
         Transfer result = repository.save(domainTransfer);
 
@@ -120,12 +122,8 @@ class TransferPersistenceAdapterTest {
         assertEquals(1L, result.getSenderAccountId());
         assertEquals(2L, result.getReceiverAccountId());
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
-        verify(springDataRepo).findById(10L);
-
-        ArgumentCaptor<TransferJpaEntity> captor = ArgumentCaptor.forClass(TransferJpaEntity.class);
-        verify(springDataRepo).save(captor.capture());
-        TransferJpaEntity capturedEntity = captor.getValue();
-        assertEquals(1L, capturedEntity.getVersion());
+        assertEquals(2L, result.getVersion());
+        verify(springDataRepo).updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED);
     }
 
     @Test
@@ -231,8 +229,8 @@ class TransferPersistenceAdapterTest {
 
         // Offset stays page * size (2 * 10), limit grows by one for hasNext:
         // PageRequest.of(page, size + 1) would wrongly offset by page * (size + 1).
-        ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
-                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
         verify(springDataRepo).findHistoryBetween(eq(100L), eq(start), eq(end), pageableCaptor.capture());
         assertEquals(20L, pageableCaptor.getValue().getOffset());
         assertEquals(11, pageableCaptor.getValue().getPageSize());
@@ -287,6 +285,124 @@ class TransferPersistenceAdapterTest {
 
         assertEquals(0L, totals.count());
         assertEquals(0, totals.volume().compareTo(BigDecimal.ZERO));
+    }
+
+    @Test
+    void shouldSummarizeMissingRowAsZero() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.of());
+
+        LoadTransferPort.ReportTotals totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(0L, totals.count());
+        assertEquals(BigDecimal.ZERO, totals.volume());
+    }
+
+    @Test
+    void shouldServeKeysetPageWithoutOffset() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime cursor = now.minusHours(1);
+        TransferJpaEntity row = createEntity(10L, 1L, 2L, new BigDecimal("200.00"),
+                Currency.TRY, TransferStatus.COMPLETED, 0L, now);
+        when(springDataRepo.findHistoryBetweenKeyset(eq(1L), eq(start), eq(now), eq(cursor), eq(9L),
+                any(Pageable.class))).thenReturn(List.of(row));
+
+        List<Transfer> result = repository.findHistoryBetweenKeyset(1L, start, now, cursor, 9L, 20);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).getId());
+    }
+
+    @Test
+    void shouldOverfetchKeysetLimitByOne() {
+        // Kills the MATH mutant (safeSize + 1 -> safeSize - 1): the keyset
+        // query must request one row beyond the logical page for hasNext.
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now.minusDays(1);
+        LocalDateTime cursor = now.minusHours(1);
+        when(springDataRepo.findHistoryBetweenKeyset(eq(1L), eq(start), eq(now), eq(cursor), eq(9L),
+                any(Pageable.class))).thenReturn(List.of());
+
+        repository.findHistoryBetweenKeyset(1L, start, now, cursor, 9L, 20);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(springDataRepo).findHistoryBetweenKeyset(eq(1L), eq(start), eq(now), eq(cursor), eq(9L),
+                captor.capture());
+        assertEquals(21, captor.getValue().getPageSize());
+    }
+
+    @Test
+    void shouldSummarizeDoubleVolumeWithoutLosingCents() {
+        // Kills the NegateConditionals mutant on (row[1] instanceof BigDecimal):
+        // a Double sum must still convert exactly via Number.toString.
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.<Object[]>of(new Object[]{2L, 300.50}));
+
+        var totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(2L, totals.count());
+        assertEquals(0, totals.volume().compareTo(new BigDecimal("300.50")));
+    }
+
+    @Test
+    void shouldSummarizeNullRowAsZero() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(Collections.singletonList(null));
+
+        var totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(0L, totals.count());
+        assertEquals(BigDecimal.ZERO, totals.volume());
+    }
+
+    @Test
+    void shouldSummarizeShortRowAsZero() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.<Object[]>of(new Object[]{5L}));
+
+        var totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(0L, totals.count());
+        assertEquals(BigDecimal.ZERO, totals.volume());
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenBulkUpdateHitsMissingRow() {
+        // Kills the NullReturnVals mutant on lambda$save$1: the 0-row bulk path
+        // must distinguish "row gone" (IllegalArgumentException) from conflict.
+        LocalDateTime now = LocalDateTime.now();
+        Transfer missing = new Transfer(999L, 1L, 2L, Money.of("200.00", Currency.TRY),
+                TransferStatus.COMPLETED, now, 1L);
+        when(springDataRepo.updateStatusIfVersionMatch(999L, 1L, TransferStatus.COMPLETED))
+                .thenReturn(0);
+        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> repository.save(missing));
+        assertEquals("Transfer not found: 999", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectStaleVersionOnBulkUpdate() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer stale = new Transfer(10L, 1L, 2L, Money.of("200.00", Currency.TRY),
+                TransferStatus.COMPLETED, now, 1L);
+        when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED))
+                .thenReturn(0);
+        when(springDataRepo.findById(10L)).thenReturn(Optional.of(
+                createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY,
+                        TransferStatus.COMPLETED, 2L, now)));
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> repository.save(stale));
     }
 
 }

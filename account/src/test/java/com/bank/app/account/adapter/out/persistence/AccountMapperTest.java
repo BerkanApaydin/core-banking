@@ -140,4 +140,26 @@ class AccountMapperTest {
         assertThatThrownBy(() -> Currency.valueOf("INVALID"))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void shouldMutateManagedEntityInPlaceWithoutTouchingIdentityOrVersion() {
+        AccountJpaEntity managed = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111",
+                "Ahmet", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 4L);
+        Account domain = new Account(1L, new UserId(100L), new Iban("TR770006200000000000000111"),
+                "Ahmet Yilmaz", Money.of("2000.00", Currency.USD), AccountStatus.SUSPENDED, 4L);
+
+        mapper.updateJpaEntity(managed, domain);
+
+        assertThat(managed.getOwnerName()).isEqualTo("Ahmet Yilmaz");
+        assertThat(managed.getBalance()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        // Kills the VoidMethodCall mutant (removed setCurrency): the managed
+        // currency must follow the domain even when it changes.
+        assertThat(managed.getCurrency()).isEqualTo(Currency.USD);
+        assertThat(managed.getStatus()).isEqualTo(AccountStatus.SUSPENDED);
+        // Identity and Hibernate-owned version are never overwritten.
+        assertThat(managed.getId()).isEqualTo(1L);
+        assertThat(managed.getUserId()).isEqualTo(100L);
+        assertThat(managed.getIban()).isEqualTo("TR770006200000000000000111");
+        assertThat(managed.getVersion()).isEqualTo(4L);
+    }
 }

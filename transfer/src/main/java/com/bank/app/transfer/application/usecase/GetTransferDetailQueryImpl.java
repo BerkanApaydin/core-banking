@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
+import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
@@ -35,8 +36,15 @@ public class GetTransferDetailQueryImpl implements GetTransferDetailQuery {
         AccountInfo sender = accountAclPort.getAccountInfo(transfer.getSenderAccountId());
         AccountInfo receiver = accountAclPort.getAccountInfo(transfer.getReceiverAccountId());
 
-        transferAuthorizationService.authorizeTransferAccess(sender.userId(), receiver.userId(),
-                "You are not authorized to view this transfer's details.");
+        // G-5 existence-oracle fix: unauthorized and missing render the same
+        // TransferNotFound shape, so sequential-ID probing cannot distinguish
+        // "exists but not mine" (403) from "does not exist" (404).
+        try {
+            transferAuthorizationService.authorizeTransferAccess(sender.userId(), receiver.userId(),
+                    "You are not authorized to view this transfer's details.");
+        } catch (AuthorizationException e) {
+            throw new TransferNotFoundException(transferId);
+        }
 
         return TransferDetailResponse.from(transfer);
     }

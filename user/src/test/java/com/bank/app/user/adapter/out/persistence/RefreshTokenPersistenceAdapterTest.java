@@ -126,6 +126,17 @@ class RefreshTokenPersistenceAdapterTest {
     }
 
     @Test
+    void shouldRejectUnknownHashOnRotate() {
+        // Kills the NullReturnVals mutant on the orElseThrow lambda: an
+        // unknown hash must fail fast instead of silently returning null.
+        when(repository.findById("ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adapter.markRotated("ghost", "new"))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown refresh token");
+    }
+
+    @Test
     void shouldRejectNulls() {
         assertThatThrownBy(() -> adapter.save(null, 7L, "f", EXPIRY))
                 .isExactlyInstanceOf(NullPointerException.class);

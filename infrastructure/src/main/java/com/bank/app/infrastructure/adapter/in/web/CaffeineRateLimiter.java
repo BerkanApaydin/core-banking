@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.web;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -30,8 +31,13 @@ public class CaffeineRateLimiter implements RateLimiter {
     private final ConcurrentHashMap<LimitTier, CaffeineRateLimiter> tierShards = new ConcurrentHashMap<>();
 
     @Autowired
+    public CaffeineRateLimiter(RateLimitProperties rateLimitProperties, ClockProviderPort clockProvider) {
+        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(), 10000,
+                clockProvider != null ? clockProvider.clock() : Clock.systemUTC());
+    }
+
     public CaffeineRateLimiter(RateLimitProperties rateLimitProperties) {
-        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(), 10000, Clock.systemDefaultZone());
+        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(), 10000, Clock.systemUTC());
     }
 
     CaffeineRateLimiter(int maxRequests, long timeWindowMs, int maxCacheSize, Clock clock) {

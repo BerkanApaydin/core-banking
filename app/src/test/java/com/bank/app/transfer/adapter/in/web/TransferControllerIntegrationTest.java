@@ -1,5 +1,7 @@
 package com.bank.app.transfer.adapter.in.web;
 
+import com.bank.app.BankApplication;
+
 
 
 
@@ -60,7 +62,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SuppressWarnings("null")
 @AutoConfigureMockMvc
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @DisplayName("TransferController Integration")
 class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTest {
 

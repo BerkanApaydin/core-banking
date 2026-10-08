@@ -4,6 +4,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.bank.app.common.domain.ExponentialBackoffPolicy;
 
 /**
  * Execution step of the {@code @Idempotent} guard (K5/D15 split): runs the
@@ -15,26 +16,58 @@ class IdempotentRetryExecutor {
 
     private static final long MAX_BACKOFF_MS = 2_000L;
 
+    /**
+     * C-2: interruptible sleep abstraction — production parks the thread with
+     * jittered backoff; tests inject a no-op recorder to assert the delay
+     * sequence without sleeping.
+     */
+    @FunctionalInterface
+    interface Sleeper {
+        void sleep(long millis) throws InterruptedException;
+    }
+
     private final IdempotencyGuard idempotencyGuard;
     private final IdempotencyResponseCodec responseCodec;
     private final TransactionTemplate transactionTemplate;
     private final int maxAttempts;
-    private final long initialDelayMs;
+    private final ExponentialBackoffPolicy backoffPolicy;
+    private final Sleeper sleeper;
 
     IdempotentRetryExecutor(IdempotencyGuard idempotencyGuard,
                             IdempotencyResponseCodec responseCodec,
                             TransactionTemplate transactionTemplate,
                             int maxAttempts,
                             long initialDelayMs) {
+        this(idempotencyGuard, responseCodec, transactionTemplate, maxAttempts,
+                new ExponentialBackoffPolicy(
+                        Math.max(1, initialDelayMs), MAX_BACKOFF_MS, 100),
+                delay -> {
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                });
+    }
+
+    // Test seam: explicit policy + sleeper.
+    IdempotentRetryExecutor(IdempotencyGuard idempotencyGuard,
+                            IdempotencyResponseCodec responseCodec,
+                            TransactionTemplate transactionTemplate,
+                            int maxAttempts,
+                            ExponentialBackoffPolicy backoffPolicy,
+                            Sleeper sleeper) {
         this.idempotencyGuard = idempotencyGuard;
         this.responseCodec = responseCodec;
         this.transactionTemplate = transactionTemplate;
         this.maxAttempts = Math.max(1, maxAttempts);
-        this.initialDelayMs = Math.max(0, initialDelayMs);
+        this.backoffPolicy = backoffPolicy;
+        this.sleeper = sleeper;
     }
 
     Object execute(String key, ProceedingJoinPoint joinPoint) throws Throwable {
-        long delay = initialDelayMs;
+        long delay = backoffPolicy.initialDelayMs();
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 ExecutionResult result = transactionTemplate.execute(status -> {
@@ -62,7 +95,11 @@ class IdempotentRetryExecutor {
                 Throwable original = invocationFailure.getCause();
                 if (isRetryable(original) && attempt < maxAttempts) {
                     try {
-                        Thread.sleep(delay);
+                        // C-2: single policy (ExponentialBackoffPolicy) drives both
+                        // retry paths; jitter is inside the policy, the wait is
+                        // delegated to Sleeper so 4xx never sleeps (isRetryable
+                        // already filters to lock failures only).
+                        sleeper.sleep(delay);
                     } catch (InterruptedException interrupted) {
                         try {
                             failAfterRollback(key, interrupted);
@@ -71,7 +108,7 @@ class IdempotentRetryExecutor {
                         }
                         throw interrupted;
                     }
-                    delay = Math.min(delay * 2, MAX_BACKOFF_MS);
+                    delay = backoffPolicy.nextDelay(delay);
                     continue;
                 }
                 // The transaction callback failed and was rolled back. An

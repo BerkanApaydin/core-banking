@@ -2,6 +2,7 @@ package com.bank.app.accountapi;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,21 @@ class AccountApiContractTest {
         assertThrows(NullPointerException.class, () -> new AccountAdjustmentResult(1L, null, balance, balance));
         assertThrows(NullPointerException.class, () -> new AccountAdjustmentResult(1L, 2L, null, balance));
         assertThrows(NullPointerException.class, () -> new AccountAdjustmentResult(1L, 2L, balance, null));
+    }
+
+    @Test
+    void notFoundShouldExposeNotFoundKind() {
+        assertEquals(BusinessFailureKind.NOT_FOUND,
+                new AccountNotFoundException(7L).getFailureKind());
+        assertEquals(BusinessFailureKind.NOT_FOUND,
+                new AccountNotFoundException("TR440006200000000000000123").getFailureKind());
+    }
+
+    @Test
+    void ibanKeyShouldNormalize() {
+        // Kills the EmptyObjectReturn mutant ("" vs normalized key).
+        assertEquals("TR440006200000000000000123",
+                AccountSnapshotCache.ibanKey("tr44 0006 2000 0000 0000 0001 23"));
     }
 
     @Test

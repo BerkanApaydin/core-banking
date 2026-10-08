@@ -1,0 +1,56 @@
+{
+  "title": "Bank App - Golden Signals + Domain Backlog",
+  "uid": "bank-app-golden",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["bank-app", "slo"],
+  "timezone": "utc",
+  "panels": [
+    {
+      "title": "HTTP p50/p95/p99 (slo)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket[5m])) by (le))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[5m])) by (le))", "legendFormat": "p95"},
+        {"expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket[5m])) by (le))", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "title": "Outbox backlog (pending + oldest age)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "max(outbox_pending_current)", "legendFormat": "pending"},
+        {"expr": "max(outbox_oldest_pending_age_seconds)", "legendFormat": "oldest_age_s"}
+      ]
+    },
+    {
+      "title": "Idempotency HTTP pending",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [{"expr": "max(idempotency_http_pending_current)", "legendFormat": "pending"}]
+    },
+    {
+      "title": "Ledger nonzero refs (must stay 0)",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [{"expr": "max(ledger_nonzero_transaction_refs)", "legendFormat": "nonzero"}]
+    },
+    {
+      "title": "Outbox poll partition errors",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [{"expr": "sum by (partition) (rate(outbox_poll_partition_error_total[5m]))", "legendFormat": "partition {{partition}}"}]
+    },
+    {
+      "title": "JVM heap + Hikari pending",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "jvm_memory_used_bytes{area=\"heap\"}", "legendFormat": "heap"},
+        {"expr": "hikaricp_connections_pending", "legendFormat": "pool_pending"}
+      ]
+    }
+  ]
+}

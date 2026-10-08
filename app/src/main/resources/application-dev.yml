@@ -7,5 +7,8 @@ spring:
       read-only: false
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  # Dev-only insecure fallback: never use in prod. Prod has no default and
+  # fails fast when JWT_SECRET is unset (see application.yml / prod yml).
+  # If this fallback value ever leaks, rotate it.
+  secret: ${JWT_SECRET:dev-only-insecure-fallback-not-for-prod}
   allow-default-secret: true

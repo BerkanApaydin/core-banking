@@ -5,6 +5,7 @@ import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrinc
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import com.bank.app.common.domain.exception.ErrorCode;
@@ -47,12 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenBlacklistPort tokenBlacklistPort;
     private final ObjectMapper objectMapper;
     private final BrowserSessionCookies browserSessionCookies;
-    private final com.bank.app.user.application.port.out.CsrfBindingPort csrfBinding;
+    private final CsrfBindingPort csrfBinding;
 
     @Autowired
     public JwtAuthenticationFilter(JwtPort jwtPort,
             TokenBlacklistPort tokenBlacklistPort, ObjectMapper objectMapper,
-            com.bank.app.user.application.port.out.CsrfBindingPort csrfBinding,
+            CsrfBindingPort csrfBinding,
             BrowserSessionCookieProperties browserSession) {
         this.jwtPort = jwtPort;
         this.tokenBlacklistPort = tokenBlacklistPort;
@@ -72,7 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /** Test-only fallback: unsigned double-submit equality, no MAC binding. */
     static final class PlainDoubleSubmitCsrfBinding
-            implements com.bank.app.user.application.port.out.CsrfBindingPort {
+            implements CsrfBindingPort {
         @Override
         public String issueCsrfToken(String bindingSubject) {
             throw new UnsupportedOperationException("test fallback cannot mint bound tokens");
@@ -156,6 +157,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             Long userId = verified.userId();
             String role = verified.role();
+            // G-2 accepted trade-off (stateless JWT): role and userId come
+            // from the verified access token without a per-request DB lookup.
+            // A role demotion therefore takes effect on this path only after
+            // the access token expires (default 15 min); the refresh path
+            // (RefreshSessionUseCaseImpl) compares tokenVersion against the DB
+            // and closes the window there. Short access TTL bounds the delay.
             if (userId == null || role == null) {
                 // Stateless JWT requires userId+role claims; legacy tokens without
                 // claims are rejected instead of falling back to a DB lookup.

@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -8,8 +9,10 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
@@ -28,14 +31,17 @@ class RefreshTokenCleanupJobTest {
 
     @Test
     void shouldDeleteSessionsExpiredAsOfNow() {
-        var job = new RefreshTokenCleanupJob(refreshTokens);
+        Clock fixed =
+                Clock.fixed(Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC);
+        var job = new RefreshTokenCleanupJob(refreshTokens,
+                AdvisorySchedulerLock.alwaysRun(),
+                () -> fixed);
         when(refreshTokens.deleteExpiredBefore(any())).thenReturn(5);
 
         job.cleanExpired();
 
         verify(refreshTokens).deleteExpiredBefore(cutoffCaptor.capture());
-        long minutesAgo = ChronoUnit.MINUTES.between(cutoffCaptor.getValue(), LocalDateTime.now());
-        assertThat(minutesAgo).isBetween(0L, 5L);
+        assertThat(cutoffCaptor.getValue()).isEqualTo(LocalDateTime.of(2026, 5, 1, 12, 0));
     }
 
     @Test

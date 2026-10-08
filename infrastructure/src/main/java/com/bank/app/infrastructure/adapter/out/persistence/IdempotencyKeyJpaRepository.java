@@ -31,4 +31,12 @@ public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKe
     @Query(value = "UPDATE idempotency_keys SET status = 'PENDING', response_body = NULL, response_status = NULL, request_hash = :requestHash, created_at = :now "
             + "WHERE key_value = :key AND status = 'FAILED'", nativeQuery = true)
     int resetFailed(@Param("key") String key, @Param("requestHash") String requestHash, @Param("now") LocalDateTime now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE idempotency_keys SET status='COMPLETED', response_body=:body, response_status=:status WHERE key_value=:key AND status='PENDING'", nativeQuery=true)
+    int completeIfPending(@Param("key") String key, @Param("body") String body, @Param("status") int status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE idempotency_keys SET status='FAILED' WHERE key_value=:key AND status='PENDING'", nativeQuery=true)
+    int failIfPending(@Param("key") String key);
 }

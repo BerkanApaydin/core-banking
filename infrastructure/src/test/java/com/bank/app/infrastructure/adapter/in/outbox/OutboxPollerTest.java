@@ -13,6 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static org.awaitility.Awaitility.await;
@@ -162,6 +164,54 @@ class OutboxPollerTest {
     @Test
     void shouldTolerateStopWithoutStart() {
         assertDoesNotThrow(outboxPoller::stop);
+    }
+
+    @Test
+    void shouldFanOutBatchAcrossWorkersWhenPoolAvailable() throws Exception {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        List<EventEntry> events = List.of(event("w1"), event("w2"), event("w3"));
+        when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(events);
+        when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of());
+        ExecutorService workers =
+                Executors.newFixedThreadPool(2);
+        try {
+            var field = OutboxPoller.class.getDeclaredField("workers");
+            field.setAccessible(true);
+            field.set(outboxPoller, workers);
+
+            // Parallel path joins every future before returning, so verification
+            // right after the call is deterministic (no awaits needed).
+            outboxPoller.pollAndProcessEvents();
+        } finally {
+            workers.shutdownNow();
+        }
+
+        verify(outboxProcessor).processEvent(events.get(0));
+        verify(outboxProcessor).processEvent(events.get(1));
+        verify(outboxProcessor).processEvent(events.get(2));
+    }
+
+    @Test
+    void shouldRecordFailureFromWorkerThreadWithoutSkippingBatch() throws Exception {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 1, 2000, 30));
+        EventEntry ok = event("ok");
+        EventEntry bad = event("bad");
+        when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(ok, bad));
+        doThrow(new RuntimeException("handler failed")).when(outboxProcessor).processEvent(bad);
+        ExecutorService workers =
+                Executors.newFixedThreadPool(2);
+        try {
+            var field = OutboxPoller.class.getDeclaredField("workers");
+            field.setAccessible(true);
+            field.set(outboxPoller, workers);
+
+            outboxPoller.pollAndProcessEvents();
+        } finally {
+            workers.shutdownNow();
+        }
+
+        verify(outboxProcessor).processEvent(ok);
+        verify(outboxProcessor).recordFailure(eq(bad), any(Throwable.class), eq(5));
     }
 
     @Test

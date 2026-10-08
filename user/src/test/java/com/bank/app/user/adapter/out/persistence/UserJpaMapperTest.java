@@ -31,14 +31,14 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map full user with all fields")
         void shouldMapFullUser() {
-            User user = new User(new UserId(42L), "johndoe", "secret", Role.ROLE_ADMIN,
+            User user = new User(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_ADMIN,
                     new EmailAddress("john@example.com"), new PhoneNumber("555-0100"), 1L);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
 
             assertThat(entity.getId()).isEqualTo(42L);
             assertThat(entity.getUsername()).isEqualTo("johndoe");
-            assertThat(entity.getPassword()).isEqualTo("secret");
+            assertThat(entity.getPassword()).isEqualTo("$2a$12$testsecrethash0000000000000000000000001");
             assertThat(entity.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(entity.getEmail()).isEqualTo("john@example.com");
             assertThat(entity.getPhone()).isEqualTo("555-0100");
@@ -49,7 +49,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should round-trip a bumped token version")
         void shouldRoundTripTokenVersion() {
-            User user = new User(new UserId(42L), "johndoe", "secret", Role.ROLE_USER,
+            User user = new User(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
                     null, null, 3L, 9L);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
@@ -61,7 +61,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map user with null email and phone")
         void shouldMapUserWithNullEmailAndPhone() {
-            User user = new User(new UserId(1L), "janedoe", "pass", Role.ROLE_USER, null, null);
+            User user = new User(new UserId(1L), "janedoe", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
 
@@ -97,14 +97,14 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map full entity with all fields")
         void shouldMapFullEntity() {
-            UserJpaEntity entity = new UserJpaEntity(42L, "johndoe", "secret", Role.ROLE_ADMIN,
+            UserJpaEntity entity = new UserJpaEntity(42L, "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_ADMIN,
                     "john@example.com", "555-0100", 1L);
 
             User user = mapper.toDomain(entity);
 
             assertThat(user.getId().value()).isEqualTo(42L);
             assertThat(user.getUsername()).isEqualTo("johndoe");
-            assertThat(user.getPassword()).isEqualTo("secret");
+            assertThat(user.getPassword()).isEqualTo("$2a$12$testsecrethash0000000000000000000000001");
             assertThat(user.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(user.getEmail().value()).isEqualTo("john@example.com");
             assertThat(user.getPhone().value()).isEqualTo("555-0100");
@@ -114,7 +114,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map entity with null email and phone")
         void shouldMapEntityWithNullEmailAndPhone() {
-            UserJpaEntity entity = new UserJpaEntity(1L, "janedoe", "pass", Role.ROLE_USER,
+            UserJpaEntity entity = new UserJpaEntity(1L, "janedoe", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                     null, null, null);
 
             User user = mapper.toDomain(entity);
@@ -141,25 +141,27 @@ class UserJpaMapperTest {
         void shouldUpdateEntity() {
             UserJpaEntity entity = new UserJpaEntity(1L, "oldname", "oldpass", Role.ROLE_USER,
                     "old@example.com", "555-0000", 0L);
-            User user = new User(new UserId(1L), "newname", "newpass", Role.ROLE_ADMIN,
-                    new EmailAddress("new@example.com"), new PhoneNumber("555-9999"), 2L);
+            User user = new User(new UserId(1L), "newname", "$2a$12$testnewpasshash000000000000000000000001", Role.ROLE_ADMIN,
+                    new EmailAddress("new@example.com"), new PhoneNumber("555-9999"), 2L, 7L);
 
             mapper.updateJpaEntity(entity, user);
 
             assertThat(entity.getUsername()).isEqualTo("newname");
-            assertThat(entity.getPassword()).isEqualTo("newpass");
+            assertThat(entity.getPassword()).isEqualTo("$2a$12$testnewpasshash000000000000000000000001");
             assertThat(entity.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(entity.getEmail()).isEqualTo("new@example.com");
             assertThat(entity.getPhone()).isEqualTo("555-9999");
+            // Kills the setTokenVersion VoidMethodCall mutant.
+            assertThat(entity.getTokenVersion()).isEqualTo(7L);
             assertThat(entity.getVersion()).isEqualTo(0L);
         }
 
         @Test
         @DisplayName("should update entity with null email and phone")
         void shouldUpdateEntityWithNullEmailAndPhone() {
-            UserJpaEntity entity = new UserJpaEntity(1L, "name", "pass", Role.ROLE_USER,
+            UserJpaEntity entity = new UserJpaEntity(1L, "name", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                     "old@example.com", "555-0000", null);
-            User user = new User(new UserId(1L), "name", "pass", Role.ROLE_USER, null, null);
+            User user = new User(new UserId(1L), "name", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
 
             mapper.updateJpaEntity(entity, user);
 
@@ -170,7 +172,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should throw when entity is null")
         void shouldThrowWhenEntityIsNull() {
-            User user = User.create("testuser", "pass");
+            User user = User.create("testuser", "$2a$12$testpasshash00000000000000000000000001");
             assertThatThrownBy(() -> mapper.updateJpaEntity(null, user))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Entity and User must not be null");

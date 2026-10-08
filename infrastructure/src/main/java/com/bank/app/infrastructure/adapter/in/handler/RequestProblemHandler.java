@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -84,9 +85,9 @@ public class RequestProblemHandler {
                 Map.of("request", "Invalid request parameters"), request);
     }
 
-    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ProblemDetail> handleConstraintViolationException(
-            jakarta.validation.ConstraintViolationException ex, WebRequest request) {
+            ConstraintViolationException ex, WebRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getConstraintViolations()
                 .forEach(violation -> {

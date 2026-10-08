@@ -11,6 +11,7 @@ import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.PasswordPolicy;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.UserRegisteredEvent;
 import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
 import com.bank.app.user.domain.exception.WeakPasswordException;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 import java.time.Clock;
@@ -68,19 +70,19 @@ class RegisterUserUseCaseTest {
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("$2a$10$hashedpasswordhashhashedpass01");
 
             registerUserUseCase.execute(request);
 
             verify(loadUserPort).findByUsername("newuser");
             verify(passwordEncoderPort).encode("Rawpassword1");
             verify(saveUserPort).save(argThat(user -> "newuser".equals(user.getUsername()) &&
-                    "hashedpassword".equals(user.getPassword()) &&
+                    "$2a$10$hashedpasswordhashhashedpass01".equals(user.getPassword()) &&
                     user.getRole() == Role.ROLE_USER));
             verify(domainEventPublisherService).publishEvents(any(User.class));
             verify(domainEventPublisherService).publishEvents(argThat(user ->
                     user.getDomainEvents().stream().anyMatch(event -> event instanceof
-                            com.bank.app.user.domain.UserRegisteredEvent registration
+                            UserRegisteredEvent registration
                             && "42".equals(registration.userId()))));
         }
 
@@ -90,12 +92,12 @@ class RegisterUserUseCaseTest {
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1", "test@example.com", "5551234567");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("$2a$10$hashedpasswordhashhashedpass01");
 
             registerUserUseCase.execute(request);
 
             verify(saveUserPort).save(argThat(user -> "newuser".equals(user.getUsername()) &&
-                    "hashedpassword".equals(user.getPassword()) &&
+                    "$2a$10$hashedpasswordhashhashedpass01".equals(user.getPassword()) &&
                     user.getEmail() != null && "test@example.com".equals(user.getEmail().value()) &&
                     user.getPhone() != null && "5551234567".equals(user.getPhone().value())));
         }
@@ -106,7 +108,7 @@ class RegisterUserUseCaseTest {
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("hashedpassword");
+            when(passwordEncoderPort.encode("Rawpassword1")).thenReturn("$2a$10$hashedpasswordhashhashedpass01");
 
             registerUserUseCase.execute(request);
 
@@ -134,8 +136,8 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should throw when username already exists")
         void shouldThrowOnDuplicateUsername() {
-            AuthRequest request = new AuthRequest("existinguser", "password");
-            User existingUser = new User(new UserId(1L), "existinguser", "hashed", Role.ROLE_USER);
+            AuthRequest request = new AuthRequest("existinguser", "$2a$12$testpasswordhash00000000000000000000001");
+            User existingUser = new User(new UserId(1L), "existinguser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
 
@@ -172,11 +174,24 @@ class RegisterUserUseCaseTest {
         void shouldPropagateSaveException() {
             AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
-            when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("encodedPassword");
+            when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("$2a$10$encodedPasswordHashEncodedPw02");
             doThrow(new RuntimeException("DB error")).when(saveUserPort).save(any(User.class));
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
                     .isExactlyInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("should map concurrent duplicate to UsernameAlreadyTakenException")
+        void shouldMapConcurrentDuplicateToConflict() {
+            AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
+            when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("$2a$10$encodedPasswordHashEncodedPw02");
+            doThrow(new DataIntegrityViolationException("duplicate key"))
+                    .when(saveUserPort).save(any(User.class));
+
+            assertThatThrownBy(() -> registerUserUseCase.execute(request))
+                    .isExactlyInstanceOf(UsernameAlreadyTakenException.class);
         }
     }
 }

@@ -38,6 +38,6 @@ class AuditBeanConfigTest {
     void shouldCreateGetAuditLogsQueryBean() {
         AuditBeanConfig config = new AuditBeanConfig();
         assertNotNull(config.getAuditLogsQuery(loadAuditLogPort, userContextService,
-                new AuditProperties(500)));
+                new AuditProperties(500, true, 365)));
     }
 }

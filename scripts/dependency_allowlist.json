@@ -1,0 +1,13 @@
+{
+  "_comment": "Accepted HIGH/CRITICAL advisories (reviewed, re-check on Spring Boot upgrade). Entries here do NOT fail scripts/dependency_review.py.",
+  "GHSA-j9f9-w8pj-32f8": {
+    "package": "org.springframework:spring-webmvc:6.2.19",
+    "reason": "SSE fragment rendering corruption. The app serves no text/event-stream endpoints (no SseEmitter/StreamingResponseBody in main sources); fix exists only on the 7.x line, which needs a Spring Boot 4 migration.",
+    "review_after": "Spring Boot upgrade carrying spring-webmvc >= 7.0.9"
+  },
+  "GHSA-pc63-qcmh-9cmg": {
+    "package": "org.springframework:spring-webmvc:6.2.19",
+    "reason": "XsltView path limitation. No XsltView/XSLT view resolution in main sources (static UI + JSON only); fix exists only on the 7.x line.",
+    "review_after": "Spring Boot upgrade carrying spring-webmvc >= 7.0.9"
+  }
+}

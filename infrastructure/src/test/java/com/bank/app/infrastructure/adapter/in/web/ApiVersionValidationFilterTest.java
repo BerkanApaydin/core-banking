@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +20,7 @@ class ApiVersionValidationFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new ApiVersionValidationFilter();
+        filter = new ApiVersionValidationFilter(new ObjectMapper());
     }
 
     @Test

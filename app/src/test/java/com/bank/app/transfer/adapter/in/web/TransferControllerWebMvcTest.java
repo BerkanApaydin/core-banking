@@ -33,6 +33,7 @@ import com.bank.app.transfer.application.dto.TransferReportResponse;
 import com.bank.app.transfer.application.dto.TransferReportTotalsResponse;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.application.port.in.*;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotalsQuery;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -77,6 +78,9 @@ class TransferControllerWebMvcTest {
 
         @MockitoBean
         private GenerateTransferReportTotalsQuery generateTransferReportTotalsPort;
+
+        @MockitoBean
+        private GenerateTransferReportWithTotalsQuery generateTransferReportWithTotalsPort;
 
         @Nested
         @DisplayName("POST /api/v1/transfers")

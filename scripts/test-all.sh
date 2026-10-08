@@ -26,6 +26,7 @@ run 'No Spring field injection in tests' "$python_cmd" scripts/check_test_inject
 run 'Load-test runner unit tests' "$python_cmd" -m unittest load_tests.test_runner -v
 run 'Load acceptance thresholds pinned' "$python_cmd" scripts/check_load_acceptance.py
 run 'Health-smoke unit tests' "$python_cmd" -m unittest ops.test_health_smoke -v
+run 'Restore-drill contract' "$python_cmd" scripts/check_restore_drill.py
 
 for script in i18n.js idempotency.js accounts.js transfers.js app.js; do
     run "JavaScript syntax: $script" node --check "app/src/main/resources/static/$script"

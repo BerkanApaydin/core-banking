@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.metrics;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,7 +10,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,16 +34,23 @@ class BacklogMetricsReporterTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        reporter = new BacklogMetricsReporter(jdbc, registry);
+        // UTC clock matches production ClockProviderPort; row timestamps below
+        // are UTC-based so age math is zone-consistent (E-2/Short-10).
+        Clock fixed =
+                Clock.fixed(Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC);
+        reporter = new BacklogMetricsReporter(jdbc, registry,
+                AdvisorySchedulerLock.alwaysRun(),
+                () -> fixed);
     }
 
     @Test
     void publishesBothSnapshotsAndZeroForEmptyBacklogs() {
+        LocalDateTime utcNow = LocalDateTime.of(2026, 5, 1, 12, 0);
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
-                .thenReturn(new BacklogMetricsReporter.Backlog(2, LocalDateTime.now().minusMinutes(5)),
+                .thenReturn(new BacklogMetricsReporter.Backlog(2, utcNow.minusMinutes(5)),
                         new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
-                .thenReturn(new BacklogMetricsReporter.Backlog(1, LocalDateTime.now().minusMinutes(2)),
+                .thenReturn(new BacklogMetricsReporter.Backlog(1, utcNow.minusMinutes(2)),
                         new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
                 .thenReturn(0L, 0L);

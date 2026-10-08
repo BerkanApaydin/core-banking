@@ -2,6 +2,7 @@ package com.bank.app.account.config;
 
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
+import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.application.port.out.IbanGeneratorPort;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.account.application.service.AccountAuthorizationService;
@@ -24,7 +25,7 @@ class AccountBeanConfigTest {
 
     @Mock private LoadAccountPort loadAccountPort;
     @Mock private SaveAccountPort saveAccountPort;
-    @Mock private com.bank.app.account.application.port.out.SaveLedgerPort ledgerPort;
+    @Mock private SaveLedgerPort ledgerPort;
     @Mock private IbanGeneratorPort ibanGeneratorPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private AuditEventPort auditEventPort;

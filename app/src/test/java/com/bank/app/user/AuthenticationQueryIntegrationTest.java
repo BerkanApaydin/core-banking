@@ -1,5 +1,7 @@
 package com.bank.app.user;
 
+import com.bank.app.BankApplication;
+
 
 import com.bank.app.user.domain.Role;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
@@ -25,7 +27,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = com.bank.app.BankApplication.class, properties = {
+@SpringBootTest(classes = BankApplication.class, properties = {
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "spring.jpa.properties.hibernate.session.events.log=false",
         "app.observability.backlog.enabled=false", "app.integrity.enabled=false"

@@ -60,6 +60,31 @@ class IbanTest {
     }
 
     @Test
+    void shouldPadSingleDigitCheckDigits() {
+        // checkDigits == 9 (< 10) must be zero-padded to "09".
+        Iban iban = Iban.fromTurkishBban("0000000000000000000005");
+        assertThat(iban.value()).isEqualTo("TR090000000000000000000005");
+        assertThat(iban.value()).hasSize(26);
+        assertThat(iban.hasValidChecksum()).isTrue();
+    }
+
+    @Test
+    void shouldNotPadTwoDigitCheckDigitsAtBoundary() {
+        // checkDigits == 10 is the exact boundary of (checkDigits < 10):
+        // the Boundary mutant (<= 10) would emit "010" (27 chars) and fail.
+        Iban iban = Iban.fromTurkishBban("0000000000000000000084");
+        assertThat(iban.value()).isEqualTo("TR100000000000000000000084");
+        assertThat(iban.value()).hasSize(26);
+        assertThat(iban.hasValidChecksum()).isTrue();
+    }
+
+    @Test
+    void shouldRejectNullBban() {
+        assertThatThrownBy(() -> Iban.fromTurkishBban(null))
+                .isExactlyInstanceOf(InvalidIbanException.class);
+    }
+
+    @Test
     void shouldThrowWhenTooShort() {
         assertThatThrownBy(() -> new Iban("TR12"))
                 .isExactlyInstanceOf(InvalidIbanException.class);

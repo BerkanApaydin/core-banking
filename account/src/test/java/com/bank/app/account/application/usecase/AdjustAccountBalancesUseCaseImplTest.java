@@ -75,7 +75,7 @@ class AdjustAccountBalancesUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         // 7.2: the adapter echoes the saved aggregate (with bumped version);
         // the use case must keep using the returned instances.
         lenient().when(saveAccountPort.save(any(Account.class)))
@@ -110,14 +110,18 @@ class AdjustAccountBalancesUseCaseImplTest {
             assertEquals(Money.of("800.00", Currency.TRY), result.senderNewBalance());
             assertEquals(Money.of("700.00", Currency.TRY), result.receiverNewBalance());
             // Account publishes its own domain events; they never leak to the caller.
-            verify(domainEventPublisherService, times(2)).publish(any(DomainEvent.class));
+            verify(domainEventPublisherService, times(2)).publishEvents(any(Account.class));
             // One audit row per balance leg, in the same transaction.
             verify(auditEventPort, times(2)).publish(auditEventCaptor.capture());
             var auditEvents = auditEventCaptor.getAllValues();
             assertEquals("ACCOUNT_DEBITED", auditEvents.get(0).action());
             assertTrue(auditEvents.get(0).details().contains("1"));
+            // Kills the NegateConditionals mutant on the verb derivation:
+            // a negated mutant swaps Debited<->Credited in the human message.
+            assertTrue(auditEvents.get(0).details().contains("Debited"));
             assertEquals("ACCOUNT_CREDITED", auditEvents.get(1).action());
             assertTrue(auditEvents.get(1).details().contains("2"));
+            assertTrue(auditEvents.get(1).details().contains("Credited"));
             // Double-entry journal: both legs share one ref and net to zero.
             verify(ledgerPort, times(2)).save(ledgerCaptor.capture());
             var legs = ledgerCaptor.getAllValues();
@@ -146,7 +150,21 @@ class AdjustAccountBalancesUseCaseImplTest {
 
             assertThrows(AccountNotFoundException.class,
                     () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
-            verify(domainEventPublisherService, never()).publish(any(DomainEvent.class));
+            verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
+            verify(auditEventPort, never()).publish(any(AuditEvent.class));
+            verify(ledgerPort, never()).save(any(LedgerEntry.class));
+        }
+
+        @Test
+        void shouldThrowWhenSecondAccountNotFound() {
+            // Kills the NullReturnVals mutant on the second lock supplier:
+            // the receiver leg must also fail fast when its row is missing.
+            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
+            when(loadAccountPort.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+            assertThrows(AccountNotFoundException.class,
+                    () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
+            verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
             verify(auditEventPort, never()).publish(any(AuditEvent.class));
             verify(ledgerPort, never()).save(any(LedgerEntry.class));
         }
@@ -171,12 +189,14 @@ class AdjustAccountBalancesUseCaseImplTest {
             assertEquals(Money.of("300.00", Currency.TRY), savedReceiver.getBalance());
             assertEquals(Money.of("1200.00", Currency.TRY), result.senderNewBalance());
             assertEquals(Money.of("300.00", Currency.TRY), result.receiverNewBalance());
-            verify(domainEventPublisherService, times(2)).publish(any(DomainEvent.class));
+            verify(domainEventPublisherService, times(2)).publishEvents(any(Account.class));
             // Reversal mirrors the legs: sender credited, receiver debited.
             verify(auditEventPort, times(2)).publish(auditEventCaptor.capture());
             var auditEvents = auditEventCaptor.getAllValues();
             assertEquals("ACCOUNT_CREDITED", auditEvents.get(0).action());
+            assertTrue(auditEvents.get(0).details().contains("Credited"));
             assertEquals("ACCOUNT_DEBITED", auditEvents.get(1).action());
+            assertTrue(auditEvents.get(1).details().contains("Debited"));
             verify(ledgerPort, times(2)).save(ledgerCaptor.capture());
             var legs = ledgerCaptor.getAllValues();
             assertEquals(LedgerDirection.CREDIT, legs.get(0).getDirection());

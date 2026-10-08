@@ -157,22 +157,20 @@ class GenerateTransferReportQueryImplTest {
     void shouldThrowIllegalArgumentExceptionWhenStartDateIsAfterEndDate() {
         LocalDateTime start = LocalDateTime.now().plusDays(1);
         LocalDateTime end = LocalDateTime.now();
-        ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-            () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Start date must not be after end date.", exception.getMessage());
+            () -> new ReportCriteria(1L, start, end));
+        assertEquals("Start date must not be after end date", exception.getMessage());
     }
 
     @Test
     void shouldThrowIllegalArgumentExceptionWhenDateRangeExceeds12Months() {
         LocalDateTime start = LocalDateTime.now().minusMonths(13);
         LocalDateTime end = LocalDateTime.now();
-        ReportCriteria criteria = new ReportCriteria(1L, start, end);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-            () -> generateTransferReportUseCase.execute(criteria));
-        assertEquals("Report range must be at most 12 months.", exception.getMessage());
+            () -> new ReportCriteria(1L, start, end));
+        assertEquals("Report range must not exceed 12 months", exception.getMessage());
     }
 
     @Test
@@ -197,5 +195,29 @@ class GenerateTransferReportQueryImplTest {
         misconfigured.execute(new ReportCriteria(1L, start, end));
 
         verify(loadTransferPort).findHistoryBetween(1L, start, end, 0, 100);
+    }
+
+    @Test
+    void shouldReportNoNextPageWhenExactlyOnePageReturned() {
+        LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
+        LocalDateTime end = start.plusDays(1);
+        AccountInfo info = new AccountInfo(1L, 100L, "TRY", "ACTIVE");
+        when(transferAuthorizationService.authorizeAccountAccess(eq(1L), anyString())).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
+                1L, "TR770006200000000000000111", 2L, "TR870006200000000000000222"));
+        Transfer first = new Transfer(10L, 1L, 2L, Money.of("10.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusHours(1));
+        Transfer second = new Transfer(11L, 1L, 2L, Money.of("20.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusHours(2));
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2))
+                .thenReturn(List.of(first, second));
+
+        TransferReportResponse response =
+                generateTransferReportUseCase.execute(new ReportCriteria(1L, start, end, 0, 2));
+
+        assertFalse(response.hasNext());
+        assertEquals(2, response.pageTransferCount());
+        assertNull(response.nextCursorCreatedAt());
+        assertNull(response.nextCursorId());
     }
 }

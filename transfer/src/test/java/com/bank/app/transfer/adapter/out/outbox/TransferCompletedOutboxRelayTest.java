@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,7 +51,7 @@ class TransferCompletedOutboxRelayTest {
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         objectMapper.findAndRegisterModules();
-        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort);
+        handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort, Clock::systemUTC);
     }
 
     @Nested
@@ -81,6 +82,20 @@ class TransferCompletedOutboxRelayTest {
                     eq("outbox_handler_TransferCompletedOutboxHandler_" + eventId),
                     any(LocalDateTime.class)))
                     .thenReturn(true);
+        }
+
+        @Test
+        @DisplayName("should skip delivery when dedup key already exists")
+        void shouldSkipDeliveryOnDuplicate() {
+            when(idempotencyPort.tryCreate(
+                    eq("outbox_handler_TransferCompletedOutboxHandler_evt-5"),
+                    any(LocalDateTime.class)))
+                    .thenReturn(false);
+
+            handler.handle(new OutboxPort.EventEntry("evt-5", "transfer", "42", "TransferCompletedEvent",
+                    "{}", 0, false, false, null, 0, LocalDateTime.now()));
+
+            verifyNoInteractions(notificationConsumer);
         }
 
         @Test
@@ -162,6 +177,30 @@ class TransferCompletedOutboxRelayTest {
             handler.handle(event);
 
             verify(notificationConsumer, never()).handleTransferCompleted(any());
+        }
+
+        @Test
+        @DisplayName("should fall back to system clock when no clock provider is wired")
+        void shouldFallBackToSystemClock() throws Exception {
+            // Kills the NegateConditionals mutant on
+            // (clockProvider != null ? ... : systemUTC): a null provider must
+            // still process via the system clock instead of throwing NPE.
+            TransferCompletedOutboxRelay nullClockHandler = new TransferCompletedOutboxRelay(
+                    objectMapper, notificationConsumer, idempotencyPort, null);
+            String json = objectMapper.writeValueAsString(new TransferCompletedEvent(
+                    42L, 1L, 2L,
+                    new Money(new BigDecimal("250.00"), Currency.TRY),
+                    TransferStatus.COMPLETED, LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-7", "Transfer",
+                    "42", "TransferCompletedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+            when(idempotencyPort.tryCreate(
+                    eq("outbox_handler_TransferCompletedOutboxHandler_evt-7"),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            nullClockHandler.handle(event);
+
+            verify(notificationConsumer).handleTransferCompleted(any());
         }
 
         @Test

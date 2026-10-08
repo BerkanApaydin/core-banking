@@ -11,6 +11,8 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
+import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
@@ -98,10 +100,10 @@ class BrowserAuthControllerWebMvcTest {
     private ClientIpResolverPort clientIpResolver;
 
     @MockitoBean
-    private com.bank.app.user.application.port.out.CsrfBindingPort csrfBinding;
+    private CsrfBindingPort csrfBinding;
 
     @MockitoBean
-    private com.bank.app.user.application.port.out.JwtPort jwtPort;
+    private JwtPort jwtPort;
 
     @MockitoBean
     private UserContextService userContextService;
@@ -146,7 +148,7 @@ class BrowserAuthControllerWebMvcTest {
         void shouldRotateOnValidRefresh() throws Exception {
             // K7/D8: refresh CSRF is bound to the verified user id.
             when(jwtPort.verifyAndDecode("old-refresh")).thenReturn(
-                    new com.bank.app.user.application.port.out.JwtPort.VerifiedToken(
+                    new JwtPort.VerifiedToken(
                             "alice", 7L, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
             when(csrfBinding.verifyCsrfToken(CSRF, CSRF, "7")).thenReturn(true);
             when(refreshSessionUseCase.execute("old-refresh")).thenReturn(
@@ -179,7 +181,7 @@ class BrowserAuthControllerWebMvcTest {
         @DisplayName("should return 403 when CSRF is not bound to the token identity (K7/D8)")
         void shouldRejectUnboundCsrf() throws Exception {
             when(jwtPort.verifyAndDecode("old-refresh")).thenReturn(
-                    new com.bank.app.user.application.port.out.JwtPort.VerifiedToken(
+                    new JwtPort.VerifiedToken(
                             "alice", 7L, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
             when(csrfBinding.verifyCsrfToken(CSRF, CSRF, "7")).thenReturn(false);
 

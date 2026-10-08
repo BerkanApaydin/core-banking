@@ -4,6 +4,7 @@ import com.bank.app.common.domain.exception.CurrencyMismatchException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
+import java.util.Optional;
 
 public record Money(
         BigDecimal amount,
@@ -27,6 +28,24 @@ public record Money(
 
     public static Money of(BigDecimal amount, Currency currency) {
         return exact(amount, currency);
+    }
+
+    /**
+     * D-1: single-transfer ceiling enforced in the domain (not only in web
+     * DTOs). {@link BalanceLimits#MAX_BALANCE_AMOUNT} is the single source of
+     * truth; web {@code @DecimalMax} mirrors the same literal.
+     */
+    public static Money ofTransferAmount(BigDecimal amount, Currency currency) {
+        Money m = exact(amount, currency);
+        if (m.amount().compareTo(BalanceLimits.MAX_BALANCE_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                    "Transfer amount exceeds maximum of " + BalanceLimits.MAX_BALANCE);
+        }
+        return m;
+    }
+
+    public static Money ofTransferAmount(String amount, Currency currency) {
+        return ofTransferAmount(new BigDecimal(amount), currency);
     }
 
     /** Creates a monetary amount without changing its numeric value. */
@@ -69,6 +88,22 @@ public record Money(
     public Money subtract(Money other) {
         requireSameCurrency(other, "cannot be subtracted");
         return new Money(this.amount.subtract(other.amount), this.currency);
+    }
+
+    /**
+     * Non-throwing subtraction: empty when currencies differ or the result
+     * would be negative. Callers that need a domain failure (e.g.
+     * {@code InsufficientBalanceException}) should pre-check with
+     * {@link #isGreaterThanOrEqual(Money)} and keep {@link #subtract(Money)}.
+     */
+    public Optional<Money> trySubtract(Money other) {
+        if (other == null || this.currency != other.currency) {
+            return Optional.empty();
+        }
+        if (this.amount.compareTo(other.amount) < 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new Money(this.amount.subtract(other.amount), this.currency));
     }
 
     public boolean isGreaterThan(Money other) {

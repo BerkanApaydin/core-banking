@@ -27,6 +27,14 @@ class TransferCancelledEventTest {
     }
 
     @Test
+    void shouldExposeAggregateIdentity() {
+        TransferCancelledEvent event = new TransferCancelledEvent(43L, 10L, 20L,
+                Money.of("500.00", Currency.TRY), STATUS, FIXED_TIME);
+        assertEquals("Transfer", event.aggregateType());
+        assertEquals("43", event.aggregateId());
+    }
+
+    @Test
     void shouldThrowNullPointerExceptionWhenTransferIdIsNull() {
         assertThrows(NullPointerException.class,
                 () -> new TransferCancelledEvent(null, 10L, 20L, Money.of("100.00", Currency.TRY), STATUS, FIXED_TIME));

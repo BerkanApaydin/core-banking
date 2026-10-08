@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,45 +84,51 @@ class IdempotencyPersistenceAdapterTest {
 
     @Test
     void shouldMarkCompleted() {
-        var entity = new IdempotencyKeyJpaEntity("key1", "PENDING", null, null, LocalDateTime.now());
+        when(repository.completeIfPending("key1", "response", 200)).thenReturn(1);
+
+        adapter.markCompleted("key1", "response", 200);
+
+        verify(repository).completeIfPending("key1", "response", 200);
+    }
+
+    @Test
+    void shouldTreatReplayAsIdempotentWhenAlreadyCompleted() {
+        var entity = new IdempotencyKeyJpaEntity("key1", "COMPLETED", "old", 200, LocalDateTime.now());
+        when(repository.completeIfPending("key1", "response", 200)).thenReturn(0);
         when(repository.findById("key1")).thenReturn(Optional.of(entity));
 
         adapter.markCompleted("key1", "response", 200);
 
-        assertThat(entity.getStatus()).isEqualTo("COMPLETED");
-        assertThat(entity.getResponseBody()).isEqualTo("response");
-        assertThat(entity.getResponseStatus()).isEqualTo(200);
-        verify(repository).save(entity);
+        verify(repository).completeIfPending("key1", "response", 200);
     }
 
     @Test
     void shouldRejectCompletionWhenReservationIsMissing() {
+        when(repository.completeIfPending("missing", "response", 200)).thenReturn(0);
         when(repository.findById("missing")).thenReturn(Optional.empty());
 
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+        assertThrows(IllegalStateException.class,
                 () -> adapter.markCompleted("missing", "response", 200));
 
-        verify(repository, never()).save(any());
+        verify(repository).completeIfPending("missing", "response", 200);
     }
 
     @Test
     void shouldMarkFailed() {
-        var entity = new IdempotencyKeyJpaEntity("key1", "PENDING", null, null, LocalDateTime.now());
-        when(repository.findById("key1")).thenReturn(Optional.of(entity));
+        when(repository.failIfPending("key1")).thenReturn(1);
 
         adapter.markFailed("key1");
 
-        assertThat(entity.getStatus()).isEqualTo("FAILED");
-        verify(repository).save(entity);
+        verify(repository).failIfPending("key1");
     }
 
     @Test
     void shouldMarkFailedWhenEntityNotFound() {
-        when(repository.findById("missing")).thenReturn(Optional.empty());
+        when(repository.failIfPending("missing")).thenReturn(0);
 
         adapter.markFailed("missing");
 
-        verify(repository, never()).save(any());
+        verify(repository).failIfPending("missing");
     }
 
     @Test

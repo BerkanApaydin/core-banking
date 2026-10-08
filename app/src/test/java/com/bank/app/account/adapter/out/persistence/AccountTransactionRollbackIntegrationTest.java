@@ -1,5 +1,7 @@
 package com.bank.app.account.adapter.out.persistence;
 
+import com.bank.app.BankApplication;
+
 import com.bank.app.user.domain.Role;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.dto.CreateAccountRequest;
@@ -29,7 +31,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @Transactional
 @SuppressWarnings("null")
 class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegrationTest {
@@ -59,7 +61,7 @@ class AccountTransactionRollbackIntegrationTest extends AbstractSpringBootIntegr
         void setUp() {
                 UserJpaEntity user = new UserJpaEntity();
                 user.setUsername("testuser");
-                user.setPassword("encoded");
+                user.setPassword("$2a$12$testencodedhash000000000000000000000001");
                 user.setRole(Role.ROLE_USER);
                 user = userRepository.save(user);
                 userId = user.getId();

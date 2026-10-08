@@ -26,16 +26,10 @@ public class GenerateTransferReportTotalsQueryImpl implements GenerateTransferRe
     @Override
     public TransferReportTotalsResponse execute(ReportCriteria criteria) {
         Objects.requireNonNull(criteria, "Criteria must not be null");
-        Long accountId = Objects.requireNonNull(criteria.accountId(), "Account ID must not be null");
-        LocalDateTime startDate = Objects.requireNonNull(criteria.startDate(), "Start date must not be null");
-        LocalDateTime endDate = Objects.requireNonNull(criteria.endDate(), "End date must not be null");
-
-        if (startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Start date must not be after end date.");
-        }
-        if (startDate.plusMonths(12).isBefore(endDate)) {
-            throw new IllegalArgumentException("Report range must be at most 12 months.");
-        }
+        // Date-range invariants live in ReportCriteria's compact constructor.
+        Long accountId = criteria.accountId();
+        LocalDateTime startDate = criteria.startDate();
+        LocalDateTime endDate = criteria.endDate();
 
         AccountInfo account = transferAuthorizationService.authorizeAccountAccess(accountId,
                 "You are not authorized to generate a report for this account.");

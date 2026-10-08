@@ -16,14 +16,14 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
                 .should().haveSimpleNameEndingWith("UseCase")
                 .orShould().haveSimpleNameEndingWith("Query")
                 .orShould().haveSimpleNameEndingWith("Command")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         ArchRule outPorts = classes()
                 .that().resideInAnyPackage("..port.out..")
                 .and().areInterfaces()
                 .should().haveSimpleNameEndingWith("Port")
                 .orShould().haveSimpleNameEndingWith("Acl")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         inPorts.check(importedClasses);
         outPorts.check(importedClasses);
@@ -34,7 +34,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         ArchRule rule = classes()
                 .that().resideInAnyPackage("..application.usecase..")
                 .should().haveSimpleNameEndingWith("Impl")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -57,7 +57,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
                 .that().resideInAnyPackage("..adapter.out..")
                 .and().haveSimpleNameEndingWith("Adapter")
                 .should().dependOnClassesThat().resideInAnyPackage("..port.out..", "com.bank.app.accountapi..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -69,7 +69,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
                 .that().haveSimpleName("JwtPort")
                 .or().haveSimpleName("TokenBlacklistPort")
                 .should().resideInAPackage("com.bank.app.user.application.port.out..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -81,7 +81,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer.application.port..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.common.domain.event..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -92,7 +92,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer.application.port..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.accountapi..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }

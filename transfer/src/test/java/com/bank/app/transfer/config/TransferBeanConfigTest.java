@@ -6,6 +6,7 @@ import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotalsQuery;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
@@ -16,10 +17,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
+import org.springframework.retry.annotation.EnableRetry;
+
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +41,7 @@ class TransferBeanConfigTest {
     @Mock private AccountSnapshotCache cachePort;
 
     private final TransferProperties transferProperties = new TransferProperties(
-            java.time.Duration.ofHours(24), 3, 500L, 2000L, 100);
+            Duration.ofHours(24), 3, 500L, 2000L, 100);
 
     @Test
     void shouldCreateTransferDomainServiceBean() {
@@ -81,6 +86,22 @@ class TransferBeanConfigTest {
     }
 
     @Test
+    void shouldCreateGenerateTransferReportTotalsQueryBean() {
+        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
+        assertNotNull(config.generateTransferReportTotalsQuery(loadTransferPort, authService));
+    }
+
+    @Test
+    void shouldCreateGenerateTransferReportWithTotalsQueryBean() {
+        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
+        TransferViewEnricher enricher = config.transferViewEnricher(accountAclPort);
+        assertTrue(config.generateTransferReportWithTotalsQuery(loadTransferPort, enricher, authService)
+                instanceof GenerateTransferReportWithTotalsQuery);
+    }
+
+    @Test
     void shouldCreateGetTransferDetailQueryBean() {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
@@ -98,7 +119,7 @@ class TransferBeanConfigTest {
     @Test
     void shouldCreateAccountInfoCachePortFallbackBean() {
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
-        Environment environment = org.mockito.Mockito.mock(Environment.class);
+        Environment environment = mock(Environment.class);
         assertNotNull(config.accountInfoCachePort(environment));
     }
 
@@ -109,7 +130,7 @@ class TransferBeanConfigTest {
         // there. If the wiring ever degrades, fail at startup instead of
         // serving per-JVM snapshots silently across replicas.
         TransferBeanConfig config = new TransferBeanConfig(transferProperties);
-        Environment prod = org.mockito.Mockito.mock(Environment.class);
+        Environment prod = mock(Environment.class);
         when(prod.matchesProfiles("prod")).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> config.accountInfoCachePort(prod));
@@ -126,6 +147,6 @@ class TransferBeanConfigTest {
         // Email/SmsNotificationAdapter carry @Retryable: without @EnableRetry those
         // annotations are silently dead and notifications die on first failure.
         assertTrue(TransferBeanConfig.class.isAnnotationPresent(
-                org.springframework.retry.annotation.EnableRetry.class));
+                EnableRetry.class));
     }
 }

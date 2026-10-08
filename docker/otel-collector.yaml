@@ -14,15 +14,16 @@ processors:
   # Keep cardinality bounded: drop high-noise HTTP attributes the app does
   # not need for banking traces (full URLs may carry account IDs).
   attributes/delete-http-target:
-    action: delete
-    key: http.target
+    actions:
+      - key: http.target
+        action: delete
 
 exporters:
   # Local default: human-readable verification that spans arrive.
   # Production: replace with jaeger/tempo/otlphttp to your backend
-  # (see docs/tracing.md) — logging alone is not retention.
-  logging:
-    loglevel: info
+  # (see docs/tracing.md) — debug alone is not retention.
+  debug:
+    verbosity: detailed
     sampling_initial: 5
     sampling_thereafter: 50
 
@@ -31,4 +32,4 @@ service:
     traces:
       receivers: [otlp]
       processors: [attributes/delete-http-target, batch]
-      exporters: [logging]
+      exporters: [debug]

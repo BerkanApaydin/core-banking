@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,7 +51,7 @@ class TransferCancelledOutboxRelayTest {
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         objectMapper.findAndRegisterModules();
-        handler = new TransferCancelledOutboxRelay(objectMapper, notificationConsumer, idempotencyPort);
+        handler = new TransferCancelledOutboxRelay(objectMapper, notificationConsumer, idempotencyPort, Clock::systemUTC);
     }
 
     @Nested
@@ -162,6 +163,26 @@ class TransferCancelledOutboxRelayTest {
             handler.handle(event);
 
             verify(notificationConsumer, never()).handleTransferCancelled(any());
+        }
+
+        @Test
+        @DisplayName("should fall back to system clock when no clock provider is wired")
+        void shouldFallBackToSystemClock() throws Exception {
+            TransferCancelledOutboxRelay nullClockHandler = new TransferCancelledOutboxRelay(
+                    objectMapper, notificationConsumer, idempotencyPort, null);
+            String json = objectMapper.writeValueAsString(new TransferCancelledEvent(
+                    42L, 1L, 2L,
+                    new Money(new BigDecimal("250.00"), Currency.TRY),
+                    TransferStatus.CANCELLED, LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-7", "Transfer",
+                    "42", "TransferCancelledEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCancelledOutboxHandler_evt-7"),
+                    any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            nullClockHandler.handle(event);
+
+            verify(notificationConsumer).handleTransferCancelled(any());
         }
 
         @Test

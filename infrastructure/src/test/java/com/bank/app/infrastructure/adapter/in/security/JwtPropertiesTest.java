@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -44,8 +45,8 @@ class JwtPropertiesTest {
     @Test
     @DisplayName("provider should accept typed properties (D13/K14)")
     void providerShouldAcceptTypedProperties() {
-        com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider provider =
-                new com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider(
+        JwtTokenProvider provider =
+                new JwtTokenProvider(
                         new JwtProperties(SECRET, 900000L, 604800000L, true));
 
         assertThat(provider.getExpirationMs()).isEqualTo(900000L);

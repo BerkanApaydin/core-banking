@@ -1,5 +1,7 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
+import com.bank.app.BankApplication;
+
 
 
 import com.bank.app.user.domain.Role;
@@ -46,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(classes = com.bank.app.BankApplication.class)
+@SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 @TestMethodOrder(OrderAnnotation.class)
 class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {

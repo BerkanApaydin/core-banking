@@ -1,4 +1,8 @@
 package com.bank.app.user.application.usecase;
+import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.domain.TokenDigest;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 
@@ -8,11 +12,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,10 +35,10 @@ class LogoutUseCaseImplTest {
     private RefreshTokenPort refreshTokenPort;
 
     @Mock
-    private com.bank.app.common.application.port.out.ClockProviderPort clockProvider;
+    private ClockProviderPort clockProvider;
 
     @Mock
-    private com.bank.app.common.application.port.out.AuditEventPort auditEventPort;
+    private AuditEventPort auditEventPort;
 
     private LogoutUseCase logoutUseCase;
 
@@ -96,7 +102,7 @@ class LogoutUseCaseImplTest {
 
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
         verify(refreshTokenPort).revoke(
-                com.bank.app.common.domain.TokenDigest.sha256Hex("valid-refresh-token"));
+                TokenDigest.sha256Hex("valid-refresh-token"));
     }
 
     @Test
@@ -118,11 +124,58 @@ class LogoutUseCaseImplTest {
 
         logoutUseCase.execute("Bearer valid-jwt-token");
 
-        var auditCaptor = org.mockito.ArgumentCaptor
-                .forClass(com.bank.app.common.domain.event.AuditEvent.class);
+        var auditCaptor = ArgumentCaptor
+                .forClass(AuditEvent.class);
         verify(auditEventPort).publish(auditCaptor.capture());
-        org.junit.jupiter.api.Assertions.assertEquals("LOGOUT", auditCaptor.getValue().action());
-        org.junit.jupiter.api.Assertions.assertEquals("alice", auditCaptor.getValue().username());
+        assertEquals("LOGOUT", auditCaptor.getValue().action());
+        assertEquals("alice", auditCaptor.getValue().username());
+    }
+
+    @Test
+    @DisplayName("should attribute unverifiable token to system (best-effort)")
+    void shouldAttributeUnverifiableTokenToSystem() {
+        // Kills the EmptyObjectReturn mutant ("" vs "system") on
+        // bestEffortUsername: an unverifiable Bearer token must fall back to
+        // "system", never to an empty identity or an exception.
+        when(jwtPort.getRemainingMs("bogus")).thenReturn(0L);
+        when(jwtPort.extractUsername("bogus")).thenThrow(new RuntimeException("bad signature"));
+
+        logoutUseCase.execute("Bearer bogus");
+
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals("system", auditCaptor.getValue().username());
+    }
+
+    @Test
+    @DisplayName("should revoke refresh session for non-Bearer callers")
+    void shouldRevokeRefreshForNonBearerCaller() {
+        // Kills the Negate mutant on the refresh-only branch (line 52):
+        // a non-Bearer header with a refresh token must still attribute the
+        // audit to the refresh identity AND revoke it. A mutant that skips
+        // the branch leaves "system" instead of "alice".
+        when(jwtPort.extractUsername("refresh-9")).thenReturn("alice");
+
+        logoutUseCase.execute("Basic token123", "refresh-9");
+
+        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("refresh-9"));
+        verifyNoInteractions(tokenBlacklistPort);
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals("alice", auditCaptor.getValue().username());
+    }
+
+    @Test
+    @DisplayName("should attribute anonymous logout to system (best-effort)")
+    void shouldAttributeAnonymousLogoutToSystem() {
+        // Kills the EmptyObjectReturn mutant ("" vs "system") on
+        // bestEffortUsername: unverifiable/absent tokens must not produce an
+        // empty audit identity.
+        logoutUseCase.execute(null, null);
+
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals("system", auditCaptor.getValue().username());
     }
 
     @Test
@@ -130,7 +183,7 @@ class LogoutUseCaseImplTest {
     void shouldLogoutWhenAuditStoreDown() {
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
         doThrow(new RuntimeException("audit down")).when(auditEventPort)
-                .publish(any(com.bank.app.common.domain.event.AuditEvent.class));
+                .publish(any(AuditEvent.class));
 
         logoutUseCase.execute("Bearer valid-jwt-token");
 

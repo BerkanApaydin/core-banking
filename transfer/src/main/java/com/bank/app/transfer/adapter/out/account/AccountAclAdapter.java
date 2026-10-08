@@ -10,6 +10,8 @@ import com.bank.app.transfer.application.port.out.AccountAclPort;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Anti-corruption adapter: implements transfer's {@link AccountAclPort} by
@@ -29,30 +31,51 @@ public class AccountAclAdapter implements AccountAclPort {
     private final AccountApi accountApi;
     private final AccountSnapshotCache cache;
 
+    /**
+     * Singleflight guards: one lock per cache key collapses a thundering herd
+     * (N threads missing the same TTL window) into one backend read. Locks are
+     * striped by key and removed after use; the map never grows beyond the
+     * number of concurrently missing keys.
+     */
+    private final ConcurrentHashMap<String, Object> inflight = new ConcurrentHashMap<>();
+
     public AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache) {
         this.accountApi = Objects.requireNonNull(accountApi, "AccountApi must not be null");
         this.cache = Objects.requireNonNull(cache, "AccountSnapshotCache must not be null");
     }
 
+    private <T> T singleflight(String key, Supplier<T> loader) {
+        Object lock = inflight.computeIfAbsent(key, k -> new Object());
+        synchronized (lock) {
+            try {
+                return loader.get();
+            } finally {
+                inflight.remove(key, lock);
+            }
+        }
+    }
+
     @Override
     public AccountAclPort.AccountInfo getAccountInfo(Long accountId) {
         AccountSnapshot snapshot = cache.getById(accountId)
-                .orElseGet(() -> {
-                    AccountSnapshot fresh = accountApi.getSnapshotById(accountId);
-                    cache.putById(accountId, fresh);
-                    return fresh;
-                });
+                .orElseGet(() -> singleflight("id-" + accountId,
+                        () -> cache.getById(accountId).orElseGet(() -> {
+                            AccountSnapshot fresh = accountApi.getSnapshotById(accountId);
+                            cache.putById(accountId, fresh);
+                            return fresh;
+                        })));
         return toAccountInfo(snapshot);
     }
 
     @Override
     public AccountAclPort.AccountInfo getAccountInfoForTransfer(String ibanValue) {
         AccountSnapshot snapshot = cache.getByIban(ibanValue)
-                .orElseGet(() -> {
-                    AccountSnapshot fresh = accountApi.getSnapshotByIban(ibanValue);
-                    cache.putByIban(ibanValue, fresh);
-                    return fresh;
-                });
+                .orElseGet(() -> singleflight("iban-" + AccountSnapshotCache.ibanKey(ibanValue),
+                        () -> cache.getByIban(ibanValue).orElseGet(() -> {
+                            AccountSnapshot fresh = accountApi.getSnapshotByIban(ibanValue);
+                            cache.putByIban(ibanValue, fresh);
+                            return fresh;
+                        })));
         return toAccountInfo(snapshot);
     }
 

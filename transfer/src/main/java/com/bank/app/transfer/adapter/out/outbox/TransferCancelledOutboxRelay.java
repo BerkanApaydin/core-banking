@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
@@ -20,8 +21,9 @@ public class TransferCancelledOutboxRelay extends AbstractTransferOutboxRelay {
 
     public TransferCancelledOutboxRelay(ObjectMapper objectMapper,
                                            TransferEventConsumer notificationConsumer,
-                                           IdempotencyPort idempotencyPort) {
-        super(idempotencyPort, "TransferCancelledEvent", DEDUP_KEY_PREFIX);
+                                           IdempotencyPort idempotencyPort,
+                                           ClockProviderPort clockProvider) {
+        super(idempotencyPort, clockProvider, "TransferCancelledEvent", DEDUP_KEY_PREFIX);
         this.objectMapper = objectMapper;
         this.notificationConsumer = notificationConsumer;
     }

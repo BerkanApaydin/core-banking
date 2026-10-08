@@ -1,19 +1,20 @@
-# PostgreSQL ENUM Types — Deferred
+# DB-1: Native Enum Decision + Procedure
 
-V30 narrows the code columns (`status`, `currency`, `role`, `direction`,
-`action`) from `VARCHAR(255)` to their real widths while the `CHECK`
-constraints from V3/V6/V8/V28 keep enforcing the value sets.
+**Status:** V32 moved status/currency/role columns to native PG enums (single
+source of truth). Reverting is expensive; the decision is sealed (V41).
 
-The natural next step is native `CREATE TYPE ... AS ENUM` columns. It is
-deferred deliberately, not overlooked:
+**Accepted:** Rarely-changing columns keep the native enum
+(`audit_logs.action`, `users.role`).
 
-1. The JPA entities map these columns as `String`. A native ENUM column
-   rejects plain-VARCHAR bind parameters, so the entities must migrate to
-   Java enums with `@Enumerated` + `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`
-   first (4 entities, 3 mappers, enum-parity tests).
-2. ENUM value sets are append-only in practice: removing a value requires
-   a table rewrite. New transfer/account states must go through the same
-   review as a Java enum change.
-3. Trigger: convert when row width measurably matters (TOAST pressure on
-   `transfers`/`ledger_entries`) or when a new code column is added —
-   whichever comes first. Do not convert pre-emptively on small tables.
+**Roadmap:** For evolvable columns such as `transfers.status` and
+`accounts.status`, evaluate a return to `VARCHAR + CHECK` (new migration +
+ADR; no data move, `USING status::text` + add CHECK).
+
+**Procedure for adding a new enum value (mandatory):**
+1. Measure the `ALTER TYPE ... ADD VALUE` lock time on staging (V32 note).
+2. PG 12 constraint: `ADD VALUE` cannot run inside a transaction; split the
+   deploy in two (type first, code second).
+3. For rename/removal: new type + `ALTER COLUMN TYPE USING` + drop old type;
+   run the lock-measurement step in `docs/release.md`.
+4. CI applies migrations to an empty DB — the large-table simulation
+   (`ci.yml` `migration-soak`) measures against a staging dump.

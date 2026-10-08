@@ -80,7 +80,7 @@ class PlaceTransferUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemDefaultZone());
+        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         transferDomainService = new TransferDomainService();
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, userContextService);

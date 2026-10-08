@@ -132,9 +132,11 @@ class GetTransferDetailQueryImplTest {
         doThrow(new AuthorizationException("You are not authorized to view this transfer's details."))
                 .when(transferAuthorizationService).authorizeTransferAccess(eq(100L), eq(200L), anyString());
 
-        AuthorizationException exception = assertThrows(AuthorizationException.class,
+        // G-5 existence-oracle fix: unauthorized renders as not-found so
+        // sequential-ID probing cannot distinguish 403 from 404.
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("You are not authorized to view this transfer's details.", exception.getMessage());
+        assertEquals("Transfer not found. ID: " + transferId, exception.getMessage());
     }
 
     @Test
@@ -220,9 +222,10 @@ class GetTransferDetailQueryImplTest {
         doThrow(new AuthorizationException("Session not found."))
                 .when(transferAuthorizationService).authorizeTransferAccess(eq(100L), eq(200L), anyString());
 
-        AuthorizationException exception = assertThrows(AuthorizationException.class,
+        // G-5: same not-found shape for unauthenticated callers.
+        TransferNotFoundException exception = assertThrows(TransferNotFoundException.class,
                 () -> getTransferDetailUseCase.execute(transferId));
-        assertEquals("Session not found.", exception.getMessage());
+        assertEquals("Transfer not found. ID: " + transferId, exception.getMessage());
     }
 
     @Test

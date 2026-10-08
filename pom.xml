@@ -42,6 +42,13 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.12.0</mockito.version>
         <byte-buddy.version>1.17.5</byte-buddy.version>
+        <!-- Dependency-review gate (scripts/dependency_review.py, OSV):
+             pinned above upstream to close HIGH/CRITICAL advisories. -->
+        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <!-- 10.1.58 was withdrawn upstream; 10.1.59 is the first published fix. -->
+        <tomcat.version>10.1.59</tomcat.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <netty.version>4.1.137.Final</netty.version>
         <jacoco.line.coverage>0.80</jacoco.line.coverage>
         <jacoco.branch.coverage>0.70</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
@@ -66,6 +73,14 @@
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-bom</artifactId>
                 <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <!-- OSV HIGH/CRITICAL (netty SNI bypass, bzip2 loop): 4.1.135 -> 4.1.137. -->
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -331,5 +346,32 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- Uzun vade #8: domain mutasyon hedefi %85. Global esik %80 kalir (CI yesil);
+         bu profil yalnizca domain paketlerini %85 ile olcer:
+         mvn pitest:mutationCoverage -Ppitest-domain -Dpitest.skip=false -->
+    <profiles>
+        <profile>
+            <id>pitest-domain</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.pitest</groupId>
+                            <artifactId>pitest-maven</artifactId>
+                            <configuration>
+                                <mutationThreshold>85</mutationThreshold>
+                                <coverageThreshold>85</coverageThreshold>
+                                <targetClasses>
+                                    <param>com.bank.app.*.domain.*</param>
+                                    <param>com.bank.app.common.domain.*</param>
+                                </targetClasses>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

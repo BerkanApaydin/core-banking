@@ -1,6 +1,8 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
+import com.bank.app.infrastructure.adapter.out.security.HmacCsrfBindingAdapter;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
@@ -16,8 +18,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletResponse;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -91,6 +95,10 @@ class JwtAuthenticationFilterTest {
     void shouldSend401WhenJwtServiceThrowsException() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer invalidjwt");
         when(JwtTokenProvider.verifyAndDecode("invalidjwt")).thenThrow(new RuntimeException("invalid token"));
+        // Kills the clearContext mutant: a stale authentication must not
+        // survive the failure path (the empty-context default would hide it).
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("stale", "creds"));
 
         MockHttpServletResponse errorResponse = new MockHttpServletResponse();
         filter.doFilterInternal(request, errorResponse, filterChain);
@@ -98,6 +106,118 @@ class JwtAuthenticationFilterTest {
         assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
         verifyNoMoreInteractions(filterChain);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldRejectVerifiedTokenWithoutUserIdClaim() throws Exception {
+        // Kills the writeProblem mutant on the legacy-claims guard: tokens
+        // without userId/role must 401 instead of authenticating or passing
+        // through.
+        when(request.getHeader("Authorization")).thenReturn("Bearer legacy");
+        when(JwtTokenProvider.verifyAndDecode("legacy")).thenReturn(
+                new JwtPort.VerifiedToken("user", null, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
+
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
+
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoInteractions(filterChain);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldRejectVerifiedTokenWithoutRoleClaim() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer legacy");
+        when(JwtTokenProvider.verifyAndDecode("legacy")).thenReturn(
+                new JwtPort.VerifiedToken("user", 42L, null, "jti", System.currentTimeMillis() + 60_000));
+
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
+
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void shouldProceedWhenSessionCookieIsAbsent() throws Exception {
+        // Kills the cookieValue EmptyObject mutant ("" vs null): an unrelated
+        // cookie must not look like a blank session token (which 401s).
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getServletPath()).thenReturn("/api/v1/accounts");
+        when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("OTHER", "x") });
+
+        MockHttpServletResponse okResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, okResponse, filterChain);
+
+        verify(filterChain).doFilter(request, okResponse);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(JwtTokenProvider);
+    }
+
+    @Test
+    void shouldStripContextPathFromRequestUri() throws Exception {
+        // Kills the requestPath context-strip mutants: behind a context path
+        // the cookie flow must still resolve the API route.
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/app/api/v1/accounts");
+        when(request.getContextPath()).thenReturn("/app");
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "signed-token") });
+        when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldKeepUriWhenContextPathDoesNotMatch() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/accounts");
+        when(request.getContextPath()).thenReturn("/other");
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "signed-token") });
+        when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void shouldNotTreatGetLoginAsPublic() throws Exception {
+        // Kills the isPublicLogin POST-guard mutant: only POST logins bypass
+        // the session check; a GET with a dead cookie must still 401.
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getServletPath()).thenReturn("/api/v1/auth/login");
+        when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "expired-token") });
+        when(request.getMethod()).thenReturn("GET");
+        when(JwtTokenProvider.verifyAndDecode("expired-token")).thenReturn(null);
+
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
+
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void shouldNotTreatGetRefreshAsRefreshRequest() throws Exception {
+        // Kills the isRefreshRequest POST-guard mutant: only POST refreshes
+        // step aside; a GET with a dead cookie must still 401.
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getServletPath()).thenReturn("/api/v1/auth/refresh");
+        when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "expired-token") });
+        when(request.getMethod()).thenReturn("GET");
+        when(JwtTokenProvider.verifyAndDecode("expired-token")).thenReturn(null);
+
+        MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+        filter.doFilterInternal(request, errorResponse, filterChain);
+
+        assertProblemResponse(errorResponse, 401, "AUTHENTICATION_FAILED", "Invalid or expired token");
+        verifyNoInteractions(filterChain);
     }
 
     @Test
@@ -193,13 +313,13 @@ class JwtAuthenticationFilterTest {
 
         var mdcSeenInChain = new String[1];
         FilterChain capturingChain = (req, res) ->
-                mdcSeenInChain[0] = org.slf4j.MDC.get("userId");
+                mdcSeenInChain[0] = MDC.get("userId");
 
         filter.doFilterInternal(request, response, capturingChain);
 
         assertEquals("42", mdcSeenInChain[0]);
         // ThreadLocal must not leak to the next request on a reused thread.
-        assertNull(org.slf4j.MDC.get("userId"));
+        assertNull(MDC.get("userId"));
     }
 
     @Test
@@ -249,6 +369,9 @@ class JwtAuthenticationFilterTest {
     void shouldStillCheckRevocationForOtherMethodsAtLogoutPath() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer revoked-token");
         when(request.getMethod()).thenReturn("GET");
+        // Real logout path: without it the POST-guard mutant is unobservable
+        // (an empty path never matches the logout constants either way).
+        when(request.getServletPath()).thenReturn("/api/v1/auth/logout");
         when(JwtTokenProvider.verifyAndDecode("revoked-token")).thenReturn(validToken());
         when(tokenBlacklistPort.isBlacklisted("revoked-token")).thenReturn(true);
 
@@ -356,6 +479,8 @@ class JwtAuthenticationFilterTest {
         when(JwtTokenProvider.verifyAndDecode("valid-token")).thenReturn(validToken());
         when(tokenBlacklistPort.isBlacklisted("valid-token"))
                 .thenThrow(new RevocationStoreUnavailableException(new RuntimeException("secret Redis detail")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("stale", "creds"));
 
         MockHttpServletResponse errorResponse = new MockHttpServletResponse();
         filter.doFilterInternal(request, errorResponse, filterChain);
@@ -402,18 +527,18 @@ class JwtAuthenticationFilterTest {
     @DisplayName("session-bound CSRF (K7/D8)")
     class BoundCsrf {
 
-        private com.bank.app.user.application.port.out.CsrfBindingPort binding;
-        private jakarta.servlet.http.Cookie csrfCookie;
+        private CsrfBindingPort binding;
+        private Cookie csrfCookie;
 
         @BeforeEach
         void setUpBound() {
-            binding = new com.bank.app.infrastructure.adapter.out.security.HmacCsrfBindingAdapter(
-                    "test-only-csrf-mac-key-32bytes!!".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            binding = new HmacCsrfBindingAdapter(
+                    "test-only-csrf-mac-key-32bytes!!".getBytes(StandardCharsets.UTF_8));
             filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort,
                     new ObjectMapper(), binding, new BrowserSessionCookieProperties(false));
             // validToken() carries userId 42: mint the cookie for that identity.
             String bound = binding.issueCsrfToken("42");
-            csrfCookie = new jakarta.servlet.http.Cookie("BANK_CSRF", bound);
+            csrfCookie = new Cookie("BANK_CSRF", bound);
         }
 
         @Test
@@ -422,8 +547,8 @@ class JwtAuthenticationFilterTest {
             when(request.getHeader("Authorization")).thenReturn(null);
             when(request.getServletPath()).thenReturn("/api/v1/accounts");
             when(request.getHeader("X-CSRF-Token")).thenReturn(csrfCookie.getValue());
-            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
-                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"), csrfCookie
+            when(request.getCookies()).thenReturn(new Cookie[] {
+                    new Cookie("BANK_SESSION", "signed-token"), csrfCookie
             });
             when(request.getMethod()).thenReturn("POST");
             when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
@@ -441,9 +566,9 @@ class JwtAuthenticationFilterTest {
             when(request.getHeader("Authorization")).thenReturn(null);
             when(request.getServletPath()).thenReturn("/api/v1/accounts");
             when(request.getHeader("X-CSRF-Token")).thenReturn(foreign);
-            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
-                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"),
-                    new jakarta.servlet.http.Cookie("BANK_CSRF", foreign)
+            when(request.getCookies()).thenReturn(new Cookie[] {
+                    new Cookie("BANK_SESSION", "signed-token"),
+                    new Cookie("BANK_CSRF", foreign)
             });
             when(request.getMethod()).thenReturn("POST");
             when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());
@@ -462,9 +587,9 @@ class JwtAuthenticationFilterTest {
             when(request.getHeader("Authorization")).thenReturn(null);
             when(request.getServletPath()).thenReturn("/api/v1/accounts");
             when(request.getHeader("X-CSRF-Token")).thenReturn(forged);
-            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[] {
-                    new jakarta.servlet.http.Cookie("BANK_SESSION", "signed-token"),
-                    new jakarta.servlet.http.Cookie("BANK_CSRF", forged)
+            when(request.getCookies()).thenReturn(new Cookie[] {
+                    new Cookie("BANK_SESSION", "signed-token"),
+                    new Cookie("BANK_CSRF", forged)
             });
             when(request.getMethod()).thenReturn("POST");
             when(JwtTokenProvider.verifyAndDecode("signed-token")).thenReturn(validToken());

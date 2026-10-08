@@ -97,7 +97,14 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
                     "User logged in successfully" + (clientIp != null ? " from IP " + clientIp : "") + ".");
             return new AuthResponse(token, refreshToken, user.id().value(), user.username(),
                     jwtPort.getExpirationMs());
-        } catch (AuthenticationFailedException | UserNotFoundException e) {
+        } catch (UserNotFoundException e) {
+            // G9: user-enumeration guard — unknown username must be
+            // indistinguishable from wrong password (401, fixed message).
+            log.warn("Failed login attempt");
+            if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
+            auditLogin("LOGIN_FAILED", username, null, "Failed login attempt.");
+            throw new AuthenticationFailedException(e);
+        } catch (AuthenticationFailedException e) {
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
             auditLogin("LOGIN_FAILED", username, null, "Failed login attempt.");

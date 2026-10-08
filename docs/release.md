@@ -38,3 +38,21 @@ bytes.
 - Staging restore/rolling drills record the digest they ran against
   (see `docs/disaster-recovery.md`); a drill without a digest proves
   nothing about the release.
+
+## O-1/DB-1: large-table migration lock measurement (mandatory for V32-class migrations)
+
+`ALTER TABLE ... TYPE` rewrites the table + holds ACCESS EXCLUSIVE. CI applies
+migrations to an empty DB and can never catch this. Before any release that
+contains `ALTER TABLE ... TYPE`, `ADD CONSTRAINT ... VALIDATE`, or
+`CREATE INDEX` (non-concurrent):
+
+1. Restore a production-size staging dump (≥1M `transfers` rows or 10% of prod,
+   whichever is larger).
+2. Run `scripts/migration_soak.sh` (seed + `flyway migrate` + lock-time report
+   from `pg_locks`/`log_lock_waits`). Record wall time per statement.
+3. Thresholds: any ACCESS EXCLUSIVE > 2s on `transfers`/`accounts`/`ledger_entries`
+   blocks the release — rewrite as `NOT VALID + VALIDATE`, `pg_repack`, or
+   batched backfill per `docs/decisions/enum-types.md`.
+4. Attach the soak log to the release tag alongside the health-smoke JSON.
+   CI `migration-soak` job enforces the script's presence (full soak runs on
+   `workflow_dispatch` + release branches with a staging dump).

@@ -6,15 +6,18 @@ import com.bank.app.account.domain.AccountCreditedEvent;
 import com.bank.app.account.domain.AccountDebitedEvent;
 import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.application.port.out.IdempotencyPort;
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -37,13 +40,23 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final IdempotencyPort idempotencyPort;
+    private final ClockProviderPort clockProvider;
 
+    @Autowired
     public AccountEventOutboxRelay(ObjectMapper objectMapper,
                                       ApplicationEventPublisher eventPublisher,
                                       IdempotencyPort idempotencyPort) {
+        this(objectMapper, eventPublisher, idempotencyPort, null);
+    }
+
+    public AccountEventOutboxRelay(ObjectMapper objectMapper,
+                                      ApplicationEventPublisher eventPublisher,
+                                      IdempotencyPort idempotencyPort,
+                                      ClockProviderPort clockProvider) {
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
         this.idempotencyPort = idempotencyPort;
+        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -54,7 +67,8 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
     @Override
     public void handle(EventEntry event) {
         String dedupKey = DEDUP_KEY_PREFIX + event.id();
-        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now())) {
+        Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
+        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now(clock))) {
             log.info("Duplicate outbox event detected, skipping. handler=AccountEventOutboxRelay, eventId={}", event.id());
             return;
         }

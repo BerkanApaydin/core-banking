@@ -23,7 +23,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
                 .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
                 .whereLayer("Adapter").mayOnlyBeAccessedByLayers("Infrastructure")
                 .whereLayer("Infrastructure").mayOnlyBeAccessedByLayers("Adapter")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -36,7 +36,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
                         "..infrastructure..",
                         "org.springframework.stereotype..",
                         "org.springframework.web..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -55,7 +55,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..application..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.springframework.transaction..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -70,7 +70,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
                         "org.springframework.lang..",
                         "jakarta.servlet..",
                         "jakarta.persistence..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -82,7 +82,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..application..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.springframework.security..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -92,7 +92,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..application.dto..")
                 .should().dependOnClassesThat().resideInAnyPackage("jakarta.validation..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -115,7 +115,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
                 .that().haveSimpleNameEndingWith("UseCase")
                 .or().haveSimpleNameEndingWith("Query")
                 .should().resideInAPackage("..application..")
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }
@@ -135,7 +135,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().haveSimpleName("LoginUserUseCaseImpl")
                 .should().beAnnotatedWith(ReadOnlyUseCase.class)
-                .allowEmptyShould(true);
+                .allowEmptyShould(false);
 
         rule.check(importedClasses);
     }

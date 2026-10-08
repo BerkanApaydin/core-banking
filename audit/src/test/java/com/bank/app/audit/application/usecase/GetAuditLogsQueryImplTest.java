@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,11 +118,55 @@ class GetAuditLogsQueryImplTest {
     void shouldFallBackToRecentWhenActorIsNull() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
         when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
-        when(loadAuditLogPort.findRecent(50)).thenReturn(List.of());
+        var log = new AuditLog(2L, "bob", AuditAction.LOGIN_SUCCEEDED,
+                "Login succeeded.", LocalDateTime.now());
+        when(loadAuditLogPort.findRecent(50)).thenReturn(List.of(log));
 
-        query.execute(null, 50);
+        List<AuditLogResponse> response = query.execute(null, 50);
 
         verify(loadAuditLogPort).findRecent(50);
+        // Kills the EmptyObjectReturn mutant on the null-actor branch:
+        // the mutant would return an empty list instead of the mapped port result.
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).username()).isEqualTo("bob");
+    }
+
+    @Test
+    void shouldDefaultNonPositiveMaxLimitTo500() {
+        // Kills both the Boundary (<= vs <) and Negate mutants on
+        // `maxLimit > 0 ? maxLimit : 500`: 0 must fall back to 500.
+        var zeroQuery = new GetAuditLogsQueryImpl(loadAuditLogPort, userContextService, 0);
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
+        when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
+        when(loadAuditLogPort.findRecent(500)).thenReturn(List.of());
+
+        zeroQuery.execute(10_000);
+
+        verify(loadAuditLogPort).findRecent(500);
+    }
+
+    @Test
+    void shouldDefaultNegativeMaxLimitTo500() {
+        var negativeQuery = new GetAuditLogsQueryImpl(loadAuditLogPort, userContextService, -10);
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
+        when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
+        when(loadAuditLogPort.findRecent(500)).thenReturn(List.of());
+
+        negativeQuery.execute(10_000);
+
+        verify(loadAuditLogPort).findRecent(500);
+    }
+
+    @Test
+    void shouldHonorPositiveMaxLimit() {
+        var customQuery = new GetAuditLogsQueryImpl(loadAuditLogPort, userContextService, 25);
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
+        when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
+        when(loadAuditLogPort.findRecent(25)).thenReturn(List.of());
+
+        customQuery.execute(10_000);
+
+        verify(loadAuditLogPort).findRecent(25);
     }
 
     @Test
@@ -134,6 +179,6 @@ class GetAuditLogsQueryImplTest {
 
         verify(loadAuditLogPort, never()).findRecent(anyInt());
         verify(loadAuditLogPort, never()).findByActor(
-                org.mockito.ArgumentMatchers.anyLong(), anyInt());
+                anyLong(), anyInt());
     }
 }

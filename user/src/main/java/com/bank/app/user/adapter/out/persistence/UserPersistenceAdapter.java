@@ -7,7 +7,6 @@ import com.bank.app.user.domain.User;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 @Component
@@ -22,7 +21,6 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public Optional<User> findByUsername(String username) {
         try {
             return repository.findByUsername(username).map(mapper::toDomain);

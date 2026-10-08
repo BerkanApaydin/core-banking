@@ -15,6 +15,7 @@ import com.bank.app.user.domain.Role;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -27,29 +28,29 @@ class AuthenticationAdapterTest {
     @Test
     void shouldAuthenticateSuccessfully() {
         AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
-        var principal = new CustomUserDetails(42L, "user", "encoded",
+        var principal = new CustomUserDetails(42L, "user", "$2a$12$testencodedhash000000000000000000000001",
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         when(authenticationManager.authenticate(any())).thenReturn(
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
 
-        var authenticated = adapter.authenticate("user", "pass");
+        var authenticated = adapter.authenticate("user", "$2a$12$testpasshash00000000000000000000000001");
         assertEquals(42L, authenticated.id().value());
         assertEquals("user", authenticated.username());
         assertEquals(Role.ROLE_ADMIN, authenticated.role());
 
         verify(authenticationManager).authenticate(
-                new UsernamePasswordAuthenticationToken("user", "pass"));
+                new UsernamePasswordAuthenticationToken("user", "$2a$12$testpasshash00000000000000000000000001"));
     }
 
     @Test
     void shouldPropagateTokenVersionFromPrincipal() {
         AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
-        var principal = new CustomUserDetails(42L, "user", "encoded",
+        var principal = new CustomUserDetails(42L, "user", "$2a$12$testencodedhash000000000000000000000001",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")), 11L);
         when(authenticationManager.authenticate(any())).thenReturn(
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
 
-        var authenticated = adapter.authenticate("user", "pass");
+        var authenticated = adapter.authenticate("user", "$2a$12$testpasshash00000000000000000000000001");
 
         assertEquals(11L, authenticated.tokenVersion());
     }
@@ -57,15 +58,15 @@ class AuthenticationAdapterTest {
     @Test
     void shouldRejectMissingProviderResult() {
         assertThrows(AuthenticationBackendUnavailableException.class,
-                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
     }
 
     @Test
     void shouldRejectUnauthenticatedProviderResult() {
         when(authenticationManager.authenticate(any())).thenReturn(
-                new UsernamePasswordAuthenticationToken("user", "pass"));
+                new UsernamePasswordAuthenticationToken("user", "$2a$12$testpasshash00000000000000000000000001"));
         assertThrows(AuthenticationBackendUnavailableException.class,
-                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
     }
 
     @Test
@@ -73,19 +74,19 @@ class AuthenticationAdapterTest {
         when(authenticationManager.authenticate(any())).thenReturn(
                 new UsernamePasswordAuthenticationToken("user", null, List.of()));
         assertThrows(AuthenticationBackendUnavailableException.class,
-                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+                () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
     }
 
     @Test
     void shouldRejectMissingOrUnknownAuthority() {
-        var principal = new CustomUserDetails(42L, "user", "encoded", List.of());
+        var principal = new CustomUserDetails(42L, "user", "$2a$12$testencodedhash000000000000000000000001", List.of());
         for (var authorities : List.of(List.<SimpleGrantedAuthority>of(),
                 List.of(new SimpleGrantedAuthority("UNSUPPORTED")),
                 List.of(new SimpleGrantedAuthority("ROLE_USER"), new SimpleGrantedAuthority("ROLE_ADMIN")))) {
             when(authenticationManager.authenticate(any())).thenReturn(
                     new UsernamePasswordAuthenticationToken(principal, null, authorities));
             assertThrows(AuthenticationBackendUnavailableException.class,
-                    () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "pass"));
+                    () -> new AuthenticationAdapter(authenticationManager).authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
         }
     }
 
@@ -109,7 +110,7 @@ class AuthenticationAdapterTest {
 
         var thrown = assertThrows(AuthenticationFailedException.class,
                 () -> adapter.authenticate("user", "wrong"));
-        org.junit.jupiter.api.Assertions.assertFalse(thrown.getMessage().contains("admin"));
+        assertFalse(thrown.getMessage().contains("admin"));
     }
 
     @Test
@@ -119,6 +120,6 @@ class AuthenticationAdapterTest {
                 .when(authenticationManager).authenticate(any());
 
         assertThrows(AuthenticationBackendUnavailableException.class,
-                () -> adapter.authenticate("user", "pass"));
+                () -> adapter.authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
     }
 }
