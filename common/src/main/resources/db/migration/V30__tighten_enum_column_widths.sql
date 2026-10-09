@@ -7,6 +7,9 @@
 -- String->enum migration in the JPA entities; see docs/decisions/enum-types.md.
 -- Safe online on small tables; assess ACCESS EXCLUSIVE lock time in staging
 -- before rolling against a large transfers table.
+-- HIGH-4: column rewrites exceed the 30s per-role statement_timeout on a
+-- populated DB. Lift it for this migration only.
+SET LOCAL statement_timeout = '10min';
 
 ALTER TABLE accounts ALTER COLUMN status TYPE VARCHAR(20);
 ALTER TABLE accounts ALTER COLUMN currency TYPE VARCHAR(3);

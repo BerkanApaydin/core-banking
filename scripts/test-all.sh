@@ -28,6 +28,8 @@ run 'Load acceptance thresholds pinned' "$python_cmd" scripts/check_load_accepta
 run 'Health-smoke unit tests' "$python_cmd" -m unittest ops.test_health_smoke -v
 run 'Restore-drill contract' "$python_cmd" scripts/check_restore_drill.py
 run 'Compose JWT default pinned' "$python_cmd" scripts/check_compose_jwt_default.py
+run 'Error message keys in bundle' "$python_cmd" scripts/check_error_keys.py
+run 'Migration statement timeouts' "$python_cmd" scripts/check_migration_timeouts.py
 if [ -f target/bom.json ]; then
     run 'Dependency review (OSV gate)' "$python_cmd" scripts/dependency_review.py
 else

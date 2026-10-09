@@ -1,6 +1,7 @@
 package com.bank.app.user.domain;
 
 import com.bank.app.common.domain.BaseAggregateRoot;
+import com.bank.app.common.domain.FieldLimits;
 import com.bank.app.common.domain.UserId;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -104,8 +105,8 @@ public class User extends BaseAggregateRoot {
         if (username.isBlank()) {
             throw new IllegalArgumentException("Username must not be empty");
         }
-        if (username.trim().length() > 255) {
-            throw new IllegalArgumentException("Username can be at most 255 characters");
+        if (username.trim().length() > FieldLimits.MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Username can be at most " + FieldLimits.MAX_TEXT + " characters");
         }
         return username.trim();
     }
@@ -128,10 +129,16 @@ public class User extends BaseAggregateRoot {
     }
 
     /**
-     * Preferred password change: takes an already-validated {@link EncodedPassword}.
+     * Preferred password change: takes an {@link EncodedPassword}.
+     *
+     * <p>CS-1: re-validates the shape via {@link EncodedPassword#of(String)}
+     * even though the argument is already a VO — a VO built with the legacy
+     * {@code ofTrusted} factory (or a future unchecked factory) must never
+     * smuggle raw input into the credential store.
      */
     public void changePassword(EncodedPassword next) {
         Objects.requireNonNull(next, "New password must not be null");
+        EncodedPassword.of(next.value());
         this.password = next.value();
         // A new secret retires every outstanding session at its next refresh.
         this.tokenVersion++;

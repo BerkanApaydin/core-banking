@@ -14,6 +14,7 @@ import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -88,7 +89,7 @@ public class AccountController {
         AccountResponse body = getAccountByIdQuery.execute(id);
         String etag = etagFor(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
         return ResponseEntity.ok().eTag(etag).body(body);
     }
@@ -101,7 +102,7 @@ public class AccountController {
         AccountResponse body = getAccountByIbanQuery.execute(iban);
         String etag = etagFor(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
         return ResponseEntity.ok().eTag(etag).body(body);
     }

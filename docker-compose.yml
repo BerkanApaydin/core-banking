@@ -12,7 +12,7 @@ services:
       - -cpg_stat_statements.track=all
       - -clog_min_duration_statement=200
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: bank_user
       POSTGRES_PASSWORD: bank_password
@@ -31,7 +31,7 @@ services:
     image: redis:7-alpine
     container_name: bank-redis
     ports:
-      - "6389:6379"
+      - "127.0.0.1:6389:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -45,7 +45,7 @@ services:
       dockerfile: Dockerfile
     container_name: bank-app
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       # Local-dev defaults below. PROD: set SPRING_PROFILES_ACTIVE=prod and provide
       # JWT_SECRET + DB_PASSWORD from a secret manager. Never deploy prod with the
@@ -57,13 +57,17 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-bank_password}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # Local-dev default is JwtTokenProvider.DEFAULT_JWT_SECRET on purpose:
-      # dev boots with it (WARN logged), while prod refuses exactly this value
-      # twice — JwtTokenProvider (allow-default-secret=false is a prod-yml
-      # literal) and ApplicationStartupValidator both fail fast on it. Keep it
-      # equal to the code constant; never use it outside local experimentation.
-      # Anything real needs an explicit generated secret:
-      #   export JWT_SECRET="$(openssl rand -base64 32)"
+      # Zero-setup local boot: `docker compose up` works with no env vars and
+      # no command-line secrets. The default below is JwtTokenProvider's
+      # DEFAULT_JWT_SECRET on purpose: dev boots with it (WARN logged), while
+      # prod refuses exactly this value twice — JwtTokenProvider
+      # (allow-default-secret=false is a prod-yml literal) plus
+      # ApplicationStartupValidator both fail fast on it. Keep it equal to the
+      # code constant (checked by scripts/check_compose_jwt_default.py); never
+      # use it outside local experimentation. Anything real needs an explicit
+      # generated secret: export JWT_SECRET="$(openssl rand -base64 32)".
+      # Exposure is loopback-only (all `ports:` below bind 127.0.0.1), so the
+      # publicly-known dev default is unreachable from the network.
       # NOTE: JWT_ALLOW_DEFAULT_SECRET is intentionally NOT passed through
       # here. The dev profile enables it via application-dev.yml; wiring it
       # through compose would let a copied line re-enable the default secret
@@ -96,7 +100,7 @@ services:
     volumes:
       - ./docker/otel-collector.yaml:/etc/otel/otel-collector.yaml:ro
     ports:
-      - "4318:4318"
+      - "127.0.0.1:4318:4318"
     restart: unless-stopped
 
 volumes:

@@ -72,7 +72,7 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
                 // Theft response joins this transaction (K11/D4): if the audit
                 // write fails, the family revocation rolls back with it — a
                 // half-revoked family with no audit trail is worse than retry.
-                auditEventPort.publish(new AuditEvent("TOKEN_REVOKED",
+                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
                         "Refresh token reuse detected; token family revoked.",
                         LocalDateTime.now(clockProvider.clock()), verified.username(),
                         verified.userId()));
@@ -94,7 +94,7 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         long tokenVersion = jwtPort.extractTokenVersion(refreshToken);
         if (tokenVersion != user.getTokenVersion()) {
             log.warn("Stale refresh token generation rejected: userId={}", verified.userId());
-            auditEventPort.publish(new AuditEvent("TOKEN_REVOKED",
+            auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
                     "Stale refresh token generation rejected; re-authentication required.",
                     LocalDateTime.now(clockProvider.clock()), verified.username(),
                     verified.userId()));

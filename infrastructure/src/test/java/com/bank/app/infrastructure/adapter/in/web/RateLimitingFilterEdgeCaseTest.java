@@ -107,11 +107,11 @@ class RateLimitingFilterEdgeCaseTest {
 
     @Test
     void shouldUseXForwardedForHeaderWhenPresent() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
         // Append-semantics: the edge proxy appends the peer it saw, so the
         // bucket uses the last (trustworthy) entry, not the spoofable first.
-        when(rateLimiter.tryAcquire("10.0.0.2|/api/v1/transfers", 120, 60_000)).thenReturn(true);
+        when(rateLimiter.tryAcquire("10.0.0.2|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -120,10 +120,10 @@ class RateLimitingFilterEdgeCaseTest {
 
     @Test
     void shouldUseRemoteAddrWhenXForwardedForIsUnknown() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getHeader("X-Forwarded-For")).thenReturn("unknown");
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/transfers", 120, 60_000)).thenReturn(true);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -132,10 +132,10 @@ class RateLimitingFilterEdgeCaseTest {
 
     @Test
     void shouldUseRemoteAddrWhenXForwardedForIsEmpty() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getHeader("X-Forwarded-For")).thenReturn("");
         when(request.getRemoteAddr()).thenReturn("192.168.1.1");
-        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/transfers", 120, 60_000)).thenReturn(true);
+        when(rateLimiter.tryAcquire("192.168.1.1|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 
@@ -143,40 +143,35 @@ class RateLimitingFilterEdgeCaseTest {
     }
 
     @Test
-    void shouldBlockTransferRequestWhenOverLimit() throws Exception {
+    void shouldPassTransferRequestToPrincipalFilter() throws Exception {
+        // M-3: resource prefixes belong to PrincipalRateLimitingFilter. The
+        // pre-auth IP filter passes them through without touching the limiter.
         when(request.getRequestURI()).thenReturn("/api/v1/transfers");
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("10.0.0.5");
-        when(rateLimiter.tryAcquire("10.0.0.5|/api/v1/transfers", 120, 60_000)).thenReturn(false);
-        when(messageSource.getMessage(anyString(), any(), anyString(), any())).thenReturn("Rate limit exceeded");
-
-        StringWriter stringWriter = new StringWriter();
-        PrintWriter writer = new PrintWriter(stringWriter);
-        when(response.getWriter()).thenReturn(writer);
 
         filter.doFilter(request, response, chain);
 
-        verify(response).setStatus(429);
-        verify(chain, never()).doFilter(request, response);
+        verify(chain).doFilter(request, response);
+        verifyNoInteractions(rateLimiter);
     }
 
     @Test
-    void shouldIsolateBucketsPerEndpointForSameIp() throws Exception {
-        // One NAT address must not share a single global bucket: login abuse
-        // must not eat the transfer budget and vice versa.
+    void shouldKeepPerEndpointBucketsOnAuthTier() throws Exception {
+        // Per-endpoint buckets survive on the auth tier: register abuse must
+        // not eat the login budget. Resource isolation moved to the
+        // principal filter (PrincipalRateLimitingFilterTest).
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.9");
         when(rateLimiter.tryAcquire("10.0.0.9|/api/v1/auth/login", 10, 10_000)).thenReturn(true);
-        when(rateLimiter.tryAcquire("10.0.0.9|/api/v1/transfers", 120, 60_000)).thenReturn(true);
+        when(rateLimiter.tryAcquire("10.0.0.9|/api/v1/auth/register", 10, 10_000)).thenReturn(true);
 
         when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         filter.doFilter(request, response, chain);
 
-        when(request.getRequestURI()).thenReturn("/api/v1/transfers/123");
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/register");
         filter.doFilter(request, response, chain);
 
         verify(rateLimiter).tryAcquire("10.0.0.9|/api/v1/auth/login", 10, 10_000);
-        verify(rateLimiter).tryAcquire("10.0.0.9|/api/v1/transfers", 120, 60_000);
+        verify(rateLimiter).tryAcquire("10.0.0.9|/api/v1/auth/register", 10, 10_000);
         verify(chain, times(2)).doFilter(request, response);
     }
 

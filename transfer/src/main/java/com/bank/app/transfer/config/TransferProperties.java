@@ -6,7 +6,9 @@ import org.springframework.boot.convert.DurationUnit;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.transfer")
 public record TransferProperties(
         // S7/S8: a Duration, not a bare int — the unit travels with the value.

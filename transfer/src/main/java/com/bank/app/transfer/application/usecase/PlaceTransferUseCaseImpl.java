@@ -84,7 +84,7 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         // behind (existing failure-handling contract: no compensation).
         Transfer savedTransfer = saveTransferPort.save(pendingTransfer);
         domainEventPublisherService.publishEvents(pendingTransfer);
-        auditEventPort.publish(new AuditEvent("TRANSFER_EXECUTED",
+        auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_EXECUTED,
                 "Transfer completed. Transfer ID: " + savedTransfer.getId(),
                 LocalDateTime.now(clockProvider.clock()),
                 transferAuthorizationService.getCurrentUsername(),

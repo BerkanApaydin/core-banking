@@ -75,7 +75,7 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         log.info("Transfer cancelled: id={}", transfer.getId());
 
         domainEventPublisherService.publishEvents(transfer);
-        auditEventPort.publish(new AuditEvent("TRANSFER_CANCELLED",
+        auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_CANCELLED,
             String.format("Transfer cancelled. Transfer ID: %d", transfer.getId()),
             LocalDateTime.now(clockProvider.clock()),
             transferAuthorizationService.getCurrentUsername()));

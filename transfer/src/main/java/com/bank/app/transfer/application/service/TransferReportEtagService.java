@@ -1,10 +1,7 @@
 package com.bank.app.transfer.application.service;
 
+import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 /**
@@ -45,12 +42,9 @@ public final class TransferReportEtagService {
                 .append(body.totalVolume() == null
                         ? "null"
                         : body.totalVolume().stripTrailingZeros().toPlainString());
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(norm.toString().getBytes(StandardCharsets.UTF_8));
-            return "W/\"report-" + HexFormat.of().formatHex(digest, 0, 8) + "\"";
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("SHA-256 unavailable", impossible);
-        }
+        // SHA-256 via the shared TokenDigest primitive (single MessageDigest ->
+        // HexFormat chain in the codebase); first 8 bytes keep the header short.
+        String fullHex = TokenDigest.sha256Hex(norm.toString());
+        return "W/\"report-" + fullHex.substring(0, 16) + "\"";
     }
 }

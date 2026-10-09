@@ -8,6 +8,10 @@
 -- poller scans a fraction of the index (direct CPU/I/O win per poll).
 -- CONCURRENTLY is intentionally not used: Flyway runs migrations in a single
 -- transaction and CREATE INDEX CONCURRENTLY cannot run inside one.
+-- HIGH-4: index build on a large outbox exceeds the 30s per-role
+-- statement_timeout. Lift it for this migration only. For very large tables
+-- prefer the CONCURRENTLY operator script outside Flyway's transaction.
+SET LOCAL statement_timeout = '10min';
 
 CREATE INDEX IF NOT EXISTS idx_outbox_pending_partition_created
     ON outbox_events (partition, created_at)

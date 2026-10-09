@@ -7,7 +7,6 @@ import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
-import com.bank.app.user.domain.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +23,7 @@ import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletResponse;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -627,20 +627,13 @@ class JwtAuthenticationFilterTest {
             when(JwtTokenProvider.extractTokenVersion("admin-token")).thenReturn(3L);
         }
 
-        private User userAtVersion(long version) {
-            User user = mock(User.class);
-            when(user.getTokenVersion()).thenReturn(version);
-            return user;
-        }
-
         @Test
         @DisplayName("allows admin calls when the token generation matches the DB")
         void allowsAdminWhenVersionMatches() throws Exception {
             stubAdminBearer();
-            // Build the user double before stubbing: nested when() inside
-            // thenReturn() corrupts the stubbing state (UnfinishedStubbing).
-            User current = userAtVersion(3L);
-            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.of(current));
+            // AV-2: the filter reads the narrow token-version projection, not
+            // the full User aggregate.
+            when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
 
             filter.doFilterInternal(request, response, filterChain);
 
@@ -652,8 +645,7 @@ class JwtAuthenticationFilterTest {
         @DisplayName("rejects admin calls with a stale (pre-demotion) token generation")
         void rejectsAdminWhenVersionIsStale() throws Exception {
             stubAdminBearer();
-            User demoted = userAtVersion(4L);
-            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.of(demoted));
+            when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(4L));
 
             MockHttpServletResponse errorResponse = new MockHttpServletResponse();
             filter.doFilterInternal(request, errorResponse, filterChain);
@@ -667,7 +659,7 @@ class JwtAuthenticationFilterTest {
         @DisplayName("rejects admin calls for deleted users (fail closed)")
         void rejectsAdminWhenUserIsGone() throws Exception {
             stubAdminBearer();
-            when(loadUserPort.findById(7L)).thenReturn(java.util.Optional.empty());
+            when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.empty());
 
             MockHttpServletResponse errorResponse = new MockHttpServletResponse();
             filter.doFilterInternal(request, errorResponse, filterChain);
@@ -680,7 +672,7 @@ class JwtAuthenticationFilterTest {
         @DisplayName("returns 503 when the user store is unreadable (fail closed)")
         void returns503WhenUserStoreIsDown() throws Exception {
             stubAdminBearer();
-            when(loadUserPort.findById(7L)).thenThrow(new RuntimeException("db down"));
+            when(loadUserPort.findTokenVersionById(7L)).thenThrow(new RuntimeException("db down"));
 
             MockHttpServletResponse errorResponse = new MockHttpServletResponse();
             filter.doFilterInternal(request, errorResponse, filterChain);

@@ -13,6 +13,10 @@ CI's `dependency-review-action` (fail-on-severity: high). 2026-10 run: 11 of
   (verified: no `SseEmitter`/`XsltView`/event-stream in main sources), so both
   are unreachable here. JSON-only API + static UI.
 
+**Offline behavior:** when OSV is unreachable the script fails closed in CI
+(`CI=true` → exit 1; the blocking `dependency-review-action` already ran
+there) and reports-and-passes locally, so offline laptop runs stay usable.
+
 **Notes:**
 - `tomcat 10.1.58` was skipped upstream (never published/withdrawn); the first
   published fix is `10.1.59` — pin that, not `.58`.

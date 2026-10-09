@@ -54,7 +54,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         String username = request.username();
 
         if (clientIp != null && loginAttemptPort.isIpBlocked(clientIp)) {
-            auditLogin("LOGIN_FAILED", username, null,
+            auditLogin(AuditEvent.LOGIN_FAILED, username, null,
                     "Blocked login attempt from IP " + clientIp + " (brute-force guard).");
             throw new TooManyFailedLoginAttemptsException(
                     "Too many failed login attempts from this IP. Please try again in "
@@ -62,7 +62,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         }
 
         if (username != null && loginAttemptPort.isUsernameBlocked(username)) {
-            auditLogin("LOGIN_FAILED", username, null,
+            auditLogin(AuditEvent.LOGIN_FAILED, username, null,
                     "Blocked login attempt for username (brute-force guard).");
             throw new TooManyFailedLoginAttemptsException(
                     "Too many failed login attempts for this username. Please try again in "
@@ -93,7 +93,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
                     LocalDateTime.now(clockProvider.clock())
                             .plus(jwtPort.getRefreshExpirationMs(), ChronoUnit.MILLIS));
             log.info("User logged in: userId={}", user.id().value());
-            auditLogin("LOGIN_SUCCEEDED", user.username(), user.id().value(),
+            auditLogin(AuditEvent.LOGIN_SUCCEEDED, user.username(), user.id().value(),
                     "User logged in successfully" + (clientIp != null ? " from IP " + clientIp : "") + ".");
             return new AuthResponse(token, refreshToken, user.id().value(), user.username(),
                     jwtPort.getExpirationMs());
@@ -102,12 +102,12 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             // indistinguishable from wrong password (401, fixed message).
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
-            auditLogin("LOGIN_FAILED", username, null, "Failed login attempt.");
+            auditLogin(AuditEvent.LOGIN_FAILED, username, null, "Failed login attempt.");
             throw new AuthenticationFailedException(e);
         } catch (AuthenticationFailedException e) {
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
-            auditLogin("LOGIN_FAILED", username, null, "Failed login attempt.");
+            auditLogin(AuditEvent.LOGIN_FAILED, username, null, "Failed login attempt.");
             throw e;
         } catch (LoginAttemptStoreUnavailableException e) {
             // A successful credential check is not enough if the login guard

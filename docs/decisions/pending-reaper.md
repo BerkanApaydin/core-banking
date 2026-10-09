@@ -21,13 +21,20 @@ transfers and `Transfer.markFailed()` had no production caller (see
    infrastructure: `ModuleBoundariesArchitectureTest` forbids
    `infrastructure → transfer`, so the job uses the context's own
    `LoadTransferPort`/`SaveTransferPort`/`AuditEventPort`.
-2. **No distributed lock.** Each candidate row is re-locked
-   (`findByIdForUpdate`) and written through the versioned bulk UPDATE. A
-   racing completion/cancellation — or another replica's reaper — surfaces as
-   `TransferNotPendingException` / optimistic-lock failure, counted as
-   conflict, never retried blindly. Stale threshold (default 15 min) stays
-   far above the 30 s use-case transaction timeout so slow placements are
-   never reaped.
+2. **No distributed lock, but a real transaction per row.** Each candidate row
+   is processed in its own `REQUIRES_NEW` transaction (`TransactionTemplate`):
+   the `findByIdForUpdate` lock, the versioned bulk UPDATE and the audit row
+   commit atomically. Without this the `PESSIMISTIC_WRITE` query runs in
+   Spring Data's read-only transaction and PostgreSQL rejects
+   `SELECT ... FOR UPDATE` with `25006` (or the writes land in separate
+   auto-commits) — either way the reaper silently stops reaping. Each row is
+   re-locked (`findByIdForUpdate`) and written through the versioned bulk
+   UPDATE. A racing completion/cancellation — or another replica's reaper —
+   surfaces as `TransferNotPendingException` / optimistic-lock failure,
+   counted as conflict, never retried blindly. Stale threshold (default
+   15 min) stays far above the 30 s use-case transaction timeout so slow
+   placements are never reaped. Covered by
+   `TransferPendingReaperIntegrationTest` against real PostgreSQL.
 3. **No domain-event publish.** There is no outbox relay for FAILED yet; an
    unhandled event type would poison the outbox. The `TRANSFER_MARKED_FAILED`
    audit row is the trail until a FAILED consumer lands (then wire

@@ -8,19 +8,19 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 
 public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKeyJpaEntity, String> {
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
             + "AND status <> 'PENDING' "
             + "AND key_kind = 'HTTP'", nativeQuery = true)
     int deleteExpiredTerminalRequests(@Param("threshold") LocalDateTime threshold);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
             + "AND status <> 'PENDING' "
             + "AND key_kind = 'HANDLER'", nativeQuery = true)
     int deleteExpiredHandlerKeys(@Param("threshold") LocalDateTime threshold);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "INSERT INTO idempotency_keys (key_value, status, created_at, request_hash, key_kind) "
             + "VALUES (:key, 'PENDING', :now, :requestHash, "
             + "CASE WHEN left(:key, length('outbox_handler_')) = 'outbox_handler_' THEN 'HANDLER' ELSE 'HTTP' END) "

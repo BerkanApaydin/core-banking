@@ -9,19 +9,22 @@ Secrets reach the app exclusively through environment variables
 - `jwt.secret: ${JWT_SECRET}` (no default) + `allow-default-secret: false`
   in `application-prod.yml`, enforced at boot by
   `ApplicationStartupValidator`;
-- CI (`ci.yml`, `mutation-nightly.yml`, `mutation-pr.yml`) injects
-  `secrets.JWT_SECRET` with a documented **test-only** fallback that can
-  never authenticate in prod (last character differs from the public dev
-  default on purpose);
+- CI (`ci.yml`, `mutation-nightly.yml`, `mutation-pr.yml`) prefers
+  `secrets.JWT_SECRET` and otherwise mints a fresh ephemeral 256-bit key per
+  run (`openssl rand -base64 32` into `GITHUB_ENV`) — no committed fallback
+  exists anywhere in the workflows. Local `docker compose up` needs no secret
+  at all: it boots with the dev default (equal to
+  `JwtTokenProvider.DEFAULT_JWT_SECRET`, loopback-bound ports only), which
+  production refuses twice at startup;
 - `.gitleaks.toml` + the `secret-scan` CI job reject new hardcoded
-  secrets; the two allowlisted values are the test-only fallbacks above.
+  secrets; the single allowlisted value is the non-secret dev placeholder
+  string (anchored, cannot match inside a real secret).
 
 ## What is still missing
 
-Plain env-vars (and especially committed fallbacks, even test-only ones)
-are not a secret store: they appear in CI logs on misconfiguration, in
-shell history, and in every `.env` copy on a laptop. For any deployment
-beyond staging:
+Plain env-vars are not a secret store: they appear in CI logs on
+misconfiguration, in shell history, and in every `.env` copy on a laptop.
+For any deployment beyond staging:
 
 ## Migration path (External Secrets Operator, recommended)
 
@@ -35,9 +38,8 @@ beyond staging:
    `${…}` bindings in `application*.yml` untouched.
 3. Keep `allow-default-secret: false` and `ApplicationStartupValidator`:
    they are the second layer if ESO ever serves an empty secret.
-4. Remove the CI fallback only after `secrets.JWT_SECRET` exists in
-   every environment that runs CI — until then the fallback keeps forks
-   green without weakening prod (it cannot satisfy the prod guard).
+4. (Done) The former CI test-only fallback is removed: every CI environment
+   either provides `secrets.JWT_SECRET` or mints an ephemeral key per run.
 
 ## Rotation runbook
 

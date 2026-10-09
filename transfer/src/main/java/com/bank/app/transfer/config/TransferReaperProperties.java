@@ -3,6 +3,7 @@ package com.bank.app.transfer.config;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Crash-window reaper tuning (see {@code TransferPendingReaper}).
@@ -11,6 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * constructed positionally in tests, so widening it would break every call
  * site for an unrelated concern.
  */
+@Validated
 @ConfigurationProperties(prefix = "app.transfer.reaper")
 public record TransferReaperProperties(
         @DefaultValue("true") boolean enabled,

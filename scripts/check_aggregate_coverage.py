@@ -9,7 +9,9 @@ EXPECTED = {
     "app", "common", "persistence", "account-api", "account",
     "transfer", "user", "audit", "infrastructure",
 }
-MINIMUM = {"LINE": 0.80, "BRANCH": 0.70}
+# HIGH-3: single source of truth with the root pom
+# (jacoco.line/branch.coverage = 0.90/0.80). Keep both in sync.
+MINIMUM = {"LINE": 0.90, "BRANCH": 0.80}
 
 
 def ratio(group: ET.Element, kind: str) -> float | None:

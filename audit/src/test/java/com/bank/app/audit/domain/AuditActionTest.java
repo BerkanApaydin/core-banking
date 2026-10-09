@@ -9,8 +9,9 @@ class AuditActionTest {
 
     @Test
     void shouldHaveAllExpectedEnumValues() {
-        // 7 money-movement actions + 5 authentication-lifecycle actions (K11/D4).
-        assertEquals(12, AuditAction.values().length);
+        // 7 money-movement actions + 5 authentication-lifecycle actions (K11/D4)
+        // + 1 crash-window reaper outcome (TRANSFER_MARKED_FAILED).
+        assertEquals(13, AuditAction.values().length);
     }
 
     @Test

@@ -1,4 +1,11 @@
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+# T-12: base images are parameterized so the release workflow can pin digests
+# (docker build --build-arg BASE_BUILDER_IMAGE=...@sha256:...). Default tags
+# stay versioned (never :latest); pin digests in release for supply-chain
+# reproducibility. Rebuild timestamp is fixed via
+# project.build.outputTimestamp in the root pom.
+ARG BASE_BUILDER_IMAGE=maven:3.9-eclipse-temurin-21-alpine
+ARG BASE_RUNTIME_IMAGE=eclipse-temurin:21-jre-alpine
+FROM ${BASE_BUILDER_IMAGE} AS builder
 WORKDIR /build
 
 # Copy parent pom and module poms to cache dependencies
@@ -32,7 +39,7 @@ COPY app/src ./app/src
 RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -B
 
 # Runner stage
-FROM eclipse-temurin:21-jre-alpine
+FROM ${BASE_RUNTIME_IMAGE}
 # D20: pin UID 1000 so the image user matches k8s runAsUser: 1000.
 # (Alpine -S assigns the next free system UID otherwise, and the pod
 # securityContext would override USER bank with an anonymous UID.)

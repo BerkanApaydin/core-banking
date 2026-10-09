@@ -44,6 +44,22 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         String username = "system";
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
+            // M-4: already-revoked access tokens short-circuit to a pure no-op
+            // (still 204 at the controller). Without this, a revoked token can
+            // re-trigger server-side logout until its natural expiry — audit
+            // spam plus a revocation oracle (logout 204 vs any other route
+            // 401 tells whether the token was revoked). The revocation check
+            // is best-effort: if the store is unreadable, fall through and
+            // attempt the normal revocation path instead of dropping logout.
+            if (isAlreadyRevoked(token) && (refreshToken == null || refreshToken.isBlank())) {
+                return;
+            }
+            if (isAlreadyRevoked(token)) {
+                // Access already gone but a refresh session was also presented:
+                // revoke it idempotently, then return without re-auditing.
+                refreshTokenPort.revoke(TokenDigest.sha256Hex(refreshToken));
+                return;
+            }
             username = bestEffortUsername(token, refreshToken);
             long remainingMs = jwtPort.getRemainingMs(token);
             if (remainingMs > 0) {
@@ -58,6 +74,16 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
             refreshTokenPort.revoke(TokenDigest.sha256Hex(refreshToken));
         }
         auditLogout(username);
+    }
+
+    private boolean isAlreadyRevoked(String token) {
+        try {
+            return tokenBlacklistPort.isBlacklisted(token);
+        } catch (RuntimeException storeUnavailable) {
+            log.debug("Logout revocation check unavailable: {}",
+                    storeUnavailable.getClass().getSimpleName());
+            return false;
+        }
     }
 
     private String bestEffortUsername(String... tokens) {
@@ -86,7 +112,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
      */
     private void auditLogout(String username) {
         try {
-            auditEventPort.publish(new AuditEvent("LOGOUT", "User logged out; tokens revoked.",
+            auditEventPort.publish(new AuditEvent(AuditEvent.LOGOUT, "User logged out; tokens revoked.",
                     LocalDateTime.now(clockProvider.clock()), username));
         } catch (Exception auditFailure) {
             log.warn("Logout audit write failed: failureType={}",

@@ -15,7 +15,12 @@ public enum AuditAction {
     LOGIN_FAILED,
     LOGOUT,
     PASSWORD_CHANGED,
-    TOKEN_REVOKED;
+    TOKEN_REVOKED,
+    // Crash-window reaper outcome (TransferPendingReaper): stale PENDING rows
+    // transitioned to FAILED. Missing this value broke the reaper's audit
+    // write (UnknownAuditActionException rolled back the FAILED transition);
+    // DB value added in V50.
+    TRANSFER_MARKED_FAILED;
 
     public static AuditAction fromString(String value) {
         if (value == null) {

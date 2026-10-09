@@ -54,6 +54,9 @@ spec:
           # Money invariant: legs sharing a transaction_ref must net to zero.
           # Any nonzero group is a page — it means a partial write escaped the
           # single-transaction ledger discipline (see docs/slo.md).
+          # Cadence note (PERF-1): the gauge is published by the nightly
+          # LedgerReconciliationJob, not a minutely scan — detection latency
+          # is up to ~24h, but once flipped the gauge persists and pages here.
           expr: max(ledger_nonzero_transaction_refs) > 0
           for: 15m
           labels:

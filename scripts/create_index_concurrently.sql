@@ -1,0 +1,33 @@
+-- scripts/create_index_concurrently.sql — operator template for large tables.
+--
+-- HIGH-4 / PERF-5: Flyway runs each migration inside one transaction, and
+-- PostgreSQL forbids CREATE INDEX CONCURRENTLY inside a transaction block.
+-- For small tables the plain CREATE INDEX in migrations is fine (brief lock).
+-- For large/populated tables (transfers, ledger_entries, outbox_events,
+-- audit_logs), run the index build here instead: CONCURRENTLY takes only
+-- SHARE UPDATE EXCLUSIVE locks and never blocks writes.
+--
+-- Usage (psql, one statement at a time):
+--   \i scripts/create_index_concurrently.sql
+-- or copy the matching block and run it manually during a maintenance window.
+-- Always run ANALYZE afterwards so the planner sees the new index immediately.
+--
+-- Example: re-run the V49 reaper index without blocking writers:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_pending_business_created
+--       ON transfers (status, business_created_at ASC, id ASC)
+--       WHERE status = 'PENDING';
+--   ANALYZE transfers;
+--
+-- Example: covering keyset indexes (V43) on a hot table:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_sender_created_id
+--       ON transfers (sender_account_id, created_at DESC, id DESC);
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_receiver_created_id
+--       ON transfers (receiver_account_id, created_at DESC, id DESC);
+--   ANALYZE transfers;
+--
+-- Example: outbox hot-path partial index (V42):
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_outbox_pending_partition_created
+--       ON outbox_events (partition, created_at)
+--       WHERE processed = false AND dead_letter = false;
+--   ANALYZE outbox_events;
+SELECT 1;

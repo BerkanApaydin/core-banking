@@ -4,7 +4,9 @@ import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.security")
 public record SecurityProperties(
     List<String> whitelistPaths

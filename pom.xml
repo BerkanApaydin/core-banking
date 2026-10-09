@@ -39,6 +39,9 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- T-12: reproducible builds — fixes timestamps inside jars so the
+             same sources always produce the same bytes. -->
+        <project.build.outputTimestamp>2026-09-27T00:00:00Z</project.build.outputTimestamp>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.12.0</mockito.version>
         <!-- F-01: 1.17.5 -> 1.17.8 minimum. 1.17.8 fixes dynamic attach on
@@ -55,8 +58,8 @@
         <tomcat.version>10.1.59</tomcat.version>
         <postgresql.version>42.7.12</postgresql.version>
         <netty.version>4.1.137.Final</netty.version>
-        <jacoco.line.coverage>0.80</jacoco.line.coverage>
-        <jacoco.branch.coverage>0.70</jacoco.branch.coverage>
+        <jacoco.line.coverage>0.90</jacoco.line.coverage>
+        <jacoco.branch.coverage>0.80</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
         <postgresql.image.tag>15-alpine</postgresql.image.tag>
         <testcontainers.version>1.20.6</testcontainers.version>
@@ -206,7 +209,14 @@
                              hs_err JVM crashes. 4 threads share one forked JVM;
                              Testcontainers ITs run separately in failsafe. -->
                         <threadCount>4</threadCount>
-                        <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding}</argLine>
+                        <!-- V46 stores wall-clock columns as TIMESTAMPTZ: the
+                             driver/JVM zone IS the stored clock. Production pins
+                             UTC via Dockerfile TZ + -Duser.timezone=UTC; tests
+                             must run in the same zone or business-time
+                             comparisons (reaper cutoff, cancellation window)
+                             shift by the host offset (found: +03:00 host made
+                             a 1h-old row look future-dated). -->
+                        <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding} -Duser.timezone=UTC</argLine>
                         <excludes>
                             <exclude>**/*IntegrationTest.java</exclude>
                             <exclude>**/*IT.java</exclude>
@@ -227,7 +237,7 @@
                     <configuration>
                         <forkCount>1</forkCount>
                         <reuseForks>true</reuseForks>
-                        <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding}</argLine>
+                        <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding} -Duser.timezone=UTC</argLine>
                         <includes>
                             <include>**/*IntegrationTest.java</include>
                             <include>**/*IT.java</include>
@@ -290,7 +300,11 @@
                         <argLine/>
                         <timestampedReports>false</timestampedReports>
                         <mutationThreshold>80</mutationThreshold>
-                        <coverageThreshold>80</coverageThreshold>
+                        <!-- HIGH-3/T-3: line coverage floor catches NO_COVERAGE
+                             mutants that mutationThreshold hides (it only
+                             scores detected mutants). Single source with
+                             pitest-domain profile's stricter 85% domain gate. -->
+                        <coverageThreshold>85</coverageThreshold>
                         <excludedMethods>
                             <param>hashCode</param>
                             <param>equals</param>

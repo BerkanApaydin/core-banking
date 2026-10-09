@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.config;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Crash-window reaper tuning for HTTP idempotency reservations (see
@@ -13,6 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * site for an unrelated concern (same split as
  * {@code TransferReaperProperties} vs {@code TransferProperties}).
  */
+@Validated
 @ConfigurationProperties(prefix = "app.idempotency.reaper")
 public record IdempotencyReaperProperties(
         @DefaultValue("true") boolean enabled,

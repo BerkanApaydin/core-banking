@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.context.NoSuchMessageException;
+import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -129,7 +130,7 @@ class RequestProblemHandlerTest {
     private static HandlerMethodValidationException methodValidationFailure() throws Exception {
         MethodParameter param = new MethodParameter(
                 RequestProblemHandlerTest.class.getDeclaredMethod("dummyEndpoint", int.class), 0);
-        param.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
+        param.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
         FieldError fieldError = new FieldError("size", "size", 200, false, null, null,
                 "must be less than or equal to 100");
         ParameterValidationResult result = new ParameterValidationResult(param, 200, List.of(fieldError),

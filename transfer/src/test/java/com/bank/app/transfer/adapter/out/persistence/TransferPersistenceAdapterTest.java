@@ -5,6 +5,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -130,17 +131,18 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowWhenUpdatingNonExistentTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now);
+        Transfer domainTransfer = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00",
+Currency.TRY), TransferStatus.COMPLETED, now);
 
         when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        // Domain NOT_FOUND (404 like the account sibling), never bare
+        // IllegalArgumentException (500).
+        TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
                 () -> repository.save(domainTransfer));
-        assertEquals("Transfer not found: 999", ex.getMessage());
         verify(springDataRepo).findById(999L);
         verify(springDataRepo, never()).save(any());
     }
-
     @Test
     void shouldFindByIdForUpdateSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
@@ -379,7 +381,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowNotFoundWhenBulkUpdateHitsMissingRow() {
         // Kills the NullReturnVals mutant on lambda$save$1: the 0-row bulk path
-        // must distinguish "row gone" (IllegalArgumentException) from conflict.
+        // must distinguish "row gone" (TransferNotFoundException/404) from conflict.
         LocalDateTime now = LocalDateTime.now();
         Transfer missing = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 1L);
@@ -387,9 +389,8 @@ class TransferPersistenceAdapterTest {
                 .thenReturn(0);
         when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        assertThrows(TransferNotFoundException.class,
                 () -> repository.save(missing));
-        assertEquals("Transfer not found: 999", ex.getMessage());
     }
 
     @Test

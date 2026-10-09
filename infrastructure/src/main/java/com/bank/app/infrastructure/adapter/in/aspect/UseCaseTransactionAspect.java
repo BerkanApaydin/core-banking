@@ -40,14 +40,25 @@ public class UseCaseTransactionAspect {
     @Pointcut("@within(com.bank.app.common.application.port.in.TransactionalUseCase)")
     void transactionalUseCaseMethod() {}
 
+    // AV-1: REQUIRES_NEW is a marker annotation, not a package literal. The
+    // owning BC declares it (e.g. audit's AuditLoggerUseCaseImpl); adding a
+    // second BC needs no infrastructure edit. The legacy package pointcut is
+    // kept as a fail-safe OR so a missed annotation can never silently run
+    // without a transaction — but new code must use the annotation.
+    @Pointcut("@within(com.bank.app.common.application.port.in.RequiresNewUseCase)")
+    void requiresNewUseCaseMethod() {}
+
     @Pointcut("within(com.bank.app.audit.application.usecase..*)")
     void auditUseCaseMethod() {}
+
+    @Pointcut("requiresNewUseCaseMethod() || auditUseCaseMethod()")
+    void independentUseCaseMethod() {}
 
     // Isolation is explicit READ_COMMITTED (PostgreSQL default): the locking
     // strategy is pessimistic (SELECT ... FOR UPDATE in stable ID order), not
     // optimistic, so REPEATABLE_READ/SERIALIZABLE would only add 40001/40003
     // retries without benefit (9.2). Declared here — not a coincidence.
-    @Around("transactionalUseCaseMethod() && !readOnlyUseCaseMethod() && !auditUseCaseMethod()")
+    @Around("transactionalUseCaseMethod() && !readOnlyUseCaseMethod() && !independentUseCaseMethod()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
@@ -56,7 +67,7 @@ public class UseCaseTransactionAspect {
         return executeWithTransaction(joinPoint, def);
     }
 
-    @Around("readOnlyUseCaseMethod() && !auditUseCaseMethod()")
+    @Around("readOnlyUseCaseMethod() && !independentUseCaseMethod()")
     public Object aroundReadOnly(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
@@ -66,7 +77,7 @@ public class UseCaseTransactionAspect {
         return executeWithTransaction(joinPoint, def);
     }
 
-    @Around("auditUseCaseMethod() && !readOnlyUseCaseMethod()")
+    @Around("independentUseCaseMethod() && !readOnlyUseCaseMethod()")
     public Object aroundAudit(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());
@@ -76,7 +87,7 @@ public class UseCaseTransactionAspect {
         return executeWithTransaction(joinPoint, def);
     }
 
-    @Around("auditUseCaseMethod() && readOnlyUseCaseMethod()")
+    @Around("independentUseCaseMethod() && readOnlyUseCaseMethod()")
     public Object aroundAuditReadOnly(ProceedingJoinPoint joinPoint) throws Throwable {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setName(joinPoint.getSignature().toShortString());

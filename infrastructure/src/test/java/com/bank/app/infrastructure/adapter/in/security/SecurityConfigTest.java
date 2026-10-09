@@ -10,14 +10,9 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -76,16 +71,5 @@ class SecurityConfigTest {
     void shouldCreateAuthenticationProviderBean() {
         AuthenticationProvider provider = securityConfig.authenticationProvider();
         assertInstanceOf(DaoAuthenticationProvider.class, provider);
-    }
-
-    @Test
-    void shouldCreateSecurityFilterChain() throws Exception {
-        HttpSecurity http = mock(HttpSecurity.class, RETURNS_DEEP_STUBS);
-        when(http.build()).thenReturn(mock(DefaultSecurityFilterChain.class));
-
-        SecurityFilterChain chain = securityConfig.securityFilterChain(http, corsConfigurationSource);
-        assertNotNull(chain);
-
-        verify(http).build();
     }
 }

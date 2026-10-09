@@ -11,6 +11,11 @@
 -- Transfer.create(...). Backfilled from created_at for existing rows.
 -- The mapper prefers business_created_at and falls back to created_at for
 -- legacy rows. Ordering queries keep using created_at (insert order).
+--
+-- HIGH-4: full-table backfill on a populated DB exceeds the 30s per-role
+-- statement_timeout (docker-init/init-db.sql). Lift it for this migration
+-- only (Flyway runs each migration in one transaction: SET LOCAL applies).
+SET LOCAL statement_timeout = '10min';
 
 ALTER TABLE transfers ADD COLUMN business_created_at TIMESTAMP(6);
 

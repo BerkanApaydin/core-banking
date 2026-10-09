@@ -8,6 +8,9 @@
 -- wildcards, so 'outbox_handler_%' would also match near-misses such as
 -- 'outboxXhandlerX...'. New writes set key_kind explicitly in tryInsert; the
 -- NOT NULL DEFAULT keeps legacy raw writers working (they land as HTTP).
+-- HIGH-4: the backfill UPDATE scans the full table on a populated DB;
+-- lift the 30s per-role statement_timeout for this migration only.
+SET LOCAL statement_timeout = '10min';
 
 ALTER TABLE idempotency_keys
     ADD COLUMN key_kind VARCHAR(16) NOT NULL DEFAULT 'HTTP';

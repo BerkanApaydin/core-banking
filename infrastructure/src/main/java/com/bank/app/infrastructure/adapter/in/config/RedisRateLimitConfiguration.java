@@ -2,6 +2,8 @@ package com.bank.app.infrastructure.adapter.in.config;
 
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
+import io.lettuce.core.api.StatefulConnection;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
@@ -14,6 +16,7 @@ import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -38,7 +41,24 @@ public class RedisRateLimitConfiguration {
         if (properties.getUsername() != null) server.setUsername(properties.getUsername());
         if (properties.getPassword() != null) server.setPassword(RedisPassword.of(properties.getPassword()));
 
-        LettuceClientConfiguration.LettuceClientConfigurationBuilder client = LettuceClientConfiguration.builder();
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder client;
+        // PERF-7: bounded pool from spring.data.redis.lettuce.pool.* (see
+        // application.yml). Without this every request shares one multiplex
+        // connection and a slow command blocks all Tomcat threads. Pooling
+        // needs the pooling builder subtype; the plain builder otherwise.
+        RedisProperties.Pool pool = properties.getLettuce() != null
+                ? properties.getLettuce().getPool() : null;
+        if (pool != null) {
+            GenericObjectPoolConfig<StatefulConnection<?, ?>> poolConfig =
+                    new GenericObjectPoolConfig<>();
+            if (pool.getMaxActive() > 0) poolConfig.setMaxTotal(pool.getMaxActive());
+            if (pool.getMaxIdle() > 0) poolConfig.setMaxIdle(pool.getMaxIdle());
+            if (pool.getMinIdle() > 0) poolConfig.setMinIdle(pool.getMinIdle());
+            if (pool.getMaxWait() != null) poolConfig.setMaxWait(pool.getMaxWait());
+            client = LettucePoolingClientConfiguration.builder().poolConfig(poolConfig);
+        } else {
+            client = LettuceClientConfiguration.builder();
+        }
         if (properties.getSsl().isEnabled()) client.useSsl();
         if (properties.getTimeout() != null) client.commandTimeout(properties.getTimeout());
         if (properties.getConnectTimeout() != null) {

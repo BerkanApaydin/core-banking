@@ -34,10 +34,11 @@ via mode 1 before this listener ever runs.
 
 ## Standalone audit use cases
 
-`AuditLoggerUseCaseImpl` (and `GetAuditLogsQueryImpl`) carry no transaction
-annotation; `UseCaseTransactionAspect` forces `REQUIRES_NEW` for the whole
-`audit.application.usecase` package so audit writes never join a business
-transaction when invoked outside the money path (see
+`AuditLoggerUseCaseImpl` declares `@RequiresNewUseCase` in its own module;
+`UseCaseTransactionAspect` interprets the marker as `REQUIRES_NEW` (the legacy
+`audit.application.usecase` package pointcut remains as a fail-safe OR).
+`GetAuditLogsQueryImpl` is read-only. Audit writes therefore never join a
+business transaction when invoked outside the money path (see
 `docs/decisions/transaction-strategy.md`).
 
 ## Rule of thumb

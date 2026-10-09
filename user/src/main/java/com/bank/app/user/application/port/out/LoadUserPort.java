@@ -15,4 +15,15 @@ public interface LoadUserPort {
     default Optional<User> findById(Long userId) {
         return Optional.empty();
     }
+
+    /**
+     * AV-2: narrow projection for the admin token-version re-check (SEC-01).
+     * Infrastructure's JwtAuthenticationFilter needs only the generation
+     * counter, not the full User aggregate — this keeps the platform filter
+     * free of {@code user.domain} imports (DIP). Defaults to the findById
+     * mapping; adapters may override with a lighter select.
+     */
+    default Optional<Long> findTokenVersionById(Long userId) {
+        return findById(userId).map(User::getTokenVersion);
+    }
 }

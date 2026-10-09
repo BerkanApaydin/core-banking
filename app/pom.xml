@@ -178,6 +178,17 @@
                         </goals>
                         <configuration>
                             <skip>${jacoco.skip}</skip>
+                            <!-- HIGH-3: the check must evaluate the AGGREGATE
+                                 report (all reactor modules), not this module's
+                                 5 bootstrap classes. dataFileIncludes pulls
+                                 every module's exec; the single source of
+                                 truth for thresholds stays in the root pom
+                                 (jacoco.line/branch.coverage) mirrored by
+                                 scripts/check_aggregate_coverage.py. -->
+                            <dataFileIncludes>
+                                <dataFileInclude>**/jacoco.exec</dataFileInclude>
+                            </dataFileIncludes>
+                            <haltOnFailure>true</haltOnFailure>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>

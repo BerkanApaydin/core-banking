@@ -3,7 +3,7 @@
 ## Current state
 
 All Flyway migrations live in one directory —
-`common/src/main/resources/db/migration/V1__…V4x__….sql` — while the JPA
+`common/src/main/resources/db/migration/V1__…V50__.sql` — while the JPA
 entities they serve live in their bounded contexts (`account`, `transfer`,
 …). The `persistence` module carries the name but owns almost no schema.
 This is backwards from the module story (BCs own their tables) and makes
@@ -22,6 +22,18 @@ Every new migration file must start with an owner header:
 (`account`, `transfer`, `user`, `audit`, `infra` for outbox/idempotency,
 `shared` only for genuinely cross-cutting changes). Reviewers reject
 owner-less migrations; the header is what a future split script groups by.
+
+## Heavy-statement convention (HIGH-4)
+
+The `bank_user` role carries `statement_timeout = '30s'`
+(`docker-init/init-db.sql`). Any migration with a full-table `UPDATE`,
+`VALIDATE CONSTRAINT`, column-type rewrite or large index build must open
+with `SET LOCAL statement_timeout = '10min';` (Flyway runs each migration in
+one transaction, so `SET LOCAL` applies). `CREATE INDEX CONCURRENTLY` is
+illegal inside Flyway's transaction — large indexes belong in
+`scripts/create_index_concurrently.sql` as an operator step instead.
+`scripts/check_migration_timeouts.py` (CI + `test-all.sh`) fails any heavy
+migration without the lift.
 
 ## Long-term split plan (not yet executed — deliberate)
 

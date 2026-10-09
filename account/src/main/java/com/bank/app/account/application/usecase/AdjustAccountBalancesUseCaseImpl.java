@@ -109,11 +109,11 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         domainEventPublisherService.publishEvents(sender);
         domainEventPublisherService.publishEvents(receiver);
         if (direction.isOutflow()) {
-            auditMovement("ACCOUNT_DEBITED", savedSender, amount);
-            auditMovement("ACCOUNT_CREDITED", savedReceiver, amount);
+            auditMovement(true, savedSender, amount);
+            auditMovement(false, savedReceiver, amount);
         } else {
-            auditMovement("ACCOUNT_CREDITED", savedSender, amount);
-            auditMovement("ACCOUNT_DEBITED", savedReceiver, amount);
+            auditMovement(false, savedSender, amount);
+            auditMovement(true, savedReceiver, amount);
         }
     }
 
@@ -126,8 +126,9 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
      */
     // S6: the saved aggregate travels as one object instead of three
     // loosely-related primitives (id + balance + implicit pairing).
-    private void auditMovement(String action, Account account, Money amount) {
-        String verb = "ACCOUNT_DEBITED".equals(action) ? "Debited" : "Credited";
+    private void auditMovement(boolean debited, Account account, Money amount) {
+        String action = debited ? AuditEvent.ACCOUNT_DEBITED : AuditEvent.ACCOUNT_CREDITED;
+        String verb = debited ? "Debited" : "Credited";
         auditEventPort.publish(new AuditEvent(action,
                 String.format("%s %s account ID %d (balance after: %s)",
                         verb, amount, account.getId(), account.getBalance()),

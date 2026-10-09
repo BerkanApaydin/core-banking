@@ -4,8 +4,11 @@ import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.EmailAddress;
 import com.bank.app.user.domain.PhoneNumber;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.EncodedPassword;
 import com.bank.app.user.domain.Role;
+import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 
+import java.time.Clock;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -196,6 +200,23 @@ class UserJpaAdapterTest {
             verify(userJpaRepository).save(captor.capture());
             assertNull(captor.getValue().getEmail());
             assertNull(captor.getValue().getPhone());
+        }
+    }
+
+    @Nested
+    @DisplayName("concurrent duplicate translation (AV-4)")
+    class ConcurrentDuplicate {
+
+        @Test
+        @DisplayName("should map unique-constraint violation to UsernameAlreadyTakenException")
+        void shouldMapConcurrentDuplicateToConflict() {
+            User user = User.create("newuser",
+                    EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001"),
+                    null, null, Clock.systemUTC());
+            when(userJpaRepository.save(any(UserJpaEntity.class)))
+                    .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+            assertThrows(UsernameAlreadyTakenException.class, () -> adapter.save(user));
         }
     }
 

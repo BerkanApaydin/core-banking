@@ -23,6 +23,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -68,9 +69,13 @@ public class OutboxPoller {
         verifyPendingPartitionsAreCovered(partitionCount);
 
         int threadCount = partitionCount <= 0 ? 1 : partitionCount;
-        // Perf-2: 4 workers per partition (I/O-bound handler work); capped to
-        // avoid thread explosion when partitionCount is raised for throughput.
-        int workerThreads = Math.min(Math.max(threadCount * 4, 4), 32);
+        // PERF-8: 4 workers per partition (I/O-bound handler work), capped at
+        // 12 — not 32. Each worker holds a REQUIRES_NEW transaction (one Hikari
+        // connection), and the pool is 20: 32 workers plus poller/HTTP threads
+        // saturate Hikari, so recordFailure's connection is skipped and
+        // retry/dead-letter accounting silently drops. 12 workers (3x default
+        // 2 partitions x 4) leaves headroom for web traffic.
+        int workerThreads = Math.min(Math.max(threadCount * 4, 4), 12);
         workers = Executors.newFixedThreadPool(workerThreads, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger();
             @Override
@@ -215,7 +220,12 @@ public class OutboxPoller {
         }
         for (Future<?> f : futures) {
             try {
-                f.get();
+                // PERF-8: bounded wait — an untimed get() parks the partition
+                // thread for the full 30s tx timeout when a handler hangs.
+                f.get(30, TimeUnit.SECONDS);
+            } catch (TimeoutException timeout) {
+                f.cancel(true);
+                log.warn("Outbox worker timed out after 30s; task cancelled");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

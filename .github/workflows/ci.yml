@@ -89,6 +89,16 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Resolve CI JWT secret (HIGH-2, no committed fallback)
+      # Never embed a secret literal in the workflow: prefer the repo secret,
+      # otherwise mint a fresh ephemeral 256-bit key for this run only.
+      run: |
+        if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> "$GITHUB_ENV"
+        else
+          echo "JWT_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+        fi
+
     # D21: no explicit actions/cache for ~/.m2 — setup-java's `cache: maven`
     # above already handles it; the duplicate step only doubled cache writes.
     - name: Unit & Integration Tests (with coverage)
@@ -102,10 +112,7 @@ jobs:
         DB_PASSWORD: bank_password
         REDIS_HOST: localhost
         REDIS_PORT: 6379
-        # CI-only fallback: deliberately NOT the dev default (...5970). The
-        # last-character difference is intentional — it keeps CI runs off the
-        # publicly-known dev secret while remaining a valid 256-bit key.
-        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
+        JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Generate aggregate CycloneDX SBOM
       run: |
@@ -147,6 +154,8 @@ jobs:
       run: |
         python3 scripts/check_compose_jwt_default.py
         python3 scripts/check_test_injection.py
+        python3 scripts/check_error_keys.py
+        python3 scripts/check_migration_timeouts.py
         grep -q "kind: HorizontalPodAutoscaler" k8s/bank-app.yaml
         grep -q "kind: PodDisruptionBudget" k8s/bank-app.yaml
         test -f docker-compose.prod.yml
@@ -181,7 +190,7 @@ jobs:
         export SPRING_PROFILES_ACTIVE=dev
         export DB_HOST=localhost DB_PORT=5432 DB_USERNAME=bank_user DB_PASSWORD=bank_password
         export REDIS_HOST=localhost REDIS_PORT=6379
-        export JWT_SECRET="${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}"
+        export JWT_SECRET="${JWT_SECRET:?JWT_SECRET must be resolved by the earlier step}"
         java -jar app/target/app-*.jar > app-load-smoke.log 2>&1 &
         echo $! > app-load.pid
         trap 'kill "$(cat app-load.pid)" 2>/dev/null || true' EXIT

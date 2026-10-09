@@ -25,3 +25,12 @@ This is deliberate, not drift:
 Revisit if a bounded context gains its own deployable: at that point the
 context moves with it, and the composition-root suite shrinks to contract
 tests between deployables.
+
+**Amendment (narrow security slices):** `SecurityAuthorizationMatrixTest`
+boots only `SecurityConfig` + the real `JwtAuthenticationFilter` with mocked
+ports and lives in `infrastructure` (not `app`): it validates filter-chain
+*composition*, not deployable wiring, and needs none of the composition
+root. Its mock beans are gated behind the `security-matrix-test` profile —
+the same pattern as `SecurityIntegrationTest`'s `security-test` profile —
+because `TestApplication`'s broad `com.bank.app` component scan would
+otherwise leak them into every other integration-test context.

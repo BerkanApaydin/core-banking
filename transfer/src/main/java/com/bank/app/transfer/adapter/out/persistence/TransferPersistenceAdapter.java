@@ -4,6 +4,7 @@ import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
+import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,9 +44,10 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         if (transfer.getVersion() == null) {
             // Exceptional path only (callers always carry the version they read):
             // one load distinguishes a missing row from a blind write.
+            // Domain NOT_FOUND (404 like the account sibling), never bare
+            // IllegalArgumentException (500).
             repository.findById(transfer.getId())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Transfer not found: " + transfer.getId()));
+                    .orElseThrow(() -> new TransferNotFoundException(transfer.getId()));
             throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
         }
         int updated = repository.updateStatusIfVersionMatch(
@@ -57,8 +59,7 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
                     transfer.getStatus(), transfer.getCreatedAt(), bumped);
         }
         repository.findById(transfer.getId())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Transfer not found: " + transfer.getId()));
+                .orElseThrow(() -> new TransferNotFoundException(transfer.getId()));
         throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
     }
 

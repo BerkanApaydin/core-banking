@@ -12,8 +12,11 @@ ADR; no data move, `USING status::text` + add CHECK).
 
 **Procedure for adding a new enum value (mandatory):**
 1. Measure the `ALTER TYPE ... ADD VALUE` lock time on staging (V32 note).
-2. PG 12 constraint: `ADD VALUE` cannot run inside a transaction; split the
-   deploy in two (type first, code second).
+2. PG 12+ runs `ADD VALUE` inside Flyway's single migration transaction just
+   fine as pure DDL (proven by V33 and V50 on PostgreSQL 15) — with one hard
+   rule: the new value must not be *used* (inserted/compared) in the same
+   transaction that adds it. A migration that both adds and uses a value must
+   still split in two.
 3. For rename/removal: new type + `ALTER COLUMN TYPE USING` + drop old type;
    run the lock-measurement step in `docs/release.md`.
 4. CI applies migrations to an empty DB — the large-table simulation

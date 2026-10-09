@@ -68,6 +68,8 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldTranslateDomainNotFoundToPublishedLanguageById() {
+        // Fully qualified: simple-name collision with the published
+        // accountapi.AccountNotFoundException (imported); Java cannot import both.
         when(accountQueryUseCase.getAccountInfo(999L))
                 .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException(999L));
 
@@ -82,6 +84,7 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldTranslateDomainNotFoundToPublishedLanguageByIban() {
+        // Fully qualified: same simple-name collision as above.
         when(accountQueryUseCase.getAccountInfoForTransfer("TR000"))
                 .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException("TR000"));
 

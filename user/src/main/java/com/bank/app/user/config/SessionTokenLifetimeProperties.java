@@ -2,6 +2,7 @@ package com.bank.app.user.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Token lifetimes needed by the browser-session adapter, owned by the User
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * records are registered as distinct beans and Spring binds each
  * independently, ignoring unknown fields.
  */
+@Validated
 @ConfigurationProperties(prefix = "jwt")
 public record SessionTokenLifetimeProperties(
         @DefaultValue("900000") long accessExpiration,

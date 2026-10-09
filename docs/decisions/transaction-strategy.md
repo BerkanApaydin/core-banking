@@ -13,8 +13,13 @@ single `@Transactional` can express uniformly:
   `PESSIMISTIC_WRITE` row locks cannot exhaust the Hikari pool;
 - explicit `READ_COMMITTED` isolation (the locking strategy is pessimistic, so
   `REPEATABLE_READ`/`SERIALIZABLE` would only add 40001/40003 retries);
-- `REQUIRES_NEW` for the `audit` package so `AFTER_COMMIT` observers never join
-  the business transaction.
+- `REQUIRES_NEW` for `@RequiresNewUseCase`-marked use cases (currently
+  `AuditLoggerUseCaseImpl`, which declares the marker in its own module) so
+  `AFTER_COMMIT` observers never join the business transaction. The legacy
+  `audit.application.usecase` package pointcut is kept as a fail-safe OR so a
+  missed annotation can never silently run without a transaction — but new
+  REQUIRES_NEW semantics must use the annotation, not the package literal
+  (see `BoundaryArchitectureTest.auditRequiresNewSemanticsMustBeAnnotated`).
 
 **Rule: application-layer code (`..application..`) must never use
 `@Transactional`** — enforced by

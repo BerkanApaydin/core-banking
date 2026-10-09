@@ -2,6 +2,7 @@ package com.bank.app.user.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Typed browser-session cookie configuration owned by the User bounded
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * {@code jwt.*} namespace; token lifetimes needed here are bound by the
  * sibling {@code SessionTokenLifetimeProperties}.
  */
+@Validated
 @ConfigurationProperties(prefix = "app.security.browser-session")
 public record BrowserSessionProperties(
         @DefaultValue("false") boolean secure

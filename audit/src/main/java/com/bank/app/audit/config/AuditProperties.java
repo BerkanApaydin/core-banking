@@ -2,7 +2,9 @@ package com.bank.app.audit.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.audit")
 public record AuditProperties(
         @DefaultValue("500") int maxQueryLimit,

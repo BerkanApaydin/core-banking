@@ -11,7 +11,7 @@ measured by the quarterly drill (`ops/restore-drill.sh`), not re-derived here.
 |---|---|---|
 | Transfer placement success | 99.9% of `POST /api/v1/transfers` → 2xx (excluding 4xx caller errors) | `http_server_requests_seconds_count{uri="/api/v1/transfers"}` |
 | Transfer placement latency | p99 < 2s | `http_server_requests_seconds` histogram, same selector |
-| No lost money movements | 100% — zero unexplained balance changes per reconciliation | Continuous gauge `ledger_nonzero_transaction_refs` (alert: `LedgerImbalance`, page on any nonzero group); the nightly manual check (V29 query) remains the drill procedure |
+| No lost money movements | 100% — zero unexplained balance changes per reconciliation | Nightly-published gauge `ledger_nonzero_transaction_refs` (alert: `LedgerImbalance`, page on any nonzero group; detection latency up to ~24h by design, PERF-1); the nightly manual check (V29 query) remains the drill procedure |
 | Outbox delivery | 100% — zero dead letters | `outbox_event_dead_letter_total` (alert: `OutboxDeadLetter`) |
 | Audit completeness | 100% — every transfer has legs + `TRANSFER_EXECUTED` row | `audit_event_consumed_total` tracks persisted rows (alert: `AuditDispatchStalled`) |
 | Auth availability | 99.9% of login attempts answered (2xx/4xx, not 5xx) | `http_server_requests_seconds_count{uri="/api/v1/auth/login"}` |
@@ -42,8 +42,11 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
   traffic).
 - Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG
   ≥200 or PgBouncer (`k8s/bank-app.yaml:94-100`, `docs/operations.md`).
-  Post-parallelization outbox ceiling is ~100-200 ev/s (partitions × workers);
-  beyond that, the `docs/decisions/kafka-readiness.md` trigger applies.
+  Post-parallelization outbox ceiling is ~100-200 ev/s (4 workers per
+  partition, capped at 12 total so `REQUIRES_NEW` workers can never exhaust
+  the 20-connection Hikari pool — raising `partition-count` past 3 no longer
+  adds workers, only scan sharding); beyond that, the
+  `docs/decisions/kafka-readiness.md` trigger applies.
 - Reconciliation: `LedgerReconciliationJob` (03:30 cron) + `ledger.nonzero`
   counter; nonzero pages (critical), drill procedure in
   `docs/disaster-recovery.md`.

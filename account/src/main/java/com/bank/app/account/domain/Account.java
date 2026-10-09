@@ -5,6 +5,7 @@ import com.bank.app.account.domain.exception.AccountClosedException;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.common.domain.BaseAggregateRoot;
+import com.bank.app.common.domain.FieldLimits;
 import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -43,8 +44,8 @@ public class Account extends BaseAggregateRoot {
         if (trimmedOwnerName.isEmpty()) {
             throw new IllegalArgumentException("Owner name must not be empty");
         }
-        if (trimmedOwnerName.length() > 255) {
-            throw new IllegalArgumentException("Owner name can be at most 255 characters");
+        if (trimmedOwnerName.length() > FieldLimits.MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Owner name can be at most " + FieldLimits.MAX_TEXT + " characters");
         }
         this.ownerName = trimmedOwnerName;
         this.balance = Objects.requireNonNull(balance, "Balance must not be null");

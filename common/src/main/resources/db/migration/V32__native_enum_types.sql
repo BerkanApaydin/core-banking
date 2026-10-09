@@ -6,6 +6,9 @@
 -- names are the enum simple names (quoted: mixed case).
 -- Safe online on small tables (brief ACCESS EXCLUSIVE per ALTER); assess lock
 -- time in staging before rolling against a large transfers table.
+-- HIGH-4: six full-table rewrites exceed the 30s per-role statement_timeout
+-- on a populated DB. Lift it for this migration only.
+SET LOCAL statement_timeout = '10min';
 
 CREATE TYPE "AccountStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'CLOSED');
 CREATE TYPE "Currency" AS ENUM ('TRY', 'USD', 'EUR');

@@ -5,11 +5,18 @@ import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 
+import com.bank.app.common.application.port.in.RequiresNewUseCase;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.UserContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * AV-1: REQUIRES_NEW semantics are declared here via {@link RequiresNewUseCase}
+ * (interpreted by infrastructure's UseCaseTransactionAspect), not hidden in a
+ * package literal in another module.
+ */
+@RequiresNewUseCase
 public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(AuditLoggerUseCaseImpl.class);

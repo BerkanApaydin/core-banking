@@ -34,6 +34,17 @@ public final class EncodedPassword {
         return new EncodedPassword(hash, false);
     }
 
+    /**
+     * CS-1: wraps hashes read from a trusted store without re-validating.
+     * Zero production call sites (rehydration passes raw Strings through the
+     * User constructor, not this factory) — kept only for legacy test
+     * fixtures. Never call with request input: {@code User.changePassword}
+     * re-validates via {@link #of(String)} even for VO arguments, so a
+     * misused {@code ofTrusted} still fails fast at the mutation boundary.
+     *
+     * @deprecated Test/legacy only. Prefer {@link #of(String)}.
+     */
+    @Deprecated
     public static EncodedPassword ofTrusted(String hash) {
         return new EncodedPassword(hash, true);
     }

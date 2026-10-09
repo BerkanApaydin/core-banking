@@ -15,6 +15,9 @@
 -- @Column(nullable = false) to match, so ddl-auto=validate fails fast on any
 -- future drift instead of discovering it on a legacy-row write.
 -- Do NOT "fix" this by editing V1/V8: Flyway checksums protect applied history.
+-- HIGH-4: full-table UPDATEs exceed the 30s per-role statement_timeout on a
+-- populated DB. Lift it for this migration only.
+SET LOCAL statement_timeout = '10min';
 
 UPDATE accounts SET version = 0 WHERE version IS NULL;
 UPDATE transfers SET version = 0 WHERE version IS NULL;

@@ -38,18 +38,18 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Stri
     @Query("SELECT e FROM OutboxJpaEntity e WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     Optional<OutboxJpaEntity> findByIdForUpdateSkipLocked(@Param("id") String id);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE OutboxJpaEntity e SET e.processed = true, e.processedAt = CURRENT_TIMESTAMP "
-           + "WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
+            + "WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markProcessed(@Param("id") String id);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE OutboxJpaEntity e SET e.processed = false, e.retryCount = :retryCount, "
-           + "e.lastError = :error WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
+            + "e.lastError = :error WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markFailed(@Param("id") String id, @Param("error") String error,
                     @Param("retryCount") int retryCount);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE OutboxJpaEntity e SET e.deadLetter = true, e.retryCount = :retryCount, "
             + "e.lastError = :error WHERE e.id = :id AND e.processed = false AND e.deadLetter = false")
     void markDeadLetter(@Param("id") String id, @Param("error") String error,

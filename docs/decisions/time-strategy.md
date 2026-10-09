@@ -19,6 +19,12 @@ developer machines (Istanbul) while CI/prod agreed on UTC.
    `LocalDateTime.now()` fixtures stay allowed in tests ONLY where no
    cross-source comparison happens; anything asserting ages, cutoffs or windows
    uses the same UTC clock as the code under test.
+   The test JVMs themselves are pinned with `-Duser.timezone=UTC` (surefire +
+   failsafe `argLine` in the root pom, mirroring the Dockerfile): since V46
+   stores wall-clock columns as TIMESTAMPTZ, the JVM zone IS the stored clock,
+   and a non-UTC host zone (e.g. +03:00 laptops) would otherwise shift every
+   DB-read instant — this exact skew once made a 1-hour-old PENDING row look
+   future-dated to the reaper cutoff.
 3. New absolute-time fields use `Instant`; new DB columns use `TIMESTAMPTZ`
    (`token_revocations.expires_at` is the precedent). Existing `TIMESTAMP`
    columns stay and are UTC by this convention — including the

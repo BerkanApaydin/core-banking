@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.security;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Typed brute-force guard configuration (replaces the scattered
@@ -14,6 +15,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * rejected here. The window must stay a positive number of minutes the
  * counter backends can represent.
  */
+@Validated
 @ConfigurationProperties(prefix = "app.security.failed-login")
 public record LoginAttemptProperties(
         @DefaultValue("5") int maxAttempts,

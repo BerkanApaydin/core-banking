@@ -66,7 +66,7 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
         account.suspend(clockProvider.clock());
         Account saved = saveAccountPort.save(account);
         domainEventPublisherService.publishEvents(saved);
-        auditEventPort.publish(new AuditEvent("ACCOUNT_SUSPENDED",
+        auditEventPort.publish(new AuditEvent(AuditEvent.ACCOUNT_SUSPENDED,
                 "Suspended account ID " + saved.getId() + " (owner user ID "
                         + saved.getUserId().value() + ")",
                 LocalDateTime.now(clockProvider.clock()),

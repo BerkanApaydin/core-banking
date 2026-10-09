@@ -86,6 +86,8 @@ class BusinessErrorHttpMapperTest {
                 Arguments.of(new CurrencyMismatchException("Different currencies"), 400, "CURRENCY_MISMATCH"),
                 Arguments.of(new AccountNotFoundException(42L), 404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new AccountNotFoundException("TR000"), 404, "ACCOUNT_NOT_FOUND_IBAN"),
+                // Fully qualified: simple-name collision with the published
+                // accountapi.AccountNotFoundException (imported above).
                 Arguments.of(new com.bank.app.account.domain.exception.AccountNotFoundException(42L),
                         404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new UserNotFoundException("Unknown user"), 404, "USER_NOT_FOUND"),

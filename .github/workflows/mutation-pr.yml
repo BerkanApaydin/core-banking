@@ -67,6 +67,14 @@ jobs:
         echo "modules=$CHANGED" >> "$GITHUB_OUTPUT"
         echo "Targeted modules: $CHANGED"
 
+    - name: Resolve CI JWT secret (HIGH-2, no committed fallback)
+      run: |
+        if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> "$GITHUB_ENV"
+        else
+          echo "JWT_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+        fi
+
     - name: Install reactor JARs (skip tests)
       run: mvn -B -ntp clean install -DskipTests
       env:
@@ -76,7 +84,7 @@ jobs:
         DB_PASSWORD: bank_password
         REDIS_HOST: localhost
         REDIS_PORT: 6379
-        JWT_SECRET: ${{ secrets.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971' }}
+        JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Targeted mutation (advisory)
       run: mvn -B -ntp pitest:mutationCoverage -pl "${{ steps.modules.outputs.modules }}" -Dpitest.skip=false -T 4

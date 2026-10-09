@@ -2,7 +2,9 @@ package com.bank.app.infrastructure.adapter.in.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.transaction")
 public record TransactionProperties(
         @DefaultValue("30") int timeoutSeconds

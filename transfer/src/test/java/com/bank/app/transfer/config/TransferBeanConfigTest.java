@@ -6,6 +6,7 @@ import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.transfer.adapter.out.account.TransferAccountAclConfiguration;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotalsQuery;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
@@ -118,7 +119,8 @@ class TransferBeanConfigTest {
 
     @Test
     void shouldCreateAccountInfoCachePortFallbackBean() {
-        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        // AV: adapter beans moved next to the adapters they construct.
+        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
         Environment environment = mock(Environment.class);
         assertNotNull(config.accountInfoCachePort(environment));
     }
@@ -129,7 +131,7 @@ class TransferBeanConfigTest {
         // ProductionConfigContractTest, so this fallback must never activate
         // there. If the wiring ever degrades, fail at startup instead of
         // serving per-JVM snapshots silently across replicas.
-        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
         Environment prod = mock(Environment.class);
         when(prod.matchesProfiles("prod")).thenReturn(true);
 
@@ -138,7 +140,7 @@ class TransferBeanConfigTest {
 
     @Test
     void shouldCreateAccountAclPortBean() {
-        TransferBeanConfig config = new TransferBeanConfig(transferProperties);
+        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
         assertNotNull(config.accountAclPort(accountApi, cachePort));
     }
 

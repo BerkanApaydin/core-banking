@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -38,6 +39,17 @@ class LedgerReconciliationJobTest {
         // Paging happens through the ledger.nonzero counter + ERROR log;
         // the scheduler itself must never throw and kill future runs.
         assertThatNoException().isThrownBy(job::reconcile);
+    }
+
+    @Test
+    void shouldPublishNonzeroCountAsGauge() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(3L);
+
+        assertThatNoException().isThrownBy(job::reconcile);
+
+        assertThat(registry.get("ledger.nonzero_transaction_refs").gauge().value()).isEqualTo(3.0);
     }
 
     @Test

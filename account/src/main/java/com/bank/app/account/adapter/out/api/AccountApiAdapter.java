@@ -50,6 +50,9 @@ public class AccountApiAdapter implements AccountApi {
     public AccountSnapshot getSnapshotById(Long accountId) {
         try {
             return toSnapshot(accountQueryUseCase.getAccountInfo(accountId));
+        // Fully qualified: simple-name collision with the published
+        // accountapi.AccountNotFoundException (imported above) — Java cannot
+        // import both, so the domain side stays qualified here.
         } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
             // Translate to the published language: downstream contexts must
             // never observe account domain types, not even as exceptions.
@@ -61,6 +64,7 @@ public class AccountApiAdapter implements AccountApi {
     public AccountSnapshot getSnapshotByIban(String ibanValue) {
         try {
             return toSnapshot(accountQueryUseCase.getAccountInfoForTransfer(ibanValue));
+        // Fully qualified: same simple-name collision as above.
         } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
             throw new AccountNotFoundException(ibanValue);
         }

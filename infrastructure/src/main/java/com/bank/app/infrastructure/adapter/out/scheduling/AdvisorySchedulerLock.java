@@ -43,12 +43,26 @@ public class AdvisorySchedulerLock {
     private final TransactionTemplate tx;
 
     @Autowired
-    public AdvisorySchedulerLock(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+    public AdvisorySchedulerLock(JdbcTemplate jdbc, PlatformTransactionManager transactionManager,
+            com.bank.app.infrastructure.adapter.in.config.TransactionProperties transactionProperties) {
         this.jdbc = jdbc;
         TransactionTemplate template = new TransactionTemplate(transactionManager);
         template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
-        template.setTimeout(30);
+        template.setTimeout(transactionProperties.timeoutSeconds());
         this.tx = template;
+    }
+
+    // Legacy wiring (tests, manual construction): default 30s budget matching
+    // app.transaction.timeout-seconds. Prefer the properties-based constructor.
+    public AdvisorySchedulerLock(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+        this(jdbc, buildDefaultTemplate(transactionManager));
+    }
+
+    private static TransactionTemplate buildDefaultTemplate(PlatformTransactionManager transactionManager) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+        template.setTimeout(30);
+        return template;
     }
 
     // Test/support construction with an explicit template.

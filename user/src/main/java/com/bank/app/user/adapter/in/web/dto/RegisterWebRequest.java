@@ -1,5 +1,7 @@
 package com.bank.app.user.adapter.in.web.dto;
 
+import com.bank.app.common.domain.FieldLimits;
+
 import com.bank.app.user.adapter.in.web.validation.ValidPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +19,7 @@ import jakarta.validation.constraints.Size;
  */
 public record RegisterWebRequest(
     @NotBlank(message = "{validation.username.required}")
-    @Size(max = 255, message = "{validation.username.tooLong}") String username,
+    @Size(max = FieldLimits.MAX_TEXT_LENGTH, message = "{validation.username.tooLong}") String username,
     @NotBlank(message = "{validation.password.required}")
     @ValidPassword
     @Size(max = 72, message = "{validation.password.tooLong}") String password,

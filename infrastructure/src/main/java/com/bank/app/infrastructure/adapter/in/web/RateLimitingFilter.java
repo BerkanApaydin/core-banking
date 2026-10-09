@@ -70,6 +70,19 @@ public class RateLimitingFilter implements Filter {
             chain.doFilter(request, response);
             return;
         }
+        // M-3: this pre-authentication filter owns ONLY the auth tier
+        // (/api/v1/auth/*). It runs before authentication
+        // (HIGHEST_PRECEDENCE + 1) so no principal exists yet — IP-keying is
+        // correct here (brute-force protection needs no identity). Resource
+        // prefixes (/accounts, /transfers, /admin) are owned by
+        // PrincipalRateLimitingFilter, which keys by authenticated principal:
+        // IP-keying them lets one NAT/botnet client starve every legitimate
+        // user behind the same egress, and gives each bot IP an independent
+        // budget on authenticated endpoints.
+        if (!rateLimitProperties.isAuthTier(matchedPrefix)) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         boolean isWriteOperation = "POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method);
         // Single-resource GETs (by id/IBAN) enable enumeration if unlimited;
@@ -87,18 +100,15 @@ public class RateLimitingFilter implements Filter {
                 httpRequest.getHeader("X-Forwarded-For"), httpRequest.getRemoteAddr());
 
         // Per-endpoint bucket per client ("ip|prefix"): login abuse must not
-        // eat the transfer budget and vice versa. A single global per-IP bucket
-        // also punishes everyone behind one NAT address for one endpoint's
-        // traffic; "|" is unambiguous here (it appears in neither IPs nor
-        // matched prefixes).
+        // eat the refresh budget and vice versa. "|" is unambiguous here (it
+        // appears in neither IPs nor matched prefixes).
         //
-        // Tiered budgets: auth endpoints (/api/v1/auth/*) keep the tight
-        // brute-force budget, authenticated resource reads get the looser one.
-        // Buckets stay IP-keyed on purpose: this filter runs before
-        // authentication (HIGHEST_PRECEDENCE + 1), so no principal exists yet —
-        // and the auth endpoints that need protection most have no principal
-        // by definition. Spoofing is contained by trust-forwarded-headers=false
-        // unless a trusted proxy overwrites X-Forwarded-For.
+        // Auth tier only (see above): buckets stay IP-keyed on purpose — this
+        // filter runs before authentication (HIGHEST_PRECEDENCE + 1), so no
+        // principal exists yet, and the auth endpoints that need protection
+        // most have no principal by definition. Spoofing is contained by
+        // trust-forwarded-headers=false unless a trusted proxy overwrites
+        // X-Forwarded-For.
         final int tierMaxRequests = rateLimitProperties.maxRequestsFor(matchedPrefix);
         final long tierWindowMs = rateLimitProperties.timeWindowMsFor(matchedPrefix);
         final String bucketKey = ip + "|" + matchedPrefix;

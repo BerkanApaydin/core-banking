@@ -7,7 +7,6 @@ import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
-import com.bank.app.user.domain.User;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import com.bank.app.common.domain.exception.ErrorCode;
@@ -50,6 +49,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     // layer). Requests under this prefix re-validate the token generation
     // against the DB (see hasCurrentTokenVersion).
     private static final String ADMIN_PATH_PREFIX = "/api/v1/admin";
+    // L-5: runtime log-level changes (/actuator/loggers, ADMIN-only per
+    // SecurityConfig) get the same re-validation — a demoted admin must not
+    // keep log control for ~15 min on a stale token.
+    private static final String ACTUATOR_LOGGERS_PREFIX = "/actuator/loggers";
 
     private final JwtPort jwtPort;
     private final TokenBlacklistPort tokenBlacklistPort;
@@ -269,7 +272,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private static boolean isAdminRequest(String path) {
-        return ADMIN_PATH_PREFIX.equals(path) || path.startsWith(ADMIN_PATH_PREFIX + "/");
+        return ADMIN_PATH_PREFIX.equals(path) || path.startsWith(ADMIN_PATH_PREFIX + "/")
+                || ACTUATOR_LOGGERS_PREFIX.equals(path) || path.startsWith(ACTUATOR_LOGGERS_PREFIX + "/");
     }
 
     /**
@@ -277,11 +281,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * generation. Pre-versioning tokens present 0 and pre-versioning users
      * persist 0 (V39 backfill), so rolling deploys never lock admins out. A
      * deleted user fails closed (empty lookup rejects).
+     *
+     * <p>AV-2: uses the narrow {@code findTokenVersionById} projection so
+     * this platform filter never imports the user BC's domain aggregate.
      */
     private boolean hasCurrentTokenVersion(String jwt, Long userId) {
         final long presented = jwtPort.extractTokenVersion(jwt);
-        final Optional<User> user = loadUserPort.findById(userId);
-        return user.map(current -> current.getTokenVersion() == presented).orElse(false);
+        final Optional<Long> current = loadUserPort.findTokenVersionById(userId);
+        return current.map(version -> version == presented).orElse(false);
     }
 
     private static boolean isLogoutRequest(HttpServletRequest request, String path) {

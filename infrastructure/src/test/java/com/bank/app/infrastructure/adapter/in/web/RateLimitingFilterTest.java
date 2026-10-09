@@ -343,55 +343,50 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void shouldLimitAccountCreation() throws Exception {
+    void shouldPassResourceTierToPrincipalFilter() throws Exception {
+        // M-3: /api/v1/accounts belongs to the principal-keyed
+        // PrincipalRateLimitingFilter (post-auth). The pre-auth IP filter must
+        // pass it through untouched — even under a strict resource budget —
+        // so one NAT egress cannot starve every user behind it.
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
-        when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
+        FilterChain chain = mock(FilterChain.class);
 
-        MockHttpServletRequest req = new MockHttpServletRequest();
-        req.setRequestURI("/api/v1/accounts");
-        req.setMethod("POST");
-        req.setRemoteAddr("10.0.0.99");
-        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest();
+            req.setRequestURI("/api/v1/accounts");
+            req.setMethod("POST");
+            req.setRemoteAddr("10.0.0.99");
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            strictFilter.doFilter(req, resp, chain);
+            assertEquals(200, resp.getStatus());
+        }
 
-        MockHttpServletRequest req2 = new MockHttpServletRequest();
-        req2.setRequestURI("/api/v1/accounts");
-        req2.setMethod("POST");
-        req2.setRemoteAddr("10.0.0.99");
-        MockHttpServletResponse resp = new MockHttpServletResponse();
-        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
-
-        assertEquals(429, resp.getStatus());
+        verify(chain, times(3)).doFilter(any(), any());
     }
 
     @Test
-    void shouldLimitByRequestUri() throws Exception {
+    void shouldPassTransferUriToPrincipalFilter() throws Exception {
+        // M-3: same split for /api/v1/transfers — IP filter passes through.
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
-        when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
-                .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
                 new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
+        FilterChain chain = mock(FilterChain.class);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setRequestURI("/api/v1/transfers/send");
         req.setRemoteAddr("10.0.0.99");
         req.setMethod("POST");
-        strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
-
-        MockHttpServletRequest req2 = new MockHttpServletRequest();
-        req2.setRequestURI("/api/v1/transfers/send");
-        req2.setRemoteAddr("10.0.0.99");
-        req2.setMethod("POST");
         MockHttpServletResponse resp = new MockHttpServletResponse();
-        strictFilter.doFilter(req2, resp, mock(FilterChain.class));
+        strictFilter.doFilter(req, resp, chain);
 
-        assertEquals(429, resp.getStatus());
+        assertEquals(200, resp.getStatus());
+        verify(chain).doFilter(any(), any());
     }
 
     @Test
@@ -474,25 +469,27 @@ class RateLimitingFilterTest {
 
     @Test
     void shouldLimitPercentEncodedAliasOfProtectedPath() throws Exception {
-        // %61 == 'a': Spring MVC decodes /api/v1/%61ccounts to /api/v1/accounts
-        // and routes it to the account endpoint. The limiter must decide on the
-        // same decoded path, otherwise the alias escapes rate limiting.
+        // %61 == 'a': Spring MVC decodes /api/v1/%61uth/login to
+        // /api/v1/auth/login and routes it to the login endpoint. The limiter
+        // must decide on the same decoded path, otherwise the alias escapes
+        // rate limiting. (Resource-tier aliases are covered by
+        // PrincipalRateLimitingFilterTest.percentEncodedAliasUsesDecodedPrefix.)
         CaffeineRateLimiter strictLimiter = createLimiter(1, 10_000);
         MessageSource localMessageSource = mock(MessageSource.class);
         when(localMessageSource.getMessage(anyString(), any(), anyString(), any()))
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();
         RateLimitingFilter strictFilter = new RateLimitingFilter(strictLimiter, localMessageSource,
-                new RateLimitProperties(null, null, 10, 10_000, 1, 10_000), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 1, 10_000, 120, 60000), objectMapper, clientIpResolver);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
-        req.setRequestURI("/api/v1/%61ccounts");
+        req.setRequestURI("/api/v1/%61uth/login");
         req.setRemoteAddr("10.0.0.77");
         req.setMethod("POST");
         strictFilter.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
         MockHttpServletRequest req2 = new MockHttpServletRequest();
-        req2.setRequestURI("/api/v1/%61ccounts");
+        req2.setRequestURI("/api/v1/%61uth/login");
         req2.setRemoteAddr("10.0.0.77");
         req2.setMethod("POST");
         MockHttpServletResponse resp = new MockHttpServletResponse();
@@ -582,9 +579,11 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void shouldReturnTieredRetryAfterForResourceTier() throws Exception {
-        // Resource tier (2, 1s): the 3rd request 429s with Retry-After from
-        // the resource window, not the auth window.
+    void shouldNotApplyAuthWindowToResourceTier() throws Exception {
+        // M-3: the pre-auth IP filter no longer owns the resource tier, so it
+        // must not 429 resource requests under ANY window — Retry-After for
+        // the resource tier is covered by
+        // PrincipalRateLimitingFilterTest.resourceTierRetryAfterComesFromResourceWindow.
         RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 2, 1_000);
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(props);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -592,17 +591,16 @@ class RateLimitingFilterTest {
                 props, objectMapper, clientIpResolver);
         FilterChain chain = mock(FilterChain.class);
 
-        MockHttpServletResponse resp = new MockHttpServletResponse();
         for (int i = 0; i < 3; i++) {
             MockHttpServletRequest req = new MockHttpServletRequest();
             req.setRequestURI("/api/v1/accounts");
             req.setRemoteAddr("10.0.0.101");
             req.setMethod("POST");
-            resp = new MockHttpServletResponse();
+            MockHttpServletResponse resp = new MockHttpServletResponse();
             tieredFilter.doFilter(req, resp, chain);
+            assertEquals(200, resp.getStatus());
         }
 
-        assertEquals(429, resp.getStatus());
-        assertEquals("1", resp.getHeader("Retry-After"));
+        verify(chain, times(3)).doFilter(any(), any());
     }
 }

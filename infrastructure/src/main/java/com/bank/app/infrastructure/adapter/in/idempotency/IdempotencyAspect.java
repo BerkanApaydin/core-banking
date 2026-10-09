@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -19,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Aspect
 @Component
-@Order(1)
+@Order(UseCaseAspectOrders.IDEMPOTENCY)
 public class IdempotencyAspect {
 
     private final IdempotencyClaimer claimer;

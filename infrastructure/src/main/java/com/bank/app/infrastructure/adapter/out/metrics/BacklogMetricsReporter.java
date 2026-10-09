@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Periodic, read-only backlog snapshot; gauges are never updated from a partial scan. */
@@ -29,10 +30,12 @@ public class BacklogMetricsReporter {
     static final String HTTP_PENDING_SQL = "SELECT count(*), min(created_at) FROM idempotency_keys "
             + "WHERE status = 'PENDING' AND key_kind = 'HTTP'";
     /**
-     * Money-movement invariant: the two legs sharing a transaction_ref must net
-     * to zero (see V29 and docs/slo.md "Nightly ledger check"). Counts nonzero
-     * groups; a healthy ledger reports 0. Runs inside the same leader-elected
-     * scan as the backlog gauges, so it inherits the max() alert aggregation.
+     * Money-movement invariant (authoritative check lives in
+     * {@code LedgerReconciliationJob}, nightly — including the
+     * {@code ledger.nonzero_transaction_refs} gauge): the two legs sharing a
+     * transaction_ref must net to zero. PERF-1: this 60s reporter MUST NOT run
+     * the full-table GROUP BY — ledger_entries is append-only and unbounded,
+     * so a minutely heap scan + hash aggregate degrades linearly.
      */
     static final String LEDGER_NONZERO_SQL = "SELECT count(*) FROM (SELECT transaction_ref FROM ledger_entries "
             + "GROUP BY transaction_ref HAVING SUM(CASE WHEN direction = 'CREDIT' "
@@ -58,7 +61,6 @@ public class BacklogMetricsReporter {
     private final AtomicLong outboxOldestAgeSeconds = new AtomicLong();
     private final AtomicLong httpPending = new AtomicLong();
     private final AtomicLong httpOldestAgeSeconds = new AtomicLong();
-    private final AtomicLong ledgerNonzeroRefs = new AtomicLong();
     private final AtomicLong auditDefaultPartitionRows = new AtomicLong();
     private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
 
@@ -82,7 +84,6 @@ public class BacklogMetricsReporter {
         meterRegistry.gauge("outbox.oldest_pending.age_seconds", outboxOldestAgeSeconds);
         meterRegistry.gauge("idempotency.http.pending.current", httpPending);
         meterRegistry.gauge("idempotency.http.oldest_pending.age_seconds", httpOldestAgeSeconds);
-        meterRegistry.gauge("ledger.nonzero_transaction_refs", ledgerNonzeroRefs);
         meterRegistry.gauge("audit.default_partition.rows", auditDefaultPartitionRows);
         meterRegistry.gauge("backlog.last_success_epoch_seconds", lastSuccessfulScanEpochSeconds);
     }
@@ -96,7 +97,8 @@ public class BacklogMetricsReporter {
         try {
             Backlog outbox = read(OUTBOX_SQL);
             Backlog http = read(HTTP_PENDING_SQL);
-            long nonzeroRefs = readCount(LEDGER_NONZERO_SQL);
+            // PERF-1: ledger invariant intentionally NOT scanned here (see
+            // LEDGER_NONZERO_SQL javadoc). LedgerReconciliationJob owns it.
             long defaultPartitionRows = tableExists("audit_logs_default")
                     ? readCount(AUDIT_DEFAULT_PARTITION_COUNT_SQL)
                     : 0;
@@ -107,7 +109,6 @@ public class BacklogMetricsReporter {
             outboxOldestAgeSeconds.set(ageSeconds(outbox, now));
             httpPending.set(http.count());
             httpOldestAgeSeconds.set(ageSeconds(http, now));
-            ledgerNonzeroRefs.set(nonzeroRefs);
             auditDefaultPartitionRows.set(defaultPartitionRows);
             lastSuccessfulScanEpochSeconds.set(completedAt);
         } catch (RuntimeException e) {
@@ -125,7 +126,7 @@ public class BacklogMetricsReporter {
         // Read the instant type (OffsetDateTime) and drop to the UTC wall
         // clock the rest of the codebase reasons in.
         Backlog result = jdbc.queryForObject(sql, (rs, rowNum) -> {
-            java.time.OffsetDateTime oldest = rs.getObject(2, java.time.OffsetDateTime.class);
+            OffsetDateTime oldest = rs.getObject(2, OffsetDateTime.class);
             return new Backlog(rs.getLong(1), oldest == null ? null : oldest.toLocalDateTime());
         });
         if (result == null) {

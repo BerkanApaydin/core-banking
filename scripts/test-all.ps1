@@ -34,6 +34,8 @@ try {
     Invoke-Checked 'Health-smoke unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'ops.test_health_smoke', '-v'))
     Invoke-Checked 'Restore-drill contract' $python ($pythonPrefix + @('scripts/check_restore_drill.py'))
     Invoke-Checked 'Compose JWT default pinned' $python ($pythonPrefix + @('scripts/check_compose_jwt_default.py'))
+    Invoke-Checked 'Error message keys in bundle' $python ($pythonPrefix + @('scripts/check_error_keys.py'))
+    Invoke-Checked 'Migration statement timeouts' $python ($pythonPrefix + @('scripts/check_migration_timeouts.py'))
     if (Test-Path -LiteralPath (Join-Path $repoRoot 'target/bom.json')) {
         Invoke-Checked 'Dependency review (OSV gate)' $python ($pythonPrefix + @('scripts/dependency_review.py'))
     } else {

@@ -27,6 +27,15 @@ public final class UseCaseAspectOrders {
     private UseCaseAspectOrders() {}
 
     private static final int LOWEST_PRECEDENCE = Integer.MAX_VALUE;
+    private static final int HIGHEST_PRECEDENCE = Integer.MIN_VALUE;
+
+    /**
+     * Idempotency guard is outermost (servlet-filter-adjacent): the claim must
+     * happen before any retry or transaction boundary. Mirrors Spring's
+     * {@code Ordered.HIGHEST_PRECEDENCE + 1} without depending on Spring
+     * (common stays framework-free).
+     */
+    public static final int IDEMPOTENCY = HIGHEST_PRECEDENCE + 1;
 
     /** Transfer retry must wrap the transaction boundary, not run inside it. */
     public static final int TRANSFER_RETRY = LOWEST_PRECEDENCE - 200;

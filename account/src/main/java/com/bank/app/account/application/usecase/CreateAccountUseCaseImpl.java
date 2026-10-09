@@ -81,7 +81,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
             savedAccount.getId(), savedAccount.getUserId(), savedAccount.getIban(),
             savedAccount.getOwnerName(), savedAccount.getBalance(), LocalDateTime.now(clockProvider.clock())
         ));
-        auditEventPort.publish(new AuditEvent("ACCOUNT_CREATED",
+        auditEventPort.publish(new AuditEvent(AuditEvent.ACCOUNT_CREATED,
             String.format("New account created. ID: %d",
                 savedAccount.getId()),
             LocalDateTime.now(clockProvider.clock()),

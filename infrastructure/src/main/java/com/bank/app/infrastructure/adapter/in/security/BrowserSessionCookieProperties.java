@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.security;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Infrastructure-owned view of the browser-session cookie flag. The User
@@ -10,6 +11,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * infrastructure side of that deliberate duality — same key, two
  * module-owned views, each bound independently.
  */
+@Validated
 @ConfigurationProperties(prefix = "app.security.browser-session")
 public record BrowserSessionCookieProperties(
         @DefaultValue("false") boolean secure

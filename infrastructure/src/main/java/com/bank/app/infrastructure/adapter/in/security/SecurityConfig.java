@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
@@ -81,10 +82,10 @@ public class SecurityConfig {
                     .includeSubDomains(true)
                     .maxAgeInSeconds(31536000))
                 .referrerPolicy(referrer -> referrer
-                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                    .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                            + "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"))
+                            + "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"))
                 .permissionsPolicy(permissions -> permissions
                     .policy("camera=(), microphone=(), geolocation=(), payment=(), usb=()")));
 

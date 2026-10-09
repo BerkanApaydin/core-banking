@@ -17,7 +17,6 @@ import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
 import com.bank.app.user.domain.exception.WeakPasswordException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import java.util.List;
 
 @TransactionalUseCase
@@ -61,16 +60,10 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         // EncodedPassword.of fails fast if the encoder ever returns raw input.
         User user = User.create(request.username(), EncodedPassword.of(encodedPassword), email, phone,
                 clockProvider.clock());
-        final User savedUser;
-        try {
-            savedUser = saveUserPort.save(user);
-        } catch (DataIntegrityViolationException concurrentDuplicate) {
-            // Check-then-save TOCTOU: two concurrent registrations with the same
-            // username both pass the findByUsername guard above. The DB unique
-            // constraint is the final arbiter — translate it back to the domain
-            // conflict instead of leaking a generic 409/500.
-            throw new UsernameAlreadyTakenException(request.username());
-        }
+        // AV-4: concurrent-duplicate translation lives in UserPersistenceAdapter
+        // (DB constraint is the final arbiter for the check-then-save TOCTOU);
+        // the application layer stays free of Spring DAO imports.
+        final User savedUser = saveUserPort.save(user);
         savedUser.recordRegistration(clockProvider.clock());
         domainEventPublisherService.publishEvents(savedUser);
 

@@ -3,10 +3,11 @@
 **Decision:** The access-token path never hits the DB (stateless JWT), except
 on admin paths. `role` and `userId` come from the signed claims; a
 demotion/promotion therefore takes effect on non-admin paths only after the
-access TTL (default 15 min). Admin paths (`/api/v1/admin/**`, SEC-01)
-re-validate the token's `ver` claim against the user's current generation
-(`JwtAuthenticationFilter.hasCurrentTokenVersion` via `LoadUserPort.findById`,
-one indexed PK read per admin call) and fail closed (401 on mismatch or
+access TTL (default 15 min). Admin paths (`/api/v1/admin/**` plus
+`/actuator/loggers/**`, SEC-01) re-validate the token's `ver` claim against
+the user's current generation (the narrow `LoadUserPort.findTokenVersionById`
+projection — one indexed PK read per admin call, no `User` aggregate crosses
+into the platform filter) and fail closed (401 on mismatch or
 deleted user, 503 when the user store is unreadable). The refresh path
 (`RefreshSessionUseCaseImpl`) compares `tokenVersion` against the DB and
 closes the window there.

@@ -53,6 +53,7 @@ class LogoutUseCaseImplTest {
     @DisplayName("should blacklist token when valid Bearer token is provided")
     void shouldBlacklistTokenWhenBearerTokenIsValid() {
         String authHeader = "Bearer valid-jwt-token";
+        when(tokenBlacklistPort.isBlacklisted("valid-jwt-token")).thenReturn(false);
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
 
         logoutUseCase.execute(authHeader);
@@ -65,12 +66,25 @@ class LogoutUseCaseImplTest {
     @DisplayName("should skip blacklist when token already expired")
     void shouldSkipBlacklistWhenTokenExpired() {
         String authHeader = "Bearer expired-jwt-token";
+        when(tokenBlacklistPort.isBlacklisted("expired-jwt-token")).thenReturn(false);
         when(jwtPort.getRemainingMs("expired-jwt-token")).thenReturn(0L);
 
         logoutUseCase.execute(authHeader);
 
         verify(jwtPort).getRemainingMs("expired-jwt-token");
-        verifyNoInteractions(tokenBlacklistPort);
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("M-4: already-revoked token short-circuits to a no-op (still 204)")
+    void shouldNoOpWhenTokenAlreadyRevoked() {
+        when(tokenBlacklistPort.isBlacklisted("revoked-jwt-token")).thenReturn(true);
+
+        logoutUseCase.execute("Bearer revoked-jwt-token");
+
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
+        verifyNoInteractions(jwtPort);
+        verifyNoInteractions(auditEventPort);
     }
 
     @Test

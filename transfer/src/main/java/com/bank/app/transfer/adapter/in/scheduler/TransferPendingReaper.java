@@ -20,6 +20,9 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Crash-window reaper for the synchronous placement path.
@@ -42,6 +45,13 @@ import org.springframework.stereotype.Component;
  * unhandled event type would poison the outbox (see
  * {@code docs/decisions/transfer-failed-state.md}). The audit row below is
  * the trail until a FAILED consumer lands.
+ *
+ * <p>Transactionality: each row is processed in its own
+ * {@code REQUIRES_NEW} transaction via {@link TransactionTemplate}, so the
+ * {@code SELECT ... FOR UPDATE} lock, the versioned bulk UPDATE and the audit
+ * row commit atomically. Without this the {@code PESSIMISTIC_WRITE} query
+ * would run in Spring Data's read-only transaction (PostgreSQL rejects
+ * {@code FOR UPDATE} there with {@code 25006}) or across auto-commits.
  */
 @Component
 @ConditionalOnProperty(prefix = "app.transfer.reaper", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -51,6 +61,7 @@ public class TransferPendingReaper {
 
     static final String REAPED_COUNTER = "transfer.pending.reaped";
     static final String CONFLICT_COUNTER = "transfer.pending.reap-conflicts";
+    private static final int REAP_TX_TIMEOUT_SECONDS = 30;
 
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
@@ -58,6 +69,7 @@ public class TransferPendingReaper {
     private final TransferReaperProperties properties;
     private final ClockProviderPort clockProvider;
     private final MeterRegistry meterRegistry;
+    private final TransactionTemplate transactionTemplate;
 
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
@@ -67,19 +79,41 @@ public class TransferPendingReaper {
         this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, null);
     }
 
+    /**
+     * Unit-test / non-transactional path: runs each row without a surrounding
+     * transaction (ports are mocks in {@code TransferPendingReaperTest}).
+     */
+    public TransferPendingReaper(LoadTransferPort loadTransferPort,
+            SaveTransferPort saveTransferPort,
+            AuditEventPort auditEventPort,
+            TransferReaperProperties properties,
+            ClockProviderPort clockProvider,
+            @Nullable MeterRegistry meterRegistry) {
+        this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, meterRegistry, null);
+    }
+
     @Autowired
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
             AuditEventPort auditEventPort,
             TransferReaperProperties properties,
             ClockProviderPort clockProvider,
-            @Autowired(required = false) @Nullable MeterRegistry meterRegistry) {
+            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
+            @Autowired(required = false) @Nullable PlatformTransactionManager transactionManager) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.auditEventPort = auditEventPort;
         this.properties = properties;
         this.clockProvider = clockProvider;
         this.meterRegistry = meterRegistry;
+        if (transactionManager != null) {
+            TransactionTemplate template = new TransactionTemplate(transactionManager);
+            template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            template.setTimeout(REAP_TX_TIMEOUT_SECONDS);
+            this.transactionTemplate = template;
+        } else {
+            this.transactionTemplate = null;
+        }
     }
 
     @Scheduled(cron = "${app.transfer.reaper.cron:0 */5 * * * *}")
@@ -108,15 +142,15 @@ public class TransferPendingReaper {
     private void reapOne(Transfer stale, Clock clock) {
         Long id = stale.getId();
         try {
-            Transfer locked = loadTransferPort.findByIdForUpdate(id).orElse(null);
-            if (locked == null) {
+            boolean reaped;
+            if (transactionTemplate != null) {
+                reaped = Boolean.TRUE.equals(transactionTemplate.execute(status -> doReapRow(id, clock)));
+            } else {
+                reaped = doReapRow(id, clock);
+            }
+            if (!reaped) {
                 return;
             }
-            locked.markFailed(clock);
-            saveTransferPort.save(locked);
-            auditEventPort.publish(new AuditEvent("TRANSFER_MARKED_FAILED",
-                    "Stale PENDING transfer marked FAILED by reaper. Transfer ID: " + id,
-                    LocalDateTime.now(clock), "system"));
             count(REAPED_COUNTER);
             log.info("Pending-transfer reaped: id={}", id);
         } catch (TransferNotPendingException | OptimisticLockingFailureException e) {
@@ -129,6 +163,24 @@ public class TransferPendingReaper {
             // the batch. The next schedule retries it.
             log.warn("Pending-transfer reap failed: id={}, failureType={}", id, e.getClass().getName());
         }
+    }
+
+    /**
+     * Runs inside the caller's transaction (or the test's no-tx path).
+     *
+     * @return {@code true} when the row was transitioned to FAILED.
+     */
+    private boolean doReapRow(Long id, Clock clock) {
+        Transfer locked = loadTransferPort.findByIdForUpdate(id).orElse(null);
+        if (locked == null) {
+            return false;
+        }
+        locked.markFailed(clock);
+        saveTransferPort.save(locked);
+        auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_MARKED_FAILED,
+                "Stale PENDING transfer marked FAILED by reaper. Transfer ID: " + id,
+                LocalDateTime.now(clock), "system"));
+        return true;
     }
 
     private void count(String name) {

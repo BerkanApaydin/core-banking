@@ -3,7 +3,9 @@ package com.bank.app.user.config;
 import com.bank.app.user.domain.PasswordPolicy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.security.password")
 public record PasswordPolicyProperties(
         @DefaultValue("12") int minLength,

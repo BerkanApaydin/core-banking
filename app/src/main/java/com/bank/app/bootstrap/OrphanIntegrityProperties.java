@@ -2,7 +2,9 @@ package com.bank.app.bootstrap;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @ConfigurationProperties(prefix = "app.integrity")
 public record OrphanIntegrityProperties(
         @DefaultValue("true") boolean enabled,

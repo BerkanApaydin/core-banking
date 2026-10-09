@@ -58,7 +58,7 @@ let fundingMode = 'unknown';
 let accountPager = { page: 0, last: true, total: 0 };
 let historyCache = { accountId: null, items: [] };
 let historyPager = { accountId: null, page: 0, last: true, total: 0 };
-let reportPager = { criteria: null, page: 0, hasNext: false, loading: false, requestVersion: 0 };
+let reportPager = { criteria: null, page: 0, hasNext: false, loading: false, requestVersion: 0, cursors: [null] };
 const cancellationsInFlight = new Set();
 
 // --- DOM Elements ---
@@ -202,6 +202,36 @@ function switchTab(tabId) {
 const REQUEST_TIMEOUT_MS = 30000;
 const PAGE_SIZE = 100; // backend @Max(100) on page size
 
+// --- Conditional-GET (ETag) cache ---
+// The server renders ETag validators on GET /transfers/report,
+// GET /transfers/{id} and GET /accounts/{id}. Opt-in per call
+// ({ etagCache: true }): the stored validator is sent as If-None-Match and
+// an unchanged re-read comes back 304 with no body — no server re-hash, no
+// re-render here. Bounded, and cleared by any successful mutation below, so
+// post-transfer balances or statuses can never go stale.
+const etagCache = new Map();
+const ETAG_CACHE_LIMIT = 30;
+
+function etagCacheKey(method, endpoint) {
+    return `${method} ${endpoint}`;
+}
+
+function etagCacheLookup(key) {
+    return etagCache.get(key) || null;
+}
+
+function etagCacheSave(key, etag, body) {
+    if (!etag) return;
+    if (!etagCache.has(key) && etagCache.size >= ETAG_CACHE_LIMIT) {
+        etagCache.delete(etagCache.keys().next().value);
+    }
+    etagCache.set(key, { etag, body });
+}
+
+function etagCacheInvalidate() {
+    etagCache.clear();
+}
+
 function isOffline() {
     return (typeof navigator !== 'undefined' && 'onLine' in navigator && !navigator.onLine);
 }
@@ -219,7 +249,12 @@ async function fetchApi(endpoint, options = {}) {
             'Content-Type': 'application/json',
             ...options.headers
         };
-        if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method.toUpperCase())) {
+        const method = (options.method || 'GET').toUpperCase();
+        const useEtagCache = options.etagCache === true && (method === 'GET' || method === 'HEAD');
+        const cacheKey = useEtagCache ? etagCacheKey(method, endpoint) : null;
+        const cached = cacheKey ? etagCacheLookup(cacheKey) : null;
+        if (cached) headers['If-None-Match'] = cached.etag;
+        if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
             const csrf = browserCsrfToken();
             if (csrf) headers['X-CSRF-Token'] = csrf;
         }
@@ -230,6 +265,16 @@ async function fetchApi(endpoint, options = {}) {
             credentials: 'same-origin',
             ...(controller ? { signal: controller.signal } : {})
         });
+
+        if (response.status === 304 && cacheKey) {
+            const hit = etagCacheLookup(cacheKey);
+            if (hit) return hit.body;
+            // Entry evicted between request and response: retry once without
+            // the validator instead of surfacing an empty body as an error.
+            const retry = { ...options };
+            delete retry.etagCache;
+            return fetchApi(endpoint, retry);
+        }
 
         if (response.status === 401) {
             // Public endpoints (login/register) return 401 for bad credentials:
@@ -284,6 +329,15 @@ async function fetchApi(endpoint, options = {}) {
                 }
             }
             throw err;
+        }
+
+        if (cacheKey) {
+            const respEtag = response.headers.get('ETag');
+            if (respEtag) etagCacheSave(cacheKey, respEtag, data);
+        } else if (method !== 'GET' && method !== 'HEAD') {
+            // Any successful write may have moved balances, statuses or report
+            // rows: drop every cached read rather than risk a stale modal.
+            etagCacheInvalidate();
         }
 
         return data;
@@ -479,6 +533,7 @@ function initReportSection() {
 
         invalidateGeneratedReport();
         reportPager.criteria = { accountId, ...range };
+        reportPager.cursors = [null];
         loadReportPage(0);
     });
     document.getElementById('report-page-previous').addEventListener('click', () => loadReportPage(reportPager.page - 1));
@@ -487,7 +542,7 @@ function initReportSection() {
 
 function invalidateGeneratedReport() {
     reportPager = { criteria: null, page: 0, hasNext: false, loading: false,
-        requestVersion: reportPager.requestVersion + 1 };
+        requestVersion: reportPager.requestVersion + 1, cursors: [null] };
     window.__lastReport = null;
     document.getElementById('report-results')?.classList.add('d-none');
     const printButton = document.getElementById('btn-print-report');
@@ -518,11 +573,13 @@ async function loadReportPage(page) {
     const criteria = reportPager.criteria;
     updateReportPagination();
     try {
-        const query = new URLSearchParams({ ...criteria, page: String(page), size: '100' });
-        const report = await fetchApi(`/transfers/report?${query}`);
+        const cursor = reportCursorForPage(reportPager.cursors, page);
+        const query = buildReportQuery(criteria, page, PAGE_SIZE, cursor);
+        const report = await fetchApi(`/transfers/report?${query}`, { etagCache: true });
         if (requestVersion !== reportPager.requestVersion) return;
         reportPager.page = page;
         reportPager.hasNext = report.hasNext === true;
+        reportPager.cursors = storeReportCursor(reportPager.cursors, page, report);
         renderReportResults(report);
         document.getElementById('btn-print-report').disabled = !document.getElementById('generator-tab').classList.contains('active');
     } catch (err) {
@@ -774,7 +831,7 @@ async function openAccountDetail(accountId) {
     body.innerHTML = `<div class="empty-state"><span class="spinner"></span><p>${__('general.loading')}</p></div>`;
     try {
         // GET /accounts/{id}: backend returns the caller's own account only.
-        const acc = await fetchApi(`/accounts/${accountId}`);
+        const acc = await fetchApi(`/accounts/${accountId}`, { etagCache: true });
         body.innerHTML = `
             <div class="detail-balance">
                 <span class="card-balance-label">${__('account.balance_label')}</span>
@@ -811,7 +868,7 @@ async function openTransferDetail(transferId) {
         // GET /transfers/{id}: backend authorizes sender-or-receiver only.
         // TransferDetailResponse carries account IDs (no IBANs): resolve names
         // from loaded accounts, fall back to #id for external accounts.
-        const t = await fetchApi(`/transfers/${transferId}`);
+        const t = await fetchApi(`/transfers/${transferId}`, { etagCache: true });
         const meta = transferStatusMeta(t.status);
         body.innerHTML = `
             <dl class="summary-list">
@@ -1093,6 +1150,41 @@ function plusMonths12(day) {
     const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
     const pad = (n) => String(n).padStart(2, '0');
     return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(Math.min(d, lastDay))}`;
+}
+
+// --- Report keyset pagination (DB-2) ---
+// The server serves report page 0 by offset and deeper pages by keyset cursor
+// (cursorCreatedAt+cursorId), so deep windows never pay OFFSET and never hit
+// the 10k offset guard. cursors[n] holds the cursor that OPENS page n;
+// cursors[0] is always null (first page). Forward pushes the nextCursor the
+// server just returned; back pops by index — no cursor, no deep page.
+function reportCursorForPage(cursors, page) {
+    const cursor = Array.isArray(cursors) ? cursors[page] : null;
+    return cursor || null;
+}
+
+function storeReportCursor(cursors, page, report) {
+    const stack = Array.isArray(cursors) ? cursors.slice(0, page + 1) : [null];
+    stack[page + 1] = report && report.hasNext === true
+        && report.nextCursorCreatedAt && report.nextCursorId != null
+        ? { createdAt: report.nextCursorCreatedAt, id: report.nextCursorId }
+        : null;
+    return stack;
+}
+
+function buildReportQuery(criteria, page, size, cursor) {
+    const params = {
+        accountId: criteria.accountId,
+        startDate: criteria.startDate,
+        endDate: criteria.endDate,
+        page: String(page),
+        size: String(size)
+    };
+    if (cursor) {
+        params.cursorCreatedAt = cursor.createdAt;
+        params.cursorId = String(cursor.id);
+    }
+    return new URLSearchParams(params);
 }
 
 // --- Authentication Operations ---

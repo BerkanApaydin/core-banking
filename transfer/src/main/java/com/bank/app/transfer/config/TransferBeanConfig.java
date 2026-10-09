@@ -11,10 +11,6 @@ import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotal
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
 import com.bank.app.transfer.application.port.in.PlaceTransferUseCase;
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshotCache;
-import com.bank.app.transfer.adapter.out.account.AccountAclAdapter;
-import com.bank.app.transfer.adapter.out.account.InMemoryAccountInfoCacheAdapter;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
@@ -28,19 +24,13 @@ import com.bank.app.transfer.application.usecase.GetTransferDetailQueryImpl;
 import com.bank.app.transfer.application.usecase.GetTransferHistoryQueryImpl;
 import com.bank.app.transfer.application.usecase.PlaceTransferUseCaseImpl;
 import com.bank.app.transfer.domain.TransferDomainService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 import org.springframework.retry.annotation.EnableRetry;
 
 @Configuration
 @EnableRetry
 public class TransferBeanConfig {
-
-    private static final Logger log = LoggerFactory.getLogger(TransferBeanConfig.class);
 
     private final TransferProperties transferProperties;
 
@@ -53,40 +43,9 @@ public class TransferBeanConfig {
         return new TransferDomainService();
     }
 
-    /**
-     * Single-JVM fallback for dev, test and single-instance use: removes the
-     * Redis dependency without changing semantics (invalidation logic is
-     * shared via {@code AbstractAccountSnapshotCache}).
-     *
-     * <p>Never valid with more than one replica: an eviction on one pod never
-     * reaches another, so account status/currency reads go stale cluster-wide
-     * for up to the TTL. Production pins the shared Redis backend with a
-     * literal (not env-overridable) value, guarded by
-     * {@code ProductionConfigContractTest} — this fallback must therefore
-     * never activate there. The profile check below is defense in depth: if
-     * the wiring ever degrades, prod fails fast at startup instead of serving
-     * stale snapshots silently.
-     */
-    @Bean
-    @ConditionalOnMissingBean(AccountSnapshotCache.class)
-    public AccountSnapshotCache accountInfoCachePort(Environment environment) {
-        if (environment.matchesProfiles("prod")) {
-            throw new IllegalStateException(
-                    "InMemoryAccountInfoCacheAdapter must not run with the prod profile: "
-                    + "no shared AccountSnapshotCache backend is registered, so per-JVM "
-                    + "caches would go stale across replicas. Fix "
-                    + "app.cache.caffeine.account-info.backend=redis instead.");
-        }
-        log.warn("No shared AccountSnapshotCache backend registered — falling back to "
-                + "single-JVM InMemoryAccountInfoCacheAdapter. Correct for dev/test/single "
-                + "instance; must never happen with more than one replica.");
-        return new InMemoryAccountInfoCacheAdapter();
-    }
-
-    @Bean
-    public AccountAclPort accountAclPort(AccountApi accountApi, AccountSnapshotCache cache) {
-        return new AccountAclAdapter(accountApi, cache);
-    }
+    // AV: adapter beans (AccountAclPort, AccountSnapshotCache fallback) live in
+    // transfer.adapter.out.account.TransferAccountAclConfiguration, next to the
+    // adapters they construct. This config wires only application beans.
 
     @Bean
     public TransferAuthorizationService transferAuthorizationService(AccountAclPort accountAclPort,

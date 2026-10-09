@@ -24,3 +24,10 @@
 are rejected with 400 — OFFSET cost is bounded by construction, and unbounded
 scrolling must use the cursor. The V43 covering indexes serve both the cursor
 range scan and the surviving shallow-offset path.
+
+**UI adoption:** the bundled report UI loads page 0 by offset and every deeper
+page by cursor (`buildReportQuery`/`storeReportCursor` in `app.js`, pinned by
+`frontend_contract.test.js`), and sends `If-None-Match` from the ETag the
+server renders per page — an unchanged re-read is a 304 with no server
+re-hash. Mutations clear the client ETag cache, so post-transfer balances
+never go stale.

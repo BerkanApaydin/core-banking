@@ -12,6 +12,13 @@
 --    Java enums — rejects corrupt or out-of-band writes.
 -- 4) idx_users_email (V18) never served a query (no findByEmail exists); drop
 --    it to stop paying write amplification on every user insert/update.
+--
+-- HIGH-4: full-table UPDATE + index builds exceed the 30s per-role
+-- statement_timeout on a populated DB. Lift it for this migration only.
+-- NOTE: plain CREATE INDEX takes a write-blocking lock; for large tables
+-- prefer the CONCURRENTLY operator script (scripts/create_index_concurrently.sql)
+-- run outside Flyway's transaction instead.
+SET LOCAL statement_timeout = '10min';
 
 UPDATE transfers SET business_created_at = created_at WHERE business_created_at IS NULL;
 

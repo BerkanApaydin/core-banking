@@ -98,7 +98,15 @@ def main():
     try:
         findings = query_osv(packages)
     except Exception as exc:  # noqa: BLE001 - network is best-effort locally
+        # L-3: fail CLOSED in CI (where the blocking gate
+        # dependency-review-action@v4 already ran), fail OPEN only for local
+        # runs without network. CI sets CI=true; local `python3
+        # scripts/dependency_review.py` keeps working offline.
+        import os as _os
         print(f"osv query failed ({exc}); gate cannot be enforced offline")
+        if _os.environ.get("CI", "").lower() in ("true", "1"):
+            print("dependency review FAILED: OSV unreachable in CI", file=sys.stderr)
+            return 1
         return 0
     allowlist = load_allowlist()
     for name, version, vid, summary, rating, score in findings:

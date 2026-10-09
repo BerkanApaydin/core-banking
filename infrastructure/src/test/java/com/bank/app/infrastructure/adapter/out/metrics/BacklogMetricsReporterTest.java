@@ -52,8 +52,8 @@ class BacklogMetricsReporterTest {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(1, utcNow.minusMinutes(2)),
                         new BacklogMetricsReporter.Backlog(0, null));
-        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
-                .thenReturn(0L, 0L);
+        // PERF-1: the minutely scan no longer touches ledger_entries; the
+        // ledger gauge keeps its initial 0 until the nightly job updates it.
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
                 eq("audit_logs_default")))
                 .thenReturn(0, 0);
@@ -64,7 +64,6 @@ class BacklogMetricsReporterTest {
         assertTrue(gauge("outbox.oldest_pending.age_seconds") >= 299);
         assertEquals(1, gauge("idempotency.http.pending.current"));
         assertTrue(gauge("idempotency.http.oldest_pending.age_seconds") >= 119);
-        assertEquals(0, gauge("ledger.nonzero_transaction_refs"));
         assertEquals(0, gauge("audit.default_partition.rows"));
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
 
@@ -74,26 +73,30 @@ class BacklogMetricsReporterTest {
         assertEquals(0, gauge("outbox.oldest_pending.age_seconds"));
         assertEquals(0, gauge("idempotency.http.pending.current"));
         assertEquals(0, gauge("idempotency.http.oldest_pending.age_seconds"));
-        assertEquals(0, gauge("ledger.nonzero_transaction_refs"));
     }
 
     @Test
-    void publishesNonzeroLedgerGroupsForAlerting() {
+    void keepsLedgerGaugeUntouchedByMinutelyScan() {
+        // PERF-1 regression: the 60s scan must not query ledger_entries at all,
+        // and must not register the gauge either (double registration with the
+        // nightly LedgerReconciliationJob would leave the job's updates wired
+        // to a dead meter). The gauge lives only in the job.
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
-        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
-                .thenReturn(3L);
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
                 eq("audit_logs_default")))
                 .thenReturn(0);
 
         reporter.scan();
 
-        assertEquals(3, gauge("ledger.nonzero_transaction_refs"));
+        assertTrue(registry.find("ledger.nonzero_transaction_refs").gauge() == null,
+                "minutely reporter must not register the ledger gauge");
         assertEquals(0, gauge("audit.default_partition.rows"));
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
+        org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never())
+                .queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class));
     }
 
     @Test
@@ -102,8 +105,6 @@ class BacklogMetricsReporterTest {
                 .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
-        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
-                .thenReturn(0L);
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
                 eq("audit_logs_default")))
                 .thenReturn(1);
@@ -124,8 +125,6 @@ class BacklogMetricsReporterTest {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
                 .thenReturn(new BacklogMetricsReporter.Backlog(1, LocalDateTime.now().minusMinutes(2)))
                 .thenThrow(new IllegalStateException("database unavailable"));
-        when(jdbc.queryForObject(eq(BacklogMetricsReporter.LEDGER_NONZERO_SQL), eq(Long.class)))
-                .thenReturn(0L);
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
                 eq("audit_logs_default")))
                 .thenReturn(0);

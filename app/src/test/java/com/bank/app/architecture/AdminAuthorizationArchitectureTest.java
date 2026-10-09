@@ -51,21 +51,29 @@ class AdminAuthorizationArchitectureTest extends ArchitectureTest {
 
     @Test
     void nonAdminControllersMustNotReachSuspendAccountUseCase() {
+        assertScopeNotEmpty("non-admin web controllers",
+                importedClasses.stream().anyMatch(c -> c.getPackageName().contains(".adapter.in.web.")
+                        && !c.getSimpleName().contains("Admin")));
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..adapter.in.web..")
                 .and().haveSimpleNameNotContaining("Admin")
                 .should().dependOnClassesThat().haveSimpleName("SuspendAccountUseCase")
                 .because("suspending accounts is admin-only; non-admin endpoints must not wire it");
+        rule.allowEmptyShould(false);
         rule.check(importedClasses);
     }
 
     @Test
     void nonAdminControllersMustNotReachAuditQuery() {
+        assertScopeNotEmpty("non-admin web controllers",
+                importedClasses.stream().anyMatch(c -> c.getPackageName().contains(".adapter.in.web.")
+                        && !c.getSimpleName().contains("Admin")));
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("..adapter.in.web..")
                 .and().haveSimpleNameNotContaining("Admin")
                 .should().dependOnClassesThat().haveSimpleName("GetAuditLogsQuery")
                 .because("reading audit logs is admin-only; non-admin endpoints must not wire it");
+        rule.allowEmptyShould(false);
         rule.check(importedClasses);
     }
 }

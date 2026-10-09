@@ -182,8 +182,12 @@ class RegisterUserUseCaseTest {
         }
 
         @Test
-        @DisplayName("should map concurrent duplicate to UsernameAlreadyTakenException")
+        @DisplayName("AV-4: concurrent-duplicate translation lives in the adapter")
         void shouldMapConcurrentDuplicateToConflict() {
+            // The DB unique-constraint translation moved to UserPersistenceAdapter
+            // (application layer stays free of Spring DAO imports): the use case
+            // propagates the port failure untouched. Adapter-level coverage lives
+            // in UserJpaAdapterTest.shouldMapConcurrentDuplicateToConflict.
             AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
             when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("$2a$10$encodedPasswordHashEncodedPw02");
@@ -191,7 +195,7 @@ class RegisterUserUseCaseTest {
                     .when(saveUserPort).save(any(User.class));
 
             assertThatThrownBy(() -> registerUserUseCase.execute(request))
-                    .isExactlyInstanceOf(UsernameAlreadyTakenException.class);
+                    .isExactlyInstanceOf(DataIntegrityViolationException.class);
         }
     }
 }

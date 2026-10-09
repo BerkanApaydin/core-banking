@@ -227,11 +227,12 @@ test('report pagination exposes every page and invalidation prevents printing st
     }
     const context = vm.createContext({
         reportPager: { criteria: { accountId: '7', startDate: '2026-09-01T00:00', endDate: '2026-09-02T00:00' },
-            page: 0, hasNext: false, loading: false, requestVersion: 0 },
+            page: 0, hasNext: false, loading: false, requestVersion: 0, cursors: [null] },
         window: { __lastReport: null },
         document: { getElementById: id => elements.get(id) },
         __: (key, page) => `${key}:${page}`,
         URLSearchParams,
+        PAGE_SIZE: 100,
         fetchApi: async url => {
             calls.push(url);
             return { transfers: [{ id: calls.length }], hasNext: calls.length === 1 };
@@ -239,7 +240,10 @@ test('report pagination exposes every page and invalidation prevents printing st
         renderReportResults: report => rendered.push(report),
         showAlert: error => { throw new Error(error); }
     });
-    const functions = 'function invalidateGeneratedReport() {'
+    const functions = 'function reportCursorForPage(cursors, page) {'
+        + source.split('function reportCursorForPage(cursors, page) {')[1]
+            .split('// --- Authentication Operations ---')[0]
+        + 'function invalidateGeneratedReport() {'
         + source.split('function invalidateGeneratedReport() {')[1].split('async function loadAccountHistory')[0];
     vm.runInContext(functions, context);
 
@@ -352,4 +356,83 @@ test('failed silent refresh keeps the session logged out', async () => {
     vm.runInContext(functions, context);
 
     assert.equal(await vm.runInContext('trySilentRefresh()', context), false);
+});
+
+test('report query omits cursor params on page 0 (offset path)', () => {
+    const functions = 'function reportCursorForPage(cursors, page) {'
+        + source.split('function reportCursorForPage(cursors, page) {')[1]
+            .split('// --- Authentication Operations ---')[0];
+    const context = vm.createContext({ URLSearchParams });
+    vm.runInContext(functions, context);
+
+    const query = vm.runInContext(
+        "buildReportQuery({ accountId: 7, startDate: '2026-09-01T00:00:00',"
+        + " endDate: '2026-09-30T23:59:59.999999' }, 0, 100, null).toString()",
+        context);
+    assert.match(query, /accountId=7/);
+    assert.match(query, /page=0/);
+    assert.match(query, /size=100/);
+    assert.doesNotMatch(query, /cursor/);
+    assert.doesNotMatch(query, /undefined/);
+});
+
+test('report query carries the keyset cursor past page 0 (no OFFSET)', () => {
+    const functions = 'function reportCursorForPage(cursors, page) {'
+        + source.split('function reportCursorForPage(cursors, page) {')[1]
+            .split('// --- Authentication Operations ---')[0];
+    const context = vm.createContext({ URLSearchParams });
+    vm.runInContext(functions, context);
+
+    const query = vm.runInContext(
+        "buildReportQuery({ accountId: 7, startDate: '2026-09-01T00:00:00',"
+        + " endDate: '2026-09-30T23:59:59.999999' }, 3, 100,"
+        + " { createdAt: '2026-09-10T12:00:00', id: 42 }).toString()",
+        context);
+    assert.match(query, /cursorCreatedAt=2026-09-10T12/);
+    assert.match(query, /cursorId=42/);
+});
+
+test('report cursor stack pushes forward and pops back', () => {
+    const functions = 'function reportCursorForPage(cursors, page) {'
+        + source.split('function reportCursorForPage(cursors, page) {')[1]
+            .split('// --- Authentication Operations ---')[0];
+    const context = vm.createContext({});
+    vm.runInContext(functions, context);
+
+    assert.equal(vm.runInContext('reportCursorForPage([null], 0)', context), null);
+    assert.equal(vm.runInContext('reportCursorForPage(null, 2)', context), null);
+    // JSON-serialized comparison: vm-realm objects carry a different
+    // prototype than host objects, so deepEqual would reject them.
+    assert.equal(vm.runInContext(
+        "JSON.stringify(storeReportCursor([null], 0,"
+        + " { hasNext: true, nextCursorCreatedAt: '2026-09-10T12:00:00', nextCursorId: 42 }))",
+        context),
+        '[null,{"createdAt":"2026-09-10T12:00:00","id":42}]');
+    // Terminal page (hasNext=false) stores null: going forward again stays
+    // on the offset path instead of sending a stale cursor.
+    assert.equal(vm.runInContext(
+        "JSON.stringify(storeReportCursor([null], 0, { hasNext: false }))", context),
+        '[null,null]');
+});
+
+test('etag cache stores validators, evicts oldest-first, clears on demand', () => {
+    const functions = 'const etagCache = new Map();'
+        + source.split('const etagCache = new Map();')[1].split('function isOffline()')[0];
+    const context = vm.createContext({ Map });
+    vm.runInContext(functions, context);
+
+    assert.equal(vm.runInContext("etagCacheLookup('GET /x')", context), null);
+    vm.runInContext("etagCacheSave('GET /x', 'W/abc', { v: 1 })", context);
+    assert.equal(vm.runInContext("JSON.stringify(etagCacheLookup('GET /x'))", context),
+        '{"etag":"W/abc","body":{"v":1}}');
+    // Empty validator never cached.
+    vm.runInContext("etagCacheSave('GET /y', null, { v: 2 })", context);
+    assert.equal(vm.runInContext("etagCacheLookup('GET /y')", context), null);
+    // Bounded at 30: the oldest entry is evicted first.
+    vm.runInContext('for (let i = 0; i < 35; i++) etagCacheSave(`GET /k${i}`, `W/"${i}"`, i)', context);
+    assert.equal(vm.runInContext('etagCache.size', context), 30);
+    assert.equal(vm.runInContext("etagCacheLookup('GET /k0')", context), null);
+    assert.equal(vm.runInContext("etagCacheLookup('GET /k34').body", context), 34);
+    vm.runInContext('etagCacheInvalidate()', context);
+    assert.equal(vm.runInContext('etagCache.size', context), 0);
 });

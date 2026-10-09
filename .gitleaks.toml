@@ -1,18 +1,15 @@
 # I-03: working-tree secret scan. Auto-discovered by `gitleaks detect`
-# (repo root). The allowlist below covers ONLY documented test-only
-# fallbacks that can never authenticate in prod:
-#  - the CI fallback JWT (last char differs from the public dev default on
-#    purpose; prod boots fail fast without a real JWT_SECRET via
-#    ApplicationStartupValidator + allow-default-secret=false),
-#  - the dev-profile placeholder string.
+# (repo root). HIGH-2: no workflow or compose file may embed a real secret
+# literal — CI mints an ephemeral key per run, compose requires JWT_SECRET.
+# The single allowlist entry below is a documented non-secret placeholder
+# (anchored so it cannot match inside a longer real secret).
 title = "bank-app secret scan"
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "documented test-only fallbacks; never valid outside CI/dev"
+description = "documented non-secret placeholder only; never a real key"
 regexes = [
-  '''404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971''',
-  '''dev-only-insecure-fallback-not-for-prod''',
+  '''^dev-only-insecure-fallback-not-for-prod$''',
 ]

@@ -9,6 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Long term #7: financial reconciliation job. Promotes the LEDGER_NONZERO_SQL
  * metric from BacklogMetricsReporter to a periodic job: counts
@@ -28,6 +30,7 @@ public class LedgerReconciliationJob {
     private final JdbcTemplate jdbc;
     private final AdvisorySchedulerLock schedulerLock;
     private final MeterRegistry meterRegistry;
+    private final AtomicLong nonzeroRefsGauge = new AtomicLong();
 
     public LedgerReconciliationJob(JdbcTemplate jdbc,
             AdvisorySchedulerLock schedulerLock,
@@ -35,6 +38,9 @@ public class LedgerReconciliationJob {
         this.jdbc = jdbc;
         this.schedulerLock = schedulerLock;
         this.meterRegistry = meterRegistry;
+        if (meterRegistry != null) {
+            meterRegistry.gauge("ledger.nonzero_transaction_refs", nonzeroRefsGauge);
+        }
     }
 
     @Scheduled(cron = "${app.integrity.ledger-reconciliation-cron:0 30 3 * * *}")
@@ -43,6 +49,7 @@ public class LedgerReconciliationJob {
             try {
                 Long nonzero = jdbc.queryForObject(LEDGER_NONZERO_SQL, Long.class);
                 long count = nonzero != null ? nonzero : 0L;
+                nonzeroRefsGauge.set(count);
                 if (meterRegistry != null) {
                     meterRegistry.counter("ledger.reconciliation.runs").increment();
                     if (count > 0) {

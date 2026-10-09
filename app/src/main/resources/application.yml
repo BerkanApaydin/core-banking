@@ -25,6 +25,12 @@ spring:
     # Aligns with server.shutdown=graceful: in-flight requests (incl. the
     # 30s use-case tx timeout) get room to finish before the context closes.
     timeout-per-shutdown-phase: 30s
+  # PERF-6: 11 @Scheduled jobs share one thread by default and block each
+  # other (five */5 jobs fire the same second as the 60s backlog scan).
+  task:
+    scheduling:
+      pool:
+        size: 4
   profiles:
     default: prod
   application:
@@ -76,6 +82,16 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # PERF-7: the Redis-backed rate limiter runs on EVERY request over one
+      # shared multiplex connection; a slow command blocks all threads.
+      # Bounded pool + timeouts fail fast instead of parking Tomcat threads.
+      timeout: ${REDIS_TIMEOUT:2000ms}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+          max-wait: ${REDIS_POOL_MAX_WAIT:1000ms}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -183,6 +199,10 @@ app:
     enabled: ${OUTBOX_POLL_ENABLED:true}
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
     max-retries: ${OUTBOX_MAX_RETRIES:5}
+    # PERF-8: workers are 4x partitions capped at 12 (see OutboxPoller), so the
+    # default 2 partitions hold max 8 REQUIRES_NEW transactions — well under
+    # the Hikari pool of 20. Raising partition-count raises workers too:
+    # keep partitions x 4 <= 12 or raise DB_MAX_POOL_SIZE first.
     partition-count: ${OUTBOX_PARTITION_COUNT:2}
     batch-size: ${OUTBOX_BATCH_SIZE:50}
     # Retention window for processed outbox rows and their handler dedup keys

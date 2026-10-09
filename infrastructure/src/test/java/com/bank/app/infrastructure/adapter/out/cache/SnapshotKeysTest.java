@@ -1,7 +1,10 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
+import com.bank.app.accountapi.AccountSnapshotCache;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,7 +44,7 @@ class SnapshotKeysTest {
     void shouldNormalizeIbanKeys() {
         // Arrange — one account written three ways.
         String canonical = "TR770006200000000000000111";
-        String lower = canonical.toLowerCase(java.util.Locale.ROOT);
+        String lower = canonical.toLowerCase(Locale.ROOT);
         String spaced = canonical.substring(0, 4) + " "
                 + canonical.substring(4, 8) + " "
                 + canonical.substring(8);
@@ -77,8 +80,8 @@ class SnapshotKeysTest {
     void shouldAlignRawAndDerivedPaths() {
         // Arrange — the normalized key form used by the reverse index.
         String canonical = "TR770006200000000000000111";
-        String normalized = com.bank.app.accountapi.AccountSnapshotCache
-                .ibanKey(canonical.toLowerCase(java.util.Locale.ROOT));
+        String normalized = AccountSnapshotCache
+                .ibanKey(canonical.toLowerCase(Locale.ROOT));
 
         // Act
         String viaRaw = SnapshotKeys.ibanKeyRaw(normalized);

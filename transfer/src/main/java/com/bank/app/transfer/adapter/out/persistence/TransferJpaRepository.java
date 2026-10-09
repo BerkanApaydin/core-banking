@@ -104,19 +104,22 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      * type unresolved. The unused {@code :cursorId} null still binds (the
      * driver infers bigint from the comparison context) but its disjunct is
      * unreachable while the cursor is null.
+     *
+     * <p>PERF-4: the cursor predicate uses ANSI row comparison
+     * {@code (created_at, id) < (cursor)} — only the ROW() syntax lets
+     * PostgreSQL apply its row-comparison index optimization against the V43
+     * covering indexes; the {@code OR} disjunction falls back to BitmapOr.
      */
     @Query(value = "SELECT * FROM ("
             + "SELECT t.* FROM transfers t "
             + "WHERE t.sender_account_id = :accountId "
             + "AND t.business_created_at BETWEEN :start AND :end "
-            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR t.created_at < :cursorCreatedAt "
-            + "OR (t.created_at = :cursorCreatedAt AND t.id < :cursorId)) "
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.created_at, t.id) < (:cursorCreatedAt, :cursorId)) "
             + "UNION ALL "
             + "SELECT t.* FROM transfers t "
             + "WHERE t.receiver_account_id = :accountId "
             + "AND t.business_created_at BETWEEN :start AND :end "
-            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR t.created_at < :cursorCreatedAt "
-            + "OR (t.created_at = :cursorCreatedAt AND t.id < :cursorId))) combined "
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.created_at, t.id) < (:cursorCreatedAt, :cursorId))) combined "
             + "ORDER BY combined.created_at DESC, combined.id DESC",
             nativeQuery = true)
     List<TransferJpaEntity> findHistoryBetweenKeyset(
