@@ -24,9 +24,9 @@ jobs:
         fail-on-severity: high
 
   secret-scan:
-    # I-03: working-tree secret scan (rules in .gitleaks.toml). The two
-    # allowlisted values are documented test-only fallbacks that can never
-    # authenticate in prod (see .gitleaks.toml + docs/decisions/secret-management.md).
+    # I-03: working-tree secret scan (rules in .gitleaks.toml). The single
+    # allowlisted value is a documented non-secret placeholder (see
+    # .gitleaks.toml + docs/decisions/secret-management.md).
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,7 +35,7 @@ jobs:
       with:
         fetch-depth: 0
     - name: Gitleaks scan
-      uses: gitleaks/gitleaks-action@v2
+      uses: gitleaks/gitleaks-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
