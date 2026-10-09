@@ -1,0 +1,6 @@
+# Shell launchers must keep LF endings on every platform: a CRLF checkout
+# breaks bash with `$'\r': command not found`. The Maven wrapper is a shell
+# script too. Windows batch files keep CRLF.
+*.sh text eol=lf
+mvnw text eol=lf
+*.cmd text eol=crlf

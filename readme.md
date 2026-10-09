@@ -159,11 +159,33 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 
 ## Getting Started
 
+Starts with a single command; no externally provided secret is needed. Both paths
+mint JWT secrets automatically (compose: zero-setup with the built-in dev
+secret; `start-app-dev`: a fresh 256-bit secret per launch, never printed or
+persisted). The resulting secret is for loopback-bound (`127.0.0.1`) local
+development only; anything real requires
+`export JWT_SECRET="$(openssl rand -base64 32)"`, and the prod profile refuses
+to boot without it (fail-fast).
+
 You can run PostgreSQL, Redis and the application together, or run Java on the host against Compose dependencies. The Compose defaults are for local development, not a public deployment.
 
-### Option A: Run Everything via Docker Compose (Recommended)
+Two paths lead to the same UI at `http://localhost:8080/` — pick by job, not by habit:
 
-Install and start Docker Desktop (with Docker Compose). Java, Maven, PostgreSQL and Redis do not need separate host installations. Clone the repository once, enter it, then build and start all three services while waiting for their health checks. If you are already in the repository root, run only the last command:
+- **Path 1 — Run (all-in-Docker):** just run or demo the app, or validate the
+  production-shaped image. Needs only Docker; every code change costs an
+  image rebuild.
+- **Path 2 — Develop (host Java):** change code, attach a debugger, iterate
+  fast. Needs Docker plus Java 21; only PostgreSQL/Redis run in containers
+  while Maven and Java run on the host with the local `.m2` cache.
+
+Run one path at a time: both bind `5432`, `6389` and `8080`, so they
+conflict. To switch from Path 1 to Path 2, stop the app container first
+(`docker compose stop app` — the launcher does this for you). To switch back,
+stop the host app (Ctrl+C), then `docker compose up --build --wait` again.
+
+### Path 1: Run Everything via Docker Compose
+
+Single command — no env file or pre-generated secret needed. Recommended when you only want to run the app:
 
 ```bash
 git clone https://github.com/BerkanApaydin/core-banking.git
@@ -175,7 +197,9 @@ Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` d
 
 Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 
-### Option B: Run Java on Your Computer
+### Path 2: Develop with Java on Your Computer
+
+Single command — the secret is generated automatically and process env is restored on exit (`SKIP_BUILD=1` reuses the existing JAR). Recommended when you change code: rebuilds reuse the host `.m2` cache and the app logs stream straight to your console, so iteration is minutes faster than an image rebuild and a debugger attaches without extra setup:
 
 From the repository root, use the launcher for your operating system (Java 21, Docker and Docker Compose required):
 

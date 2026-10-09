@@ -52,7 +52,7 @@ class TransferDomainServiceTest {
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
-                    .hasMessage("Cannot transfer to the same account: TR770006200000000000000111");
+                    .hasMessage("Cannot transfer to the same account: TR770006*******0111");
         }
 
         @Test
@@ -64,7 +64,7 @@ class TransferDomainServiceTest {
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(SameAccountTransferException.class)
-                    .hasMessage("Cannot transfer to the same account: tr770006200000000000000111");
+                    .hasMessage("Cannot transfer to the same account: TR770006*******0111");
         }
 
         @Test

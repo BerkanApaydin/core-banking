@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.service;
 
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.exception.AuthorizationException;
@@ -42,7 +43,7 @@ class TransferAuthorizationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransferAuthorizationService(accountAclPort, userContextService);
+        service = new TransferAuthorizationService(accountAclPort, new ResourceOwnershipPolicy(userContextService));
     }
 
     @Nested

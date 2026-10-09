@@ -2,6 +2,7 @@ package com.bank.app.account.application.service;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
@@ -33,7 +34,7 @@ class AccountAuthorizationServiceTest {
 
     @BeforeEach
     void setUp() {
-        authorizationService = new AccountAuthorizationService(userContextService);
+        authorizationService = new AccountAuthorizationService(new ResourceOwnershipPolicy(userContextService));
     }
 
     @Nested

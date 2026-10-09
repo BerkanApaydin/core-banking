@@ -66,8 +66,14 @@ public class ApplicationStartupValidator {
         // so account status/currency reads go stale cluster-wide up to the
         // TTL. Prod pins backend=redis (literal, see application-prod.yml);
         // fail fast here as well so no env/flag override can silently
-        // reinstate the local backend in production.
-        requireRedisBackend("app.cache.caffeine.account-info.backend");
+        // reinstate the local backend in production. Resolved with
+        // canonical-wins semantics: either prefix may carry the value.
+        CacheProperties.AccountInfoCache snapshotCache = CacheBackendResolution.resolve(environment);
+        if (!"redis".equalsIgnoreCase(snapshotCache.backend())) {
+            throw new IllegalStateException(
+                    "Production requires a shared Redis backend: app.cache.account-info.backend "
+                    + "(canonical; legacy app.cache.caffeine.account-info.backend still honored as fallback)");
+        }
         requireProdCors();
         requirePositive("app.security.failed-login.max-attempts", 5L);
         requirePositive("app.security.failed-login.window-minutes", 15L);
@@ -76,7 +82,11 @@ public class ApplicationStartupValidator {
         requirePositive("app.security.rate-limit.resource-max-requests", 120L);
         requirePositive("app.security.rate-limit.resource-time-window-ms", 60_000L);
         // Snapshot-cache SCAN batch: zero would make evict-all a no-op loop.
-        requirePositive("app.cache.caffeine.account-info.eviction-batch-size", 500L);
+        // Resolved with canonical-wins semantics (see above).
+        if (snapshotCache.evictionBatchSize() <= 0) {
+            throw new IllegalStateException(
+                    "Production requires a positive value: app.cache.account-info.eviction-batch-size");
+        }
         // Outbox poller misconfiguration silently stops money-movement
         // callbacks: a zero batch/negative retry count must fail fast at
         // startup, not as a stalled outbox in production.

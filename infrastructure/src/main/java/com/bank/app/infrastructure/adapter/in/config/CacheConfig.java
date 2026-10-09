@@ -17,10 +17,10 @@ import java.util.concurrent.TimeUnit;
 @EnableConfigurationProperties(CacheProperties.class)
 public class CacheConfig {
 
-    private final CacheProperties cacheProperties;
+    private final CacheProperties.AccountInfoCache accountInfoCache;
 
-    public CacheConfig(CacheProperties cacheProperties) {
-        this.cacheProperties = cacheProperties;
+    public CacheConfig(CacheProperties.AccountInfoCache resolvedAccountInfoCache) {
+        this.accountInfoCache = resolvedAccountInfoCache;
     }
 
     @Bean
@@ -31,8 +31,8 @@ public class CacheConfig {
         // only — so no other region is pre-created.
         CaffeineCacheManager cacheManager = new CaffeineCacheManager("accountAclInfo");
         cacheManager.setCaffeine(Caffeine.newBuilder()
-                .maximumSize(cacheProperties.accountInfo().maximumSize())
-                .expireAfterWrite(cacheProperties.accountInfo().expireAfterWrite(), TimeUnit.SECONDS)
+                .maximumSize(accountInfoCache.maximumSize())
+                .expireAfterWrite(accountInfoCache.expireAfterWrite(), TimeUnit.SECONDS)
                 .recordStats());
         return cacheManager;
     }

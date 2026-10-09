@@ -20,7 +20,7 @@ class JwtTokenProviderTest {
 
     private JwtTokenProvider jwtTokenProvider;
 
-    private static final String SECRET = "KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=";
+    private static final String SECRET = "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
 
     @BeforeEach
     void setUp() {

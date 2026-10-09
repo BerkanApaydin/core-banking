@@ -2,9 +2,10 @@ package com.bank.app.infrastructure.adapter.out.cache;
 
 import com.bank.app.accountapi.AbstractAccountSnapshotCache;
 import com.bank.app.accountapi.AccountSnapshot;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.bank.app.infrastructure.adapter.in.config.SnapshotCacheCaffeineCondition;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +15,10 @@ import java.util.Optional;
 /**
  * Caffeine-backed account snapshot cache implementation (single-JVM).
  *
- * <p>Active when {@code app.cache.caffeine.account-info.backend=caffeine}
- * (default: dev/test/single instance). Production uses the Redis backend
+ * <p>Active when the resolved snapshot-cache backend is single-JVM (the
+ * default; see
+ * {@link com.bank.app.infrastructure.adapter.in.config.CacheBackendResolution}).
+ * Production uses the Redis backend
  * instead so that all replicas share one cache and invalidations are
  * visible cluster-wide. Takes precedence over the transfer module's in-memory
  * fallback via {@code @Primary}. Invalidation semantics live in
@@ -24,7 +27,7 @@ import java.util.Optional;
  */
 @Component
 @Primary
-@ConditionalOnProperty(name = "app.cache.caffeine.account-info.backend", havingValue = "caffeine", matchIfMissing = true)
+@Conditional(SnapshotCacheCaffeineCondition.class)
 public class CaffeineAccountInfoCacheAdapter extends AbstractAccountSnapshotCache {
 
     private static final String CACHE_NAME = "accountAclInfo";

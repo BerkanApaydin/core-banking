@@ -1,19 +1,19 @@
 package com.bank.app.account.application.service;
 
 import com.bank.app.account.domain.Account;
-import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.domain.exception.AuthorizationException;
 
 public class AccountAuthorizationService {
 
-    private final UserContextService userContextService;
+    private final ResourceOwnershipPolicy ownershipPolicy;
 
-    public AccountAuthorizationService(UserContextService userContextService) {
-        this.userContextService = userContextService;
+    public AccountAuthorizationService(ResourceOwnershipPolicy ownershipPolicy) {
+        this.ownershipPolicy = ownershipPolicy;
     }
 
     public void authorizeAccountOwner(Account account, String errorMessage) {
-        userContextService.checkUserAuthorization(account.getUserId().value(), errorMessage);
+        ownershipPolicy.requireOwner(account.getUserId().value(), errorMessage);
     }
 
     /** Queries hide the existence of accounts owned by another user. */
@@ -22,16 +22,15 @@ public class AccountAuthorizationService {
     }
 
     public void authorizeUserAction(Long expectedUserId, String errorMessage) {
-        userContextService.checkUserAuthorization(expectedUserId, errorMessage);
+        ownershipPolicy.requireOwner(expectedUserId, errorMessage);
     }
 
     public Long getCurrentUserId() {
-        return userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("error.login_required", null,
-                        "You must be logged in to perform this action."));
+        return ownershipPolicy.currentUserIdOrThrow(new AuthorizationException("error.login_required", null,
+                "You must be logged in to perform this action."));
     }
 
     public String getCurrentUsername() {
-        return userContextService.getCurrentUsernameOrSystem();
+        return ownershipPolicy.currentUsernameOrSystem();
     }
 }

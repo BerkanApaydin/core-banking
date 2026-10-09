@@ -8,10 +8,9 @@ import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.Money;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Collection;
 import java.util.Map;
@@ -37,13 +36,16 @@ public class AccountApiAdapter implements AccountApi {
     private final AccountQueryUseCase accountQueryUseCase;
     private final AdjustAccountBalancesUseCase adjustAccountBalancesUseCase;
     private final AccountSnapshotCache snapshotCache;
+    private final TransactionBoundaryPort transactionBoundary;
 
     public AccountApiAdapter(AccountQueryUseCase accountQueryUseCase,
             AdjustAccountBalancesUseCase adjustAccountBalancesUseCase,
-            AccountSnapshotCache snapshotCache) {
+            AccountSnapshotCache snapshotCache,
+            TransactionBoundaryPort transactionBoundary) {
         this.accountQueryUseCase = accountQueryUseCase;
         this.adjustAccountBalancesUseCase = adjustAccountBalancesUseCase;
         this.snapshotCache = Objects.requireNonNull(snapshotCache, "AccountSnapshotCache must not be null");
+        this.transactionBoundary = Objects.requireNonNull(transactionBoundary, "TransactionBoundaryPort must not be null");
     }
 
     @Override
@@ -94,8 +96,10 @@ public class AccountApiAdapter implements AccountApi {
     /**
      * Single invalidation point for every balance mutation (F-04): eviction is
      * deferred to AFTER_COMMIT when a transaction is active so a rollback never
-     * evicts a still-valid snapshot. Kept in this class (not a separate service)
-     * so the boundary ownership stays obvious, and the direct
+     * evicts a still-valid snapshot. Transaction-state reads go through
+     * {@link TransactionBoundaryPort} so this bounded context never imports
+     * Spring transaction support classes. Kept in this class (not a separate
+     * service) so the boundary ownership stays obvious, and the direct
      * {@code evictById} calls live here so
      * {@code CacheInvalidationArchitectureTest} sees them (directly or through
      * this one-hop helper).
@@ -105,13 +109,10 @@ public class AccountApiAdapter implements AccountApi {
         // use case succeeds. Eviction deferred to AFTER_COMMIT when a
         // transaction is active; the else-branch keeps the direct evictById
         // call for non-transactional callers (tests, schedulers).
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    snapshotCache.evictById(senderId);
-                    snapshotCache.evictById(receiverId);
-                }
+        if (transactionBoundary.isTransactionActive()) {
+            transactionBoundary.runAfterCommit(() -> {
+                snapshotCache.evictById(senderId);
+                snapshotCache.evictById(receiverId);
             });
         } else {
             snapshotCache.evictById(senderId);

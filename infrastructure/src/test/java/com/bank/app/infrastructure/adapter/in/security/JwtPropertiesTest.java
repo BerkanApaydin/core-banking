@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("JwtProperties")
 class JwtPropertiesTest {
 
-    private static final String SECRET = "KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=";
+    private static final String SECRET = "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
 
     @Test
     @DisplayName("should bind explicit values (D13/K14)")

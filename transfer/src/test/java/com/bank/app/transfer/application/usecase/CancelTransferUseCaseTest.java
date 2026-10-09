@@ -3,6 +3,7 @@ package com.bank.app.transfer.application.usecase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -58,7 +59,7 @@ class CancelTransferUseCaseTest {
     void setUp() {
         lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
-                accountAclPort, userContextService);
+                accountAclPort, new ResourceOwnershipPolicy(userContextService));
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
                 accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, Duration.ofHours(72));
     }

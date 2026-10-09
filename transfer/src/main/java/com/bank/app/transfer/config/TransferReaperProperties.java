@@ -21,7 +21,10 @@ public record TransferReaperProperties(
         // use-case transaction timeout so slow (not dead) placements are
         // never reaped.
         @DefaultValue("PT15M") Duration olderThan,
-        @DefaultValue("50") int batchSize
+        @DefaultValue("50") int batchSize,
+        // Per-row REQUIRES_NEW transaction timeout (see TransferPendingReaper):
+        // kept well above any single-row write, well below olderThan.
+        @DefaultValue("30") int txTimeoutSeconds
 ) {
     public TransferReaperProperties {
         if (olderThan == null || olderThan.isNegative() || olderThan.isZero()) {
@@ -29,6 +32,9 @@ public record TransferReaperProperties(
         }
         if (batchSize < 1 || batchSize > 200) {
             throw new IllegalArgumentException("batchSize must be between 1 and 200: " + batchSize);
+        }
+        if (txTimeoutSeconds < 1 || txTimeoutSeconds > 300) {
+            throw new IllegalArgumentException("txTimeoutSeconds must be between 1 and 300: " + txTimeoutSeconds);
         }
     }
 }

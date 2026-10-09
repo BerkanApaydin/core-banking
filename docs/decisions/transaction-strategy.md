@@ -47,3 +47,11 @@ across the 7 use-case classes with no compile-time exhaustiveness. Moving adapte
 the aspect would force business-shaped markers (`@TransactionalUseCase`) onto
 infrastructure concerns (outbox polling, idempotency claims) that are not use
 cases. The split follows the layer, not the author.
+
+## Adapters that only observe the boundary: TransactionBoundaryPort
+
+Three adapters needed transaction *visibility* without owning a boundary: AccountApiAdapter (defer cache eviction to AFTER_COMMIT), TransferUseCaseRetryAspect (suppress retry inside an existing tx) and TransferPendingReaper (per-row REQUIRES_NEW with a configured timeout). They previously imported Spring transaction support classes directly, pinning bounded contexts to Spring.
+
+Since 2026-10 all three go through TransactionBoundaryPort (common, framework-free: isTransactionActive, unAfterCommit, executeRequiresNew). The single Spring-backed implementation is SpringTransactionBoundaryAdapter (infrastructure/adapter/out/tx, optional PlatformTransactionManager so unit tests run the action directly). Persistence failure *types* (spring-dao, e.g. OptimisticLockingFailureException) stay shared: they are the failure taxonomy mapped centrally by the problem handlers, not transaction control.
+
+**Rule: no class under com.bank.app.account.., com.bank.app.transfer.., com.bank.app.user.. or com.bank.app.audit.. may access TransactionSynchronizationManager, TransactionSynchronization, TransactionTemplate, PlatformTransactionManager or TransactionDefinition** — enforced by CodingRulesArchitectureTest.noProgrammaticSpringTransactionsInBoundedContexts.

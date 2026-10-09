@@ -58,7 +58,7 @@ class TransferPendingReaperTest {
         lenient().when(clockProvider.clock()).thenReturn(fixedClock);
         meters = new SimpleMeterRegistry();
         reaper = new TransferPendingReaper(loadTransferPort, saveTransferPort, auditEventPort,
-                new TransferReaperProperties(true, Duration.ofMinutes(15), 50), clockProvider, meters);
+                new TransferReaperProperties(true, Duration.ofMinutes(15), 50, 30), clockProvider, meters);
     }
 
     private static Transfer pending(Long id) {
@@ -172,11 +172,15 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("rejects non-positive thresholds and out-of-range batches")
         void shouldValidate() {
-            assertThatCode(() -> new TransferReaperProperties(true, Duration.ZERO, 50))
+            assertThatCode(() -> new TransferReaperProperties(true, Duration.ZERO, 50, 30))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
-            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 0))
+            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 0, 30))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
-            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 201))
+            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 201, 30))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 50, 0))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatCode(() -> new TransferReaperProperties(true, Duration.ofMinutes(15), 50, 301))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
     }

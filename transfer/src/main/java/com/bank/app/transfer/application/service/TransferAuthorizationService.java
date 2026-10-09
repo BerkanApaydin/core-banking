@@ -2,23 +2,23 @@ package com.bank.app.transfer.application.service;
 
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
-import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.exception.AuthorizationException;
 
 public class TransferAuthorizationService {
 
     private final AccountAclPort accountAclPort;
-    private final UserContextService userContextService;
+    private final ResourceOwnershipPolicy ownershipPolicy;
 
-    public TransferAuthorizationService(AccountAclPort accountAclPort, UserContextService userContextService) {
+    public TransferAuthorizationService(AccountAclPort accountAclPort, ResourceOwnershipPolicy ownershipPolicy) {
         this.accountAclPort = accountAclPort;
-        this.userContextService = userContextService;
+        this.ownershipPolicy = ownershipPolicy;
     }
 
     public AccountInfo authorizeSender(String senderIban) {
         AccountInfo senderInfo = accountAclPort.getAccountInfoForTransfer(senderIban);
-        userContextService.checkUserAuthorization(senderInfo.userId(),
+        ownershipPolicy.requireOwner(senderInfo.userId(),
                 "You are not authorized to transfer from this account.");
         return senderInfo;
     }
@@ -29,27 +29,25 @@ public class TransferAuthorizationService {
 
     public AccountInfo authorizeByAccountId(AccountId accountId) {
         AccountInfo accountInfo = accountAclPort.getAccountInfo(accountId);
-        userContextService.checkUserAuthorization(accountInfo.userId(),
+        ownershipPolicy.requireOwner(accountInfo.userId(),
                 "You are not authorized to cancel this transfer.");
         return accountInfo;
     }
 
     public AccountInfo authorizeAccountAccess(AccountId accountId, String errorMessage) {
         AccountInfo accountInfo = accountAclPort.getAccountInfo(accountId);
-        userContextService.checkUserAuthorization(accountInfo.userId(), errorMessage);
+        ownershipPolicy.requireOwner(accountInfo.userId(), errorMessage);
         return accountInfo;
     }
 
     public void authorizeTransferAccess(Long senderUserId, Long receiverUserId, String errorMessage) {
-        Long currentUserId = userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
-                        "Session not found. Please log in again."));
-        if (!currentUserId.equals(senderUserId) && !currentUserId.equals(receiverUserId)) {
-            throw new AuthorizationException("error.not_resource_owner", null, errorMessage);
-        }
+        ownershipPolicy.requireParticipant(senderUserId, receiverUserId,
+                new AuthorizationException("error.session_not_found", null,
+                        "Session not found. Please log in again."),
+                new AuthorizationException("error.not_resource_owner", null, errorMessage));
     }
 
     public String getCurrentUsername() {
-        return userContextService.getCurrentUsernameOrSystem();
+        return ownershipPolicy.currentUsernameOrSystem();
     }
 }

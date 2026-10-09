@@ -11,9 +11,9 @@ class AccountNotActiveExceptionTest {
     @Test
     void shouldCreateWithIban() {
         AccountNotActiveException ex = new AccountNotActiveException("TR770006200000000000000111");
-        assertEquals("Account not active: TR770006200000000000000111", ex.getMessage());
+        assertEquals("Account not active: TR770006*******0111", ex.getMessage());
         assertEquals("error.account_not_active", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"TR770006200000000000000111"}, ex.getArgs());
+        assertArrayEquals(new Object[]{"TR770006*******0111"}, ex.getArgs());
     }
 
     @Test

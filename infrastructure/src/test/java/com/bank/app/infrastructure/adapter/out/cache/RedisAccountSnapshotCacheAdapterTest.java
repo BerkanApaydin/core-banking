@@ -53,7 +53,8 @@ class RedisAccountSnapshotCacheAdapterTest {
     void setUp() {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
         lenient().when(redisTemplate.opsForSet()).thenReturn(setOps);
-        adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate, new CacheProperties(null));
+        adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate,
+                new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 500));
     }
 
     @Test
@@ -226,9 +227,8 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldHonorConfiguredTtl() {
-        CacheProperties props = new CacheProperties(
+        var customTtl = new RedisAccountSnapshotCacheAdapter(redisTemplate,
                 new CacheProperties.AccountInfoCache("caffeine", 1000, 10L, 500L));
-        var customTtl = new RedisAccountSnapshotCacheAdapter(redisTemplate, props);
 
         customTtl.putById(1L, SNAPSHOT);
 

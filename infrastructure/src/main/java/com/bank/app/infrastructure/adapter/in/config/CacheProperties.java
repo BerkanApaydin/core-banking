@@ -8,9 +8,18 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.cache.caffeine")
 public record CacheProperties(AccountInfoCache accountInfo) {
 
+    /**
+     * Legacy prefix binding ({@code app.cache.caffeine.*}). New deployments
+     * should set only the canonical {@code app.cache.account-info.*} keys (see
+     * {@link CacheBackendResolution}): canonical wins on conflict. This binding
+     * stays so existing deployments keep working. Runtime code must inject the
+     * resolved {@code AccountInfoCache} bean from
+     * {@code AccountCacheAliasConfig} instead of this record, so behavior and
+     * backend selection can never disagree.
+     */
     public CacheProperties {
         if (accountInfo == null) {
-            accountInfo = new AccountInfoCache("caffeine", 1000, 60, 500);
+            accountInfo = AccountInfoCache.defaults();
         }
     }
 
@@ -27,11 +36,28 @@ public record CacheProperties(AccountInfoCache accountInfo) {
          * backward compatibility; the value selects the backend:
          * {@code caffeine} = single-JVM (dev/test/single instance),
          * {@code redis} = shared across replicas (production).
+         * New deployments should use the canonical
+         * {@code app.cache.account-info.*} keys instead.
          */
         public AccountInfoCache {
             if (backend == null || backend.isBlank()) {
                 backend = "caffeine";
             }
+        }
+
+        static AccountInfoCache defaults() {
+            return new AccountInfoCache("caffeine", 1000, 60, 500);
+        }
+
+        /**
+         * True when every field holds the binding default — i.e. the operator
+         * did not customize this prefix. Used by
+         * {@link CacheBackendResolution} to prefer an explicitly customized
+         * prefix over an untouched one. Keep the literals in sync with the
+         * {@code @DefaultValue}s above.
+         */
+        public boolean isDefault() {
+            return this.equals(defaults());
         }
     }
 }

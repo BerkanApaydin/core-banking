@@ -1,5 +1,6 @@
 package com.bank.app.transfer.domain.exception;
 
+import com.bank.app.common.domain.IbanLogMask;
 import com.bank.app.common.domain.exception.BusinessException;
 
 public class SameAccountTransferException extends BusinessException {
@@ -9,6 +10,7 @@ public class SameAccountTransferException extends BusinessException {
     public String getErrorCode() { return "SAME_ACCOUNT_TRANSFER"; }
 
     public SameAccountTransferException(String iban) {
-        super("error.same_account_transfer", new Object[]{iban}, "Cannot transfer to the same account: " + iban);
+        super("error.same_account_transfer", new Object[]{IbanLogMask.mask(iban)},
+                "Cannot transfer to the same account: " + IbanLogMask.mask(iban));
     }
 }

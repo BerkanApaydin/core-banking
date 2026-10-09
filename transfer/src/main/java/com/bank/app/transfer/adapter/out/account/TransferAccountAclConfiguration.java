@@ -43,7 +43,7 @@ public class TransferAccountAclConfiguration {
                     "InMemoryAccountInfoCacheAdapter must not run with the prod profile: "
                     + "no shared AccountSnapshotCache backend is registered, so per-JVM "
                     + "caches would go stale across replicas. Fix "
-                    + "app.cache.caffeine.account-info.backend=redis instead.");
+                    + "app.cache.account-info.backend=redis instead.");
         }
         log.warn("No shared AccountSnapshotCache backend registered — falling back to "
                 + "single-JVM InMemoryAccountInfoCacheAdapter. Correct for dev/test/single "

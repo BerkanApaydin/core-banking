@@ -54,3 +54,9 @@ For any deployment beyond staging:
 4. Revoke the old value at the manager; verify no pod still references it
    (`kubectl exec … env | grep -c` must be 0 for the old fingerprint —
    exact values never leave the manager).
+
+## 2026-10 dev-default rotation (O-1)
+
+The former DEFAULT_JWT_SECRET value appeared in git history and therefore counts as compromised. It was replaced with a freshly generated 256-bit Base64 value in JwtTokenProvider.DEFAULT_JWT_SECRET + the docker-compose.yml dev default (kept equal by scripts/check_compose_jwt_default.py, which fails CI on drift). Prod behavior is unchanged: the new value is refused exactly like the old one (llow-default-secret: false + ApplicationStartupValidator).
+
+History still contains the old value: treat any pre-rotation token signed with it as compromised (short TTL bounds the exposure) and, for full hygiene, rewrite history with git filter-repo or rotate the repository if the history was ever pushed to an untrusted remote. New hardcoded secrets remain rejected by gitleaks + the secret-scan CI job.

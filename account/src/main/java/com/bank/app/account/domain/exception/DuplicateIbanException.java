@@ -1,5 +1,6 @@
 package com.bank.app.account.domain.exception;
 
+import com.bank.app.common.domain.IbanLogMask;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
 
@@ -13,7 +14,8 @@ public class DuplicateIbanException extends BusinessException {
     public String getErrorCode() { return "DUPLICATE_IBAN"; }
 
     public DuplicateIbanException(String iban) {
-        super("error.duplicate_iban", new Object[]{iban}, "An account already exists with this IBAN: " + iban);
+        super("error.duplicate_iban", new Object[]{IbanLogMask.mask(iban)},
+                "An account already exists with this IBAN: " + IbanLogMask.mask(iban));
     }
 
     public DuplicateIbanException(String messageKey, Object[] args, String defaultMessage) {

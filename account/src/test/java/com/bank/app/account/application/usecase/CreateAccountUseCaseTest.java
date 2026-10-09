@@ -275,7 +275,7 @@ class CreateAccountUseCaseTest {
 
             assertThatThrownBy(() -> createAccountUseCase.execute(request))
                     .isExactlyInstanceOf(DuplicateIbanException.class)
-                    .hasMessage("An account already exists with this IBAN: " + VALID_IBAN);
+                    .hasMessage("An account already exists with this IBAN: TR440006*******0123");
             verify(saveAccountPort, never()).save(any(Account.class));
         }
 

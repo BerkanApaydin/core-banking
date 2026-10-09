@@ -94,8 +94,37 @@ class CodingRulesArchitectureTest extends ArchitectureTest {
     }
 
     @Test
-    void noDirectTransactionalAnnotationInUseCases() {
-        // R7/P5-2: use cases declare transactions via @TransactionalUseCase /
+    void noProgrammaticSpringTransactionsInBoundedContexts() {
+        // Bounded contexts observe the transaction boundary through
+        // TransactionBoundaryPort (common, framework-free). Direct use of
+        // Spring programmatic control pins adapters to Spring and hides tx
+        // control inside business modules; the single Spring-backed
+        // implementation lives in infrastructure (SpringTransactionBoundaryAdapter).
+        // Persistence failure *types* (spring-dao) stay allowed: they are the
+        // shared failure taxonomy mapped centrally by the problem handlers.
+        DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> programmaticTxControl =
+                new DescribedPredicate<>("Spring programmatic transaction control") {
+                    private final java.util.Set<String> controlled = java.util.Set.of(
+                            "org.springframework.transaction.support.TransactionSynchronizationManager",
+                            "org.springframework.transaction.support.TransactionSynchronization",
+                            "org.springframework.transaction.support.TransactionTemplate",
+                            "org.springframework.transaction.PlatformTransactionManager",
+                            "org.springframework.transaction.TransactionDefinition");
+                    @Override
+                    public boolean test(com.tngtech.archunit.core.domain.JavaClass javaClass) {
+                        return controlled.contains(javaClass.getName());
+                    }
+                };
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.account..", "com.bank.app.transfer..",
+                        "com.bank.app.user..", "com.bank.app.audit..")
+                .should().accessClassesThat(programmaticTxControl)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void noDirectTransactionalAnnotationInUseCases() {        // R7/P5-2: use cases declare transactions via @TransactionalUseCase /
         // @ReadOnlyUseCase markers (UseCaseTransactionAspect owns isolation +
         // timeout). A direct @Transactional would silently bypass the aspect's
         // READ_COMMITTED/timeout contract and split the tx model in two.

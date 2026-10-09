@@ -7,6 +7,7 @@ import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
@@ -14,10 +15,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 import java.util.Set;
@@ -38,11 +38,15 @@ class AccountApiAdapterTest {
     @Mock
     private AccountSnapshotCache snapshotCache;
 
+    @Mock
+    private TransactionBoundaryPort transactionBoundary;
+
     private AccountApiAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountApiAdapter(accountQueryUseCase, adjustAccountBalancesUseCase, snapshotCache);
+        adapter = new AccountApiAdapter(accountQueryUseCase, adjustAccountBalancesUseCase,
+                snapshotCache, transactionBoundary);
     }
 
     @Test
@@ -92,7 +96,7 @@ class AccountApiAdapterTest {
                 AccountNotFoundException.class,
                 () -> adapter.getSnapshotByIban("TR000"));
 
-        assertEquals("Account not found. IBAN: TR000", ex.getMessage());
+        assertEquals("Account not found. IBAN: ***", ex.getMessage());
         assertEquals(BusinessFailureKind.NOT_FOUND, ex.getFailureKind());
         assertEquals("ACCOUNT_NOT_FOUND_IBAN", ex.getErrorCode());
     }
@@ -157,28 +161,24 @@ class AccountApiAdapterTest {
     @Test
     void shouldDeferEvictionUntilAfterCommitInsideTransaction() {
         // AFTER_COMMIT rule: a rollback must never evict a still-valid
-        // snapshot. Kills the registerSynchronization + afterCommit mutants.
+        // snapshot. The port defers the eviction; running the captured hook
+        // simulates the commit.
         Money amount = Money.of("50.00", Currency.TRY);
         AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
                 Money.of("950.00", Currency.TRY), Money.of("550.00", Currency.TRY));
         when(adjustAccountBalancesUseCase.debitAndCredit(1L, 2L, amount)).thenReturn(expected);
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-        try {
-            assertSame(expected, adapter.adjustBalances(1L, 2L, amount));
+        when(transactionBoundary.isTransactionActive()).thenReturn(true);
 
-            // No eviction before commit.
-            verify(snapshotCache, never()).evictById(anyLong());
-            for (TransactionSynchronization sync :
-                    TransactionSynchronizationManager.getSynchronizations()) {
-                sync.afterCommit();
-            }
-            verify(snapshotCache).evictById(1L);
-            verify(snapshotCache).evictById(2L);
-            verify(snapshotCache, never()).evictAll();
-        } finally {
-            TransactionSynchronizationManager.clear();
-        }
+        assertSame(expected, adapter.adjustBalances(1L, 2L, amount));
+
+        // No eviction before commit.
+        verify(snapshotCache, never()).evictById(anyLong());
+        ArgumentCaptor<Runnable> afterCommit = ArgumentCaptor.forClass(Runnable.class);
+        verify(transactionBoundary).runAfterCommit(afterCommit.capture());
+        afterCommit.getValue().run();
+        verify(snapshotCache).evictById(1L);
+        verify(snapshotCache).evictById(2L);
+        verify(snapshotCache, never()).evictAll();
     }
 
     @Test
@@ -187,21 +187,16 @@ class AccountApiAdapterTest {
         AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,
                 Money.of("1000.00", Currency.TRY), Money.of("500.00", Currency.TRY));
         when(adjustAccountBalancesUseCase.reverseForCancellation(1L, 2L, amount)).thenReturn(expected);
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-        try {
-            assertSame(expected, adapter.reverseForCancellation(1L, 2L, amount));
+        when(transactionBoundary.isTransactionActive()).thenReturn(true);
 
-            verify(snapshotCache, never()).evictById(anyLong());
-            for (TransactionSynchronization sync :
-                    TransactionSynchronizationManager.getSynchronizations()) {
-                sync.afterCommit();
-            }
-            verify(snapshotCache).evictById(1L);
-            verify(snapshotCache).evictById(2L);
-        } finally {
-            TransactionSynchronizationManager.clear();
-        }
+        assertSame(expected, adapter.reverseForCancellation(1L, 2L, amount));
+
+        verify(snapshotCache, never()).evictById(anyLong());
+        ArgumentCaptor<Runnable> afterCommit = ArgumentCaptor.forClass(Runnable.class);
+        verify(transactionBoundary).runAfterCommit(afterCommit.capture());
+        afterCommit.getValue().run();
+        verify(snapshotCache).evictById(1L);
+        verify(snapshotCache).evictById(2L);
     }
 
     @Test

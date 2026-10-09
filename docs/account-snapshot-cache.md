@@ -46,16 +46,18 @@ costs extra DB load, never a 500. Eviction loss is self-healing via TTL.
 
 ## Which backend runs, and why the in-memory one never should
 
-The cache port has three implementations. Which one is wired is decided by a
-single property, `app.cache.caffeine.account-info.backend`:
+The cache port has three implementations. Which one is wired is decided by the
+resolved backend (canonical `app.cache.account-info.backend`, legacy
+`app.cache.caffeine.account-info.backend` as fallback — canonical wins on
+conflict; see `CacheBackendResolution`):
 
 | Value | Bean | Where |
 |---|---|---|
-| `redis` (production) | `RedisAccountSnapshotCacheAdapter` | `RedisRateLimitConfiguration.SnapshotCacheRedis` |
+| `redis` (production) | `RedisAccountSnapshotCacheAdapter` | `SnapshotCacheRedisCondition` (+ `RedisRateLimitConfiguration.SnapshotCacheRedis` for the connection factory) |
 | anything else | none registered → `TransferBeanConfig.accountInfoCachePort()` falls back to `InMemoryAccountInfoCacheAdapter` | `@ConditionalOnMissingBean(AccountSnapshotCache.class)` |
 | — | `AbstractAccountSnapshotCache` | shared invalidation logic, not a backend |
 
-`application-prod.yml` sets the property to the **literal** `redis` (not
+`application-prod.yml` sets both keys to the **literal** `redis` (not
 `${CACHE_ACCOUNT_INFO_BACKEND:redis}` as the base file does). That matters: a
 literal cannot be redirected by an environment variable, so the fallback
 cannot be switched on in production by accident.

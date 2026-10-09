@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.in.scheduler;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
@@ -20,9 +21,6 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Crash-window reaper for the synchronous placement path.
@@ -47,11 +45,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * the trail until a FAILED consumer lands.
  *
  * <p>Transactionality: each row is processed in its own
- * {@code REQUIRES_NEW} transaction via {@link TransactionTemplate}, so the
- * {@code SELECT ... FOR UPDATE} lock, the versioned bulk UPDATE and the audit
- * row commit atomically. Without this the {@code PESSIMISTIC_WRITE} query
- * would run in Spring Data's read-only transaction (PostgreSQL rejects
+ * {@code REQUIRES_NEW} transaction through {@link TransactionBoundaryPort},
+ * so the {@code SELECT ... FOR UPDATE} lock, the versioned bulk UPDATE and the
+ * audit row commit atomically. Without this the {@code PESSIMISTIC_WRITE}
+ * query would run in Spring Data's read-only transaction (PostgreSQL rejects
  * {@code FOR UPDATE} there with {@code 25006}) or across auto-commits.
+ * Programmatic transaction control lives behind the port so this module never
+ * imports Spring transaction support classes.
  */
 @Component
 @ConditionalOnProperty(prefix = "app.transfer.reaper", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -61,7 +61,6 @@ public class TransferPendingReaper {
 
     static final String REAPED_COUNTER = "transfer.pending.reaped";
     static final String CONFLICT_COUNTER = "transfer.pending.reap-conflicts";
-    private static final int REAP_TX_TIMEOUT_SECONDS = 30;
 
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
@@ -69,14 +68,14 @@ public class TransferPendingReaper {
     private final TransferReaperProperties properties;
     private final ClockProviderPort clockProvider;
     private final MeterRegistry meterRegistry;
-    private final TransactionTemplate transactionTemplate;
+    private final TransactionBoundaryPort transactionBoundary;
 
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
             AuditEventPort auditEventPort,
             TransferReaperProperties properties,
             ClockProviderPort clockProvider) {
-        this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, null);
+        this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, null, null);
     }
 
     /**
@@ -99,21 +98,14 @@ public class TransferPendingReaper {
             TransferReaperProperties properties,
             ClockProviderPort clockProvider,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
-            @Autowired(required = false) @Nullable PlatformTransactionManager transactionManager) {
+            @Autowired(required = false) @Nullable TransactionBoundaryPort transactionBoundary) {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.auditEventPort = auditEventPort;
         this.properties = properties;
         this.clockProvider = clockProvider;
         this.meterRegistry = meterRegistry;
-        if (transactionManager != null) {
-            TransactionTemplate template = new TransactionTemplate(transactionManager);
-            template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            template.setTimeout(REAP_TX_TIMEOUT_SECONDS);
-            this.transactionTemplate = template;
-        } else {
-            this.transactionTemplate = null;
-        }
+        this.transactionBoundary = transactionBoundary;
     }
 
     @Scheduled(cron = "${app.transfer.reaper.cron:0 */5 * * * *}")
@@ -143,8 +135,9 @@ public class TransferPendingReaper {
         Long id = stale.getId();
         try {
             boolean reaped;
-            if (transactionTemplate != null) {
-                reaped = Boolean.TRUE.equals(transactionTemplate.execute(status -> doReapRow(id, clock)));
+            if (transactionBoundary != null) {
+                reaped = Boolean.TRUE.equals(transactionBoundary.executeRequiresNew(
+                        () -> doReapRow(id, clock), properties.txTimeoutSeconds()));
             } else {
                 reaped = doReapRow(id, clock);
             }

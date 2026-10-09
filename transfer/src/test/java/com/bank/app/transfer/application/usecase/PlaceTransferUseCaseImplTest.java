@@ -1,6 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
@@ -84,7 +85,7 @@ class PlaceTransferUseCaseImplTest {
         lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         transferDomainService = new TransferDomainService();
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
-                accountAclPort, userContextService);
+                accountAclPort, new ResourceOwnershipPolicy(userContextService));
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
                 accountAclPort, saveTransferPort,
                 transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider, auditEventPort);

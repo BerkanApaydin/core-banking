@@ -59,6 +59,11 @@ management:
 
 app:
   cache:
+    # Canonical prod pin (literal, not env-overridable — see
+    # ProductionConfigContractTest). The legacy key below mirrors it so raw-key
+    # readers and older overrides keep working; canonical wins on conflict.
+    account-info:
+      backend: redis
     caffeine:
       account-info:
         backend: redis

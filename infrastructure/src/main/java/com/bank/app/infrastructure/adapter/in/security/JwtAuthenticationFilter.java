@@ -1,38 +1,28 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
-import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
-import com.bank.app.common.adapter.in.api.PublicApiPaths;
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import java.util.Collections;
 import java.io.IOException;
-import java.util.Optional;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -41,18 +31,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_AUTHORIZATION = "Authorization";
-    private static final String MDC_USER_KEY = "userId";
     // Single generic message for revoked AND invalid tokens: distinct messages
     // let callers oracle whether a token was revoked (information disclosure).
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
-    // SEC-01: mirrors SecurityConfig's "/api/v1/admin/**" matcher (G-1 outer
-    // layer). Requests under this prefix re-validate the token generation
-    // against the DB (see hasCurrentTokenVersion).
-    private static final String ADMIN_PATH_PREFIX = "/api/v1/admin";
-    // L-5: runtime log-level changes (/actuator/loggers, ADMIN-only per
-    // SecurityConfig) get the same re-validation — a demoted admin must not
-    // keep log control for ~15 min on a stale token.
-    private static final String ACTUATOR_LOGGERS_PREFIX = "/actuator/loggers";
 
     private final JwtPort jwtPort;
     private final TokenBlacklistPort tokenBlacklistPort;
@@ -60,6 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
     private final BrowserSessionCookies browserSessionCookies;
     private final CsrfBindingPort csrfBinding;
+    private final AdminTokenVersionValidator tokenVersionValidator;
 
     @Autowired
     public JwtAuthenticationFilter(JwtPort jwtPort,
@@ -73,6 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.objectMapper = objectMapper;
         this.csrfBinding = csrfBinding;
         this.browserSessionCookies = new BrowserSessionCookies(browserSession.secure());
+        this.tokenVersionValidator = new AdminTokenVersionValidator(jwtPort, loadUserPort);
     }
 
     // Isolated filter tests only (same package): falls back to the plain
@@ -109,12 +92,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader(HEADER_AUTHORIZATION);
         final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
-        final String path = requestPath(request);
+        final String path = FilterRequestDecisions.requestPath(request);
         // Refresh endpoints own their authentication entirely (refresh token
         // in body or cookie, validated by the controller): an expired or
         // blacklisted access token in the header/cookie must not block a
         // legitimate rotation, so the filter steps aside completely here.
-        if (isRefreshRequest(request, path)) {
+        if (FilterRequestDecisions.isRefreshRequest(request, path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -126,10 +109,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // valid session up front.
         final boolean browserAuth = authHeader == null
                 && path.startsWith("/api/")
-                && !isPublicLogin(request, path)
-                && !isRefreshRequest(request, path);
+                && !FilterRequestDecisions.isPublicLogin(request, path)
+                && !FilterRequestDecisions.isRefreshRequest(request, path);
         final String jwt = bearerAuth ? authHeader.substring(BEARER_PREFIX.length())
-                : browserAuth ? cookieValue(request, browserSessionCookies.sessionCookieName()) : null;
+                : browserAuth ? FilterRequestDecisions.cookieValue(request, browserSessionCookies.sessionCookieName()) : null;
 
         if (jwt == null) {
             filterChain.doFilter(request, response);
@@ -153,14 +136,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // only this exact action re-submit a still-valid signed token so
             // revocation can be retried idempotently; every other route must
             // continue enforcing the blacklist.
-            if (!isLogoutRequest(request, path) && tokenBlacklistPort.isBlacklisted(jwt)) {
+            if (!FilterRequestDecisions.isLogoutRequest(request, path) && tokenBlacklistPort.isBlacklisted(jwt)) {
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
             // Refresh tokens authenticate only the refresh endpoints: a leaked
             // long-lived token must never pass as API authorization.
             if (JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
-                    && !isRefreshRequest(request, path)) {
+                    && !FilterRequestDecisions.isRefreshRequest(request, path)) {
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
@@ -181,14 +164,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
-            // SEC-01: a demoted/suspended admin's pre-change access token
-            // would otherwise stay valid until expiry. Admin calls are rare,
-            // so one indexed PK lookup per admin request is negligible — and
-            // it closes the 15-minute residual-authorization window exactly
-            // where the blast radius is largest (suspend, audit, user admin).
-            if (isAdminRequest(path)) {
+            if (FilterRequestDecisions.isAdminRequest(path)) {
                 try {
-                    if (!hasCurrentTokenVersion(jwt, userId)) {
+                    if (!tokenVersionValidator.hasCurrentTokenVersion(jwt, userId)) {
                         rejectUnauthorized(response, request.getRequestURI());
                         return;
                     }
@@ -212,34 +190,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (!bearerAuth && BrowserSessionCookies.requiresCsrf(request.getMethod())
                     && !csrfBinding.verifyCsrfToken(
                             request.getHeader(BrowserSessionCookies.CSRF_HEADER),
-                            cookieValue(request, browserSessionCookies.csrfCookieName()),
+                            FilterRequestDecisions.cookieValue(request, browserSessionCookies.csrfCookieName()),
                             String.valueOf(userId))) {
                 reject(response, HttpStatus.FORBIDDEN,
                         ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token",
                         request.getRequestURI());
                 return;
             }
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = new SimpleAuthenticatedPrincipal(
-                        userId,
-                        verified.username(),
-                        Collections.singletonList(
-                                new SimpleGrantedAuthority(role)));
-
-                // Signature already verified above; establish the security context.
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities());
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-                // MDC userId for downstream logs (prod JSON layout renders it).
-                // Removed in the finally below: Tomcat threads are reused and
-                // MDC is a ThreadLocal — leaking it would attribute the next
-                // request's logs to this user.
-                MDC.put(MDC_USER_KEY, String.valueOf(userId));
-            }
+            SecurityContextPopulator.establish(verified, role, request);
         } catch (RevocationStoreUnavailableException e) {
             log.warn("JWT revocation backend unavailable; refusing authenticated request");
             SecurityContextHolder.clearContext();
@@ -257,7 +215,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
-            MDC.remove(MDC_USER_KEY);
+            SecurityContextPopulator.clear();
         }
     }
 
@@ -269,67 +227,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void reject(HttpServletResponse response, HttpStatus status,
             String code, String message, String path) throws IOException {
         ProblemDetailFactory.writeProblem(response, objectMapper, status, code, message, path);
-    }
-
-    private static boolean isAdminRequest(String path) {
-        return ADMIN_PATH_PREFIX.equals(path) || path.startsWith(ADMIN_PATH_PREFIX + "/")
-                || ACTUATOR_LOGGERS_PREFIX.equals(path) || path.startsWith(ACTUATOR_LOGGERS_PREFIX + "/");
-    }
-
-    /**
-     * Compares the token's {@code ver} claim against the user's current
-     * generation. Pre-versioning tokens present 0 and pre-versioning users
-     * persist 0 (V39 backfill), so rolling deploys never lock admins out. A
-     * deleted user fails closed (empty lookup rejects).
-     *
-     * <p>AV-2: uses the narrow {@code findTokenVersionById} projection so
-     * this platform filter never imports the user BC's domain aggregate.
-     */
-    private boolean hasCurrentTokenVersion(String jwt, Long userId) {
-        final long presented = jwtPort.extractTokenVersion(jwt);
-        final Optional<Long> current = loadUserPort.findTokenVersionById(userId);
-        return current.map(version -> version == presented).orElse(false);
-    }
-
-    private static boolean isLogoutRequest(HttpServletRequest request, String path) {
-        if (!"POST".equals(request.getMethod())) return false;
-        return PublicApiPaths.LOGOUT.equals(path)
-                || PublicApiPaths.BROWSER_LOGOUT.equals(path);
-    }
-
-    private static boolean isPublicLogin(HttpServletRequest request, String path) {
-        if (!"POST".equals(request.getMethod())) return false;
-        // REGISTER is permitAll (see SecurityProperties): a stale/expired
-        // session cookie on a shared browser must not 401 a new registration
-        // before it reaches the controller.
-        return PublicApiPaths.LOGIN.equals(path)
-                || PublicApiPaths.BROWSER_LOGIN.equals(path)
-                || PublicApiPaths.REGISTER.equals(path);
-    }
-
-    private static boolean isRefreshRequest(HttpServletRequest request, String path) {
-        if (!"POST".equals(request.getMethod())) return false;
-        return PublicApiPaths.REFRESH.equals(path)
-                || PublicApiPaths.BROWSER_REFRESH.equals(path);
-    }
-
-    private static String requestPath(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        if (uri == null) {
-            String servletPath = request.getServletPath();
-            return servletPath == null ? "" : servletPath;
-        }
-        String contextPath = request.getContextPath();
-        return contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
-                ? uri.substring(contextPath.length()) : uri;
-    }
-
-    private static String cookieValue(HttpServletRequest request, String name) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) return null;
-        for (Cookie cookie : cookies) {
-            if (name.equals(cookie.getName())) return cookie.getValue();
-        }
-        return null;
     }
 }

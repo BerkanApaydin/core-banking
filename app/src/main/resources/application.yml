@@ -190,6 +190,8 @@ app:
       cron: ${TRANSFER_REAPER_CRON:0 */5 * * * *}
       older-than: ${TRANSFER_REAPER_OLDER_THAN:PT15M}
       batch-size: ${TRANSFER_REAPER_BATCH_SIZE:50}
+      # Per-row REQUIRES_NEW transaction timeout (seconds).
+      tx-timeout-seconds: ${TRANSFER_REAPER_TX_TIMEOUT_SECONDS:30}
   notification:
     email-enabled: ${NOTIFICATION_EMAIL_ENABLED:true}
     sms-enabled: ${NOTIFICATION_SMS_ENABLED:true}
@@ -209,7 +211,20 @@ app:
     # (unprocessed and dead-letter rows are never deleted).
     retention-days: ${OUTBOX_RETENTION_DAYS:30}
   cache:
+    # Canonical snapshot-cache keys: prefer app.cache.account-info.* for all
+    # four settings. The legacy app.cache.caffeine.account-info.* keys below
+    # remain as a deprecated fallback: they apply only while the canonical
+    # record is entirely at defaults; on conflict the canonical value wins
+    # (see CacheBackendResolution). Set every key under ONE prefix.
+    account-info:
+      backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
+      maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
+      expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}
+      # SCAN batch for operational evict-all resets (Redis backend).
+      eviction-batch-size: ${CACHE_ACCOUNT_INFO_EVICTION_BATCH_SIZE:500}
     caffeine:
+      # Deprecated alias of the block above (same env placeholders, so both
+      # prefixes agree unless explicitly overridden). Do not diverge them.
       account-info:
         backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
         maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}

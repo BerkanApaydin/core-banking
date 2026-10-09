@@ -47,7 +47,7 @@ class RedisAccountSnapshotCacheIntegrationTest {
         template.opsForValue().set("account-snapshot:batch:one", "value");
         template.opsForValue().set("unrelated:test-key", "keep");
 
-        new RedisAccountSnapshotCacheAdapter(template, new CacheProperties(null)).evictAll();
+        new RedisAccountSnapshotCacheAdapter(template, new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 500)).evictAll();
 
         assertFalse(Boolean.TRUE.equals(template.hasKey("account-snapshot:id-1")));
         assertFalse(Boolean.TRUE.equals(template.hasKey("account-snapshot:batch:one")));
@@ -56,7 +56,7 @@ class RedisAccountSnapshotCacheIntegrationTest {
 
     @Test
     void evictByIdDropsDistributedIndexEntriesWrittenByAnotherPod() {
-        var adapter = new RedisAccountSnapshotCacheAdapter(template, new CacheProperties(null));
+        var adapter = new RedisAccountSnapshotCacheAdapter(template, new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 500));
         var snapshot = new AccountSnapshot(7L, 70L, "TRY", "ACTIVE");
         String iban = "TR330006100519786457841326";
         // Another pod's writes: IBAN snapshot + reverse index + id mapping.
@@ -73,7 +73,7 @@ class RedisAccountSnapshotCacheIntegrationTest {
 
     @Test
     void putIbansWritesTtlEntriesReadableBack() {
-        var adapter = new RedisAccountSnapshotCacheAdapter(template, new CacheProperties(null));
+        var adapter = new RedisAccountSnapshotCacheAdapter(template, new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 500));
 
         adapter.putIbans(Set.of(8L, 9L), Map.of(8L, "TR8", 9L, "TR9"));
 

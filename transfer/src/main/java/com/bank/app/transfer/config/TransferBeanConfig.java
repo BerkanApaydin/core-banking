@@ -3,6 +3,7 @@ package com.bank.app.transfer.config;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
 import com.bank.app.transfer.application.port.in.GenerateTransferReportQuery;
@@ -49,8 +50,8 @@ public class TransferBeanConfig {
 
     @Bean
     public TransferAuthorizationService transferAuthorizationService(AccountAclPort accountAclPort,
-                                                                       UserContextService userContextService) {
-        return new TransferAuthorizationService(accountAclPort, userContextService);
+                                                                        UserContextService userContextService) {
+        return new TransferAuthorizationService(accountAclPort, new ResourceOwnershipPolicy(userContextService));
     }
 
     @Bean

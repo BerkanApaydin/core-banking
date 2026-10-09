@@ -24,6 +24,7 @@ import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
+import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,7 +59,7 @@ public class AccountBeanConfig {
 
     @Bean
     public AccountAuthorizationService accountAuthorizationService(UserContextService userContextService) {
-        return new AccountAuthorizationService(userContextService);
+        return new AccountAuthorizationService(new ResourceOwnershipPolicy(userContextService));
     }
 
 

@@ -44,7 +44,7 @@ class ApplicationStartupValidatorTest {
     @CsvSource(delimiter = '|', value = {
             "jwt.secret | '' | non-default JWT secret",
             "jwt.secret | '   ' | non-default JWT secret",
-            "jwt.secret | KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE= | non-default JWT secret",
+            "jwt.secret | i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s= | non-default JWT secret",
             "spring.datasource.password | '' | database password",
             "spring.datasource.password | bank_password | default database password",
             "app.security.token-blacklist.backend | redis | hybrid or database",
@@ -102,5 +102,33 @@ class ApplicationStartupValidatorTest {
         environment.setActiveProfiles("prod");
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .hasMessageContaining("database password");
+    }
+
+    @Test
+    void acceptsCanonicalSnapshotCacheBackend() {
+        var environment = validProductionEnvironment()
+                .withProperty("app.cache.account-info.backend", "redis")
+                .withProperty("app.cache.caffeine.account-info.backend", "caffeine");
+        assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNonRedisCanonicalSnapshotCacheBackend() {
+        // "caffeine" is the default and therefore indistinguishable from unset
+        // (legacy fallback would apply); use a non-default unknown value to
+        // exercise the canonical rejection path.
+        var environment = validProductionEnvironment()
+                .withProperty("app.cache.account-info.backend", "inmemory");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .hasMessageContaining("app.cache.account-info.backend");
+    }
+
+    @Test
+    void rejectsZeroCanonicalEvictionBatchSize() {
+        var environment = validProductionEnvironment()
+                .withProperty("app.cache.account-info.eviction-batch-size", "0");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .hasMessageContaining("eviction-batch-size");
     }
 }

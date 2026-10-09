@@ -39,6 +39,12 @@ public interface AccountSnapshotCache {
 
     void putIbans(Collection<Long> accountIds, Map<Long, String> ibans);
 
+    /**
+     * Operational reset: clears the whole region. Never call from request paths
+     * or mutation flows — balance mutations must use {@link #evictById(Long)}
+     * (O(1) per account). On a populated production cache this scans the whole
+     * keyspace; schedule off-peak (see docs/operations.md).
+     */
     void evictAll();
 
     /**

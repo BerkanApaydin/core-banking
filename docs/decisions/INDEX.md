@@ -44,3 +44,9 @@ is the single map: ID → file → one-sentence decision.
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
 - `pending-reaper.md` (R-1: stale-PENDING crash-window recovery through the domain)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
+| O-1 | `docs/decisions/secret-management.md` (2026-10 rotation) | Leaked dev-default JWT secret rotated; history still counts as compromised. |
+| O-3 | `docs/decisions/token-version.md` (2026-10 acceptance) | 15-min window accepted on money paths too; no per-request tokenVersion lookup in transfer. |
+| O-12 | `docs/decisions/iban-pii.md` | Raw IBANs masked at exception construction via `IbanLogMask`; never at the log site. |
+| TX-P | `docs/decisions/transaction-strategy.md` (boundary port) | Adapters observe tx state via `TransactionBoundaryPort`; no programmatic Spring TX in BCs (ArchUnit). |
+| CACHE-1 | `docs/decisions/cache-prefix-alias.md` | Canonical `app.cache.account-info.*` keys; legacy prefix deprecated fallback with canonical-wins merge. |
+| AUD-1 | `docs/decisions/audit-persistence.md` | `AuditLogJpaEntity` intentionally outside the shared auditing base; explicit `@PrePersist` only. |

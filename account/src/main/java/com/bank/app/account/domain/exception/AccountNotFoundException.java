@@ -1,5 +1,6 @@
 package com.bank.app.account.domain.exception;
 
+import com.bank.app.common.domain.IbanLogMask;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
 
@@ -18,6 +19,7 @@ public class AccountNotFoundException extends BusinessException {
     }
 
     public AccountNotFoundException(String iban) {
-        super("error.account_not_found_iban", new Object[]{iban}, "Account not found. IBAN: " + iban);
+        super("error.account_not_found_iban", new Object[]{IbanLogMask.mask(iban)},
+                "Account not found. IBAN: " + IbanLogMask.mask(iban));
     }
 }

@@ -24,3 +24,5 @@ is the rationale for the default.
 
 **Alternative (rejected):** `tokenVersion` lookup on every request — correct but
 costs p99 + DB load; unnecessary on the rate-limited non-auth hot paths.
+
+**O-3 acceptance (2026-10):** the window also covers money-movement paths (PlaceTransfer, CancelTransfer): they authorize the *resource owner* from the verified token without a per-request 	okenVersion lookup. Extending the DB check there would couple 	ransfer to the user-owned token lifecycle (a new cross-BC port on the request hot path, +1 DB RTT per transfer) for a 15-minute residual window on an already short-lived credential. Accepted: owner check + short TTL + refresh rotation + family revoke bound the risk; high-security deployments use the strict-mode flag instead of per-endpoint checks.

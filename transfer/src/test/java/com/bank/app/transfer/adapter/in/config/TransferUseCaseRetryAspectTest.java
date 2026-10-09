@@ -1,5 +1,6 @@
 package com.bank.app.transfer.adapter.in.config;
 
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.transfer.config.TransferProperties;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -185,18 +185,32 @@ class TransferUseCaseRetryAspectTest {
         @Test
         @DisplayName("should bypass retry inside an existing transaction")
         void shouldBypassRetryInsideTransaction() throws Throwable {
-            // Kills the NegateConditionals mutant on isActualTransactionActive:
+            // Kills the NegateConditionals mutant on the transaction check:
             // inside a transaction the join point must run exactly once with
-            // no retry, even for lock failures.
-            TransactionSynchronizationManager.initSynchronization();
-            TransactionSynchronizationManager.setActualTransactionActive(true);
-            try {
-                when(joinPoint.proceed()).thenReturn("success");
-                assertThat(aspect.around(joinPoint)).isEqualTo("success");
-                verify(joinPoint, times(1)).proceed();
-            } finally {
-                TransactionSynchronizationManager.clear();
-            }
+            // no retry, even for lock failures. Transaction state arrives
+            // through the port (stubbed active here); production wires the
+            // Spring-backed implementation.
+            TransactionBoundaryPort activeBoundary = new TransactionBoundaryPort() {
+                @Override
+                public boolean isTransactionActive() {
+                    return true;
+                }
+
+                @Override
+                public void runAfterCommit(Runnable action) {
+                    action.run();
+                }
+
+                @Override
+                public <T> T executeRequiresNew(java.util.function.Supplier<T> action, int timeoutSeconds) {
+                    return action.get();
+                }
+            };
+            TransferUseCaseRetryAspect txAspect = new TransferUseCaseRetryAspect(
+                    new TransferProperties(Duration.ofHours(24), 3, 50, 500, 100), activeBoundary);
+            when(joinPoint.proceed()).thenReturn("success");
+            assertThat(txAspect.around(joinPoint)).isEqualTo("success");
+            verify(joinPoint, times(1)).proceed();
         }
 
         @Test

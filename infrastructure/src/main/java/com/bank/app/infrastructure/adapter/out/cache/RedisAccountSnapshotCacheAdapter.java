@@ -3,9 +3,10 @@ package com.bank.app.infrastructure.adapter.out.cache;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.infrastructure.adapter.in.config.CacheProperties;
+import com.bank.app.infrastructure.adapter.in.config.SnapshotCacheRedisCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,8 +25,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Redis-backed account snapshot cache implementation (shared across replicas).
  *
- * <p>Active when {@code app.cache.caffeine.account-info.backend=redis}
- * (production). Unlike the Caffeine backend, the {@code id ↔ IBAN} reverse
+ * <p>Active when the resolved snapshot-cache backend is {@code redis}
+ * (canonical {@code app.cache.account-info.backend}, legacy
+ * {@code app.cache.caffeine.account-info.backend} as fallback — see
+ * {@link com.bank.app.infrastructure.adapter.in.config.CacheBackendResolution}).
+ * Unlike the Caffeine backend, the {@code id ↔ IBAN} reverse
  * index lives in Redis as well (sets + reverse keys), so an
  * {@code evictById} issued on one pod also drops the IBAN entries written
  * by other pods. All entries carry the same TTL as the Caffeine backend
@@ -40,7 +44,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Component
 @Primary
-@ConditionalOnProperty(name = "app.cache.caffeine.account-info.backend", havingValue = "redis")
+@Conditional(SnapshotCacheRedisCondition.class)
 public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
 
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
@@ -93,10 +97,10 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     private final DefaultRedisScript<Long> trackIbanScript;
 
     public RedisAccountSnapshotCacheAdapter(StringRedisTemplate redisTemplate,
-            CacheProperties cacheProperties) {
+            CacheProperties.AccountInfoCache resolvedAccountInfoCache) {
         this.redisTemplate = redisTemplate;
-        this.ttlSeconds = cacheProperties.accountInfo().expireAfterWrite();
-        this.evictionBatchSize = Math.toIntExact(cacheProperties.accountInfo().evictionBatchSize());
+        this.ttlSeconds = resolvedAccountInfoCache.expireAfterWrite();
+        this.evictionBatchSize = Math.toIntExact(resolvedAccountInfoCache.evictionBatchSize());
         this.evictByIdScript = new DefaultRedisScript<>(LUA_EVICT_BY_ID, Long.class);
         this.putIbansScript = new DefaultRedisScript<>(LUA_PUT_IBANS, Long.class);
         this.trackIbanScript = new DefaultRedisScript<>(LUA_TRACK_IBAN, Long.class);
@@ -194,10 +198,15 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     /**
      * Full-region scan + batched delete. Prefer {@link #evictById(Long)} for
      * balance mutations (O(1) Lua); reserve this for operational resets only —
-     * on a populated production cache it scans the whole keyspace.
+     * on a populated production cache it scans the whole keyspace. Do not call
+     * from request paths or mutation flows; schedule operational resets for
+     * off-peak hours (see docs/operations.md).
      */
     @Override
     public void evictAll() {
+        log.warn("Snapshot cache full-region evict-all started (scan batch {}). "
+                + "Prefer evictById for mutations; reserve evict-all for off-peak operational resets.",
+                evictionBatchSize);
         ScanOptions options = ScanOptions.scanOptions()
                 .match(SnapshotKeys.scanPattern())
                 .count(evictionBatchSize)

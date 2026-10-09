@@ -52,7 +52,7 @@ public class JwtTokenProvider implements JwtPort {
      */
     @Deprecated
     public static final String DEFAULT_JWT_SECRET =
-            "KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=";
+            "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
 
     /** Token type claim distinguishing access from refresh tokens. */
     public static final String TOKEN_TYPE_CLAIM = "typ";

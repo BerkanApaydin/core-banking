@@ -5,9 +5,9 @@ import com.bank.app.account.domain.AccountCreatedEvent;
 import com.bank.app.account.domain.AccountCreditedEvent;
 import com.bank.app.account.domain.AccountDebitedEvent;
 import com.bank.app.account.domain.AccountSuspendedEvent;
+import com.bank.app.common.application.outbox.IdempotentOutboxRelay;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
-import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,12 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @Component
-public class AccountEventOutboxRelay implements OutboxEventPort {
+public class AccountEventOutboxRelay extends IdempotentOutboxRelay {
 
     private static final Logger log = LoggerFactory.getLogger(AccountEventOutboxRelay.class);
     // NOTE: literal intentionally keeps the pre-rename handler name: dedup keys are
@@ -39,8 +37,6 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
 
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
-    private final IdempotencyPort idempotencyPort;
-    private final ClockProviderPort clockProvider;
 
     @Autowired
     public AccountEventOutboxRelay(ObjectMapper objectMapper,
@@ -53,10 +49,9 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
                                       ApplicationEventPublisher eventPublisher,
                                       IdempotencyPort idempotencyPort,
                                       ClockProviderPort clockProvider) {
+        super(idempotencyPort, clockProvider, DEDUP_KEY_PREFIX);
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
-        this.idempotencyPort = idempotencyPort;
-        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -65,27 +60,27 @@ public class AccountEventOutboxRelay implements OutboxEventPort {
     }
 
     @Override
-    public void handle(EventEntry event) {
-        String dedupKey = DEDUP_KEY_PREFIX + event.id();
-        Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
-        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now(clock))) {
-            log.info("Duplicate outbox event detected, skipping. handler=AccountEventOutboxRelay, eventId={}", event.id());
-            return;
-        }
-
+    protected void deliver(EventEntry event) throws Exception {
         Class<? extends DomainEvent> eventClass = SUPPORTED_EVENTS.get(event.eventType());
         if (eventClass == null) {
             log.warn("Unsupported account event type: {}", event.eventType());
             return;
         }
-        try {
-            DomainEvent domainEvent = objectMapper.readValue(event.payload(), eventClass);
-            eventPublisher.publishEvent(domainEvent);
-            log.debug("Published account event: type={}, id={}", event.eventType(), event.id());
-        } catch (Exception e) {
-            log.error("Failed to handle account event: type={}, id={}, failureType={}",
-                    event.eventType(), event.id(), e.getClass().getName());
-            throw new RuntimeException("AccountEventOutboxRelay failed for " + event.eventType(), e);
-        }
+        DomainEvent domainEvent = objectMapper.readValue(event.payload(), eventClass);
+        eventPublisher.publishEvent(domainEvent);
+        log.debug("Published account event: type={}, id={}", event.eventType(), event.id());
+    }
+
+    @Override
+    protected void onDuplicateSkipped(EventEntry event) {
+        log.info("Duplicate outbox event detected, skipping. handler=AccountEventOutboxRelay, eventId={}",
+                event.id());
+    }
+
+    @Override
+    protected void onDeliveryFailed(EventEntry event, Exception failure) {
+        log.error("Failed to handle account event: type={}, id={}, failureType={}",
+                event.eventType(), event.id(), failure.getClass().getName());
+        throw new RuntimeException("AccountEventOutboxRelay failed for " + event.eventType(), failure);
     }
 }

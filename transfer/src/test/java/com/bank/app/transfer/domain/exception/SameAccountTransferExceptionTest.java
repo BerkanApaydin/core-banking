@@ -11,8 +11,9 @@ class SameAccountTransferExceptionTest {
     void shouldCreateWithIban() {
         SameAccountTransferException ex = new SameAccountTransferException("TR770006200000000000000111");
         assertEquals("error.same_account_transfer", ex.getMessageKey());
-        assertArrayEquals(new Object[]{"TR770006200000000000000111"}, ex.getArgs());
-        assertTrue(ex.getMessage().contains("TR770006200000000000000111"));
+        assertArrayEquals(new Object[]{"TR770006*******0111"}, ex.getArgs());
+        assertTrue(ex.getMessage().contains("TR770006*******0111"));
+        assertTrue(!ex.getMessage().contains("TR770006200000000000000111"), "raw IBAN must not leak");
     }
 
     @Test

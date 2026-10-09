@@ -72,7 +72,7 @@ services:
       # here. The dev profile enables it via application-dev.yml; wiring it
       # through compose would let a copied line re-enable the default secret
       # in a prod-shaped deployment.
-      JWT_SECRET: "${JWT_SECRET:-KqppTj5E0Ofnmy0Zqpes4lcblwsqf50J7huOCLOjsYE=}"
+      JWT_SECRET: "${JWT_SECRET:-i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=}"
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-10}

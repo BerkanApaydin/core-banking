@@ -306,8 +306,9 @@ class ProductionConfigContractTest {
      * {@code @ConditionalOnMissingBean(AccountSnapshotCache.class)}, so the
      * infrastructure backend wins whenever it is wired. That backend is
      * {@code RedisAccountSnapshotCacheAdapter}, enabled by
-     * {@code RedisRateLimitConfiguration.SnapshotCacheRedis} on
-     * {@code app.cache.caffeine.account-info.backend=redis}.
+     * {@code SnapshotCacheRedisCondition} on the resolved backend
+     * (canonical {@code app.cache.account-info.backend}, legacy
+     * {@code app.cache.caffeine.account-info.backend} as fallback).
      *
      * <p>The silent-failure path this guards is: if the prod value ever degrades
      * away from {@code redis}, no backend bean is registered, the conditional
@@ -325,7 +326,7 @@ class ProductionConfigContractTest {
         @Test
         @DisplayName("production must pin the snapshot cache to the shared Redis backend")
         void productionMustUseSharedSnapshotCacheBackend() {
-            assertThat(property("app.cache.caffeine.account-info.backend", ""))
+            assertThat(property("app.cache.account-info.backend", ""))
                     .as("production must use redis for the account snapshot cache. Anything else "
                             + "leaves TransferBeanConfig's @ConditionalOnMissingBean fallback "
                             + "(InMemoryAccountInfoCacheAdapter) active, which is a per-JVM map: "
@@ -334,17 +335,24 @@ class ProductionConfigContractTest {
                             + "(14.1). The prod value is a literal, not an env placeholder, so an "
                             + "environment override cannot flip it by accident")
                     .isEqualTo("redis");
+            assertThat(property("app.cache.caffeine.account-info.backend", ""))
+                    .as("legacy alias must mirror the canonical prod pin so raw-key readers "
+                            + "and older overrides resolve the same backend")
+                    .isEqualTo("redis");
         }
 
         @Test
         @DisplayName("production must not let an environment variable redirect the snapshot cache")
         void productionSnapshotCacheBackendMustNotBeEnvOverridable() {
-            String raw = rawProperty("app.cache.caffeine.account-info.backend");
+            String raw = rawProperty("app.cache.account-info.backend");
 
             assertThat(raw)
                     .as("if this were ${CACHE_ACCOUNT_INFO_BACKEND:caffeine} the env var would "
                             + "override it in prod and could silently reinstate the in-memory "
                             + "fallback; a literal keeps the Redis decision non-negotiable")
+                    .doesNotContain("${");
+            assertThat(rawProperty("app.cache.caffeine.account-info.backend"))
+                    .as("legacy alias must be a literal for the same reason")
                     .doesNotContain("${");
         }
     }
