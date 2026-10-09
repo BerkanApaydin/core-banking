@@ -11,7 +11,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("HmacCsrfBindingAdapter")
 class HmacCsrfBindingAdapterTest {
 
-    private static final String SECRET = "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
+    // Zero-entropy placeholder: valid shape, never flags secret scanners.
+    // The real dev default lives only in JwtTokenProvider + compose.
+    private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     @Test
     @DisplayName("should round-trip via JwtProperties-derived key (K7/D8)")

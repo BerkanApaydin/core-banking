@@ -20,7 +20,10 @@ class JwtTokenProviderTest {
 
     private JwtTokenProvider jwtTokenProvider;
 
-    private static final String SECRET = "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
+    // Zero-entropy placeholder: valid 256-bit length, but uniform content never
+    // flags secret scanners. Tests needing the REAL dev default reference
+    // JwtTokenProvider.DEFAULT_JWT_SECRET explicitly (see below).
+    private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     @BeforeEach
     void setUp() {
@@ -130,7 +133,10 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldThrowWhenDefaultSecretWithoutExplicitConsent() {
-        JwtTokenProvider defaultProvider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, false);
+        // Uses the real dev default (not the placeholder): this test pins the
+        // production refusal path, so it must track the constant, not a copy.
+        JwtTokenProvider defaultProvider = new JwtTokenProvider(
+                JwtTokenProvider.DEFAULT_JWT_SECRET, 86400000L, 604800000L, false);
         assertThrows(IllegalStateException.class, defaultProvider::validateSecret);
     }
 
@@ -143,7 +149,8 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldAllowDefaultSecretWithExplicitConsent() {
-        JwtTokenProvider consentingProvider = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
+        JwtTokenProvider consentingProvider = new JwtTokenProvider(
+                JwtTokenProvider.DEFAULT_JWT_SECRET, 86400000L, 604800000L, true);
         assertDoesNotThrow(consentingProvider::validateSecret);
     }
 

@@ -10,7 +10,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("JwtProperties")
 class JwtPropertiesTest {
 
-    private static final String SECRET = "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
+    // Zero-entropy placeholder: valid shape, never flags secret scanners.
+    // The real dev default lives only in JwtTokenProvider + compose.
+    private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     @Test
     @DisplayName("should bind explicit values (D13/K14)")

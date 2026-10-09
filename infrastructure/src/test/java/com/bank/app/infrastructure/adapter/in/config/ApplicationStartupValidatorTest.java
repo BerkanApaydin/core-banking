@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
+import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -40,11 +41,17 @@ class ApplicationStartupValidatorTest {
                 .doesNotThrowAnyException();
     }
 
+    // The default-secret row references the constant (not a literal copy) so
+    // the next rotation updates this test automatically — and no real-looking
+    // secret literal lives in test sources.
+    private static final String DEFAULT_SECRET_CSV =
+            "jwt.secret | " + JwtTokenProvider.DEFAULT_JWT_SECRET + " | non-default JWT secret";
+
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
             "jwt.secret | '' | non-default JWT secret",
             "jwt.secret | '   ' | non-default JWT secret",
-            "jwt.secret | i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s= | non-default JWT secret",
+            DEFAULT_SECRET_CSV,
             "spring.datasource.password | '' | database password",
             "spring.datasource.password | bank_password | default database password",
             "app.security.token-blacklist.backend | redis | hybrid or database",
