@@ -56,8 +56,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("security-matrix-test")
 class SecurityAuthorizationMatrixTest {
 
+    private final MockMvc mockMvc;
+
     @Autowired
-    private MockMvc mockMvc;
+    SecurityAuthorizationMatrixTest(MockMvc mockMvc) {
+        this.mockMvc = mockMvc;
+    }
 
     // TestApplication-based integration tests scan "com.bank.app" broadly
     // (including test-classes), so this config is gated behind a dedicated
