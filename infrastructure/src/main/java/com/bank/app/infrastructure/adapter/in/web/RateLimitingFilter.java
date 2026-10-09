@@ -123,12 +123,25 @@ public class RateLimitingFilter implements Filter {
             // not depend on the domain.exception package (see ArchitectureTest).
             // RFC 9110 Retry-After, derived from the same tier window the
             // limiter enforces so clients back off exactly long enough.
-            httpResponse.setHeader("Retry-After", String.valueOf(Math.max(1, tierWindowMs / 1000)));
+            long windowSeconds = Math.max(1, tierWindowMs / 1000);
+            httpResponse.setHeader("Retry-After", String.valueOf(windowSeconds));
+            // IETF RateLimit header fields (draft-ietf-httpapi-ratelimit-headers):
+            // Limit/Reset on every decision, Remaining only on reject (the
+            // limiter contract returns allow/deny without a live counter, so a
+            // success-path Remaining would be fabricated — report 0 only when
+            // the bucket is provably exhausted).
+            httpResponse.setHeader("RateLimit-Limit", String.valueOf(tierMaxRequests));
+            httpResponse.setHeader("RateLimit-Remaining", "0");
+            httpResponse.setHeader("RateLimit-Reset", String.valueOf(windowSeconds));
             ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.TOO_MANY_REQUESTS,
                     "RATE_LIMIT_EXCEEDED", message, path);
             return;
         }
 
+        // I-10: advertise the enforced budget on the success path too, so
+        // well-behaved clients can pace themselves before hitting 429.
+        httpResponse.setHeader("RateLimit-Limit", String.valueOf(tierMaxRequests));
+        httpResponse.setHeader("RateLimit-Reset", String.valueOf(Math.max(1, tierWindowMs / 1000)));
         chain.doFilter(request, response);
     }
 

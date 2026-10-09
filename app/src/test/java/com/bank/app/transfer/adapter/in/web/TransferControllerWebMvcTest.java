@@ -239,7 +239,7 @@ class TransferControllerWebMvcTest {
                 void shouldReturn200() throws Exception {
                         TransferDetailResponse response = new TransferDetailResponse(
                                         1L, 10L, 20L, new BigDecimal("150.00"),
-                                        "TRY", TransferStatus.COMPLETED, LocalDateTime.now());
+                                        "TRY", TransferStatus.COMPLETED, LocalDateTime.now(), null);
 
                         when(getTransferDetailPort.execute(1L)).thenReturn(response);
 

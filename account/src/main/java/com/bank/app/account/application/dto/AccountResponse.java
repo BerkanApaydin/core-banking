@@ -14,7 +14,10 @@ public record AccountResponse(
         BigDecimal balance,
         String currency,
         AccountStatus status,
-        boolean active) {
+        boolean active,
+        // I-10: optimistic-concurrency version for If-Match/ETag clients.
+        // Nullable: pre-persistence aggregates carry no version yet.
+        Long version) {
     public AccountResponse {
         Objects.requireNonNull(id);
         Objects.requireNonNull(userId);
@@ -34,6 +37,7 @@ public record AccountResponse(
                 account.getBalance().amount(),
                 account.getBalance().currency().name(),
                 account.getStatus(),
-                account.getStatus() == AccountStatus.ACTIVE);
+                account.getStatus() == AccountStatus.ACTIVE,
+                account.getVersion());
     }
 }

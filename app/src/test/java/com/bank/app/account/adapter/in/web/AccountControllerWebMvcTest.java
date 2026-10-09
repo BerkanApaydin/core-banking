@@ -85,7 +85,7 @@ class AccountControllerWebMvcTest {
                                         "Ali Veli",
                                         new BigDecimal("500.00"), Currency.TRY);
                         AccountResponse response = new AccountResponse(1L, 100L, "TR440006200000000000000123",
-                                        "Ali Veli", new BigDecimal("500.00"), "TRY", AccountStatus.ACTIVE, true);
+                                        "Ali Veli", new BigDecimal("500.00"), "TRY", AccountStatus.ACTIVE, true, null);
 
                         when(createAccountPort.execute(any(CreateAccountRequest.class))).thenReturn(response);
                         when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
@@ -153,7 +153,7 @@ class AccountControllerWebMvcTest {
                 @DisplayName("should return 200 with paginated account list")
                 void shouldReturn200() throws Exception {
                         AccountResponse a1 = new AccountResponse(1L, 100L, "TR770006200000000000000111",
-                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
+                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true, null);
                         PageResponse<AccountResponse> page = PageResponse.of(List.of(a1), 0, 20, 1);
                         when(getAccountsByUserQuery.execute(anyInt(), anyInt())).thenReturn(page);
 
@@ -179,7 +179,7 @@ class AccountControllerWebMvcTest {
                 @DisplayName("should return 200 when account exists")
                 void shouldReturn200() throws Exception {
                         AccountResponse response = new AccountResponse(1L, 100L, "TR770006200000000000000111",
-                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
+                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true, null);
                         when(getAccountByIdQuery.execute(1L)).thenReturn(response);
 
                         mockMvc.perform(get("/api/v1/accounts/1"))
@@ -207,7 +207,7 @@ class AccountControllerWebMvcTest {
                 @DisplayName("should return 200 when account exists")
                 void shouldReturn200() throws Exception {
                         AccountResponse response = new AccountResponse(1L, 100L, "TR770006200000000000000111",
-                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
+                                        "Ali", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true, null);
                         when(getAccountByIbanQuery.execute("TR770006200000000000000111")).thenReturn(response);
 
                         mockMvc.perform(get("/api/v1/accounts/iban/TR770006200000000000000111"))

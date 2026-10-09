@@ -54,7 +54,7 @@ class AccountControllerTest {
 
     private static AccountResponse response(long id) {
         return new AccountResponse(id, 100L, "TR770006200000000000000111",
-                "Ahmet", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true);
+                "Ahmet", new BigDecimal("1000.00"), "TRY", AccountStatus.ACTIVE, true, null);
     }
 
     @BeforeEach

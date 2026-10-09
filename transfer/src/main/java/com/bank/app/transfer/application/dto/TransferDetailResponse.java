@@ -13,7 +13,10 @@ public record TransferDetailResponse(
     BigDecimal amount,
     String currency,
     TransferStatus status,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    // I-10: optimistic-concurrency version for If-Match/ETag clients.
+    // Nullable: pending aggregates materialized before persist carry none.
+    Long version
 ) {
     public TransferDetailResponse {
         Objects.requireNonNull(id);
@@ -34,7 +37,8 @@ public record TransferDetailResponse(
             transfer.getAmount().amount(),
             transfer.getAmount().currency().name(),
             transfer.getStatus(),
-            transfer.getCreatedAt()
+            transfer.getCreatedAt(),
+            transfer.getVersion()
         );
     }
 }

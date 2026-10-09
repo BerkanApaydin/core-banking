@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/monitoring.coreos.com/prometheusrule_v1.json
 # Prometheus alerting rules for the instrumented signals. Thresholds below
 # are starting points — derive production values from staging baselines
 # (see docs/operational-checks.md) before paging anyone.
@@ -122,6 +123,42 @@ spec:
             severity: ticket
           annotations:
             summary: "Backlog metrics scan has not completed in 2h"
+        - alert: IdempotencyHttpBacklogGrowing
+          # I-06: size complement to the staleness alert above. A stuck
+          # reaper/cleanup leaves PENDING HTTP keys piling up; money is not
+          # lost (TTL + reaper) but clients spin on replayed keys.
+          # Gauge: BacklogMetricsReporter "idempotency.http.pending.current".
+          expr: max(idempotency_http_pending_current) > 500
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Pending HTTP idempotency keys above 500 — check reaper/cleanup"
+            runbook_url: "docs/operations.md"
+        - alert: IdempotencyHttpOldestPendingGrowing
+          # Mirror of OutboxOldestPendingGrowing for the HTTP-key seam: the
+          # oldest-pending gauge exists but had no alert, so a wedged key
+          # (client never completes the second leg) was invisible.
+          expr: max(idempotency_http_oldest_pending_age_seconds) > 1800
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Oldest pending HTTP idempotency key is older than 30 minutes"
+    - name: http-edge
+      interval: 60s
+      rules:
+        - alert: Http429RateHigh
+          # I-06: sustained 429s mean either abuse (tighten budgets / block)
+          # or legitimate traffic outgrowing the tier (raise
+          # app.security.rate-limit budgets). Standard Spring metric only.
+          expr: sum(rate(http_server_requests_seconds_count{status="429"}[5m])) > 2
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "HTTP 429 rate above 2/sec — abuse or under-provisioned rate limits"
+            runbook_url: "docs/operations.md"
     - name: database
       interval: 60s
       rules:

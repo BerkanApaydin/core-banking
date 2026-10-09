@@ -23,6 +23,22 @@ jobs:
       with:
         fail-on-severity: high
 
+  secret-scan:
+    # I-03: working-tree secret scan (rules in .gitleaks.toml). The two
+    # allowlisted values are documented test-only fallbacks that can never
+    # authenticate in prod (see .gitleaks.toml + docs/decisions/secret-management.md).
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - name: Gitleaks scan
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     # D21: least privilege — checkout + artifact upload need only read.
     permissions:
@@ -139,6 +155,22 @@ jobs:
         test -f scripts/audit_partition_finalize.sql
         echo "contracts present"
 
+    - name: Tool-only sources guard (I-08)
+      # audit-work/ holds investigation probes and evidence JSON — no Maven
+      # module may compile or reference it. It is outside every module's
+      # src/ tree by construction; this fails closed if that ever changes.
+      run: |
+        if grep -rq "audit-work" --include="pom.xml" . 2>/dev/null; then
+          echo "::error::no module pom may reference audit-work/ (tool-only sources)"
+          exit 1
+        fi
+        refs=$(grep -rl "audit\.work\|audit-work" --include="*.java" account user transfer audit common infrastructure persistence app account-api 2>/dev/null | grep -v "/target/" || true)
+        if [ -n "$refs" ]; then
+          echo "::error::main sources must not reference audit-work/ probes: $refs"
+          exit 1
+        fi
+        echo "tool-only sources guard passed"
+
     - name: Live rate-limit smoke (real app + runner)
       # Boots the packaged jar against the CI postgres/redis services and runs
       # the deterministic rate-limit profile (15 registrations -> 429, then
@@ -209,6 +241,14 @@ jobs:
       run: |
         npm ci
         npm run lint
+
+    - name: Frontend audit (npm audit, high+, advisory)
+      # Advisory on purpose: the shipped UI is dependency-free vanilla JS —
+      # npm covers a single devDependency (eslint), so a blocking gate would
+      # let dev-tool noise veto prod builds. Findings are reported for triage;
+      # blocking supply-chain gates stay in dependency-review + OSV review.
+      run: npm audit --audit-level=high
+      continue-on-error: true
 
     - name: Architecture Tests
       # Wildcard (not an explicit class list): a new *ArchitectureTest must

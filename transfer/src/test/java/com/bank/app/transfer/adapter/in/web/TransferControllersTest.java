@@ -105,12 +105,25 @@ class TransferControllersTest {
     void shouldReturnTransferDetail() throws Exception {
         when(getTransferDetailQuery.execute(7L)).thenReturn(new TransferDetailResponse(
                 7L, 1L, 2L, new BigDecimal("50.00"), "TRY", TransferStatus.COMPLETED,
-                LocalDateTime.of(2026, 9, 2, 10, 0)));
+                LocalDateTime.of(2026, 9, 2, 10, 0), 5L));
 
         mockMvc.perform(get("/transfers/7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.amount").value(50.00));
+                .andExpect(jsonPath("$.amount").value(50.00))
+                .andExpect(jsonPath("$.version").value(5))
+                .andExpect(header().string("ETag", "W/\"transfer-7-5\""));
+    }
+
+    @Test
+    void shouldReturn304WhenDetailEtagMatches() throws Exception {
+        when(getTransferDetailQuery.execute(7L)).thenReturn(new TransferDetailResponse(
+                7L, 1L, 2L, new BigDecimal("50.00"), "TRY", TransferStatus.COMPLETED,
+                LocalDateTime.of(2026, 9, 2, 10, 0), 5L));
+
+        mockMvc.perform(get("/transfers/7").header("If-None-Match", "W/\"transfer-7-5\""))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string("ETag", "W/\"transfer-7-5\""));
     }
 
     @Test

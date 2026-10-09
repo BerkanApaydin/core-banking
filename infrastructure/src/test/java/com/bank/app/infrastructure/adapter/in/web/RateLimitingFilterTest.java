@@ -97,6 +97,39 @@ class RateLimitingFilterTest {
     }
 
     @Test
+    void shouldAdvertiseIetfRateLimitHeaders() throws IOException, ServletException {
+        // I-10: success path carries Limit+Reset so clients can pace
+        // themselves; the reject path additionally carries Remaining: 0.
+        FilterChain chain = mock(FilterChain.class);
+
+        MockHttpServletRequest allowed = new MockHttpServletRequest();
+        allowed.setRequestURI("/api/v1/auth/login");
+        allowed.setRemoteAddr("172.16.0.9");
+        allowed.setMethod("POST");
+        MockHttpServletResponse allowedResponse = new MockHttpServletResponse();
+        filter.doFilter(allowed, allowedResponse, chain);
+
+        assertEquals(200, allowedResponse.getStatus());
+        assertEquals("10", allowedResponse.getHeader("RateLimit-Limit"));
+        assertEquals("10", allowedResponse.getHeader("RateLimit-Reset"));
+        assertNull(allowedResponse.getHeader("RateLimit-Remaining"),
+                "Remaining must be omitted on success — the limiter contract "
+                + "has no live counter to report");
+
+        for (int i = 0; i < 9; i++) {
+            filter.doFilter(allowed, new MockHttpServletResponse(), chain);
+        }
+        MockHttpServletResponse rejected = new MockHttpServletResponse();
+        filter.doFilter(allowed, rejected, chain);
+
+        assertEquals(429, rejected.getStatus());
+        assertEquals("10", rejected.getHeader("RateLimit-Limit"));
+        assertEquals("0", rejected.getHeader("RateLimit-Remaining"));
+        assertEquals("10", rejected.getHeader("RateLimit-Reset"));
+        assertEquals("10", rejected.getHeader("Retry-After"));
+    }
+
+    @Test
     void shouldNotInvokeFilterChainWhenRateLimitExceeded()
             throws IOException, ServletException {
 

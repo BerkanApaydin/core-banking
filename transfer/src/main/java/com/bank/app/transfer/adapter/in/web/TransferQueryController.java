@@ -63,8 +63,27 @@ public class TransferQueryController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Queries transfer details")
-    public ResponseEntity<TransferDetailResponse> getDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(getTransferDetailQuery.execute(id));
+    public ResponseEntity<TransferDetailResponse> getDetail(
+            @PathVariable Long id,
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        TransferDetailResponse body = getTransferDetailQuery.execute(id);
+        String etag = etagForDetail(body);
+        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        return ResponseEntity.ok().eTag(etag).body(body);
+    }
+
+    /**
+     * I-10: weak ETag over identity + optimistic-lock version (same
+     * {@code W/"..."} shape as {@link TransferReportEtagService}). A null
+     * version (pre-persist shapes in tests) falls back to status+createdAt so
+     * the validator is never empty — and any persist round-trip changes the
+     * version, invalidating stale client copies.
+     */
+    static String etagForDetail(TransferDetailResponse body) {
+        Object v = body.version() != null ? body.version() : body.status() + "-" + body.createdAt();
+        return "W/\"transfer-" + body.id() + "-" + v + "\"";
     }
 
     @GetMapping("/history/{accountId}")

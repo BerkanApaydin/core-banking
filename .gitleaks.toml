@@ -1,0 +1,18 @@
+# I-03: working-tree secret scan. Auto-discovered by `gitleaks detect`
+# (repo root). The allowlist below covers ONLY documented test-only
+# fallbacks that can never authenticate in prod:
+#  - the CI fallback JWT (last char differs from the public dev default on
+#    purpose; prod boots fail fast without a real JWT_SECRET via
+#    ApplicationStartupValidator + allow-default-secret=false),
+#  - the dev-profile placeholder string.
+title = "bank-app secret scan"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "documented test-only fallbacks; never valid outside CI/dev"
+regexes = [
+  '''404E635266556A586E3272357538782F413F4428472B4B6250645367566B5971''',
+  '''dev-only-insecure-fallback-not-for-prod''',
+]

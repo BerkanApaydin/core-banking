@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -81,13 +82,37 @@ public class AccountController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Queries account by ID", description = "Returns only an account owned by the authenticated user; unknown and other-owned IDs both return 404.")
-    public ResponseEntity<AccountResponse> getAccountById(@PathVariable Long id) {
-        return ResponseEntity.ok(getAccountByIdQuery.execute(id));
+    public ResponseEntity<AccountResponse> getAccountById(
+            @PathVariable Long id,
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        AccountResponse body = getAccountByIdQuery.execute(id);
+        String etag = etagFor(body);
+        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        return ResponseEntity.ok().eTag(etag).body(body);
     }
 
     @GetMapping("/iban/{iban}")
     @Operation(summary = "Queries account by IBAN", description = "Returns only an account owned by the authenticated user; unknown and other-owned IBANs both return 404.")
-    public ResponseEntity<AccountResponse> getAccountByIban(@PathVariable String iban) {
-        return ResponseEntity.ok(getAccountByIbanQuery.execute(iban));
+    public ResponseEntity<AccountResponse> getAccountByIban(
+            @PathVariable String iban,
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        AccountResponse body = getAccountByIbanQuery.execute(iban);
+        String etag = etagFor(body);
+        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        return ResponseEntity.ok().eTag(etag).body(body);
+    }
+
+    /**
+     * I-10: weak ETag over identity + optimistic-lock version. A null version
+     * (pre-persist shapes in tests) falls back to status+balance so the
+     * validator is never empty.
+     */
+    static String etagFor(AccountResponse body) {
+        Object v = body.version() != null ? body.version() : body.status() + "-" + body.balance();
+        return "W/\"account-" + body.id() + "-" + v + "\"";
     }
 }
