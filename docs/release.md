@@ -31,10 +31,13 @@ bytes.
 
 ## Rules
 
-- `bank-app:latest` is dev-only. Production applies a manifest whose
+- `bank-app:latest` must never appear as an `image:` reference in a
+  production manifest (CI K9/D7 guard enforces this); local compose builds
+  from source instead of pulling tags. Production applies a manifest whose
   `image:` contains `@sha256:`.
 - The digest file (`k8s/.image-digest`) is committed with every
-  release; `git log -- k8s/.image-digest` is the release ledger.
+  release, starting with the first cut (absent before any release exists);
+  `git log -- k8s/.image-digest` is the release ledger.
 - Staging restore/rolling drills record the digest they ran against
   (see `docs/disaster-recovery.md`); a drill without a digest proves
   nothing about the release.

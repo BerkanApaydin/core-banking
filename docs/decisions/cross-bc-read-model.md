@@ -13,7 +13,8 @@ published language (`AccountApi` → `AccountApiAdapter`), with
 identity + status only (`AccountSnapshotContractTest` pins this) — balances
 are always re-read authoritatively under pessimistic locks in the mutation
 transaction, so the cache cannot weaken overdraft protection. Mutations evict
-both legs granularly (`AccountAclAdapter.evictMutatedAccounts`); the 60s TTL
+both legs granularly on the Account boundary
+(`AccountApiAdapter.evictSnapshotsAfterCommit`, after commit); the 60s TTL
 is a backstop, not the consistency mechanism. Full semantics:
 `docs/account-snapshot-cache.md`.
 

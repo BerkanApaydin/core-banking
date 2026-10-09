@@ -12,7 +12,7 @@
 - totals_restored: TRY=455930.00, USD=2000.00
 - totals_match: True (values identical; raw string compare was order-sensitive — compare per-currency rows, as ops/restore-drill.sh does with ORDER BY)
 - nonzero_ledger_groups: NONE
-- ledger_note: source ledger_entries holds no transfer legs in this env � net-zero check is vacuous here; staging drill must run it against real legs
+- ledger_note: source ledger_entries holds no transfer legs in this env — net-zero check is vacuous here; staging drill must run it against real legs
 - row_counts_match: True
 - smoke_on_restored_db_exit: 1 (procedural gap found: dev profile disables liveness/readiness groups, so --require-probes 404s; fixed by booting with MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true — see ops/restore-drill.sh note; re-run below passed with exit 0; verified 4/4 PASS with probes enabled: health, liveness, readiness, browser-session)
 - achieved_RPO_RTO: N/A for local rehearsal (measured only in staging drill)

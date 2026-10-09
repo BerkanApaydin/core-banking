@@ -5,13 +5,13 @@ is the single map: ID → file → one-sentence decision.
 
 | ID | File | Decision (one sentence) |
 |---|---|---|
-| K1 | `application.yml:44`, `k8s/bank-app.yaml:83-93`, `docs/operations.md` | Single-ingress topology uses `PROXY_TRUST_HEADERS=true`; turn it off behind a CDN/multi-hop chain. |
-| K3 | `application.yml:44`, `k8s/bank-app.yaml:94-100` | Connection budget: 6 pods × 20 = 120 backend connections; use managed PG ≥200 or PgBouncer. |
+| K1 | `application.yml` (`proxy.trust-forwarded-headers`), `k8s/bank-app.yaml` (`PROXY_TRUST_HEADERS`), `docs/operations.md` | Single-ingress topology uses `PROXY_TRUST_HEADERS=true`; turn it off behind a CDN/multi-hop chain. |
+| K3 | `application.yml` (Hikari `maximum-pool-size`), `k8s/bank-app.yaml` (`DB_MAX_POOL_SIZE`) | Connection budget: 6 pods × 20 = 120 backend connections; use managed PG ≥200 or PgBouncer. |
 | K5/D15 | `IdempotencyAspect`, `IdempotentRetryExecutor` | Claim → decide → execute split; single backoff policy. |
-| K7/D8 | `JwtAuthenticationFilter:173` | CSRF token is HMAC-bound to the server-verified user id. |
-| K9/D7 | `k8s/bank-app.yaml:47-52` | Image `:latest` forbidden; digest pin (`pin-image-digest.sh` + CI guard). |
+| K7/D8 | `JwtAuthenticationFilter` (bound-CSRF comment) | CSRF token is HMAC-bound to the server-verified user id. |
+| K9/D7 | `k8s/bank-app.yaml` (`image:` pin block) | Image `:latest` forbidden; digest pin (`pin-image-digest.sh` + CI guard). |
 | K12/D5 | Schedulers (`IdempotencyCleanup`, `OutboxRetention`, `AuditRetention`, `BacklogMetrics`) | Advisory-lock single-flight; no tx, the lock guard owns the transaction. |
-| S6 | `AdjustAccountBalancesUseCaseImpl:107` | Audit row travels as one object (no loose id+balance primitives). |
+| S6 | `AdjustAccountBalancesUseCaseImpl.auditMovement` | Audit row travels as one object (no loose id+balance primitives). |
 | D13/K14 | `JwtTokenProvider` | Typed properties; no `@Value` scatter. |
 | D14/S12 | `AccountApiAdapter` | Published language is implemented in `adapter.out`. |
 | D22 | `application.yml`, compose | Tracing off by default in prod (no pointless localhost dial). |
@@ -22,6 +22,15 @@ is the single map: ID → file → one-sentence decision.
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
 | R-1 | `docs/decisions/pending-reaper.md` | Crash-window reaper marks stale PENDING transfers FAILED via the domain; no distributed lock, version conflicts counted. |
 | T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
+| K19 | `docs/decisions/api-versioning.md` | URL versioning via `@ApiVersion` + additive-change rules; published language evolves by addition only. |
+| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout), observe-after-commit (dispatch). |
+| K17 | `docs/decisions/cross-bc-read-model.md` | Transfer reads account via published language + snapshot cache; projection direction when that stops being enough. |
+| — | `docs/decisions/dependency-review.md` | OSV gate on the SBOM + accepted risks in the allowlist, re-reviewed on Boot upgrades. |
+| — | `docs/decisions/infrastructure-split.md` | Roadmap: split `infrastructure` into web/security/outbox/observability modules. |
+| K18 | `docs/decisions/saga-readiness.md` | Documented (not implemented) saga path; tripwire comments at the ACL calls. |
+| — | `docs/decisions/test-placement.md` | Spring-context tests live in `app`; unit tests live in their owning modules. |
+| — | `docs/decisions/transaction-strategy.md` | Marker-aspect programmatic tx for use cases; declarative `@Transactional` for single-boundary adapters. |
+| S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained (reachable via the pending reaper); revisit if async placement stays absent. |
 
 ## Newly added decisions (this improvement round)
 

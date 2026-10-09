@@ -38,7 +38,7 @@ the guard owns its transaction, and a contended lock marks rollback-only.**
 ## Why not one mechanism?
 
 Moving use cases to `@Transactional` would scatter timeout/isolation policy
-across 14+ call sites with no compile-time exhaustiveness. Moving adapters to
+across the 7 use-case classes with no compile-time exhaustiveness. Moving adapters to
 the aspect would force business-shaped markers (`@TransactionalUseCase`) onto
 infrastructure concerns (outbox polling, idempotency claims) that are not use
 cases. The split follows the layer, not the author.

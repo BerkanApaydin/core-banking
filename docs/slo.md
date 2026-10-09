@@ -36,7 +36,8 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
 
 - Grafana: `k8s/grafana-dashboard.json` (p50/p95/p99 + backlog + ledger gauge).
 - Recording rule: every release attaches `ops/health_smoke.py --json` plus the
-  k6 rate-limit log to the release tag; p95/p99 are read from these logs (the
+  load-test runner log (`load_tests/runner.py --mode rate-limit`) to the release
+  tag; p95/p99 are read from these logs (the
   2s p99 above is a starting point, re-derived from the first month of staging
   traffic).
 - Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG

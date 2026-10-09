@@ -16,9 +16,9 @@ Contract guard: `AccountSnapshotContractTest` pins the record shape; adding a
 
 | Writer path | Invalidation |
 |---|---|
-| `transfer` → `debitAndCredit` / `reverseForCancellation` | `AccountAclAdapter.evictMutatedAccounts` evicts **both legs by id** (granular; unrelated entries never stampede) |
+| `transfer` → `debitAndCredit` / `reverseForCancellation` (via `AccountApiAdapter`) | `AccountApiAdapter.evictSnapshotsAfterCommit` evicts **both legs by id** after commit (granular; unrelated entries never stampede). Ownership lives on the Account boundary — `AccountAclAdapter` must not double-evict (see its class javadoc) |
 | Account open (`POST /accounts`) | Nothing to evict: the id is new, and the per-id IBAN map only gains entries |
-| Account suspend/close | Same transfer-path eviction on next mutation; status reads fall back to DB on TTL expiry |
+| Account suspend | `SuspendAccountUseCaseImpl` evicts the id directly; status reads fall back to DB on TTL expiry |
 
 Cross-replica: the Redis backend keeps the id↔IBAN index in Redis too
 (sets + reverse keys, same TTL), so an `evictById` on one pod drops IBAN
@@ -38,7 +38,10 @@ costs extra DB load, never a 500. Eviction loss is self-healing via TTL.
    authoritative state under pessimistic locks; a cached balance would bypass
    overdraft protection.
 2. **Every new balance-mutation path must evict its accounts** — follow
-   `AccountAclAdapter.evictMutatedAccounts` (by id, not `evictAll`).
+   `AccountApiAdapter.evictSnapshotsAfterCommit` (by id after commit, not `evictAll`).
+   Pinned by `CacheInvalidationArchitectureTest.accountApiMutationsMustEvictSnapshots`
+   (new `AccountApi` mutators) and `.accountStatusMutatorsMustEvictSnapshots`
+   (status mutators).
 3. Keep index keys on the same TTL as data keys (see `SnapshotKeys`).
 
 ## Which backend runs, and why the in-memory one never should
