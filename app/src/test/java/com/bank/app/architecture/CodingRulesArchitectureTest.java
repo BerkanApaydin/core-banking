@@ -6,7 +6,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
+import com.bank.app.transfer.domain.Transfer;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
@@ -185,6 +187,31 @@ class CodingRulesArchitectureTest extends ArchitectureTest {
                 .that().resideInAnyPackage("com.bank.app..")
                 .and().haveSimpleNameNotContaining("Money")
                 .should().callConstructor(Money.class, BigDecimal.class, Currency.class)
+                .allowEmptyShould(false);
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void onlyTransferDomainServiceMayCreateTransfers() {
+        // Structural checksum guarantee (generalizes spendableTransferPathMustEnforceIbanChecksum
+        // beyond the class name): Transfer.create is the spendable-creation point, and only
+        // TransferDomainService.validateAndCreateTransfer enforces MOD 97-10 (Iban.checked)
+        // before it. A future BulkTransferUseCase calling Transfer.create directly would
+        // bypass the checksum — fail the build instead. Legacy format-only reads keep using
+        // new Iban() and never touch create, so they are unaffected.
+        DescribedPredicate<JavaClass> callsTransferCreate =
+                new DescribedPredicate<>("call Transfer.create") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return javaClass.getMethodCallsFromSelf().stream()
+                                .anyMatch(call -> call.getTargetOwner().getName()
+                                                .equals(Transfer.class.getName())
+                                        && call.getName().equals("create"));
+                    }
+                };
+        ArchRule rule = classes()
+                .that(callsTransferCreate)
+                .should().haveSimpleName("TransferDomainService")
                 .allowEmptyShould(false);
         rule.check(importedClasses);
     }

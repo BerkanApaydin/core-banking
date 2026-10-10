@@ -41,7 +41,7 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
   2s p99 above is a starting point, re-derived from the first month of staging
   traffic).
 - Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG
-  ≥200 or PgBouncer (`k8s/bank-app.yaml:94-100`, `docs/operations.md`).
+  ≥200 or PgBouncer (`k8s/bank-app.yaml:106-111`, `docs/operations.md`).
   Post-parallelization outbox ceiling is ~100-200 ev/s (4 workers per
   partition, capped at 12 total so `REQUIRES_NEW` workers can never exhaust
   the 20-connection Hikari pool — raising `partition-count` past 3 no longer

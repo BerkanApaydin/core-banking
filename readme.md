@@ -32,7 +32,7 @@ A modular simulation of selected core banking workflows—account management and
 ### DevOps & Prerequisites
 
 - **Docker & Docker Compose:** Multi-container orchestration.
-- **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and production PostgreSQL/Redis deployments are not included (throwaway dev-only ones live in `postgres-redis-dev.yaml`).
+- **Kubernetes:** Baseline manifests in `k8s/` (Deployment, HPA, PDB, probes). Secrets and production PostgreSQL/Redis deployments are not included (throwaway dev-only ones live in `k8s/postgres-redis-dev.yaml`).
 - **Maven 3.9.x:** Recommended build system (Maven 3.9.16 wrapper configuration is pre-configured).
 - **Prerequisites:** Java 21 JDK and a running Docker daemon. The local test launcher also needs Python 3.10+ and Node.js.
 - **Environment:** Common local variables are shown in `.env.example`; profile-specific settings and deployment checks are in [operations](docs/operations.md).
@@ -92,9 +92,10 @@ graph LR
     app -. wires .-> infra
     transfer -- published language --> api
     account -. implements .-> api
-    transfer & account & user & audit --> shared
-    api --> shared
-    infra --> shared
+    transfer & account & user --> shared
+    audit -- common only --> shared
+    api -- common only --> shared
+    infra -- common only --> shared
     infra -. implements ports of .-> api & user & audit
 ```
 
@@ -104,7 +105,7 @@ graph LR
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
 | Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
 
-> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary and naming rules); the above are the only three rules you need to know.
+> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules); the above are the only three rules you need to know.
 
 > [!NOTE]
 > `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and account mutations invalidate affected cached snapshots.

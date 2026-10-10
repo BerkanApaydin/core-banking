@@ -23,4 +23,27 @@ infrastructure-observability  (metrics, health, tracing, reconciliation job)
 2. Physically split the Maven modules (move refactor, package names stable).
 3. Add the 4 modules to the `app` pom; CI matrix unchanged.
 
+**Completed since (prerequisites, no behavior change):**
+- The `infrastructure` → `account` compile dependency is removed (test-scope
+  only, for IT slices that need an `AccountApi` implementation at test
+  runtime); production cross-context reads go via `account-api`. Pinned by
+  `ModuleBoundariesArchitectureTest.infrastructureShouldNotDependOnAccountModule`
+  (`com.bank.app.account..` does not match `com.bank.app.accountapi..` —
+  ArchUnit matches package segments — so legitimate `account-api` usage keeps
+  passing).
+- BC adapters → `infrastructure` is explicitly forbidden
+  (`LayeringArchitectureTest.adaptersShouldNotDependOnInfrastructure`; the
+  layered-architecture rule stays loose for the composition root). Verified
+  zero such dependencies before pinning.
+- Adapter cross-coupling is now checked from all four bounded contexts
+  (`account`, `transfer`, `user`, `audit` as sources), not just two.
+
+**Deferred (deliberate):** no `user-api`/`audit-api` extraction. `JwtPort`
+stays owned by the `user` BC (ISP), and `infrastructure` also needs
+`audit.domain` (`AuditAction`, `AuditLog`) plus `audit.config` — moving only
+the ports would leave the domain leakage in place, moving the domain would
+break BC ownership. In this single-artifact monolith the ArchUnit cage is
+sufficient; revisit only if a real microservice split is decided (see
+`arch-test-hardening.md`).
+
 **Cost:** ~2-3 days + CI verification. Prerequisite for team-split scale at Level 6.

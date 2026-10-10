@@ -139,4 +139,24 @@ class LayeringArchitectureTest extends ArchitectureTest {
 
         rule.check(importedClasses);
     }
+
+    @Test
+    void adaptersShouldNotDependOnInfrastructure() {
+        // Pinned clean state: bounded-context adapters program against ports and
+        // the shared kernel only. Infrastructure implements context-owned ports;
+        // the dependency arrow never reverses (DIP). The layered-architecture
+        // rule above leaves the Adapter<->Infrastructure edge loose for the
+        // composition root, so this explicit rule fails the build on the first
+        // reintroduction of an adapter->infrastructure import.
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage(
+                        "com.bank.app.account.adapter..",
+                        "com.bank.app.transfer.adapter..",
+                        "com.bank.app.user.adapter..",
+                        "com.bank.app.audit.adapter..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.infrastructure..")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
 }

@@ -18,5 +18,15 @@ oracle; G-5 reduces transfer-detail to the same shape).
 only reach admin use cases; runs together with `LayeringArchitectureTest`
 (`allowEmptyShould(false)`) and the `ArchitectureTest` non-empty import guard.
 
+Money-path authorization is pinned the same way, one level stronger:
+`WriteAuthorizationArchitectureTest` checks not only the wiring
+(`PlaceTransferUseCaseImpl` → `TransferAuthorizationService`) but the actual
+invocation — an unused import satisfies `dependOnClassesThat` while dropping
+the `authorize...()` call, so the call checks fail the build where the wiring
+checks stay green. A one-hop same-class helper (e.g. a private
+`authorize(...)` the use case extracts later) still passes, mirroring the
+`CacheInvalidationArchitectureTest` helper pattern; removing the
+authorization does not.
+
 **Alternative (rejected):** `@PreAuthorize` only — visible but new prefixes open
 silently; URL only — a prefix change drops the protection without the inner layer.

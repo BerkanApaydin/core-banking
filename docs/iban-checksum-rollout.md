@@ -15,3 +15,5 @@ ORDER BY id;
 ```
 
 Any returned row needs a business decision and a coordinated correction procedure. Do not rewrite IBANs solely by calculating new check digits: even a mathematically valid number does not establish that an institution allocated it or that the current user owns it. Preserve references, client contracts, audit evidence, and rollback/forward-repair steps before a manual change. The application enforces checksum on **new account creation only**; legacy reads remain possible during this migration. Institution allocation and ownership verification remain separate product integrations.
+
+Spendable-transfer creation is gated structurally, not just by the two callsites: `Transfer.create` may only be called by `TransferDomainService.validateAndCreateTransfer`, which enforces MOD 97-10 via `Iban.checked` on both legs before delegating (pinned by `CodingRulesArchitectureTest.onlyTransferDomainServiceMayCreateTransfers`, alongside the per-path checksum rules). Legacy format-only reads never touch `create`, so they are unaffected by the gate.

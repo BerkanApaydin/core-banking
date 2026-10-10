@@ -44,6 +44,7 @@ is the single map: ID → file → one-sentence decision.
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
 - `pending-reaper.md` (R-1: stale-PENDING crash-window recovery through the domain)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
+- `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 | O-1 | `docs/decisions/secret-management.md` (2026-10 rotation) | Leaked dev-default JWT secret rotated; history still counts as compromised. |
 | O-3 | `docs/decisions/token-version.md` (2026-10 acceptance) | 15-min window accepted on money paths too; no per-request tokenVersion lookup in transfer. |
 | O-12 | `docs/decisions/iban-pii.md` | Raw IBANs masked at exception construction via `IbanLogMask`; never at the log site. |

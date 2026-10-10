@@ -71,6 +71,25 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
     }
 
     @Test
+    void infrastructureShouldNotDependOnAccountModule() {
+        // Compile scope for account was removed on purpose (test-scope only for
+        // IT slices); cross-context reads go via the account-api published
+        // language. Pin it: any production import of com.bank.app.account..
+        // fails the build (ArchitectureTest imports production classes only,
+        // so the test-scope dependency is invisible here).
+        // NOTE: "com.bank.app.account.." does not match "com.bank.app.accountapi.."
+        // (ArchUnit matches package segments), so the legitimate account-api
+        // usage in infrastructure keeps passing — same as the transfer/account
+        // rules above coexisting with account-api consumption.
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.infrastructure..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account..")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
     void accountApiShouldOnlyDependOnSharedKernel() {
         // Published language: stable contract, framework-free, no BC dependencies.
         ArchRule rule = classes()
@@ -101,6 +120,24 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
                         "com.bank.app.account.adapter..",
                         "com.bank.app.user.adapter..",
                         "com.bank.app.audit.adapter..");
+
+        rule.check(importedClasses);
+
+        rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.user.adapter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.bank.app.account.adapter..",
+                        "com.bank.app.transfer.adapter..",
+                        "com.bank.app.audit.adapter..");
+
+        rule.check(importedClasses);
+
+        rule = noClasses()
+                .that().resideInAnyPackage("com.bank.app.audit.adapter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.bank.app.account.adapter..",
+                        "com.bank.app.transfer.adapter..",
+                        "com.bank.app.user.adapter..");
 
         rule.check(importedClasses);
     }
