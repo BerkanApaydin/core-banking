@@ -82,13 +82,16 @@ class PlaceTransferUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         transferDomainService = new TransferDomainService();
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, new ResourceOwnershipPolicy(userContextService));
         placeTransferUseCase = new PlaceTransferUseCaseImpl(
                 accountAclPort, saveTransferPort,
                 transferDomainService, transferAuthorizationService, domainEventPublisherService, clockProvider, auditEventPort);
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     private AccountInfo senderInfo() {
@@ -121,6 +124,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should place transfer successfully")
         void shouldPlaceTransferSuccessfully() {
+            stubClock();
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
@@ -159,6 +163,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should create a PENDING transfer initially then mark COMPLETED")
         void shouldCreatePendingThenComplete() {
+            stubClock();
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
 
@@ -193,19 +198,42 @@ class PlaceTransferUseCaseImplTest {
         }
 
         @Test
-        @DisplayName("should throw when IBAN is invalid even before calling ACL")
-        void shouldThrowOnInvalidSenderIban() {
+        @DisplayName("should throw when account lookup rejects the IBAN")
+        void shouldThrowWhenAccountLookupRejectsIban() {
             when(accountAclPort.getAccountInfoForTransfer(anyString()))
                     .thenThrow(new InvalidIbanException("INVALID"));
 
             TransferRequest request = new TransferRequest("INVALID", RECEIVER_IBAN, AMOUNT, Currency.TRY);
             assertThatThrownBy(() -> placeTransferUseCase.execute(request))
                     .isExactlyInstanceOf(InvalidIbanException.class);
+
+            verify(saveTransferPort, never()).save(any());
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should reject a checksum-invalid IBAN at the domain boundary even when accounts exist")
+        void shouldRejectChecksumInvalidIbanAtDomainBoundary() {
+            stubClock();
+            String badChecksumIban = "TR770006200000000000000112";
+            when(accountAclPort.getAccountInfoForTransfer(badChecksumIban)).thenReturn(senderInfo());
+            when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN)).thenReturn(receiverInfo());
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+
+            TransferRequest request = new TransferRequest(
+                    badChecksumIban, RECEIVER_IBAN, AMOUNT, Currency.TRY);
+            assertThatThrownBy(() -> placeTransferUseCase.execute(request))
+                    .isExactlyInstanceOf(InvalidIbanException.class);
+
+            verify(saveTransferPort, never()).save(any());
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
         }
 
         @Test
         @DisplayName("should throw SameAccountTransferException when sender and receiver are same")
         void shouldThrowOnSameAccount() {
+            stubClock();
             AccountInfo sameInfo = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "TRY", "ACTIVE");
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(sameInfo);
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
@@ -213,11 +241,15 @@ class PlaceTransferUseCaseImplTest {
             TransferRequest request = new TransferRequest(SENDER_IBAN, SENDER_IBAN, AMOUNT, Currency.TRY);
             assertThatThrownBy(() -> placeTransferUseCase.execute(request))
                     .isExactlyInstanceOf(SameAccountTransferException.class);
+
+            verify(saveTransferPort, never()).save(any());
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
         }
 
         @Test
         @DisplayName("should throw when sender currency does not match amount currency")
         void shouldThrowOnSenderCurrencyMismatch() {
+            stubClock();
             AccountInfo usdSender = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "USD", "ACTIVE");
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(usdSender);
             when(accountAclPort.getAccountInfoForTransfer(RECEIVER_IBAN)).thenReturn(receiverInfo());
@@ -225,6 +257,9 @@ class PlaceTransferUseCaseImplTest {
 
             assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
                     .isInstanceOf(CurrencyMismatchException.class);
+
+            verify(saveTransferPort, never()).save(any());
+            verify(accountAclPort, never()).debitAndCredit(any(), any(), any());
         }
     }
 
@@ -253,6 +288,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should throw and not compensate when debitAndCredit fails after PENDING save")
         void shouldNotCompensateOnDebitFailure() {
+            stubClock();
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -298,6 +334,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should throw when first save fails before debit")
         void shouldThrowWhenInitialSaveFails() {
+            stubClock();
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -316,6 +353,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should throw and not compensate when event publishing fails after complete")
         void shouldNotCompensateWhenEventPublishFails() {
+            stubClock();
             stubAccountLookup();
             doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
             when(saveTransferPort.save(any(Transfer.class)))
@@ -343,6 +381,7 @@ class PlaceTransferUseCaseImplTest {
         @Test
         @DisplayName("should throw when receiver currency does not match sender")
         void shouldThrowOnReceiverCurrencyMismatch() {
+            stubClock();
             AccountInfo trySender = new AccountInfo(SENDER_ACCOUNT_ID, SENDER_USER_ID, "TRY", "ACTIVE");
             AccountInfo usdReceiver = new AccountInfo(RECEIVER_ACCOUNT_ID, RECEIVER_USER_ID, "USD", "ACTIVE");
             when(accountAclPort.getAccountInfoForTransfer(SENDER_IBAN)).thenReturn(trySender);

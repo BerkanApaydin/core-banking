@@ -47,7 +47,10 @@ class DomainEventOutboxAdapterTest {
         void setUp() throws Exception {
             adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
                     new OutboxProperties(5, 50, 0, 2000, 30));
-            lenient().when(objectMapper.writeValueAsString(any())).thenReturn(TEST_PAYLOAD);
+        }
+
+        private void stubSerializer() throws Exception {
+            when(objectMapper.writeValueAsString(any())).thenReturn(TEST_PAYLOAD);
         }
 
         private DomainEvent createEvent(String aggregateId) {
@@ -71,6 +74,7 @@ class DomainEventOutboxAdapterTest {
 
         @Test
         void shouldSaveSerializedEventToOutbox() throws Exception {
+            stubSerializer();
             DomainEvent event = createEvent(AGGREGATE_ID);
 
             adapter.publish(event);
@@ -92,7 +96,8 @@ class DomainEventOutboxAdapterTest {
         }
 
         @Test
-        void shouldResolvePartitionFromAggregateId() {
+        void shouldResolvePartitionFromAggregateId() throws Exception {
+            stubSerializer();
             DomainEvent event = createEvent(AGGREGATE_ID);
 
             adapter.publish(event);
@@ -103,7 +108,8 @@ class DomainEventOutboxAdapterTest {
         }
 
         @Test
-        void shouldUsePartitionZeroWhenAggregateIdIsNull() {
+        void shouldUsePartitionZeroWhenAggregateIdIsNull() throws Exception {
+            stubSerializer();
             DomainEvent event = createEvent(null);
 
             adapter.publish(event);
@@ -114,6 +120,7 @@ class DomainEventOutboxAdapterTest {
 
         @Test
         void shouldRejectOversizedPayloadInsteadOfPersistingIt() throws Exception {
+            stubSerializer();
             DomainEvent event = createEvent(AGGREGATE_ID);
             when(objectMapper.writeValueAsString(event))
                     .thenReturn("x".repeat(DomainEventOutboxAdapter.MAX_PAYLOAD_CHARS + 1));
@@ -126,6 +133,7 @@ class DomainEventOutboxAdapterTest {
 
         @Test
         void shouldThrowWhenSerializationFails() throws Exception {
+            stubSerializer();
             DomainEvent event = createEvent(AGGREGATE_ID);
             when(objectMapper.writeValueAsString(event)).thenThrow(new JsonProcessingException("serialization error") {});
 
@@ -135,7 +143,8 @@ class DomainEventOutboxAdapterTest {
         }
 
         @Test
-        void shouldPublishDifferentEventsWithUniqueIds() {
+        void shouldPublishDifferentEventsWithUniqueIds() throws Exception {
+            stubSerializer();
             DomainEvent event1 = createEvent(AGGREGATE_ID);
             DomainEvent event2 = createEvent(AGGREGATE_ID);
 

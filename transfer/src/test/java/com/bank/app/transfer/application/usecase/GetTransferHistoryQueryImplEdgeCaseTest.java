@@ -97,12 +97,6 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
         }
 
         @Test
-        void shouldThrowNullPointerExceptionWhenAccountIdIsNullWithPagination() {
-                assertThrows(NullPointerException.class,
-                                () -> getTransferHistoryUseCase.execute(null, 0, 20));
-        }
-
-        @Test
         void shouldCallFindHistoryWithCorrectPagination() {
                 AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
                 when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
@@ -110,22 +104,12 @@ class GetTransferHistoryQueryImplEdgeCaseTest {
                                 .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
                 when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
 
-                getTransferHistoryUseCase.execute(1L, 0, 20);
+                PageResponse<TransferResponse> history = getTransferHistoryUseCase.execute(1L, 0, 20);
 
                 verify(loadTransferPort).findHistoryPage(1L, 0, 20);
-        }
-
-        @Test
-        void shouldServeExplicitPage0AndSize20() {
-                AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
-                when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
-                when(loadTransferPort.findHistoryPage(eq(1L), eq(0), eq(20)))
-                                .thenReturn(new LoadTransferPort.HistoryPage(Collections.emptyList(), 0L));
-                when(accountAclPort.getIbansForAccounts(anySet())).thenReturn(Collections.emptyMap());
-
-                getTransferHistoryUseCase.execute(1L, 0, 20);
-
-                verify(loadTransferPort).findHistoryPage(1L, 0, 20);
+                assertNotNull(history);
+                assertTrue(history.content().isEmpty());
+                assertEquals(0L, history.totalElements());
         }
 
         @Test

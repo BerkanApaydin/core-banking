@@ -50,14 +50,21 @@ class RegisterUserUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
-        lenient().when(saveUserPort.save(any(User.class))).thenAnswer(invocation -> {
+        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort,
+                PasswordPolicy.DEFAULT, domainEventPublisherService, clockProvider);
+    }
+
+    private void stubClockAndSave() {
+        stubClock();
+        when(saveUserPort.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
             return new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole(),
                     user.getEmail(), user.getPhone());
         });
-        registerUserUseCase = new RegisterUserUseCaseImpl(loadUserPort, saveUserPort, passwordEncoderPort,
-                PasswordPolicy.DEFAULT, domainEventPublisherService, clockProvider);
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     @Nested
@@ -67,6 +74,7 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should register user successfully")
         void shouldRegisterSuccessfully() {
+            stubClockAndSave();
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
@@ -89,6 +97,7 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should register user with email and phone")
         void shouldRegisterWithEmailAndPhone() {
+            stubClockAndSave();
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1", "test@example.com", "5551234567");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
@@ -105,6 +114,7 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should register user with null email and phone")
         void shouldRegisterWithNullEmailAndPhone() {
+            stubClockAndSave();
             AuthRequest request = new AuthRequest("newuser", "Rawpassword1");
 
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
@@ -118,6 +128,7 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should encode password")
         void shouldEncodePassword() {
+            stubClockAndSave();
             AuthRequest request = new AuthRequest("newuser", "rawPassword123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
             when(passwordEncoderPort.encode("rawPassword123")).thenReturn("$2a$10$encryptedhash");
@@ -172,6 +183,7 @@ class RegisterUserUseCaseTest {
         @Test
         @DisplayName("should propagate save exception")
         void shouldPropagateSaveException() {
+            stubClock();
             AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
             when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("$2a$10$encodedPasswordHashEncodedPw02");
@@ -188,6 +200,7 @@ class RegisterUserUseCaseTest {
             // (application layer stays free of Spring DAO imports): the use case
             // propagates the port failure untouched. Adapter-level coverage lives
             // in UserJpaAdapterTest.shouldMapConcurrentDuplicateToConflict.
+            stubClock();
             AuthRequest request = new AuthRequest("newuser", "Mypasswor123");
             when(loadUserPort.findByUsername("newuser")).thenReturn(Optional.empty());
             when(passwordEncoderPort.encode("Mypasswor123")).thenReturn("$2a$10$encodedPasswordHashEncodedPw02");

@@ -31,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,10 +54,13 @@ class TransferPendingReaperTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(fixedClock);
         meters = new SimpleMeterRegistry();
         reaper = new TransferPendingReaper(loadTransferPort, saveTransferPort, auditEventPort,
                 new TransferReaperProperties(true, Duration.ofMinutes(15), 50, 30), clockProvider, meters);
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(fixedClock);
     }
 
     private static Transfer pending(Long id) {
@@ -73,6 +75,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("marks stale PENDING rows FAILED and audits each one")
         void shouldReapStalePending() {
+            stubClock();
             Transfer stale = pending(1L);
             when(loadTransferPort.findStalePending(any(), anyInt())).thenReturn(List.of(stale));
             when(loadTransferPort.findByIdForUpdate(1L)).thenReturn(Optional.of(pending(1L)));
@@ -87,6 +90,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("does nothing when no stale rows exist")
         void shouldDoNothingWhenEmpty() {
+            stubClock();
             when(loadTransferPort.findStalePending(any(), anyInt())).thenReturn(List.of());
 
             reaper.reap();
@@ -98,6 +102,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("treats a concurrently completed row as conflict, not failure")
         void shouldCountConflictWhenAlreadyCompleted() {
+            stubClock();
             Transfer stale = pending(2L);
             Transfer completed = new Transfer(2L, new AccountId(10L), new AccountId(20L),
                     Money.exact(new BigDecimal("100.00"), Currency.TRY),
@@ -115,6 +120,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("treats a version conflict on save as conflict and continues the batch")
         void shouldCountConflictOnOptimisticLock() {
+            stubClock();
             Transfer first = pending(3L);
             Transfer second = pending(4L);
             when(loadTransferPort.findStalePending(any(), anyInt())).thenReturn(List.of(first, second));
@@ -138,6 +144,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("skips rows that vanished and survives a poisoned row")
         void shouldSurviveMissingAndPoisonedRows() {
+            stubClock();
             Transfer missing = pending(5L);
             Transfer poisoned = pending(6L);
             Transfer healthy = pending(7L);
@@ -156,6 +163,7 @@ class TransferPendingReaperTest {
         @Test
         @DisplayName("survives a failed scan without killing the scheduler")
         void shouldSurviveScanFailure() {
+            stubClock();
             when(loadTransferPort.findStalePending(any(), anyInt()))
                     .thenThrow(new IllegalStateException("db down"));
 

@@ -46,12 +46,16 @@ class LogoutUseCaseImplTest {
     void setUp() {
         logoutUseCase = new LogoutUseCaseImpl(tokenBlacklistPort, jwtPort, refreshTokenPort,
                 clockProvider, auditEventPort);
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     @Test
     @DisplayName("should blacklist token when valid Bearer token is provided")
     void shouldBlacklistTokenWhenBearerTokenIsValid() {
+        stubClock();
         String authHeader = "Bearer valid-jwt-token";
         when(tokenBlacklistPort.isBlacklisted("valid-jwt-token")).thenReturn(false);
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
@@ -65,6 +69,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should skip blacklist when token already expired")
     void shouldSkipBlacklistWhenTokenExpired() {
+        stubClock();
         String authHeader = "Bearer expired-jwt-token";
         when(tokenBlacklistPort.isBlacklisted("expired-jwt-token")).thenReturn(false);
         when(jwtPort.getRemainingMs("expired-jwt-token")).thenReturn(0L);
@@ -85,11 +90,14 @@ class LogoutUseCaseImplTest {
         verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
         verifyNoInteractions(jwtPort);
         verifyNoInteractions(auditEventPort);
+        verifyNoInteractions(refreshTokenPort);
+        verify(clockProvider, never()).clock();
     }
 
     @Test
     @DisplayName("should do nothing when header does not start with Bearer")
     void shouldDoNothingWhenHeaderIsNotBearer() {
+        stubClock();
         String authHeader = "Basic token123";
 
         logoutUseCase.execute(authHeader);
@@ -101,6 +109,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should do nothing when header is null")
     void shouldDoNothingWhenHeaderIsNull() {
+        stubClock();
         logoutUseCase.execute(null);
 
         verifyNoInteractions(jwtPort);
@@ -110,6 +119,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should revoke refresh session when refresh token is supplied")
     void shouldRevokeRefreshTokenWhenSupplied() {
+        stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
 
         logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
@@ -122,6 +132,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should ignore blank refresh token")
     void shouldIgnoreBlankRefreshToken() {
+        stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
 
         logoutUseCase.execute("Bearer valid-jwt-token", "  ");
@@ -133,6 +144,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should publish LOGOUT audit with the token identity (K11/D4)")
     void shouldPublishLogoutAudit() {
+        stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
         when(jwtPort.extractUsername("valid-jwt-token")).thenReturn("alice");
 
@@ -148,6 +160,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should attribute unverifiable token to system (best-effort)")
     void shouldAttributeUnverifiableTokenToSystem() {
+        stubClock();
         // Kills the EmptyObjectReturn mutant ("" vs "system") on
         // bestEffortUsername: an unverifiable Bearer token must fall back to
         // "system", never to an empty identity or an exception.
@@ -164,6 +177,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should revoke refresh session for non-Bearer callers")
     void shouldRevokeRefreshForNonBearerCaller() {
+        stubClock();
         // Kills the Negate mutant on the refresh-only branch (line 52):
         // a non-Bearer header with a refresh token must still attribute the
         // audit to the refresh identity AND revoke it. A mutant that skips
@@ -182,6 +196,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should attribute anonymous logout to system (best-effort)")
     void shouldAttributeAnonymousLogoutToSystem() {
+        stubClock();
         // Kills the EmptyObjectReturn mutant ("" vs "system") on
         // bestEffortUsername: unverifiable/absent tokens must not produce an
         // empty audit identity.
@@ -195,6 +210,7 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("should still logout when the audit store is down (K11/D4)")
     void shouldLogoutWhenAuditStoreDown() {
+        stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
         doThrow(new RuntimeException("audit down")).when(auditEventPort)
                 .publish(any(AuditEvent.class));

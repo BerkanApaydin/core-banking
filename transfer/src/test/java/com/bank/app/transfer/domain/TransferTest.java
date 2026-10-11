@@ -21,7 +21,6 @@ import com.bank.app.common.domain.AccountId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 
 @SuppressWarnings("null")
 @DisplayName("Transfer domain entity")
@@ -64,7 +63,8 @@ class TransferTest {
         @Test
         @DisplayName("should create transfer with version")
         void shouldCreateWithVersion() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now(), 3L);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now(), 3L);
             assertThat(transfer.getVersion()).isEqualTo(3L);
         }
 
@@ -78,7 +78,8 @@ class TransferTest {
         @Test
         @DisplayName("should reject zero amount on create (D-1)")
         void shouldRejectZeroAmountOnCreate() {
-            assertThatThrownBy(() -> Transfer.create(new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY), Clock.systemUTC()))
+            assertThatThrownBy(() -> Transfer.create(new AccountId(1L), new AccountId(2L),
+                    Money.of("0.00", Currency.TRY), Clock.systemUTC()))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
 
@@ -100,11 +101,15 @@ class TransferTest {
         void shouldRejectNullArgs(String field) {
             assertThatThrownBy(() -> {
                 switch (field) {
-                    case "senderAccountId" -> new Transfer(1L, null, new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-                    case "receiverAccountId" -> new Transfer(1L, new AccountId(1L), null, AMOUNT, TransferStatus.COMPLETED, now());
-                    case "amount" -> new Transfer(1L, new AccountId(1L), new AccountId(2L), null, TransferStatus.COMPLETED, now());
+                    case "senderAccountId" ->
+                        new Transfer(1L, null, new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+                    case "receiverAccountId" ->
+                        new Transfer(1L, new AccountId(1L), null, AMOUNT, TransferStatus.COMPLETED, now());
+                    case "amount" ->
+                        new Transfer(1L, new AccountId(1L), new AccountId(2L), null, TransferStatus.COMPLETED, now());
                     case "status" -> new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, null, now());
-                    case "createdAt" -> new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, null);
+                    case "createdAt" ->
+                        new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, null);
                 }
             }).isExactlyInstanceOf(NullPointerException.class);
         }
@@ -113,9 +118,13 @@ class TransferTest {
         @DisplayName("should return correct getters")
         void shouldReturnCorrectGetters() {
             LocalDateTime now = now();
-            Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), AMOUNT, TransferStatus.COMPLETED, now, 5L);
+            Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), AMOUNT,
+                    TransferStatus.COMPLETED, now, 5L);
+            assertThat(transfer.getId()).isEqualTo(1L);
             assertThat(transfer.getSenderAccountId()).isEqualTo(new AccountId(10L));
             assertThat(transfer.getReceiverAccountId()).isEqualTo(new AccountId(20L));
+            assertThat(transfer.getAmount()).isEqualTo(AMOUNT);
+            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
             assertThat(transfer.getCreatedAt()).isEqualTo(now);
             assertThat(transfer.getVersion()).isEqualTo(5L);
         }
@@ -123,7 +132,8 @@ class TransferTest {
         @Test
         @DisplayName("should reject same sender and receiver in constructor")
         void shouldRejectSameAccountInConstructor() {
-            assertThatThrownBy(() -> new Transfer(1L, new AccountId(7L), new AccountId(7L), AMOUNT, TransferStatus.COMPLETED, now()))
+            assertThatThrownBy(() -> new Transfer(1L, new AccountId(7L), new AccountId(7L), AMOUNT,
+                    TransferStatus.COMPLETED, now()))
                     .isExactlyInstanceOf(SameAccountTransferException.class);
         }
 
@@ -137,8 +147,9 @@ class TransferTest {
         @Test
         @DisplayName("should reject zero amount for PENDING transfer in constructor")
         void shouldRejectZeroAmountPendingInConstructor() {
-            assertThatThrownBy(() -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
-                    TransferStatus.PENDING, now()))
+            assertThatThrownBy(
+                    () -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
+                            TransferStatus.PENDING, now()))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
 
@@ -146,8 +157,9 @@ class TransferTest {
         @ValueSource(strings = { "COMPLETED", "FAILED", "CANCELLED" })
         @DisplayName("should reject zero amount regardless of status in constructor")
         void shouldRejectZeroAmountForAnyStatusInConstructor(String status) {
-            assertThatThrownBy(() -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
-                    TransferStatus.valueOf(status), now()))
+            assertThatThrownBy(
+                    () -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
+                            TransferStatus.valueOf(status), now()))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must not be zero");
         }
@@ -160,7 +172,8 @@ class TransferTest {
         @Test
         @DisplayName("should complete a PENDING transfer")
         void shouldCompletePending() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
             transfer.complete(Clock.systemUTC());
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.COMPLETED);
         }
@@ -170,7 +183,8 @@ class TransferTest {
         void shouldCompleteWithClock() {
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
 
             transfer.complete(clock);
 
@@ -185,7 +199,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when completing already COMPLETED transfer")
         void shouldThrowOnAlreadyCompleted() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
             assertThatThrownBy(() -> transfer.complete(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
@@ -194,7 +209,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when completing FAILED transfer")
         void shouldThrowOnFailedStatus() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED,
+                    now());
             assertThatThrownBy(() -> transfer.complete(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
@@ -203,7 +219,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when completing CANCELLED transfer")
         void shouldThrowOnCancelledStatus() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED,
+                    now());
             assertThatThrownBy(() -> transfer.complete(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
                     .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
@@ -212,7 +229,8 @@ class TransferTest {
         @Test
         @DisplayName("should complete only once")
         void shouldCompleteOnlyOnce() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
             transfer.complete(Clock.systemUTC());
             assertThatThrownBy(() -> transfer.complete(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class);
@@ -226,7 +244,8 @@ class TransferTest {
         @Test
         @DisplayName("should cancel within 24-hour window and register event")
         void shouldCancelWithinWindow() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now().minusHours(2));
             transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
             assertThat(transfer.getDomainEvents())
@@ -239,8 +258,12 @@ class TransferTest {
         @Test
         @DisplayName("should cancel at exactly 24-hour window boundary")
         void shouldCancelAtBoundary() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-            transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
+            Instant now = Instant.parse("2026-06-22T10:00:00Z");
+            Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+            LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(24 * 3600L), ZoneOffset.UTC);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    createdAt);
+            transfer.cancel(clock, Duration.ofHours(24));
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
 
@@ -249,7 +272,8 @@ class TransferTest {
         void shouldCancelWithZeroWindow() {
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, fixedNow);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    fixedNow);
             transfer.cancel(clock, Duration.ZERO);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
         }
@@ -257,7 +281,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when transfer is older than 24 hours")
         void shouldThrowAfterWindow() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now().minusHours(25));
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now().minusHours(25));
             assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
@@ -267,7 +292,8 @@ class TransferTest {
         @DisplayName("should throw just after window boundary")
         void shouldThrowJustAfterBoundary() {
             LocalDateTime createdAt = now().minusHours(24).minusMinutes(1);
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, createdAt);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    createdAt);
             assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
@@ -276,7 +302,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when window is zero and transfer is old")
         void shouldThrowWithZeroWindowAndOldTransfer() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now().minusMinutes(1));
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now().minusMinutes(1));
             assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), Duration.ZERO))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("cancellation window has passed");
@@ -285,7 +312,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when already cancelled")
         void shouldThrowWhenAlreadyCancelled() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED,
+                    now());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferAlreadyCancelledException.class)
                     .hasMessage("Transfer already cancelled. ID: 1");
@@ -294,7 +322,8 @@ class TransferTest {
         @Test
         @DisplayName("should throw when status is FAILED")
         void shouldThrowOnFailedStatus() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED,
+                    now());
             assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class)
                     .hasMessageContaining("already failed");
@@ -316,7 +345,8 @@ class TransferTest {
             Clock clock = Clock.fixed(now, ZoneOffset.UTC);
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(1), ZoneOffset.UTC);
 
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, createdAt);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    createdAt);
             transfer.cancel(clock, Duration.ofHours(24));
 
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
@@ -329,7 +359,8 @@ class TransferTest {
             Clock clock = Clock.fixed(now, ZoneOffset.UTC);
             LocalDateTime createdAt = LocalDateTime.ofInstant(now.minusSeconds(25 * 3600 + 6), ZoneOffset.UTC);
 
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, createdAt);
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    createdAt);
             assertThatThrownBy(() -> transfer.cancel(clock, Duration.ofHours(24)))
                     .isExactlyInstanceOf(TransferNotCancellableException.class);
         }
@@ -344,7 +375,8 @@ class TransferTest {
         void shouldMarkFailedFromPending() {
             Instant failedAt = Instant.parse("2026-06-24T12:00:00Z");
             Clock clock = Clock.fixed(failedAt, ZoneOffset.UTC);
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
             transfer.markFailed(clock);
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
             assertThat(transfer.getDomainEvents()).hasSize(1);
@@ -360,7 +392,8 @@ class TransferTest {
         @Test
         @DisplayName("should mark PENDING transfer as FAILED with fixed clock")
         void shouldMarkFailedFromPendingWithClock() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
             transfer.markFailed(Clock.systemUTC());
             assertThat(transfer.getStatus()).isEqualTo(TransferStatus.FAILED);
         }
@@ -368,41 +401,31 @@ class TransferTest {
         @Test
         @DisplayName("should throw when marking already COMPLETED transfer as failed")
         void shouldThrowOnAlreadyCompleted() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
             assertThatThrownBy(() -> transfer.markFailed(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Only PENDING transfers can be completed. Current status: COMPLETED");
+                    .hasMessage("Only PENDING transfers can be marked as failed. Current status: COMPLETED");
         }
 
         @Test
         @DisplayName("should throw when marking already CANCELLED transfer as failed")
         void shouldThrowOnCancelledStatus() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED,
+                    now());
             assertThatThrownBy(() -> transfer.markFailed(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Only PENDING transfers can be completed. Current status: CANCELLED");
+                    .hasMessage("Only PENDING transfers can be marked as failed. Current status: CANCELLED");
         }
 
         @Test
         @DisplayName("should throw when marking already FAILED transfer as failed")
         void shouldThrowOnAlreadyFailed() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.FAILED,
+                    now());
             assertThatThrownBy(() -> transfer.markFailed(Clock.systemUTC()))
                     .isExactlyInstanceOf(TransferNotPendingException.class)
-                    .hasMessage("Only PENDING transfers can be completed. Current status: FAILED");
-        }
-    }
-
-    @Nested
-    @DisplayName("cancel no-arg")
-    class CancelNoArg {
-
-        @Test
-        @DisplayName("should cancel using default 24-hour window")
-        void shouldCancelWithDefaultWindow() {
-            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now().minusHours(2));
-            transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
-            assertThat(transfer.getStatus()).isEqualTo(TransferStatus.CANCELLED);
+                    .hasMessage("Only PENDING transfers can be marked as failed. Current status: FAILED");
         }
     }
 
@@ -413,23 +436,28 @@ class TransferTest {
         @Test
         @DisplayName("equals should return true when same ID")
         void equalsWhenSameId() {
-            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-            Transfer t2 = new Transfer(1L, new AccountId(3L), new AccountId(4L), Money.of("200.00", Currency.USD), TransferStatus.PENDING, now());
+            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
+            Transfer t2 = new Transfer(1L, new AccountId(3L), new AccountId(4L), Money.of("200.00", Currency.USD),
+                    TransferStatus.PENDING, now());
             assertThat(t1).isEqualTo(t2);
         }
 
         @Test
         @DisplayName("equals should return false when different ID")
         void notEqualsWhenDifferentId() {
-            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-            Transfer t2 = new Transfer(2L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
+            Transfer t2 = new Transfer(2L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
             assertThat(t1).isNotEqualTo(t2);
         }
 
         @Test
         @DisplayName("equals should return false when only one ID is null")
         void notEqualsWhenOneNullId() {
-            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
             Transfer t2 = Transfer.create(new AccountId(1L), new AccountId(2L), AMOUNT, Clock.systemUTC());
             assertThat(t1).isNotEqualTo(t2);
             assertThat(t2).isNotEqualTo(t1);
@@ -446,24 +474,19 @@ class TransferTest {
         @Test
         @DisplayName("equals should return false for different type")
         void notEqualsForDifferentType() {
-            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
             assertThat(t1).isNotEqualTo("some-string");
         }
 
         @Test
         @DisplayName("hashCode should be consistent with equals")
         void hashCodeConsistentWithEquals() {
-            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-            Transfer t2 = new Transfer(1L, new AccountId(3L), new AccountId(4L), Money.of("200.00", Currency.USD), TransferStatus.PENDING, now());
+            Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,
+                    now());
+            Transfer t2 = new Transfer(1L, new AccountId(3L), new AccountId(4L), Money.of("200.00", Currency.USD),
+                    TransferStatus.PENDING, now());
             assertThat(t1).hasSameHashCodeAs(t2);
-        }
-
-        @Test
-        @DisplayName("equals should return false when this.id is null and other.id is not null")
-        void notEqualsWhenThisIdIsNull() {
-            Transfer t1 = Transfer.create(new AccountId(1L), new AccountId(2L), AMOUNT, Clock.systemUTC());
-            Transfer t2 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED, now());
-            assertThat(t1).isNotEqualTo(t2);
         }
 
         @Test
@@ -475,13 +498,91 @@ class TransferTest {
     }
 
     @Nested
+    @DisplayName("null contracts")
+    class NullContracts {
+
+        @Test
+        @DisplayName("should reject null sender in create before same-account check")
+        void shouldRejectNullSenderInCreate() {
+            assertThatThrownBy(() -> Transfer.create(null, null, AMOUNT, Clock.systemUTC()))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Sender account ID must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null receiver in create")
+        void shouldRejectNullReceiverInCreate() {
+            assertThatThrownBy(() -> Transfer.create(new AccountId(1L), null, AMOUNT, Clock.systemUTC()))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Receiver account ID must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null amount in create")
+        void shouldRejectNullAmountInCreate() {
+            assertThatThrownBy(() -> Transfer.create(new AccountId(1L), new AccountId(2L), null, Clock.systemUTC()))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Transfer amount must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null clock in create")
+        void shouldRejectNullClockInCreate() {
+            assertThatThrownBy(() -> Transfer.create(new AccountId(1L), new AccountId(2L), AMOUNT, null))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Clock must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null clock in complete")
+        void shouldRejectNullClockInComplete() {
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
+            assertThatThrownBy(() -> transfer.complete(null))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Clock must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null clock in cancel before status checks")
+        void shouldRejectNullClockInCancel() {
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED,
+                    now());
+            assertThatThrownBy(() -> transfer.cancel(null, Duration.ofHours(24)))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Clock must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null window in cancel before status checks")
+        void shouldRejectNullWindowInCancel() {
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.CANCELLED,
+                    now());
+            assertThatThrownBy(() -> transfer.cancel(Clock.systemUTC(), null))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Cancellation window must not be null");
+        }
+
+        @Test
+        @DisplayName("should reject null clock in markFailed")
+        void shouldRejectNullClockInMarkFailed() {
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.PENDING,
+                    now());
+            assertThatThrownBy(() -> transfer.markFailed(null))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Clock must not be null");
+        }
+    }
+
+    @Nested
     @DisplayName("toString")
     class ToString {
 
         @Test
         @DisplayName("should include id, sender, receiver, amount, and status")
         void shouldIncludeFields() {
-            Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), AMOUNT, TransferStatus.COMPLETED, now());
+            Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), AMOUNT,
+                    TransferStatus.COMPLETED, now());
             assertThat(transfer.toString())
                     .contains("id=1")
                     .contains("sender=10")

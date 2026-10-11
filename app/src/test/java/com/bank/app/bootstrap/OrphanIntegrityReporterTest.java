@@ -6,7 +6,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,14 +39,14 @@ class OrphanIntegrityReporterTest {
     @Mock
     private MeterRegistry meterRegistry;
 
-    @BeforeEach
-    void stubGauges() {
-        lenient().when(meterRegistry.gauge(anyString(), any(Iterable.class), any(AtomicLong.class)))
+    private void stubGauges() {
+        when(meterRegistry.gauge(anyString(), any(Iterable.class), any(AtomicLong.class)))
                 .thenAnswer(invocation -> invocation.getArgument(2));
     }
 
     @Test
     void shouldRunThreeChecksWhenClean() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
 
         OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
@@ -59,6 +57,7 @@ class OrphanIntegrityReporterTest {
 
     @Test
     void shouldReportWithoutDeletingWhenOrphansExist() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
 
         OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
@@ -69,6 +68,7 @@ class OrphanIntegrityReporterTest {
 
     @Test
     void shouldExposeCountsAsGauges() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         var gaugeCaptor = ArgumentCaptor.forClass(AtomicLong.class);
 
@@ -80,6 +80,7 @@ class OrphanIntegrityReporterTest {
 
     @Test
     void shouldTolerateNullCounts() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenAnswer(invocation -> null);
 
         OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, meterRegistry);
@@ -108,12 +109,14 @@ class OrphanIntegrityReporterTest {
 
     @Test
     void shouldLogErrorWhenOrphansExceedThreshold() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         assertNotNull(findEventAtLevel(Level.ERROR));
     }
 
     @Test
     void shouldLogWarnWhenOrphansBelowThreshold() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
 
         Logger logger =
@@ -204,6 +207,7 @@ class OrphanIntegrityReporterTest {
 
     @Test
     void shouldNotLogWarnWhenClean() {
+        stubGauges();
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
         assertNull(findWarnEvent());
     }

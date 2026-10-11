@@ -38,7 +38,6 @@ class IdempotencyPendingReaperTest {
 
     @BeforeEach
     void setUp() {
-        org.mockito.Mockito.lenient().when(clockProvider.clock()).thenReturn(fixedClock);
         meters = new SimpleMeterRegistry();
         reaper = new IdempotencyPendingReaper(
                 idempotencyPort,
@@ -55,6 +54,7 @@ class IdempotencyPendingReaperTest {
         @Test
         @DisplayName("transitions stale PENDING rows to FAILED and counts them")
         void shouldReapStalePending() {
+            when(clockProvider.clock()).thenReturn(fixedClock);
             when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(3);
 
             reaper.reapStalePending();
@@ -66,6 +66,7 @@ class IdempotencyPendingReaperTest {
         @Test
         @DisplayName("does nothing when no stale rows exist")
         void shouldDoNothingWhenEmpty() {
+            when(clockProvider.clock()).thenReturn(fixedClock);
             when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(0);
 
             reaper.reapStalePending();
@@ -77,6 +78,7 @@ class IdempotencyPendingReaperTest {
         @Test
         @DisplayName("survives a store failure without killing the scheduler")
         void shouldSurviveStoreFailure() {
+            when(clockProvider.clock()).thenReturn(fixedClock);
             when(idempotencyPort.failStalePending(any(LocalDateTime.class)))
                     .thenThrow(new IllegalStateException("db down"));
 

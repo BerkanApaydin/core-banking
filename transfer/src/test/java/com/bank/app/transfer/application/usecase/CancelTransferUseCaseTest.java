@@ -28,7 +28,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import com.bank.app.common.domain.AccountId;
 
@@ -55,17 +57,24 @@ class CancelTransferUseCaseTest {
 
     private CancelTransferUseCase cancelTransferUseCase;
 
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
+
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
         TransferAuthorizationService transferAuthorizationService = new TransferAuthorizationService(
                 accountAclPort, new ResourceOwnershipPolicy(userContextService));
         cancelTransferUseCase = new CancelTransferUseCaseImpl(loadTransferPort, saveTransferPort,
                 accountAclPort, auditEventPort, transferAuthorizationService, domainEventPublisherService, clockProvider, Duration.ofHours(72));
     }
 
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+    }
+
     @Test
     void shouldCancelTransferSuccessfully() {
+        stubClock();
         Long transferId = 1L;
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
@@ -121,10 +130,11 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowWhenTransferAlreadyCancelled() {
+        stubClock();
         Long transferId = 1L;
         Transfer transfer = createCompletedTransfer(transferId, new AccountId(10L), new AccountId(20L),
                 new Money(new BigDecimal("100.00"), Currency.TRY));
-        transfer.cancel(Clock.systemUTC(), Duration.ofHours(24));
+        transfer.cancel(FIXED_CLOCK, Duration.ofHours(24));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(new AccountId(10L)))
@@ -136,6 +146,7 @@ class CancelTransferUseCaseTest {
 
     @Test
     void shouldThrowWhenTransferNotCompleted() {
+        stubClock();
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
         Transfer transfer = Transfer.create(new AccountId(10L), new AccountId(20L), amount, Clock.systemUTC());
@@ -146,11 +157,38 @@ class CancelTransferUseCaseTest {
 
         assertThrows(TransferNotCancellableException.class,
                 () -> cancelTransferUseCase.execute(transferId));
+        verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
+        verify(saveTransferPort, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowWhenTransferFailed() {
+        stubClock();
+        Long transferId = 1L;
+        Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
+        Transfer transfer = new Transfer(transferId, new AccountId(10L), new AccountId(20L), amount,
+                TransferStatus.FAILED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600), ZoneOffset.UTC));
+
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+        when(accountAclPort.getAccountInfo(new AccountId(10L)))
+                .thenReturn(new AccountInfo(new AccountId(10L), 100L, "TRY", "ACTIVE"));
+
+        assertThrows(TransferNotCancellableException.class,
+                () -> cancelTransferUseCase.execute(transferId));
+        verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
+        verify(saveTransferPort, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowOnNullTransferId() {
+        assertThrows(NullPointerException.class, () -> cancelTransferUseCase.execute(null));
+        verifyNoInteractions(loadTransferPort);
+        verifyNoInteractions(accountAclPort);
     }
 
     private static Transfer createCompletedTransfer(Long id, AccountId senderId, AccountId receiverId, Money amount) {
         Transfer transfer = new Transfer(id, senderId, receiverId, amount,
-                TransferStatus.COMPLETED, LocalDateTime.now().minusHours(1));
+                TransferStatus.COMPLETED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600), ZoneOffset.UTC));
         return transfer;
     }
 }

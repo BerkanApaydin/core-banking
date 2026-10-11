@@ -47,13 +47,17 @@ class UseCaseTransactionAspectTest {
     @BeforeEach
     void setUp() {
         aspect = new UseCaseTransactionAspect(transactionManager, new TransactionProperties(30));
-        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         when(joinPoint.getSignature()).thenReturn(signature);
         when(signature.toShortString()).thenReturn("testSignature");
     }
 
+    private void stubTransaction() {
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+    }
+
     @Test
     void shouldProceedOnAround() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = aspect.around(joinPoint);
@@ -68,6 +72,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldApplyConfiguredTimeout() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         aspect.around(joinPoint);
@@ -78,6 +83,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldProceedOnAroundReadOnly() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = aspect.aroundReadOnly(joinPoint);
@@ -93,6 +99,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldRollbackOnException() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenThrow(new RuntimeException("test error"));
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> aspect.around(joinPoint));
@@ -103,6 +110,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldCompleteParticipatingTransactionStatus() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = aspect.around(joinPoint);
@@ -115,6 +123,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldMarkParticipatingTransactionRollbackOnlyOnFailure() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenThrow(new IllegalArgumentException("failed"));
 
         assertThrows(IllegalArgumentException.class, () -> aspect.around(joinPoint));
@@ -143,6 +152,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldProceedOnAroundAudit() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = aspect.aroundAudit(joinPoint);
@@ -158,6 +168,7 @@ class UseCaseTransactionAspectTest {
 
     @Test
     void shouldProceedOnAroundAuditReadOnly() throws Throwable {
+        stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = aspect.aroundAuditReadOnly(joinPoint);

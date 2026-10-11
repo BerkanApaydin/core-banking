@@ -68,6 +68,17 @@ class TransferDomainServiceTest {
         }
 
         @Test
+        @DisplayName("should throw SameAccountTransferException when IBANs match after whitespace normalization")
+        void shouldThrowSameAccountTransferExceptionWhenIbansMatchAfterNormalization() {
+            TransferParticipants participants = new TransferParticipants(
+                new AccountId(1L), "TR77 0006 2000 0000 0000 0001 11", Currency.TRY,
+                new AccountId(2L), "TR770006200000000000000111", Currency.TRY);
+
+            assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("100.00", Currency.TRY), Clock.systemUTC()))
+                    .isExactlyInstanceOf(SameAccountTransferException.class);
+        }
+
+        @Test
         @DisplayName("should throw NullPointerException when amount is null")
         void shouldThrowNullPointerExceptionWhenAmountIsNull() {
             TransferParticipants participants = new TransferParticipants(

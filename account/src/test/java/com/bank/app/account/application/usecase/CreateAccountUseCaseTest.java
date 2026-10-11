@@ -73,7 +73,10 @@ class CreateAccountUseCaseTest {
         createAccountUseCase = new CreateAccountUseCaseImpl(
                 loadAccountPort, saveAccountPort, ibanGeneratorPort, domainEventPublisherService, auditEventPort,
                 accountAuthorizationService, clockProvider, true);
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
     }
 
     private CreateAccountRequest validRequest() {
@@ -82,6 +85,7 @@ class CreateAccountUseCaseTest {
 
     @Test
     void generatesIbanWhenClientDoesNotProvideOne() {
+        stubClock();
         Iban generated = Iban.fromTurkishBban("0000001234567890123456");
         when(ibanGeneratorPort.generate()).thenReturn(generated);
         when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
@@ -100,6 +104,7 @@ class CreateAccountUseCaseTest {
 
     @Test
     void retriesWhenGeneratedIbanAlreadyExists() {
+        stubClock();
         Iban first = Iban.fromTurkishBban("0000001234567890123456");
         Iban second = Iban.fromTurkishBban("0000001234567890123457");
         Account existing = new Account(7L, new UserId(USER_ID), first, OWNER,
@@ -163,6 +168,7 @@ class CreateAccountUseCaseTest {
 
     @Test
     void nonDemoOpeningStartsAtZero() {
+        stubClock();
         var productionUseCase = new CreateAccountUseCaseImpl(loadAccountPort, saveAccountPort, ibanGeneratorPort,
                 domainEventPublisherService, auditEventPort, accountAuthorizationService, clockProvider, false);
         var request = new CreateAccountRequest(USER_ID, VALID_IBAN, OWNER, BigDecimal.ZERO, Currency.TRY);
@@ -185,6 +191,7 @@ class CreateAccountUseCaseTest {
         @Test
         @DisplayName("should create account successfully")
         void shouldCreateSuccessfully() {
+            stubClock();
             CreateAccountRequest request = validRequest();
             Iban iban = new Iban(request.iban());
             Account savedAccount = new Account(1L, new UserId(USER_ID), iban, OWNER,

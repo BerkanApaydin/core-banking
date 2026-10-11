@@ -45,7 +45,10 @@ public class Transfer extends BaseAggregateRoot {
     }
 
     public static Transfer create(AccountId senderAccountId, AccountId receiverAccountId, Money amount, Clock clock) {
+        Objects.requireNonNull(senderAccountId, "Sender account ID must not be null");
+        Objects.requireNonNull(receiverAccountId, "Receiver account ID must not be null");
         Objects.requireNonNull(amount, "Transfer amount must not be null");
+        Objects.requireNonNull(clock, "Clock must not be null");
         // D-1 inner guarantee: even a direct Transfer.create caller cannot
         // exceed the ceiling (TransferDomainService is the normal path).
         // Zero rejection lives in the constructor (single enforcement point):
@@ -61,6 +64,7 @@ public class Transfer extends BaseAggregateRoot {
     }
 
     public void complete(Clock clock) {
+        Objects.requireNonNull(clock, "Clock must not be null");
         if (this.status != TransferStatus.PENDING) {
             throw new TransferNotPendingException(this.status);
         }
@@ -134,7 +138,7 @@ public class Transfer extends BaseAggregateRoot {
     public void markFailed(Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         if (this.status != TransferStatus.PENDING) {
-            throw new TransferNotPendingException(this.status);
+            throw new TransferNotPendingException(this.status, "marked as failed");
         }
         this.status = TransferStatus.FAILED;
         registerEvent(new TransferFailedEvent(
@@ -142,6 +146,8 @@ public class Transfer extends BaseAggregateRoot {
     }
 
     public void cancel(Clock clock, Duration cancellationWindow) {
+        Objects.requireNonNull(clock, "Clock must not be null");
+        Objects.requireNonNull(cancellationWindow, "Cancellation window must not be null");
         if (this.status == TransferStatus.CANCELLED) {
             throw new TransferAlreadyCancelledException(this.id);
         }
@@ -157,7 +163,6 @@ public class Transfer extends BaseAggregateRoot {
                 detail
             );
         }
-        Objects.requireNonNull(cancellationWindow, "Cancellation window must not be null");
         LocalDateTime now = LocalDateTime.now(clock);
         if (this.createdAt.plus(cancellationWindow).isBefore(now)) {
             throw new TransferNotCancellableException(

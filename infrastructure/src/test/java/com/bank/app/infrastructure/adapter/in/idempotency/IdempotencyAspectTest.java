@@ -71,9 +71,15 @@ class IdempotencyAspectTest {
                 new TransactionProperties(30),
                 new IdempotencyProperties(
                         24, "0 0 * * * *", 3, 0));
-        lenient().when(transactionManager.getTransaction(any())).thenAnswer(
+    }
+
+    private void stubGuardedUser() {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(42L));
+    }
+
+    private void stubTransaction() {
+        when(transactionManager.getTransaction(any())).thenAnswer(
                 ignored -> new SimpleTransactionStatus());
-        lenient().when(userContextService.getCurrentUserId()).thenReturn(Optional.of(42L));
     }
 
     @AfterEach
@@ -87,10 +93,13 @@ class IdempotencyAspectTest {
 
         when(request.getHeader("Idempotency-Key"))
                 .thenReturn(header);
-        lenient().when(request.getMethod()).thenReturn("POST");
-        lenient().when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+    }
+
+    private void stubRequestPath() {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
         // Servlet contract: never null. RequestPathResolver decodes via UrlPathHelper.
-        lenient().when(request.getContextPath()).thenReturn("");
+        when(request.getContextPath()).thenReturn("");
     }
 
     private String userKey() {
@@ -231,6 +240,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnCompletedResponseWithCustomStatus() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -254,6 +265,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnCompletedResponseWithDefaultStatus() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -277,6 +290,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldThrowConcurrentRequestException() throws Exception {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -294,6 +309,9 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldCompleteRequestWhenResponseSuccessful() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -326,6 +344,9 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldCompleteWhenBodyNull() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -349,6 +370,9 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldFailWhenStatusNotSuccessful() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -372,6 +396,9 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldCompleteWhenReturnTypeNotResponseEntity() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -397,6 +424,9 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldFailAndRethrowException() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -420,6 +450,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnEmptyBodyWhenCachedResponseIsNull() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -442,6 +474,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnEmptyBodyWhenCachedResponseIsBlank() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -464,6 +498,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnEmptyBodyWhenCachedResponseIsNullLiteral() throws Throwable {
+        stubRequestPath();
+        stubGuardedUser();
 
         mockRequest("abc");
 
@@ -486,6 +522,8 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldUseClientIpForPublicEndpoint() throws Throwable {
+        stubRequestPath();
+        stubTransaction();
 
         mockRequest("abc");
 
@@ -509,6 +547,7 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldReturnCompletedForPublicEndpoint() throws Throwable {
+        stubRequestPath();
 
         mockRequest("abc");
 
@@ -532,6 +571,7 @@ class IdempotencyAspectTest {
 
     @Test
     void shouldThrowConcurrentRequestForPublicEndpoint() throws Exception {
+        stubRequestPath();
 
         mockRequest("abc");
 
@@ -579,6 +619,9 @@ class IdempotencyAspectTest {
     }
 
     private void reserveNewRequest() {
+        stubRequestPath();
+        stubGuardedUser();
+        stubTransaction();
         mockRequest("abc");
         when(userContextService.getCurrentUsername()).thenReturn(Optional.of("user"));
         when(idempotencyGuard.startRequest(eq(userKey()), anyString()))

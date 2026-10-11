@@ -25,7 +25,7 @@ public final class TransferDomainService {
         Iban.checked(participants.senderIban());
         Iban.checked(participants.receiverIban());
 
-        if (participants.senderIban().equalsIgnoreCase(participants.receiverIban())
+        if (Iban.normalize(participants.senderIban()).equalsIgnoreCase(Iban.normalize(participants.receiverIban()))
                 || Objects.equals(participants.senderId(), participants.receiverId())) {
             throw new SameAccountTransferException(participants.senderIban());
         }

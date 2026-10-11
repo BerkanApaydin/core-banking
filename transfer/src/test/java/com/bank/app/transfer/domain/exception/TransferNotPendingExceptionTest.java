@@ -27,4 +27,13 @@ class TransferNotPendingExceptionTest {
         TransferNotPendingException ex = new TransferNotPendingException(TransferStatus.FAILED);
         assertEquals("TRANSFER_NOT_PENDING", ex.getErrorCode());
     }
+
+    @Test
+    void shouldDescribeMarkFailedOperation() {
+        TransferNotPendingException ex = new TransferNotPendingException(TransferStatus.COMPLETED, "marked as failed");
+        assertEquals("error.transfer_not_pending", ex.getMessageKey());
+        assertEquals("TRANSFER_NOT_PENDING", ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("marked as failed"));
+        assertTrue(ex.getMessage().contains("COMPLETED"));
+    }
 }

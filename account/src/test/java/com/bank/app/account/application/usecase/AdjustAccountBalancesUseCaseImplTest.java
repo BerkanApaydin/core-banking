@@ -75,11 +75,6 @@ class AdjustAccountBalancesUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(Clock.systemUTC());
-        // 7.2: the adapter echoes the saved aggregate (with bumped version);
-        // the use case must keep using the returned instances.
-        lenient().when(saveAccountPort.save(any(Account.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
         useCase = new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider,
                 domainEventPublisherService, auditEventPort, ledgerPort);
         senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
@@ -88,11 +83,20 @@ class AdjustAccountBalancesUseCaseImplTest {
                 "Receiver", Money.of("500.00", Currency.TRY), AccountStatus.ACTIVE);
     }
 
+    private void stubClockAndSave() {
+        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        // 7.2: the adapter echoes the saved aggregate (with bumped version);
+        // the use case must keep using the returned instances.
+        when(saveAccountPort.save(any(Account.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
     @Nested
     @DisplayName("debitAndCredit")
     class DebitAndCredit {
         @Test
         void shouldDebitSenderAndCreditReceiver() {
+            stubClockAndSave();
             Money amount = Money.of("200.00", Currency.TRY);
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
             when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
@@ -152,6 +156,8 @@ class AdjustAccountBalancesUseCaseImplTest {
 
             assertThrows(AccountNotFoundException.class,
                     () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
+            verify(saveAccountPort, never()).save(any(Account.class));
+            verify(clockProvider, never()).clock();
             verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
             verify(auditEventPort, never()).publish(any(AuditEvent.class));
             verify(ledgerPort, never()).save(any(LedgerEntry.class));
@@ -166,9 +172,29 @@ class AdjustAccountBalancesUseCaseImplTest {
 
             assertThrows(AccountNotFoundException.class,
                     () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
+            verify(saveAccountPort, never()).save(any(Account.class));
+            verify(clockProvider, never()).clock();
             verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
             verify(auditEventPort, never()).publish(any(AuditEvent.class));
             verify(ledgerPort, never()).save(any(LedgerEntry.class));
+        }
+
+        @Test
+        void shouldThrowWhenSenderIdIsNull() {
+            NullPointerException ex = assertThrows(NullPointerException.class,
+                    () -> useCase.debitAndCredit(null, 2L, Money.of("10.00", Currency.TRY)));
+            assertEquals("id1 must not be null", ex.getMessage());
+            verifyNoInteractions(saveAccountPort, domainEventPublisherService, auditEventPort,
+                    ledgerPort);
+        }
+
+        @Test
+        void shouldThrowWhenReceiverIdIsNull() {
+            NullPointerException ex = assertThrows(NullPointerException.class,
+                    () -> useCase.debitAndCredit(1L, null, Money.of("10.00", Currency.TRY)));
+            assertEquals("id2 must not be null", ex.getMessage());
+            verifyNoInteractions(saveAccountPort, domainEventPublisherService, auditEventPort,
+                    ledgerPort);
         }
     }
 
@@ -177,6 +203,7 @@ class AdjustAccountBalancesUseCaseImplTest {
     class ReverseBalances {
         @Test
         void shouldCreditSenderAndDebitReceiver() {
+            stubClockAndSave();
             Money amount = Money.of("200.00", Currency.TRY);
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
             when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
@@ -206,6 +233,23 @@ class AdjustAccountBalancesUseCaseImplTest {
             assertEquals(LedgerDirection.DEBIT, legs.get(1).getDirection());
             assertEquals(2L, legs.get(1).getAccountId());
             assertEquals(legs.get(0).getTransactionRef(), legs.get(1).getTransactionRef());
+        }
+
+        @Test
+        void shouldResolvePartiesWhenSenderIdIsGreaterThanReceiverId() {
+            stubClockAndSave();
+            Money amount = Money.of("200.00", Currency.TRY);
+            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
+            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
+
+            AccountAdjustmentResult result = useCase.debitAndCredit(2L, 1L, amount);
+
+            assertEquals(2L, result.senderAccountId());
+            assertEquals(1L, result.receiverAccountId());
+            assertEquals(Money.of("300.00", Currency.TRY), result.senderNewBalance());
+            assertEquals(Money.of("1200.00", Currency.TRY), result.receiverNewBalance());
+            verify(saveAccountPort, times(2)).save(any(Account.class));
+            verify(domainEventPublisherService, times(2)).publishEvents(any(Account.class));
         }
 
         @Test

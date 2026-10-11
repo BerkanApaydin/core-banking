@@ -51,14 +51,17 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        lenient().when(redisTemplate.opsForSet()).thenReturn(setOps);
         adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate,
                 new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 500));
     }
 
+    private void stubValueOps() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+    }
+
     @Test
     void shouldGetById() {
+        stubValueOps();
         when(valueOps.get("account-snapshot:id-1")).thenReturn("1|10|TRY|ACTIVE");
 
         assertEquals(SNAPSHOT, adapter.getById(1L).orElseThrow());
@@ -66,6 +69,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenMissing() {
+        stubValueOps();
         when(valueOps.get("account-snapshot:id-99")).thenReturn(null);
 
         assertTrue(adapter.getById(99L).isEmpty());
@@ -73,6 +77,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldReturnEmptyOnCorruptData() {
+        stubValueOps();
         when(valueOps.get("account-snapshot:id-1")).thenReturn("not-a-snapshot");
 
         assertTrue(adapter.getById(1L).isEmpty());
@@ -80,6 +85,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldPutByIdWithTtl() {
+        stubValueOps();
         adapter.putById(1L, SNAPSHOT);
 
         verify(valueOps).set("account-snapshot:id-1", "1|10|TRY|ACTIVE", 60L, TimeUnit.SECONDS);
@@ -87,6 +93,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldPutByIbanAndMaintainDistributedIndex() {
+        stubValueOps();
         adapter.putByIban("tr45 0006 1005 1978 6456 8412 34", SNAPSHOT);
 
         String ibanKey = AccountSnapshotCache.ibanKey("tr45 0006 1005 1978 6456 8412 34");
@@ -104,6 +111,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldGetByIban() {
+        stubValueOps();
         String ibanKey = AccountSnapshotCache.ibanKey("TR1");
         when(valueOps.get("account-snapshot:iban-" + ibanKey)).thenReturn("1|10|TRY|ACTIVE");
 
@@ -133,6 +141,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldPutAndGetIbansBatchPerId() {
+        stubValueOps();
         var ids = Set.of(1L, 2L);
         var ibans = Map.of(1L, "TR1", 2L, "TR2");
         when(valueOps.multiGet(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
@@ -149,6 +158,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldMissBulkReadOnPartialHit() {
+        stubValueOps();
         when(valueOps.multiGet(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")))
                 .thenReturn(Arrays.asList("TR1", null));
 
@@ -197,6 +207,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldFailOpenWhenRedisDown() {
+        stubValueOps();
         when(valueOps.get(anyString())).thenThrow(new RuntimeException("connection refused"));
         when(valueOps.multiGet(any())).thenThrow(new RuntimeException("connection refused"));
 
@@ -227,6 +238,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
     @Test
     void shouldHonorConfiguredTtl() {
+        stubValueOps();
         var customTtl = new RedisAccountSnapshotCacheAdapter(redisTemplate,
                 new CacheProperties.AccountInfoCache("caffeine", 1000, 10L, 500L));
 

@@ -61,19 +61,25 @@ class SuspendAccountUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
-        lenient().when(saveAccountPort.save(any(Account.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
         useCase = new SuspendAccountUseCaseImpl(loadAccountPort, saveAccountPort, userContextService,
                 clockProvider, domainEventPublisherService, auditEventPort, snapshotCache);
         activeAccount = new Account(1L, new UserId(10L), new Iban("TR450006100519786456841234"),
                 "Owner", Money.of("100.00", Currency.TRY), AccountStatus.ACTIVE);
     }
 
+    private void stubClockAndSave() {
+        when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+        when(saveAccountPort.save(any(Account.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
     private void asAdmin() {
-        lenient().when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
-        lenient().when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
-        lenient().when(userContextService.getCurrentUsernameOrSystem()).thenReturn("admin");
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
+        when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
+    }
+
+    private void stubUsername() {
+        when(userContextService.getCurrentUsernameOrSystem()).thenReturn("admin");
     }
 
     @Nested
@@ -83,6 +89,8 @@ class SuspendAccountUseCaseImplTest {
         @Test
         void shouldSuspendActiveAccountAndEvictSnapshot() {
             asAdmin();
+            stubUsername();
+            stubClockAndSave();
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(activeAccount));
 
             AccountInfo result = useCase.suspend(1L);
@@ -105,6 +113,8 @@ class SuspendAccountUseCaseImplTest {
         @Test
         void shouldSucceedWhenAlreadySuspended() {
             asAdmin();
+            stubUsername();
+            stubClockAndSave();
             activeAccount.suspend(FIXED_CLOCK);
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(activeAccount));
 

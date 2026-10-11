@@ -37,12 +37,16 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(cacheManager.getCache("accountAclInfo")).thenReturn(cache);
         adapter = new CaffeineAccountInfoCacheAdapter(cacheManager);
+    }
+
+    private void stubCache() {
+        when(cacheManager.getCache("accountAclInfo")).thenReturn(cache);
     }
 
     @Test
     void shouldGetById() {
+        stubCache();
         var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
         when(cache.get("id-1", AccountSnapshot.class)).thenReturn(snapshot);
 
@@ -58,6 +62,7 @@ class CaffeineAccountInfoCacheAdapterTest {
 
     @Test
     void shouldPutAndEvict() {
+        stubCache();
         var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
 
         adapter.putById(1L, snapshot);

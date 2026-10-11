@@ -37,7 +37,10 @@ class UserJpaAdapterTest {
     @BeforeEach
     void setUp() {
         adapter = new UserPersistenceAdapter(userJpaRepository, new UserJpaMapper());
-        lenient().when(userJpaRepository.save(any(UserJpaEntity.class))).thenAnswer(invocation -> {
+    }
+
+    private void stubSaveEcho() {
+        when(userJpaRepository.save(any(UserJpaEntity.class))).thenAnswer(invocation -> {
             UserJpaEntity entity = invocation.getArgument(0);
             return new UserJpaEntity(entity.getId() == null ? 42L : entity.getId(),
                     entity.getUsername(), entity.getPassword(), entity.getRole(),
@@ -47,6 +50,7 @@ class UserJpaAdapterTest {
 
     @Test
     void shouldSaveUserSuccessfully() {
+        stubSaveEcho();
         UserJpaEntity existingEntity = new UserJpaEntity();
         existingEntity.setId(1L);
         existingEntity.setVersion(0L);
@@ -106,6 +110,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should create new entity when id is null")
         void shouldCreateNewEntityWhenIdIsNull() {
+            stubSaveEcho();
             User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             adapter.save(user);
@@ -121,6 +126,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should map email and phone when present")
         void shouldMapEmailAndPhoneWhenPresent() {
+            stubSaveEcho();
             User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"));
 
@@ -135,6 +141,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should leave email and phone null when not present")
         void shouldLeaveEmailAndPhoneNullWhenNotPresent() {
+            stubSaveEcho();
             User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             adapter.save(user);
@@ -153,6 +160,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should update entity when found")
         void shouldUpdateEntityWhenFound() {
+            stubSaveEcho();
             UserJpaEntity existingEntity = new UserJpaEntity();
             existingEntity.setId(1L);
             existingEntity.setVersion(0L);
@@ -186,6 +194,7 @@ class UserJpaAdapterTest {
         @Test
         @DisplayName("should set email and phone to null when not present")
         void shouldSetEmailAndPhoneToNullWhenNotPresent() {
+            stubSaveEcho();
             UserJpaEntity existingEntity = new UserJpaEntity();
             existingEntity.setId(1L);
             existingEntity.setVersion(0L);

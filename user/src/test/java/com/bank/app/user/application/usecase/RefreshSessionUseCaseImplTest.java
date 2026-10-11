@@ -36,7 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,7 +61,10 @@ class RefreshSessionUseCaseImplTest {
     @BeforeEach
     void setUp() {
         useCase = new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort);
-        lenient().when(clockProvider.clock()).thenReturn(FIXED);
+    }
+
+    private void stubClock() {
+        when(clockProvider.clock()).thenReturn(FIXED);
     }
 
     private VerifiedToken verified() {
@@ -78,6 +80,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should rotate into a fresh pair sharing the family")
     void shouldRotateSuccessfully() {
+        stubClock();
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
@@ -144,6 +147,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should reject expired refresh token")
     void shouldRejectExpiredToken() {
+        stubClock();
         StoredRefresh expired = new StoredRefresh(HASH, 7L, "family-1",
                 LocalDateTime.now(FIXED).minusMinutes(1), false, null);
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
@@ -159,6 +163,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should reject plain-revoked token (logged out)")
     void shouldRejectRevokedToken() {
+        stubClock();
         StoredRefresh revoked = new StoredRefresh(HASH, 7L, "family-1",
                 LocalDateTime.now(FIXED).plusDays(7), true, null);
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
@@ -174,6 +179,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should revoke family on rotated-token reuse")
     void shouldRevokeFamilyOnReuse() {
+        stubClock();
         StoredRefresh rotated = new StoredRefresh(HASH, 7L, "family-1",
                 LocalDateTime.now(FIXED).plusDays(7), true, "replacement-hash");
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
@@ -190,6 +196,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should publish TOKEN_REVOKED when a reused token kills its family (K11/D4)")
     void shouldPublishTokenRevokedOnReuse() {
+        stubClock();
         StoredRefresh rotated = new StoredRefresh(HASH, 7L, "family-1",
                 LocalDateTime.now(FIXED).plusDays(7), true, "replacement-hash");
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
@@ -209,6 +216,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should reject null expiry without rotating (fail-closed)")
     void shouldRejectNullExpiry() {
+        stubClock();
         // A stored row without an expiry must never be treated as immortal:
         // fail closed exactly like an already-expired row.
         StoredRefresh noExpiry = new StoredRefresh(HASH, 7L, "family-1", null, false, null);
@@ -234,6 +242,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should rotate with the user's current token version")
     void shouldRotateWithCurrentVersion() {
+        stubClock();
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
@@ -253,6 +262,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should reject a refresh minted before a role or password change")
     void shouldRejectStaleTokenVersion() {
+        stubClock();
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
@@ -276,6 +286,7 @@ class RefreshSessionUseCaseImplTest {
     @Test
     @DisplayName("should reject rotation when the user no longer exists")
     void shouldRejectMissingUser() {
+        stubClock();
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
