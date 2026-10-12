@@ -1,8 +1,10 @@
 package com.bank.app.infrastructure.adapter.out.scheduling;
 
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,6 +63,7 @@ class AdvisorySchedulerLockTest {
 
         assertThat(result).isFalse();
         assertThat(ran).isFalse();
+        verify(status).setRollbackOnly();
     }
 
     @Test
@@ -84,5 +88,47 @@ class AdvisorySchedulerLockTest {
 
         assertThat(result).isTrue();
         assertThat(ran).isTrue();
+    }
+
+    @Test
+    @DisplayName("should honor the configured timeout from properties")
+    void shouldHonorConfiguredTimeoutFromProperties() {
+        when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        when(jdbc.queryForObject(eq(AdvisorySchedulerLock.LOCK_SQL), eq(Boolean.class), eq("job")))
+                .thenReturn(Boolean.TRUE);
+        var lock = new AdvisorySchedulerLock(jdbc, transactionManager, new TransactionProperties(17));
+        AtomicBoolean ran = new AtomicBoolean();
+
+        boolean result = lock.runIfLeader("job", () -> ran.set(true));
+
+        assertThat(result).isTrue();
+        assertThat(ran).isTrue();
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRED);
+        assertThat(definition.getValue().getTimeout()).isEqualTo(17);
+    }
+
+    @Test
+    @DisplayName("should use the legacy 30s budget for the two-arg constructor")
+    void shouldUseLegacyDefaultTimeout() {
+        when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        when(jdbc.queryForObject(eq(AdvisorySchedulerLock.LOCK_SQL), eq(Boolean.class), eq("job")))
+                .thenReturn(Boolean.TRUE);
+        var lock = new AdvisorySchedulerLock(jdbc, transactionManager);
+        AtomicBoolean ran = new AtomicBoolean();
+
+        boolean result = lock.runIfLeader("job", () -> ran.set(true));
+
+        assertThat(result).isTrue();
+        assertThat(ran).isTrue();
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRED);
+        assertThat(definition.getValue().getTimeout()).isEqualTo(30);
     }
 }

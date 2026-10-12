@@ -30,4 +30,59 @@ class IdempotencyKeyJpaEntityTest {
         assertEquals("body2", empty.getResponseBody());
         assertEquals(now, empty.getCreatedAt());
     }
+
+    @Test
+    void shouldExposeAssignedIdViaPersistableContract() {
+        IdempotencyKeyJpaEntity entity =
+                new IdempotencyKeyJpaEntity("persist-key", "PENDING", "body", LocalDateTime.now());
+
+        assertEquals("persist-key", entity.getId());
+        assertEquals(entity.getKey(), entity.getId());
+    }
+
+    @Test
+    void shouldTrackNewStateUntilPostLoadOrPrePersist() {
+        IdempotencyKeyJpaEntity entity =
+                new IdempotencyKeyJpaEntity("new-key", "PENDING", "body", LocalDateTime.now());
+
+        assertTrue(entity.isNew());
+
+        entity.markNotNew();
+
+        assertFalse(entity.isNew());
+    }
+
+    @Test
+    void shouldRoundTripRequestHash() {
+        IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity();
+        assertNull(entity.getRequestHash());
+
+        entity.setRequestHash("abc123hash");
+
+        assertEquals("abc123hash", entity.getRequestHash());
+    }
+
+    @Test
+    void shouldDefaultKeyKindToHttpAndRoundTrip() {
+        IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity();
+
+        assertEquals("HTTP", entity.getKeyKind());
+
+        entity.setKeyKind("HANDLER");
+
+        assertEquals("HANDLER", entity.getKeyKind());
+    }
+
+    @Test
+    void shouldRoundTripResponseStatus() {
+        IdempotencyKeyJpaEntity withStatus = new IdempotencyKeyJpaEntity(
+                "key", "COMPLETED", "body", 200, LocalDateTime.now());
+
+        assertEquals(200, withStatus.getResponseStatus());
+
+        IdempotencyKeyJpaEntity entity = new IdempotencyKeyJpaEntity();
+        assertNull(entity.getResponseStatus());
+        entity.setResponseStatus(409);
+        assertEquals(409, entity.getResponseStatus());
+    }
 }

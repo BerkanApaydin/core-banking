@@ -75,7 +75,13 @@ jobs:
         JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Domain mutation coverage (85% gate)
-      run: mvn -B -ntp pitest:mutationCoverage -Ppitest-domain -Dpitest.skip=false -T 4
+      # NOTE: -DtargetClasses is intentional. Every module pom pins its own
+      # broad targetClasses (e.g. infrastructure: com.bank.app.infrastructure.*),
+      # which shadows the pitest-domain profile's domain filter in
+      # pluginManagement. Without this flag the nightly gates every module's
+      # adapters at 85% instead of only domain code. -DfailWhenNoMutations
+      # lets domain-free modules (infrastructure, app) pass with 0 mutants.
+      run: mvn -B -ntp pitest:mutationCoverage -Ppitest-domain -DtargetClasses='com.bank.app.*.domain.*,com.bank.app.common.domain.*' -DfailWhenNoMutations=false -Dpitest.skip=false -T 4
       env:
         DB_HOST: localhost
         DB_PORT: 5432

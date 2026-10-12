@@ -2,14 +2,19 @@ package com.bank.app.infrastructure.adapter.in.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("null")
 class RedisRateLimitConfigurationTest {
@@ -148,6 +153,115 @@ class RedisRateLimitConfigurationTest {
                     assertThat(context)
                             .hasSingleBean(StringRedisTemplate.class);
                 });
+    }
+
+    @Test
+    void shouldApplyDatabaseIndex() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        properties.setDatabase(3);
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        assertThat(factory.getStandaloneConfiguration().getDatabase()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldRejectUrlSentinelAndClusterConfigurations() {
+        RedisRateLimitConfiguration configuration = new RedisRateLimitConfiguration();
+
+        RedisProperties withUrl = new RedisProperties();
+        withUrl.setUrl("redis://localhost:6379");
+        assertThatThrownBy(() -> configuration.redisConnectionFactory(withUrl))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("standalone");
+
+        RedisProperties withSentinel = new RedisProperties();
+        RedisProperties.Sentinel sentinel = new RedisProperties.Sentinel();
+        sentinel.setMaster("mymaster");
+        withSentinel.setSentinel(sentinel);
+        assertThatThrownBy(() -> configuration.redisConnectionFactory(withSentinel))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        RedisProperties withCluster = new RedisProperties();
+        RedisProperties.Cluster cluster = new RedisProperties.Cluster();
+        cluster.setNodes(java.util.List.of("localhost:6379"));
+        withCluster.setCluster(cluster);
+        assertThatThrownBy(() -> configuration.redisConnectionFactory(withCluster))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldRejectSslBundle() {
+        RedisProperties properties = new RedisProperties();
+        properties.getSsl().setBundle("my-bundle");
+
+        assertThatThrownBy(() -> new RedisRateLimitConfiguration().redisConnectionFactory(properties))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SSL bundles");
+    }
+
+    @Test
+    void shouldApplyPoolBounds() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        properties.getLettuce().getPool().setMaxActive(5);
+        properties.getLettuce().getPool().setMaxIdle(4);
+        properties.getLettuce().getPool().setMinIdle(2);
+        properties.getLettuce().getPool().setMaxWait(Duration.ofSeconds(3));
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        assertThat(factory.getClientConfiguration())
+                .isInstanceOf(LettucePoolingClientConfiguration.class);
+        LettucePoolingClientConfiguration pooling =
+                (LettucePoolingClientConfiguration) factory.getClientConfiguration();
+        assertThat(pooling.getPoolConfig().getMaxTotal()).isEqualTo(5);
+        assertThat(pooling.getPoolConfig().getMaxIdle()).isEqualTo(4);
+        assertThat(pooling.getPoolConfig().getMinIdle()).isEqualTo(2);
+        assertThat(pooling.getPoolConfig().getMaxWaitDuration()).isEqualTo(Duration.ofSeconds(3));
+    }
+
+    @Test
+    void shouldSkipNonPositivePoolBounds() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        properties.getLettuce().getPool().setMaxActive(0);
+        properties.getLettuce().getPool().setMaxIdle(0);
+        properties.getLettuce().getPool().setMinIdle(0);
+        properties.getLettuce().getPool().setMaxWait(null);
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        assertThat(factory.getClientConfiguration())
+                .isInstanceOf(LettucePoolingClientConfiguration.class);
+        LettucePoolingClientConfiguration pooling =
+                (LettucePoolingClientConfiguration) factory.getClientConfiguration();
+        // Commons-pool2 defaults survive when bounds are non-positive/absent.
+        assertThat(pooling.getPoolConfig().getMaxTotal()).isEqualTo(8);
+        assertThat(pooling.getPoolConfig().getMaxIdle()).isEqualTo(8);
+        assertThat(pooling.getPoolConfig().getMinIdle()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldConfigureRedisTemplateSerializers() {
+        RedisProperties properties = new RedisProperties();
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        RedisTemplate<Object, Object> template =
+                new RedisRateLimitConfiguration().redisTemplate(factory);
+
+        assertThat(template).isNotNull();
+        assertThat(template.getKeySerializer()).isInstanceOf(StringRedisSerializer.class);
+        assertThat(template.getValueSerializer()).isInstanceOf(StringRedisSerializer.class);
+        assertThat(template.getConnectionFactory()).isSameAs(factory);
     }
 
     @Test

@@ -60,4 +60,42 @@ class LedgerReconciliationJobTest {
 
         assertThatNoException().isThrownBy(job::reconcile);
     }
+
+    @Test
+    void shouldCountEveryRunEvenWhenBalanced() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+
+        assertThatNoException().isThrownBy(job::reconcile);
+
+        assertThat(registry.counter("ledger.reconciliation.runs").count()).isEqualTo(1.0);
+        assertThat(registry.counter("ledger.reconciliation.nonzero").count()).isEqualTo(0.0);
+        assertThat(registry.get("ledger.nonzero_transaction_refs").gauge().value()).isEqualTo(0.0);
+    }
+
+    @Test
+    void shouldCountNonzeroRefsByObservedCount() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(3L);
+
+        assertThatNoException().isThrownBy(job::reconcile);
+
+        assertThat(registry.counter("ledger.reconciliation.runs").count()).isEqualTo(1.0);
+        assertThat(registry.counter("ledger.reconciliation.nonzero").count()).isEqualTo(3.0);
+    }
+
+    @Test
+    void shouldTreatNullCountAsZero() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(null);
+
+        assertThatNoException().isThrownBy(job::reconcile);
+
+        assertThat(registry.get("ledger.nonzero_transaction_refs").gauge().value()).isEqualTo(0.0);
+        assertThat(registry.counter("ledger.reconciliation.runs").count()).isEqualTo(1.0);
+        assertThat(registry.counter("ledger.reconciliation.nonzero").count()).isEqualTo(0.0);
+    }
 }

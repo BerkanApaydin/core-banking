@@ -67,6 +67,7 @@ class UseCaseTransactionAspectTest {
         verify(transactionManager).getTransaction(definitionCaptor.capture());
         DefaultTransactionDefinition def = definitionCaptor.getValue();
         assertEquals("testSignature", def.getName());
+        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
         verify(transactionManager).commit(transactionStatus);
     }
 
@@ -94,6 +95,8 @@ class UseCaseTransactionAspectTest {
         DefaultTransactionDefinition def = definitionCaptor.getValue();
         assertEquals("testSignature", def.getName());
         assertEquals(true, def.isReadOnly());
+        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
+        assertEquals(30, def.getTimeout());
         verify(transactionManager).commit(transactionStatus);
     }
 
@@ -163,6 +166,8 @@ class UseCaseTransactionAspectTest {
         DefaultTransactionDefinition def = definitionCaptor.getValue();
         assertEquals("testSignature", def.getName());
         assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
+        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
+        assertEquals(30, def.getTimeout());
         verify(transactionManager).commit(transactionStatus);
     }
 
@@ -180,6 +185,8 @@ class UseCaseTransactionAspectTest {
         assertEquals("testSignature", def.getName());
         assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
         assertEquals(true, def.isReadOnly());
+        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
+        assertEquals(30, def.getTimeout());
         verify(transactionManager).commit(transactionStatus);
     }
 }

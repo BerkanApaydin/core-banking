@@ -84,6 +84,24 @@ class RedisLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldBlockIpWhenMaxAttemptsIsZeroAndCountPresent() {
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        stubOpsForValue();
+        when(valueOps.get("login_attempt:ip:" + TEST_IP)).thenReturn("0");
+
+        assertThat(zeroThreshold.isIpBlocked(TEST_IP)).isTrue();
+    }
+
+    @Test
+    void shouldNotBlockIpWhenMaxAttemptsIsZeroAndNoCount() {
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        stubOpsForValue();
+        when(valueOps.get("login_attempt:ip:" + TEST_IP)).thenReturn(null);
+
+        assertThat(zeroThreshold.isIpBlocked(TEST_IP)).isFalse();
+    }
+
+    @Test
     void shouldReturnFalseWhenUsernameNotPresent() {
         stubOpsForValue();
         when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn(null);
@@ -118,6 +136,22 @@ class RedisLoginAttemptAdapterTest {
     @Test
     void shouldReturnFalseWhenUsernameBlockingDisabled() {
         assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15)).isUsernameBlocked(TEST_USERNAME)).isFalse();
+    }
+
+    @Test
+    void shouldBlockUsernameWhenMaxAttemptsIsZeroAndCountPresent() {
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        stubOpsForValue();
+        when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("0");
+
+        assertThat(zeroThreshold.isUsernameBlocked(TEST_USERNAME)).isTrue();
+    }
+
+    @Test
+    void shouldReturnFalseForNullUsernameEvenWithZeroThreshold() {
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+
+        assertThat(zeroThreshold.isUsernameBlocked(null)).isFalse();
     }
 
     @Test

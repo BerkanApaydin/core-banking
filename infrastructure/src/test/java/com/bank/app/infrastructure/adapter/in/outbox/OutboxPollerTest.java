@@ -215,6 +215,101 @@ class OutboxPollerTest {
     }
 
     @Test
+    void shouldReturnZeroJitterForNonPositiveDelay() throws Exception {
+        var method = OutboxPoller.class.getDeclaredMethod("initialJitter", long.class);
+        method.setAccessible(true);
+
+        assertEquals(0L, (long) method.invoke(null, 0L));
+        assertEquals(0L, (long) method.invoke(null, -5L));
+    }
+
+    @Test
+    void shouldJitterWithinDelayBounds() throws Exception {
+        var method = OutboxPoller.class.getDeclaredMethod("initialJitter", long.class);
+        method.setAccessible(true);
+
+        // delay=1: mutant replacing +1 with -1 calls nextLong(0, 0) which throws.
+        for (int i = 0; i < 20; i++) {
+            long jitter = (long) method.invoke(null, 1L);
+            assertTrue(jitter == 0L || jitter == 1L);
+        }
+        // Primitive-returns mutant (always 0) fails this statistical check.
+        boolean sawNonZero = false;
+        for (int i = 0; i < 100; i++) {
+            if ((long) method.invoke(null, 1_000L) != 0L) {
+                sawNonZero = true;
+                break;
+            }
+        }
+        assertTrue(sawNonZero, "expected some non-zero jitter over 100 draws");
+        for (int i = 0; i < 50; i++) {
+            long jitter = (long) method.invoke(null, 2_000L);
+            assertTrue(jitter >= 0L && jitter <= 2_000L);
+        }
+    }
+
+    @Test
+    void shouldIgnorePendingOutsideRangeWhenUnpartitioned() {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 0, 2000, 30));
+        // Unpartitioned mode never queries the pending-range guard; lenient so the
+        // boundary mutant (<=0 -> <0, which would query and throw on 5L) still fails.
+        lenient().when(outboxPort.countPendingOutsidePartitionRange(0)).thenReturn(5L);
+        when(outboxPort.findAndLockUnprocessed(50, -1)).thenReturn(List.of(event("e1")));
+
+        outboxPoller.pollAndProcessEvents();
+
+        verify(outboxProcessor).processEvent(any(EventEntry.class));
+    }
+
+    @Test
+    void shouldProcessExactlyPartitionCountPartitions() {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(0L);
+        when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(event("e0")));
+        when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
+
+        outboxPoller.pollAndProcessEvents();
+
+        verify(outboxPort, times(1)).findAndLockUnprocessed(50, 0);
+        verify(outboxPort, times(1)).findAndLockUnprocessed(50, 1);
+        verify(outboxPort, never()).findAndLockUnprocessed(50, 2);
+        verify(outboxProcessor, times(2)).processEvent(any(EventEntry.class));
+    }
+
+    @Test
+    void shouldStartPartitionedPollerAndStop() throws Exception {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(0L);
+
+        outboxPoller.start();
+        try {
+            var field = OutboxPoller.class.getDeclaredField("executor");
+            field.setAccessible(true);
+            var executor = (ScheduledExecutorService) field.get(outboxPoller);
+            assertNotNull(executor);
+            assertFalse(executor.isShutdown());
+        } finally {
+            outboxPoller.stop();
+        }
+    }
+
+    @Test
+    void shouldSizeWorkerPoolAtTwelveForThreePartitions() throws Exception {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30));
+        when(outboxPort.countPendingOutsidePartitionRange(3)).thenReturn(0L);
+
+        outboxPoller.start();
+        try {
+            var field = OutboxPoller.class.getDeclaredField("workers");
+            field.setAccessible(true);
+            var workers = (java.util.concurrent.ThreadPoolExecutor) field.get(outboxPoller);
+            assertEquals(12, workers.getCorePoolSize());
+        } finally {
+            outboxPoller.stop();
+        }
+    }
+
+    @Test
     void shouldCountAbortedPollCyclesPerPartition() {
         var registry = new SimpleMeterRegistry();
         var meteredPoller = new OutboxPoller(outboxPort, outboxProcessor, outboxProperties, registry);

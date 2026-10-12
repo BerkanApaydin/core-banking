@@ -138,4 +138,140 @@ class ApplicationStartupValidatorTest {
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .hasMessageContaining("eviction-batch-size");
     }
+
+    @Test
+    void rejectsZeroAuditRetentionDays() {
+        var environment = validProductionEnvironment().withProperty("app.audit.retention-days", "0");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("positive value");
+    }
+
+    @Test
+    void rejectsLocalhostCorsOriginInProduction() {
+        var environment = validProductionEnvironment()
+                .withProperty("app.security.cors.allowed-origins", "https://bank.example.com,http://localhost:3000");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("localhost CORS");
+    }
+
+    @Test
+    void rejectsLoopbackVariantsInProduction() {
+        for (String origin : new String[]{
+                "http://127.0.0.1:3000", "http://[::1]:3000", "https://foo.localhost",
+                "localhost", "not-a-uri-localhost-fallback"}) {
+            // The last value exercises the raw fall-through in originHost (no URI host):
+            // it is loopback only when it literally matches; use an explicit loopback raw value.
+            String candidate = origin.equals("not-a-uri-localhost-fallback") ? "foo.localhost" : origin;
+            var environment = validProductionEnvironment()
+                    .withProperty("app.security.cors.allowed-origins", candidate);
+            assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                    .as("origin %s must be rejected", candidate)
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("localhost CORS");
+        }
+    }
+
+    @Test
+    void acceptsExplicitNonLoopbackCorsOrigins() {
+        var environment = validProductionEnvironment()
+                .withProperty("app.security.cors.allowed-origins",
+                        "https://bank.example.com, https://my-localhost-app.com, ,https://localhost.example.com");
+        assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsBlankCorsOriginsAsUnconfigured() {
+        var blank = validProductionEnvironment().withProperty("app.security.cors.allowed-origins", "   ");
+        assertThatCode(() -> new ApplicationStartupValidator(blank).validateProductionConfig())
+                .doesNotThrowAnyException();
+
+        var emptyEntries = validProductionEnvironment()
+                .withProperty("app.security.cors.allowed-origins", " , , ");
+        assertThatCode(() -> new ApplicationStartupValidator(emptyEntries).validateProductionConfig())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void toleratesNullCorsOriginsAsUnconfigured() throws Exception {
+        org.springframework.core.env.Environment environment =
+                org.mockito.Mockito.mock(org.springframework.core.env.Environment.class);
+        org.mockito.Mockito.when(environment.getProperty("app.security.cors.allowed-origins", ""))
+                .thenReturn(null);
+        var validator = new ApplicationStartupValidator(environment);
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("requireProdCors");
+        method.setAccessible(true);
+
+        assertThatCode(() -> {
+            try {
+                method.invoke(validator);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                sneakyThrow(e.getCause());
+            }
+        }).doesNotThrowAnyException();
+    }
+
+    private static <T extends Throwable> void sneakyThrow(Throwable t) throws T {
+        throw (T) t;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "localhost", "LOCALHOST", "127.0.0.1", "::1", "[::1]", "foo.localhost", ".localhost"})
+    void detectsLoopbackHosts(String host) throws Exception {
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        method.setAccessible(true);
+
+        assertThatCode(() -> {
+            boolean loopback = (boolean) method.invoke(null, host);
+            if (!loopback) {
+                throw new AssertionError("expected loopback for " + host);
+            }
+        }).doesNotThrowAnyException();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "example.com", "my-localhost-app.com", "localhost.example.com", "127.0.0.2"})
+    void rejectsNonLoopbackHosts(String host) throws Exception {
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        method.setAccessible(true);
+
+        assertThatCode(() -> {
+            boolean loopback = (boolean) method.invoke(null, host);
+            if (loopback) {
+                throw new AssertionError("unexpected loopback for " + host);
+            }
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void treatsNullHostAsNonLoopback() throws Exception {
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        method.setAccessible(true);
+
+        assertThatCode(() -> {
+            boolean loopback = (boolean) method.invoke(null, (Object) null);
+            if (loopback) {
+                throw new AssertionError("null host must not be loopback");
+            }
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void extractsHostLowerCasedFromValidOrigin() throws Exception {
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("originHost", String.class);
+        method.setAccessible(true);
+
+        String host = (String) method.invoke(null, "https://Example.COM:8443/some/path");
+        org.assertj.core.api.Assertions.assertThat(host).isEqualTo("example.com");
+    }
+
+    @Test
+    void fallsBackToRawOriginWhenUriHasNoHost() throws Exception {
+        var method = ApplicationStartupValidator.class.getDeclaredMethod("originHost", String.class);
+        method.setAccessible(true);
+
+        String raw = (String) method.invoke(null, "notauri with spaces");
+        org.assertj.core.api.Assertions.assertThat(raw).isEqualTo("notauri with spaces");
+    }
 }

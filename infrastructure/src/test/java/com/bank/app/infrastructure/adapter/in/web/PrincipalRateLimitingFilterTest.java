@@ -92,6 +92,8 @@ class PrincipalRateLimitingFilterTest {
 
         verify(chain).doFilter(request, response);
         assertEquals(200, response.getStatus());
+        assertEquals("120", response.getHeader("RateLimit-Limit"));
+        assertEquals("60", response.getHeader("RateLimit-Reset"));
     }
 
     @Test
@@ -108,6 +110,10 @@ class PrincipalRateLimitingFilterTest {
         filter().doFilter(request, response, chain);
 
         assertEquals(429, response.getStatus());
+        assertEquals("60", response.getHeader("Retry-After"));
+        assertEquals("120", response.getHeader("RateLimit-Limit"));
+        assertEquals("0", response.getHeader("RateLimit-Remaining"));
+        assertEquals("60", response.getHeader("RateLimit-Reset"));
         verify(chain, never()).doFilter(any(), any());
     }
 
@@ -167,6 +173,84 @@ class PrincipalRateLimitingFilterTest {
         verify(chain).doFilter(request, response);
         verify(rateLimiter, times(1))
                 .tryAcquire("principal:name:alice|/api/v1/accounts", 120, 60_000L);
+    }
+
+    @Test
+    void unsupportedMethodPassesThroughWithoutRateLimit() throws Exception {
+        authenticate("alice");
+        MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "OPTIONS", "10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyInt(), anyLong());
+    }
+
+    @Test
+    void unauthenticatedRequestPassesThroughWithoutPrincipalBucket() throws Exception {
+        SecurityContextHolder.clearContext();
+        MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyInt(), anyLong());
+    }
+
+    @Test
+    void anonymousUserPassesThroughWithoutPrincipalBucket() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+        MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyInt(), anyLong());
+    }
+
+    @Test
+    void userIdPrincipalUsesIdBucket() throws Exception {
+        com.bank.app.common.application.port.out.AuthenticatedPrincipalPort port =
+                mock(com.bank.app.common.application.port.out.AuthenticatedPrincipalPort.class);
+        when(port.getAuthenticatedUserId()).thenReturn(42L);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(port, null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        when(rateLimiter.tryAcquire("principal:42|/api/v1/transfers", 120, 60_000L)).thenReturn(true);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1"), response, chain);
+
+        verify(chain).doFilter(any(), any());
+        verify(rateLimiter).tryAcquire("principal:42|/api/v1/transfers", 120, 60_000L);
+    }
+
+    @Test
+    void usernamePrincipalUsesNameBucket() throws Exception {
+        com.bank.app.common.application.port.out.AuthenticatedPrincipalPort port =
+                mock(com.bank.app.common.application.port.out.AuthenticatedPrincipalPort.class);
+        when(port.getAuthenticatedUserId()).thenReturn(null);
+        when(port.getAuthenticatedUsername()).thenReturn("carol");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(port, null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        when(rateLimiter.tryAcquire("principal:name:carol|/api/v1/transfers", 120, 60_000L))
+                .thenReturn(true);
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1"),
+                new MockHttpServletResponse(), chain);
+
+        verify(chain).doFilter(any(), any());
     }
 
     @Test

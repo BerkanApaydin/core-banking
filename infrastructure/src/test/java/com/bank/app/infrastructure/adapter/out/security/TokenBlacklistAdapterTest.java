@@ -1,12 +1,18 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
+import com.github.benmanes.caffeine.cache.Cache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -99,6 +105,54 @@ class TokenBlacklistAdapterTest {
         void shouldHandleEmptyBlacklist() {
             adapter.cleanExpired();
             assertThat(adapter.isBlacklisted("any")).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("expiry boundary")
+    class ExpiryBoundary {
+
+        @Test
+        @DisplayName("should ignore zero expiry like negative expiry")
+        void shouldIgnoreZeroExpiry() {
+            adapter.blacklist("zero-token", 0L);
+
+            assertThat(adapter.isBlacklisted("zero-token")).isFalse();
+        }
+
+        @Test
+        @DisplayName("should treat the exact deadline as expired")
+        void shouldTreatExactDeadlineAsExpired() throws Exception {
+            Clock start = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
+            TokenBlacklistAdapter clocked = new TokenBlacklistAdapter(
+                    new TokenBlacklistProperties(1_000L, 10_000L));
+            clocked.setClockForTests(start);
+            clocked.blacklist("exact-token", 1_000L);
+
+            assertThat(clocked.isBlacklisted("exact-token")).isTrue();
+
+            clocked.setClockForTests(Clock.fixed(Instant.parse("2026-01-01T00:00:01Z"), ZoneOffset.UTC));
+
+            assertThat(clocked.isBlacklisted("exact-token")).isFalse();
+            // The expired entry must be invalidated, not left in the cache.
+            Field cacheField = TokenBlacklistAdapter.class.getDeclaredField("blacklist");
+            cacheField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Cache<String, Long> cache = (Cache<String, Long>) cacheField.get(clocked);
+            assertThat(cache.getIfPresent(TokenDigest.sha256Hex("exact-token"))).isNull();
+        }
+
+        @Test
+        @DisplayName("should reset to system clock when cleared")
+        void shouldResetClockWhenCleared() {
+            TokenBlacklistAdapter clocked = new TokenBlacklistAdapter(
+                    new TokenBlacklistProperties(1_000L, 10_000L));
+            clocked.setClockForTests(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+            clocked.setClockForTests(null);
+
+            clocked.blacklist("reset-token", 60_000L);
+
+            assertThat(clocked.isBlacklisted("reset-token")).isTrue();
         }
     }
 

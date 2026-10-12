@@ -367,9 +367,13 @@
         </plugins>
     </build>
 
-    <!-- Uzun vade #8: domain mutasyon hedefi %85. Global esik %80 kalir (CI yesil);
-         bu profil yalnizca domain paketlerini %85 ile olcer:
-         mvn pitest:mutationCoverage -Ppitest-domain -Dpitest.skip=false -->
+    <!-- Uzun vade #8: domain mutasyon hedefi %85. Global esik %80 kalir (CI yesil).
+         NOT: her modul pom'u kendi targetClasses degerini sabitler, bu yuzden
+         asagidaki domain filtresi pluginManagement'te etkisiz kalir. Nightly
+         (mutation-nightly.yml) -DtargetClasses ile acikca override eder; bu
+         profili bu sekilde calistirmadan kosmak tum modullerin adapter'larini %85 ile
+         olcer (istenmeyen). Dogru kullanim:
+         mvn pitest:mutationCoverage -Ppitest-domain -DtargetClasses='com.bank.app.*.domain.*,com.bank.app.common.domain.*' -DfailWhenNoMutations=false -Dpitest.skip=false -->
     <profiles>
         <profile>
             <id>pitest-domain</id>
