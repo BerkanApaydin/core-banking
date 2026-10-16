@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -46,6 +47,7 @@ class DomainEventOutboxAdapterTest {
         @BeforeEach
         void setUp() throws Exception {
             adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
+                    () -> UUID.randomUUID().toString(),
                     new OutboxProperties(5, 50, 0, 2000, 30));
         }
 
@@ -163,6 +165,7 @@ class DomainEventOutboxAdapterTest {
         void shouldSerializeWithObjectMapper() throws Exception {
             ObjectMapper realMapper = new ObjectMapper();
             adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> Clock.systemUTC(),
+                    () -> UUID.randomUUID().toString(),
                     new OutboxProperties(5, 50, 0, 2000, 30));
             DomainEvent event = new DomainEvent() {
                 @Override public LocalDateTime occurredAt() { return LocalDateTime.of(2024, 1, 15, 10, 30); }

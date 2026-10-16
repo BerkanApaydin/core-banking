@@ -27,7 +27,15 @@ public record TransactionRef(String value) {
         }
     }
 
-    /** Groups the legs of one business operation (debit + credit share it). */
+    /**
+     * Test/tooling use only. Production paths must pass an explicit ID supplier
+     * via {@link #newRef(Supplier)} (injected as {@code IdGeneratorPort}) so refs
+     * stay deterministic and seedable — a hidden {@code UUID.randomUUID()} default
+     * is a purity trap for future production callers.
+     *
+     * @deprecated test/tooling use only; production code passes an ID supplier.
+     */
+    @Deprecated(forRemoval = false)
     public static TransactionRef newRef() {
         return new TransactionRef(UUID.randomUUID().toString());
     }

@@ -42,7 +42,14 @@ public final class LedgerEntry {
         this.occurredAt = Objects.requireNonNull(occurredAt, "Occurred-at must not be null");
     }
 
-    /** Groups the legs of one business operation (debit + credit share it). */
+    /**
+     * Test/tooling use only. Production paths must pass an explicit ID supplier
+     * via {@link #newTransactionRef(Supplier)} (injected as
+     * {@code IdGeneratorPort}) so refs stay deterministic and seedable.
+     *
+     * @deprecated test/tooling use only; production code passes an ID supplier.
+     */
+    @Deprecated(forRemoval = false)
     public static TransactionRef newTransactionRef() {
         return TransactionRef.newRef();
     }

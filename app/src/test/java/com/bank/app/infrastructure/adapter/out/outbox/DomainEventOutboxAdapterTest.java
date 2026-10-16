@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +47,7 @@ class DomainEventOutboxAdapterTest {
     @BeforeEach
     void setUp() {
         adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
+                () -> UUID.randomUUID().toString(),
                 new OutboxProperties(5, 50, 0, 2000, 30));
     }
 

@@ -35,7 +35,7 @@ public class TransferJpaMapper {
         LocalDateTime createdAt = entity.getBusinessCreatedAt() != null
                 ? entity.getBusinessCreatedAt()
                 : entity.getCreatedAt();
-        return new Transfer(
+        return Transfer.rehydrate(
                 entity.getId(),
                 // Persistence edge: wrap raw ids into the domain type here.
                 new AccountId(entity.getSenderAccountId()),

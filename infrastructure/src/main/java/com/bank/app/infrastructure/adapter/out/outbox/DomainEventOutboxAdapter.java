@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.out.outbox;
 import com.bank.app.common.application.port.out.EventPublisherPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.common.domain.event.DomainEvent;
 import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -13,7 +14,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Component
 @Primary
@@ -33,13 +33,15 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
     private final OutboxPort outboxPort;
     private final ObjectMapper objectMapper;
     private final ClockProviderPort clockProvider;
+    private final IdGeneratorPort idGenerator;
     private final OutboxProperties outboxProperties;
 
     public DomainEventOutboxAdapter(OutboxPort outboxPort, ObjectMapper objectMapper,
-            ClockProviderPort clockProvider, OutboxProperties outboxProperties) {
+            ClockProviderPort clockProvider, IdGeneratorPort idGenerator, OutboxProperties outboxProperties) {
         this.outboxPort = outboxPort;
         this.objectMapper = objectMapper;
         this.clockProvider = clockProvider;
+        this.idGenerator = idGenerator;
         this.outboxProperties = outboxProperties;
     }
 
@@ -62,7 +64,9 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
         }
         String eventType = event.getClass().getSimpleName();
         LocalDateTime now = LocalDateTime.now(clockProvider.clock());
-        String id = UUID.randomUUID().toString();
+        // D-1: outbox row ID comes from the ID port (seedable in tests),
+        // never from a hidden UUID call inside the adapter.
+        String id = idGenerator.newId();
 
         String aggregateType = event.aggregateType();
         String aggregateId = event.aggregateId();

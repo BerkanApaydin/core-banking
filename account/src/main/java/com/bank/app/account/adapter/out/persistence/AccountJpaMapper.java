@@ -45,14 +45,13 @@ public class AccountJpaMapper {
         if (entity == null) {
             throw new IllegalArgumentException("entity must not be null");
         }
-        return Account.builder()
-                .id(entity.getId())
-                .userId(new UserId(entity.getUserId()))
-                .iban(new Iban(entity.getIban()))
-                .ownerName(entity.getOwnerName())
-                .balance(Money.exact(entity.getBalance(), entity.getCurrency()))
-                .status(entity.getStatus())
-                .version(entity.getVersion())
-                .build();
+        return Account.rehydrate(
+                entity.getId(),
+                new UserId(entity.getUserId()),
+                new Iban(entity.getIban()),
+                entity.getOwnerName(),
+                Money.exact(entity.getBalance(), entity.getCurrency()),
+                entity.getStatus(),
+                entity.getVersion());
     }
 }

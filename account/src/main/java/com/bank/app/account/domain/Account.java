@@ -69,6 +69,19 @@ public class Account extends BaseAggregateRoot {
         return new Builder();
     }
 
+    /**
+     * L4: persistence rehydration entry point. The public constructors stay for
+     * backward compatibility (tests, mappers), but production rehydration should
+     * flow through here so construction sites are greppable and a future
+     * architecture test can pin them to persistence adapters. Behavior is
+     * identical to the all-state constructor: invariants are re-validated so a
+     * corrupt row can never materialize an illegal aggregate.
+     */
+    public static Account rehydrate(Long id, UserId userId, Iban iban, String ownerName,
+            Money balance, AccountStatus status, Long version) {
+        return new Account(id, userId, iban, ownerName, balance, status, version);
+    }
+
     public static class Builder {
         private Long id;
         private UserId userId;

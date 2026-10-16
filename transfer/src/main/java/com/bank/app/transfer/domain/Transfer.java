@@ -64,6 +64,19 @@ public class Transfer extends BaseAggregateRoot {
         return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
     }
 
+    /**
+     * L4: persistence rehydration entry point. The public constructors stay for
+     * backward compatibility (tests, mappers), but production rehydration should
+     * flow through here so construction sites are greppable and a future
+     * architecture test can pin them to persistence adapters. Behavior is
+     * identical to the all-state constructor: same-account and zero-amount
+     * invariants are re-validated so a corrupt row can never materialize.
+     */
+    public static Transfer rehydrate(Long id, AccountId senderAccountId, AccountId receiverAccountId,
+            Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
+        return new Transfer(id, senderAccountId, receiverAccountId, amount, status, createdAt, version);
+    }
+
     public void complete(Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         if (this.status != TransferStatus.PENDING) {
