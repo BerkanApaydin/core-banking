@@ -3,7 +3,7 @@
 ## Current state
 
 All Flyway migrations live in one directory —
-`common/src/main/resources/db/migration/V1__…V51__.sql` — while the JPA
+`common/src/main/resources/db/migration/V1__…V53__.sql` — while the JPA
 entities they serve live in their bounded contexts (`account`, `transfer`,
 …). The `persistence` module carries the name but owns almost no schema.
 This is backwards from the module story (BCs own their tables) and makes

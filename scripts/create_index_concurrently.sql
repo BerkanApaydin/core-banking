@@ -30,4 +30,10 @@
 --       ON outbox_events (partition, created_at)
 --       WHERE processed = false AND dead_letter = false;
 --   ANALYZE outbox_events;
+--
+-- Example: outbox retention expression index (V52) on a large table:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_outbox_retention_processed_created
+--       ON outbox_events ((COALESCE(processed_at, created_at)), id)
+--       WHERE processed = true AND dead_letter = false;
+--   ANALYZE outbox_events;
 SELECT 1;

@@ -66,6 +66,20 @@ class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
                 + "WHERE tablename = 'idempotency_keys' "
                 + "AND indexname = 'idx_idempotency_pending_http_kind'", Integer.class));
+        // L2/V52: subsumed/dead indexes must stay dropped (write amplification).
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
+                + "WHERE indexname IN ('idx_outbox_events_unprocessed', 'idx_transfers_created_at', "
+                + "'idx_audit_logs_timestamp', 'idx_ledger_account_business', "
+                + "'idx_accounts_user_id_status', 'idx_audit_logs_username', "
+                + "'idx_audit_logs_username_action', 'idx_idempotency_keys_created_at')",
+                Integer.class));
+        // L3/V52: retention expression index over COALESCE(processed_at, created_at).
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
+                + "WHERE tablename = 'outbox_events' "
+                + "AND indexname = 'idx_outbox_retention_processed_created'", Integer.class));
+        // L6/V53: replay body is unbounded TEXT, never a business-tx failure mode.
+        assertEquals("text", jdbc.queryForObject("SELECT udt_name FROM information_schema.columns "
+                + "WHERE table_name = 'idempotency_keys' AND column_name = 'response_body'", String.class));
     }
 
     private void insertOutbox(String id, LocalDateTime createdAt, boolean processed, boolean deadLetter) {

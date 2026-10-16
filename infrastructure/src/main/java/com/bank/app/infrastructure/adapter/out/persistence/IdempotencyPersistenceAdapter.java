@@ -2,6 +2,8 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -10,6 +12,17 @@ import java.util.Optional;
 
 @Repository
 public class IdempotencyPersistenceAdapter implements IdempotencyPort {
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotencyPersistenceAdapter.class);
+
+    /**
+     * L6: replay-body application cap. The column is unbounded TEXT since V53
+     * so an oversized body can never roll the business transaction back;
+     * anything above this is truncated (replay-only field, business outcome
+     * already committed) with a warn for visibility. 10 000 matches the
+     * legacy VARCHAR cap so existing replay behavior is unchanged.
+     */
+    static final int MAX_RESPONSE_BODY_CHARS = 10_000;
 
     private final IdempotencyKeyJpaRepository repository;
 
@@ -46,7 +59,7 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
 
     @Override
     public void markCompleted(String key, String responseBody, int responseStatus) {
-        int affected = repository.completeIfPending(key, responseBody, responseStatus);
+        int affected = repository.completeIfPending(key, capResponseBody(key, responseBody), responseStatus);
         if (affected == 0) {
             // Not PENDING anymore: missing reservation is a bug, already-completed
             // is an idempotent replay (first-wins preserved) — return silently.
@@ -94,5 +107,13 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
             total += deleted;
         } while (deleted >= RETENTION_BATCH_SIZE);
         return total;
+    }
+
+    private static String capResponseBody(String key, String responseBody) {
+        if (responseBody != null && responseBody.length() > MAX_RESPONSE_BODY_CHARS) {
+            log.warn("Idempotency replay body truncated: key={}, chars={}", key, responseBody.length());
+            return responseBody.substring(0, MAX_RESPONSE_BODY_CHARS);
+        }
+        return responseBody;
     }
 }

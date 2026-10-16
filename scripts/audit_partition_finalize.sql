@@ -36,8 +36,8 @@ END $$;
 
 DROP TABLE audit_logs_legacy;
 
-ALTER INDEX idx_audit_logs_timestamp_new RENAME TO idx_audit_logs_timestamp;
-ALTER INDEX idx_audit_logs_username_new RENAME TO idx_audit_logs_username;
+-- L2: only the live query-surface indexes are renamed (username + bare
+-- timestamp indexes stay dropped per V52, not resurrected here).
 ALTER INDEX idx_audit_logs_timestamp_id_new RENAME TO idx_audit_logs_timestamp_id;
 ALTER INDEX idx_audit_logs_actor_timestamp_new RENAME TO idx_audit_logs_actor_timestamp;
 

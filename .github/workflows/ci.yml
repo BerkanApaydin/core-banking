@@ -163,6 +163,15 @@ jobs:
           echo "::error::V51 repeats the V41 phantom index name"
           exit 1
         fi
+        # L2/V52: the eight subsumed/dead indexes must stay in the drop list.
+        for idx in idx_outbox_events_unprocessed idx_transfers_created_at idx_audit_logs_timestamp idx_ledger_account_business idx_accounts_user_id_status idx_audit_logs_username idx_audit_logs_username_action idx_idempotency_keys_created_at; do
+          grep -q "DROP INDEX IF EXISTS $idx" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql || { echo "::error::V52 missing drop for $idx"; exit 1; }
+        done
+        # L3/V52: retention expression index over COALESCE(processed_at, created_at).
+        grep -q "idx_outbox_retention_processed_created" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
+        grep -q "COALESCE(processed_at, created_at)" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
+        # L6/V53: replay body widened to TEXT, never a business-tx failure mode.
+        grep -q "ALTER TABLE idempotency_keys ALTER COLUMN response_body TYPE TEXT" common/src/main/resources/db/migration/V53__widen_idempotency_response_body.sql
         echo "migration content contracts present"
 
     - name: Supply-chain self-contracts (O-1/O-2)

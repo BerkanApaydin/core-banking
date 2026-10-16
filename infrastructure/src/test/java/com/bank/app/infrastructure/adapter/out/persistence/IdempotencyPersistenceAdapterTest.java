@@ -166,6 +166,21 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
+    void shouldTruncateOversizedReplayBodyInsteadOfFailingBusinessWrite() {
+        // L6: completion joins the business tx; an oversized replay body must
+        // truncate (replay-only) rather than fail the write and roll money back.
+        String oversized = "x".repeat(IdempotencyPersistenceAdapter.MAX_RESPONSE_BODY_CHARS + 1);
+        when(repository.completeIfPending(eq("key1"), anyString(), eq(200))).thenReturn(1);
+
+        adapter.markCompleted("key1", oversized, 200);
+
+        verify(repository).completeIfPending(eq("key1"),
+                argThat(body -> body != null
+                        && body.length() == IdempotencyPersistenceAdapter.MAX_RESPONSE_BODY_CHARS),
+                eq(200));
+    }
+
+    @Test
     void shouldFailStalePending() {
         var threshold = LocalDateTime.now();
         when(repository.failStalePending(threshold)).thenReturn(2);

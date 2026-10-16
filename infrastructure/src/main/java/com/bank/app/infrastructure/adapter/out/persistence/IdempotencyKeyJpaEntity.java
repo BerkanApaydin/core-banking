@@ -36,7 +36,14 @@ public class IdempotencyKeyJpaEntity implements Persistable<String> {
     @Column(name = "key_kind", nullable = false)
     private String keyKind = "HTTP";
 
-    @Column(name = "response_body", length = 10000)
+    /**
+     * Replay body for a COMPLETED key. Unbounded TEXT since V53 (was
+     * VARCHAR(10000)): completion joins the business transaction, so a
+     * length cap here used to roll the business mutation back on oversized
+     * responses. The application cap lives in
+     * {@code IdempotencyPersistenceAdapter} (truncate + warn, replay-only).
+     */
+    @Column(name = "response_body", columnDefinition = "TEXT")
     private String responseBody;
 
     @Column(name = "response_status")

@@ -90,8 +90,9 @@ SELECT setval(pg_get_serial_sequence('audit_logs', 'id'),
 --    every partition). Suffixed _new: the legacy table (renamed below, kept
 --    for verification) still owns the canonical names; the finalize script
 --    drops the legacy table and renames these after post-swap reads are green.
-CREATE INDEX idx_audit_logs_timestamp_new ON audit_logs ("timestamp" DESC);
-CREATE INDEX idx_audit_logs_username_new ON audit_logs (username);
+--    L2: only the live query-surface indexes are recreated — the subsumed
+--    idx_audit_logs_timestamp (prefix of _timestamp_id) and the unused
+--    username indexes (no username-based query; dropped in V52) stay dropped.
 CREATE INDEX idx_audit_logs_timestamp_id_new ON audit_logs ("timestamp" DESC, id DESC);
 CREATE INDEX idx_audit_logs_actor_timestamp_new
     ON audit_logs (actor_user_id, "timestamp" DESC, id DESC);
