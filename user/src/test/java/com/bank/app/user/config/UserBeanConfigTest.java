@@ -3,6 +3,7 @@ package com.bank.app.user.config;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -36,6 +37,7 @@ class UserBeanConfigTest {
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
+    @Mock private IdGeneratorPort idGenerator;
 
     @Test
     void shouldCreateRegisterUserUseCaseBean() {
@@ -48,7 +50,7 @@ class UserBeanConfigTest {
     void shouldCreateLoginUserUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
         LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort,
-                loginAttemptPort, refreshTokenPort, clockProvider, auditEventPort);
+                loginAttemptPort, refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort);
         assertNotNull(useCase);
     }
 

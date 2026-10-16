@@ -74,28 +74,24 @@ class RefreshTokenPersistenceAdapterTest {
 
     @Test
     void shouldMarkRotated() {
-        RefreshTokenJpaEntity entity = new RefreshTokenJpaEntity();
-        entity.setTokenHash("old");
-        when(repository.findById("old")).thenReturn(Optional.of(entity));
+        // C-1: conditional UPDATE wins the race in one round trip.
+        when(repository.rotateIfActive("old", "new")).thenReturn(1);
 
         adapter.markRotated("old", "new");
 
-        verify(repository).save(entityCaptor.capture());
-        assertThat(entityCaptor.getValue().isRevoked()).isTrue();
-        assertThat(entityCaptor.getValue().getReplacedByHash()).isEqualTo("new");
+        verify(repository).rotateIfActive("old", "new");
+        verify(repository, never()).save(any());
     }
 
     @Test
     void shouldRevokeFamily() {
-        RefreshTokenJpaEntity first = new RefreshTokenJpaEntity();
-        RefreshTokenJpaEntity second = new RefreshTokenJpaEntity();
-        when(repository.findByFamilyId("family-1")).thenReturn(List.of(first, second));
+        // P-2: single bulk UPDATE instead of SELECT + N UPDATE.
+        when(repository.revokeFamilyBulk("family-1")).thenReturn(2);
 
         adapter.revokeFamily("family-1");
 
-        assertThat(first.isRevoked()).isTrue();
-        assertThat(second.isRevoked()).isTrue();
-        verify(repository).saveAll(List.of(first, second));
+        verify(repository).revokeFamilyBulk("family-1");
+        verify(repository, never()).saveAll(any());
     }
 
     @Test
@@ -127,9 +123,9 @@ class RefreshTokenPersistenceAdapterTest {
 
     @Test
     void shouldRejectUnknownHashOnRotate() {
-        // Kills the NullReturnVals mutant on the orElseThrow lambda: an
-        // unknown hash must fail fast instead of silently returning null.
-        when(repository.findById("ghost")).thenReturn(Optional.empty());
+        // 0 rotated rows (unknown hash or lost race) must fail fast instead
+        // of silently returning — the use case re-reads from there.
+        when(repository.rotateIfActive("ghost", "new")).thenReturn(0);
 
         assertThatThrownBy(() -> adapter.markRotated("ghost", "new"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)

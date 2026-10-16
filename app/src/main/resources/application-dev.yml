@@ -9,6 +9,9 @@ spring:
 jwt:
   # Dev-only insecure fallback: never use in prod. Prod has no default and
   # fails fast when JWT_SECRET is unset (see application.yml / prod yml).
+  # The fallback is a valid 256-bit Base64 value (decodes to the ASCII
+  # 'dev-only-NOT-FOR-PROD-0000000000') so a missing JWT_SECRET fails with a
+  # clear prod-guard message instead of a raw Base64 DecodingException.
   # If this fallback value ever leaks, rotate it.
-  secret: ${JWT_SECRET:dev-only-insecure-fallback-not-for-prod}
+  secret: ${JWT_SECRET:ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=}
   allow-default-secret: true

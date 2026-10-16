@@ -2,6 +2,7 @@ package com.bank.app.transfer.domain;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
@@ -80,7 +81,7 @@ class TransferTest {
         void shouldRejectZeroAmountOnCreate() {
             assertThatThrownBy(() -> Transfer.create(new AccountId(1L), new AccountId(2L),
                     Money.of("0.00", Currency.TRY), Clock.systemUTC()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class);
+                    .isExactlyInstanceOf(InvalidAmountException.class);
         }
 
         @Test
@@ -150,18 +151,18 @@ class TransferTest {
             assertThatThrownBy(
                     () -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
                             TransferStatus.PENDING, now()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class);
+                    .isExactlyInstanceOf(InvalidAmountException.class);
         }
 
         @ParameterizedTest(name = "should reject zero amount for {0} transfer in constructor")
         @ValueSource(strings = { "COMPLETED", "FAILED", "CANCELLED" })
         @DisplayName("should reject zero amount regardless of status in constructor")
         void shouldRejectZeroAmountForAnyStatusInConstructor(String status) {
-            assertThatThrownBy(
-                    () -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
-                            TransferStatus.valueOf(status), now()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("must not be zero");
+                assertThatThrownBy(
+                        () -> new Transfer(1L, new AccountId(1L), new AccountId(2L), Money.of("0.00", Currency.TRY),
+                                TransferStatus.valueOf(status), now()))
+                        .isExactlyInstanceOf(InvalidAmountException.class)
+                        .hasMessageContaining("must not be zero");
         }
     }
 

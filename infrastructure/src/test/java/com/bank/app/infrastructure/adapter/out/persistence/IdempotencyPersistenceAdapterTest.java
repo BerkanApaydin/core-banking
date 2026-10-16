@@ -134,21 +134,35 @@ class IdempotencyPersistenceAdapterTest {
     @Test
     void shouldDeleteExpired() {
         var threshold = LocalDateTime.now();
-        when(repository.deleteExpiredTerminalRequests(threshold)).thenReturn(3);
+        when(repository.deleteExpiredTerminalRequestsBatch(threshold, 1000)).thenReturn(3);
 
         int deleted = adapter.deleteExpired(threshold);
 
         assertThat(deleted).isEqualTo(3);
+        verify(repository).deleteExpiredTerminalRequestsBatch(threshold, 1000);
     }
 
     @Test
     void shouldDeleteExpiredHandlerKeys() {
         var threshold = LocalDateTime.now();
-        when(repository.deleteExpiredHandlerKeys(threshold)).thenReturn(4);
+        when(repository.deleteExpiredHandlerKeysBatch(threshold, 1000)).thenReturn(4);
 
         int deleted = adapter.deleteExpiredHandlerKeys(threshold);
 
         assertThat(deleted).isEqualTo(4);
+    }
+
+    @Test
+    void shouldPageBatchesUntilShortBatch() {
+        // P-3: a full batch means "maybe more" — the loop continues; a short
+        // batch stops it. 1000 + 3 = 1003 total over two round trips.
+        var threshold = LocalDateTime.now();
+        when(repository.deleteExpiredTerminalRequestsBatch(threshold, 1000)).thenReturn(1000, 3);
+
+        int deleted = adapter.deleteExpired(threshold);
+
+        assertThat(deleted).isEqualTo(1003);
+        verify(repository, times(2)).deleteExpiredTerminalRequestsBatch(threshold, 1000);
     }
 
     @Test

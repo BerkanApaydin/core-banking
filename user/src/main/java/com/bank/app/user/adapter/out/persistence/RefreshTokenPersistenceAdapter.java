@@ -2,7 +2,6 @@ package com.bank.app.user.adapter.out.persistence;
 
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -49,11 +48,14 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     public void markRotated(String oldHash, String newHash) {
         Objects.requireNonNull(oldHash, "Old hash must not be null");
         Objects.requireNonNull(newHash, "New hash must not be null");
-        RefreshTokenJpaEntity entity = repository.findById(oldHash)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown refresh token"));
-        entity.setRevoked(true);
-        entity.setReplacedByHash(newHash);
-        repository.save(entity);
+        // C-1: conditional UPDATE (no read-modify-write): 0 rows means a
+        // concurrent refresh already rotated this token, or it is unknown.
+        // Same fail-fast contract as before — the use case re-reads to tell
+        // reuse (family revoke) apart from a stale/unknown token.
+        int rotated = repository.rotateIfActive(oldHash, newHash);
+        if (rotated == 0) {
+            throw new IllegalArgumentException("Unknown refresh token");
+        }
     }
 
     @Override
@@ -70,9 +72,8 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     @Override
     public void revokeFamily(String familyId) {
         Objects.requireNonNull(familyId, "Family ID must not be null");
-        List<RefreshTokenJpaEntity> members = repository.findByFamilyId(familyId);
-        members.forEach(member -> member.setRevoked(true));
-        repository.saveAll(members);
+        // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips.
+        repository.revokeFamilyBulk(familyId);
     }
 
     @Override

@@ -9,8 +9,10 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
+import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
@@ -19,27 +21,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
 // Credential lookups use short read-only transactions in their adapters.
 // The Redis-backed login guard must not run inside a relational transaction.
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(LoginUserUseCaseImpl.class);
 
+    /**
+     * SE-5: lazily-minted dummy BCrypt hash (cost 12 like production) for the
+     * timing-oracle guard below. Generated once per JVM via the port so the
+     * value is always a valid hash for the configured encoder.
+     */
+    private volatile String dummyBcryptHash;
+
     private final AuthenticationPort authenticationPort;
     private final JwtPort jwtPort;
     private final LoginAttemptPort loginAttemptPort;
     private final RefreshTokenPort refreshTokenPort;
+    private final PasswordEncoderPort passwordEncoderPort;
+    private final IdGeneratorPort idGenerator;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public LoginUserUseCaseImpl(AuthenticationPort authenticationPort, JwtPort jwtPort,
                                 LoginAttemptPort loginAttemptPort, RefreshTokenPort refreshTokenPort,
+                                PasswordEncoderPort passwordEncoderPort, IdGeneratorPort idGenerator,
                                 ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.authenticationPort = authenticationPort;
         this.jwtPort = jwtPort;
         this.loginAttemptPort = loginAttemptPort;
         this.refreshTokenPort = refreshTokenPort;
+        this.passwordEncoderPort = passwordEncoderPort;
+        this.idGenerator = idGenerator;
         this.clockProvider = clockProvider;
         this.auditEventPort = auditEventPort;
     }
@@ -89,7 +102,9 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             refreshTokenPort.save(
                     TokenDigest.sha256Hex(refreshToken),
                     user.id().value(),
-                    UUID.randomUUID().toString(),
+                    // D-3: session family ID comes from the ID port (seedable
+                    // in tests), not a hidden UUID call in the application.
+                    idGenerator.newId(),
                     LocalDateTime.now(clockProvider.clock())
                             .plus(jwtPort.getRefreshExpirationMs(), ChronoUnit.MILLIS));
             log.info("User logged in: userId={}", user.id().value());
@@ -100,6 +115,11 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         } catch (UserNotFoundException e) {
             // G9: user-enumeration guard — unknown username must be
             // indistinguishable from wrong password (401, fixed message).
+            // SE-5: burn one BCrypt comparison so this path costs the same as
+            // a real password mismatch (Spring skips the hash when the user
+            // row is missing, which is a ~250ms timing oracle). Best-effort:
+            // a broken encoder must never turn login into a 500.
+            burnDummyPasswordCompare(request.password());
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
             auditLogin(AuditEvent.LOGIN_FAILED, username, null, "Failed login attempt.");
@@ -113,6 +133,30 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             // A successful credential check is not enough if the login guard
             // cannot reset or record its state. Do not return the generated JWT.
             throw e;
+        }
+    }
+
+    /**
+     * SE-5 timing-oracle guard: one dummy BCrypt comparison against a cached
+     * dummy hash (same cost factor as production hashes).
+     */
+    private void burnDummyPasswordCompare(String rawPassword) {
+        try {
+            String hash = dummyBcryptHash;
+            if (hash == null) {
+                synchronized (this) {
+                    hash = dummyBcryptHash;
+                    if (hash == null) {
+                        hash = passwordEncoderPort.encode("login-timing-oracle-dummy");
+                        dummyBcryptHash = hash;
+                    }
+                }
+            }
+            passwordEncoderPort.matches(rawPassword == null ? "" : rawPassword, hash);
+        } catch (RuntimeException ignored) {
+            // Best-effort only: never fail a login on oracle-guard noise.
+            log.debug("Dummy password comparison unavailable: {}",
+                    ignored.getClass().getSimpleName());
         }
     }
 

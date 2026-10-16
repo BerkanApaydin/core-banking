@@ -8,17 +8,26 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 
 public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKeyJpaEntity, String> {
+    /**
+     * P-3: batched retention deletes (same IN-subquery pattern as outbox
+     * retention): one unbounded DELETE would hold the whole expired tail in a
+     * single long transaction. Callers loop until a batch comes back short.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
+    @Query(value = "DELETE FROM idempotency_keys WHERE key_value IN ("
+            + "SELECT key_value FROM idempotency_keys WHERE created_at < :threshold "
             + "AND status <> 'PENDING' "
-            + "AND key_kind = 'HTTP'", nativeQuery = true)
-    int deleteExpiredTerminalRequests(@Param("threshold") LocalDateTime threshold);
+            + "AND key_kind = 'HTTP' LIMIT :batch)", nativeQuery = true)
+    int deleteExpiredTerminalRequestsBatch(@Param("threshold") LocalDateTime threshold,
+                                           @Param("batch") int batch);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "DELETE FROM idempotency_keys WHERE created_at < :threshold "
+    @Query(value = "DELETE FROM idempotency_keys WHERE key_value IN ("
+            + "SELECT key_value FROM idempotency_keys WHERE created_at < :threshold "
             + "AND status <> 'PENDING' "
-            + "AND key_kind = 'HANDLER'", nativeQuery = true)
-    int deleteExpiredHandlerKeys(@Param("threshold") LocalDateTime threshold);
+            + "AND key_kind = 'HANDLER' LIMIT :batch)", nativeQuery = true)
+    int deleteExpiredHandlerKeysBatch(@Param("threshold") LocalDateTime threshold,
+                                      @Param("batch") int batch);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "INSERT INTO idempotency_keys (key_value, status, created_at, request_hash, key_kind) "

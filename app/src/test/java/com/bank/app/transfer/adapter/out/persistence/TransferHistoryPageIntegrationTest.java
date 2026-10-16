@@ -89,6 +89,25 @@ class TransferHistoryPageIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldReturnRowsWithoutWindowForDeeperPages() {
+        // P-1: rows-only query matches the windowed query's content/order.
+        List<TransferJpaEntity> rows = repo.findHistoryRows(201L, 2, 0);
+        assertEquals(2, rows.size());
+        assertEquals(30.00, rows.get(0).getAmount().doubleValue());
+        assertEquals(20.00, rows.get(1).getAmount().doubleValue());
+
+        List<TransferJpaEntity> remainder = repo.findHistoryRows(201L, 2, 2);
+        assertEquals(1, remainder.size());
+        assertEquals(10.00, remainder.get(0).getAmount().doubleValue());
+    }
+
+    @Test
+    void shouldCountHistorySeparately() {
+        assertEquals(3L, repo.countHistory(201L));
+        assertEquals(0L, repo.countHistory(999L));
+    }
+
+    @Test
     void shouldSummarizeRangeWithCountAndSumInOneScan() {
         var rows = repo.summarizeRange(201L,
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1));

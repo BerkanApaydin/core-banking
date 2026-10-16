@@ -2,6 +2,8 @@ package com.bank.app.account.domain;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.InvalidAmountException;
+import java.util.function.Supplier;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -30,7 +32,7 @@ public final class LedgerEntry {
         this.direction = Objects.requireNonNull(direction, "Direction must not be null");
         this.amount = Objects.requireNonNull(amount, "Amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Ledger amount must not be zero");
+            throw new InvalidAmountException("Ledger amount must not be zero");
         }
         this.balanceAfter = Objects.requireNonNull(balanceAfter, "Balance after must not be null");
         if (amount.currency() != balanceAfter.currency()) {
@@ -43,6 +45,14 @@ public final class LedgerEntry {
     /** Groups the legs of one business operation (debit + credit share it). */
     public static TransactionRef newTransactionRef() {
         return TransactionRef.newRef();
+    }
+
+    /**
+     * D-1: testable overload — production passes
+     * {@code IdGeneratorPort::newId}; see {@link TransactionRef#newRef}.
+     */
+    public static TransactionRef newTransactionRef(Supplier<String> idSupplier) {
+        return TransactionRef.newRef(idSupplier);
     }
 
     public static LedgerEntry debit(Long accountId, Money amount, Money balanceAfter,

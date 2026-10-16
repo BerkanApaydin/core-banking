@@ -377,6 +377,21 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.amount", is(100.00)));
+
+                // T-2: the name promises no double EXECUTION, not just a
+                // replayed response — pin the money effect: exactly one debit,
+                // one transfer row, and one balanced ledger pair.
+                var sender = accountRepo.findByIban("TR770006200000000000000111").orElseThrow();
+                var receiver = accountRepo.findByIban("TR870006200000000000000222").orElseThrow();
+                assertEquals(0, new BigDecimal("900.00").compareTo(sender.getBalance()),
+                                "sender debited exactly once");
+                assertEquals(0, new BigDecimal("600.00").compareTo(receiver.getBalance()),
+                                "receiver credited exactly once");
+                assertEquals(1, transferRepo.count(), "exactly one transfer row");
+                Long legs = entityManager.createQuery(
+                                "select count(l) from LedgerEntryJpaEntity l", Long.class)
+                                .getSingleResult();
+                assertEquals(2, legs, "exactly one debit+credit ledger pair");
         }
 
         @Test

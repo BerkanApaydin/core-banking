@@ -7,7 +7,7 @@ bytes.
 
 ## Flow
 
-1. Tag the release: `git tag v0.0.2 && git push origin v0.0.2`.
+1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then builds with the pinned `BASE_BUILDER_IMAGE`/`BASE_RUNTIME_IMAGE` args and pins both the app manifest and the Flyway Job manifest to `@sha256` digests.
    `.github/workflows/release.yml` builds the `Dockerfile`, pushes to
    GHCR (`ghcr.io/<owner>/bank-app:<tag>`), pins `k8s/bank-app.yaml`
    to the resolved digest (`bank-app@sha256:…`, verified with `grep`

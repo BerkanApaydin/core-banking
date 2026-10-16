@@ -4,6 +4,7 @@ import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import org.junit.jupiter.api.DisplayName;
@@ -170,7 +171,7 @@ class TransferDomainServiceTest {
                 new AccountId(2L), "TR870006200000000000000222", Currency.TRY);
 
             assertThatThrownBy(() -> transferDomainService.validateAndCreateTransfer(participants, Money.of("0.00", Currency.TRY), Clock.systemUTC()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .isExactlyInstanceOf(InvalidAmountException.class)
                     .hasMessage("Transfer amount must not be zero");
         }
 

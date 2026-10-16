@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Set;
 
 /** Cross-cutting coding rules: DI hygiene + no blocking sleeps on request threads. */
 class CodingRulesArchitectureTest extends ArchitectureTest {
@@ -106,7 +107,7 @@ class CodingRulesArchitectureTest extends ArchitectureTest {
         // shared failure taxonomy mapped centrally by the problem handlers.
         DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> programmaticTxControl =
                 new DescribedPredicate<>("Spring programmatic transaction control") {
-                    private final java.util.Set<String> controlled = java.util.Set.of(
+                    private final Set<String> controlled = Set.of(
                             "org.springframework.transaction.support.TransactionSynchronizationManager",
                             "org.springframework.transaction.support.TransactionSynchronization",
                             "org.springframework.transaction.support.TransactionTemplate",

@@ -75,7 +75,9 @@ public class AccountController {
 
     @GetMapping
     @Operation(summary = "Lists my accounts with pagination",
-            description = "Returns only accounts owned by the authenticated user, newest first.")
+            description = "Offset pagination (page/size, newest first) over the caller's own "
+                    + "accounts — a bounded per-user collection, so no keyset cursor is needed. "
+                    + "Returns only accounts owned by the authenticated user.")
     public ResponseEntity<PageResponse<AccountResponse>> listAccounts(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {

@@ -9,13 +9,53 @@ on:
       tag:
         description: 'Tag to build, push and pin (e.g. v0.0.2)'
         required: true
+      base_builder_image:
+        description: 'Builder base image (digest-pin for reproducibility)'
+        required: false
+        default: 'maven:3.9-eclipse-temurin-21-alpine'
+      base_runtime_image:
+        description: 'Runtime base image (digest-pin for reproducibility)'
+        required: false
+        default: 'eclipse-temurin:21-jre-alpine'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
+  verify-green-ci:
+    # O-2: the release ships whatever is checked out — never ship a red
+    # commit. Manual dispatch does not imply green CI, so the workflow itself
+    # refuses to publish unless the exact SHA has a successful ci.yml run.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Require green CI on this SHA
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        SHA=$(git rev-parse HEAD)
+        echo "Release candidate SHA: $SHA"
+        MATCH=$(gh run list --workflow ci.yml --status success --limit 20 \
+          --json headSha,conclusion --jq ".[] | select(.headSha==\"$SHA\") | .headSha" | head -1)
+        if [ "$MATCH" != "$SHA" ]; then
+          echo "::error::No successful ci.yml run for SHA $SHA — merge green CI first, then release."
+          exit 1
+        fi
+        echo "Green CI confirmed for $SHA"
+
   build-push:
+    needs: verify-green-ci
+    # Attach the GitHub environment so owners can require manual approval
+    # (configure reviewers under Settings > Environments > production).
+    # Unconfigured environments record the deployment without blocking.
+    environment: production
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v5
@@ -42,6 +82,25 @@ jobs:
         context: .
         push: true
         tags: ${{ steps.meta.outputs.tags }}
+        build-args: |
+          BASE_BUILDER_IMAGE=${{ inputs.base_builder_image }}
+          BASE_RUNTIME_IMAGE=${{ inputs.base_runtime_image }}
+
+    - name: Pin flyway image to digest
+      # O-7: k8s/flyway-migrate-job.yaml floats on flyway/flyway:11-alpine in
+      # git (dev convenience); the DEPLOYED manifest is digest-pinned here, the
+      # same mechanism as the app image below. A failed inspect fails closed.
+      run: |
+        docker pull flyway/flyway:11-alpine
+        PINNED=$(docker image inspect --format '{{index .RepoDigests 0}}' flyway/flyway:11-alpine)
+        if [ -z "$PINNED" ]; then
+          echo "::error::could not resolve flyway digest"
+          exit 1
+        fi
+        echo "Flyway pinned: $PINNED"
+        awk -v img="$PINNED" '{ if ($0 ~ /^[[:space:]]*image:[[:space:]]+flyway\/flyway:/) print "          image: " img; else print }' k8s/flyway-migrate-job.yaml > k8s/flyway-migrate-job.yaml.tmp && mv k8s/flyway-migrate-job.yaml.tmp k8s/flyway-migrate-job.yaml
+        grep -q "@sha256:" k8s/flyway-migrate-job.yaml
+        echo "$PINNED" > k8s/.flyway-digest
 
     - name: Pin manifest to digest
       env:
@@ -59,6 +118,8 @@ jobs:
         files: |
           k8s/bank-app.yaml
           k8s/.image-digest
+          k8s/flyway-migrate-job.yaml
+          k8s/.flyway-digest
         body: |
           Pinned image: `ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}`
           The attached `bank-app.yaml` is already pinned to that digest — apply it directly. See `docs/release.md`.

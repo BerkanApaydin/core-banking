@@ -4,9 +4,22 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 @SuppressWarnings("null")
 class ModuleBoundariesArchitectureTest extends ArchitectureTest {
+
+    @Test
+    void modulesShouldBeFreeOfCycles() {
+        // No compile-time cycles between top-level slices (bounded contexts
+        // + platform modules): clean today, but a future refactor could close
+        // a loop (e.g. user-api/audit-api extraction touching infra) and turn
+        // the modular monolith into a distributed-monolith knot. The
+        // composition root (com.bank.app) matches no slice and stays exempt.
+        ArchRule rule = slices().matching("com.bank.app.(*)..").should().beFreeOfCycles();
+
+        rule.check(importedClasses);
+    }
 
     @Test
     void accountApplicationShouldNotDependOnTransferAdapter() {

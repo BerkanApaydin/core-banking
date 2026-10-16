@@ -20,6 +20,7 @@ import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.usecase.LogoutUseCaseImpl;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,9 +50,10 @@ public class UserBeanConfig {
     @Bean
     public LoginUserUseCase loginUserUseCase(AuthenticationPort authenticationPort, JwtPort jwtPort,
                                              LoginAttemptPort loginAttemptPort, RefreshTokenPort refreshTokenPort,
+                                             PasswordEncoderPort passwordEncoderPort, IdGeneratorPort idGenerator,
                                              ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort, refreshTokenPort,
-                clockProvider, auditEventPort);
+                passwordEncoderPort, idGenerator, clockProvider, auditEventPort);
     }
 
     @Bean

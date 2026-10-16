@@ -150,6 +150,38 @@ jobs:
         test -f k8s/grafana-dashboard.json
         echo "migration-soak + keyset index + dashboard present"
 
+    - name: Migration content contracts (O-8 — presence is not proof)
+      # A presence check only fails when a file is deleted; these pin the
+      # CONTENT that made V51 necessary: V51 must drop the real V27 index
+      # name, and must not repeat V41's phantom-name typo.
+      run: |
+        grep -q "idx_idempotency_pending_http_created_at" common/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql
+        grep -q "idx_idempotency_pending_http_created_at" common/src/main/resources/db/migration/V27__index_pending_http_idempotency.sql
+        # Phantom check is DROP-scoped: V51's own comment names the V41 typo
+        # for context, so a bare filename grep would false-positive on it.
+        if grep -q "DROP INDEX.*idx_pending_http_idempotency" common/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql; then
+          echo "::error::V51 repeats the V41 phantom index name"
+          exit 1
+        fi
+        echo "migration content contracts present"
+
+    - name: Supply-chain self-contracts (O-1/O-2)
+      # The release must stay gated and the image must stay scanned: if a
+      # future edit drops either, CI fails here instead of shipping blind.
+      run: |
+        grep -q "verify-green-ci" .github/workflows/release.yml
+        grep -q "needs: verify-green-ci" .github/workflows/release.yml
+        grep -q "aquasecurity/trivy-action" .github/workflows/ci.yml
+        grep -q "BASE_BUILDER_IMAGE" .github/workflows/release.yml
+        echo "supply-chain self-contracts present"
+
+    - name: Migration chain contract (T-1/O-3 upgrade-path guard)
+      # Static half of the upgrade-path story: a broken Flyway chain (gap,
+      # duplicate, empty file) fails closed at deploy time — catch it here.
+      # The dynamic half (seeded-volume soak) stays manual per release
+      # (scripts/migration_soak.sh) because it needs a staging dump.
+      run: python3 scripts/check_migration_chain.py
+
     - name: Contract checks (secret pin, test DI, autoscaling, prod compose, partition scripts)
       run: |
         python3 scripts/check_compose_jwt_default.py
@@ -315,3 +347,35 @@ jobs:
       with:
         name: failsafe-reports
         path: '**/target/failsafe-reports/'
+
+    - name: Build image (Dockerfile regression guard)
+      # O-1: the release publishes an image, so CI must prove the Dockerfile
+      # still builds on every PR — otherwise a broken Dockerfile (or a CVE'd
+      # base) reaches the registry unnoticed. push:false + load:true keeps the
+      # image in the daemon for the scan below without publishing anything.
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: false
+        load: true
+        tags: bank-app:ci
+
+    - name: Scan image (trivy, HIGH/CRITICAL fail-closed)
+      # O-1: image vulnerabilities must break the build like OSV does for
+      # libraries — a blind registry push is how CVEs ship. SBOM upload stays
+      # in the earlier CycloneDX step; this is the CVE gate.
+      uses: aquasecurity/trivy-action@0.24.0
+      with:
+        image-ref: 'bank-app:ci'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'HIGH,CRITICAL'
+        exit-code: '1'
+
+    - name: Upload trivy SARIF
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: trivy-sarif
+        path: trivy-results.sarif
+        if-no-files-found: warn

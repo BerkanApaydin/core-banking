@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -191,6 +192,32 @@ class RefreshSessionUseCaseImplTest {
 
         verify(refreshTokenPort).revokeFamily("family-1");
         verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("should take the reuse path when a concurrent refresh wins the rotation race (C-1)")
+    void shouldTakeReusePathOnLostRotationRace() {
+        stubClock();
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        StoredRefresh rotated = new StoredRefresh(HASH, 7L, "family-1",
+                LocalDateTime.now(FIXED).plusDays(7), true, "winner-hash");
+        // First read: active; conditional rotation loses; re-read: rotated.
+        when(refreshTokenPort.findByTokenHash(HASH))
+                .thenReturn(Optional.of(stored()))
+                .thenReturn(Optional.of(rotated));
+        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(freshUser()));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
+        doThrow(new IllegalArgumentException("Unknown refresh token"))
+                .when(refreshTokenPort).markRotated(eq(HASH), anyString());
+
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(RefreshTokenReuseException.class);
+
+        verify(refreshTokenPort).revokeFamily("family-1");
+        verify(refreshTokenPort, never()).save(anyString(), anyLong(), anyString(), any());
     }
 
     @Test

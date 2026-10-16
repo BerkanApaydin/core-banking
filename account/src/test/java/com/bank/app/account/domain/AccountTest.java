@@ -9,6 +9,7 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -229,7 +230,7 @@ class AccountTest {
         void shouldThrowOnZeroDebit() {
             Account account = activeAccount(1000);
             assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY), Clock.systemUTC()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .isExactlyInstanceOf(InvalidAmountException.class)
                     .hasMessage("Debit amount must not be zero");
         }
 
@@ -321,7 +322,7 @@ class AccountTest {
         void shouldThrowOnZeroCredit() {
             Account account = activeAccount(1000);
             assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY), Clock.systemUTC()))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .isExactlyInstanceOf(InvalidAmountException.class)
                     .hasMessage("Credit amount must not be zero");
         }
 

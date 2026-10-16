@@ -50,7 +50,7 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 plus one supporting module (`audit`).
 
 - **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled integrity observer.
-- **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
+- **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdGeneratorPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
 - **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports; production revocations are stored durably in PostgreSQL and checked alongside legacy Redis records), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
@@ -95,17 +95,18 @@ graph LR
     transfer & account & user --> shared
     audit -- common only --> shared
     api -- common only --> shared
-    infra -- common only --> shared
-    infra -. implements ports of .-> api & user & audit
+    infra -- compile: common + api --> shared & api
+    infra -. implements ports of .-> user & audit
 ```
 
 | Rule                                        | Meaning                                                                                                                                                      |
 | :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `transfer` → `account` **forbidden**        | Transfer must never touch the account module at compile time — `account-api` only                                                                            |
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
+| `infrastructure` → `user`/`audit` compile edge | Deliberate and port-only (no BC adapter/internals); `user-api`/`audit-api` published languages would remove even this edge — tracked follow-up, not a violation |
 | Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
 
-> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules); the above are the only three rules you need to know.
+> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the above are the only four rules you need to know.
 
 > [!NOTE]
 > `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and account mutations invalidate affected cached snapshots.
@@ -114,7 +115,7 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints and both refresh endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session). Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create and transfer paths have rate limits.
+All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints and both refresh endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session). Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create and transfer paths have rate limits. Mutating requests larger than 2 MB (`app.security.request-body.max-bytes`) are rejected with `413` before authentication.
 
 | Module | Endpoint | Method | Description / notes |
 | :--- | :--- | :--- | :--- |
@@ -230,5 +231,6 @@ The launcher stops the Compose app container if it is running, waits for Postgre
 - **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-module report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
 - **Browser contract checks:** `node app/src/test/js/idempotency.test.js` and `node app/src/test/js/frontend_contract.test.js` exercise session/idempotency, report pagination (offset page 0, keyset cursors past it, ETag cache rules) and funding-capability behavior. CI runs both; a real browser/TLS acceptance test is not yet included.
 - **CI dependency checks:** CI is configured to reject newly introduced high/critical dependency advisories on pull requests and to publish an aggregate CycloneDX SBOM. These checks do not replace a review of vulnerabilities already present in the dependency baseline.
+- **CI image scan & gated releases:** Every build compiles the `Dockerfile` and fails on HIGH/CRITICAL Trivy findings, so the published image is scanned like the libraries. Releases are manual-only and refuse to ship without a successful CI run on the exact SHA (`verify-green-ci`, plus a `production` environment for approval); the app and Flyway manifests ship digest-pinned (see [release automation](docs/release.md)).
 - **Operational checks:** The read-only [health smoke](docs/operations.md) validates health and anonymous authorization responses. The [load-test guide](load_tests/README.md) separates rate-limit verification from data-writing capacity tests on an isolated simulation deployment.
 - **Run Mutation Testing (Pitest) separately:** On a fresh checkout, first run `./mvnw clean install` (or `.\mvnw.cmd clean install` on Windows) so all reactor JARs, including the shared test JAR, are available to PIT's separate invocation. Then run `./mvnw pitest:mutationCoverage -Dpitest.skip=false` (or `.\mvnw.cmd pitest:mutationCoverage -Dpitest.skip=false` on Windows). CI follows the same sequence.

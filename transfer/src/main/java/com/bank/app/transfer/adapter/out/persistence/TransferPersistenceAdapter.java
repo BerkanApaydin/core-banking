@@ -78,13 +78,23 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(size, 1);
         long offset = (long) safePage * safeSize;
-        List<Object[]> rows = repository.findHistoryPage(accountId, safeSize, offset);
-        List<Transfer> items = rows.stream()
-                .map(row -> mapper.toDomain((TransferJpaEntity) row[0]))
+        if (safePage == 0) {
+            // Hot path unchanged: one range scan serves rows + exact total.
+            List<Object[]> rows = repository.findHistoryPage(accountId, safeSize, offset);
+            List<Transfer> items = rows.stream()
+                    .map(row -> mapper.toDomain((TransferJpaEntity) row[0]))
+                    .toList();
+            // Window function repeats the total on every row; empty page means zero.
+            long total = rows.isEmpty() ? 0L : ((Number) rows.get(0)[1]).longValue();
+            return new LoadTransferPort.HistoryPage(items, total);
+        }
+        // P-1: deeper pages skip the COUNT(*) OVER() window — rows stream
+        // without a global count/sort, and the total comes from a separate
+        // covering-index count instead of riding on every row.
+        List<Transfer> items = repository.findHistoryRows(accountId, safeSize, offset).stream()
+                .map(mapper::toDomain)
                 .toList();
-        // Window function repeats the total on every row; empty page means zero.
-        long total = rows.isEmpty() ? 0L : ((Number) rows.get(0)[1]).longValue();
-        return new LoadTransferPort.HistoryPage(items, total);
+        return new LoadTransferPort.HistoryPage(items, repository.countHistory(accountId));
     }
 
     @Override

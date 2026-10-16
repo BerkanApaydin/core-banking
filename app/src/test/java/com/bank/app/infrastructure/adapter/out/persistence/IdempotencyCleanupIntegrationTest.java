@@ -46,7 +46,7 @@ class IdempotencyCleanupIntegrationTest extends AbstractIntegrationTest {
         insert(completedOutbox, "COMPLETED", expired);
         insert(prefixNearMiss, "COMPLETED", expired);
 
-        assertEquals(3, repository.deleteExpiredTerminalRequests(threshold));
+        assertEquals(3, repository.deleteExpiredTerminalRequestsBatch(threshold, 1000));
 
         assertExists(completedRequest, false);
         assertExists(failedRequest, false);
@@ -70,7 +70,7 @@ class IdempotencyCleanupIntegrationTest extends AbstractIntegrationTest {
         insert(pendingHandler, "PENDING", expired);
         insert(completedHttp, "COMPLETED", expired);
 
-        assertEquals(1, repository.deleteExpiredHandlerKeys(threshold));
+        assertEquals(1, repository.deleteExpiredHandlerKeysBatch(threshold, 1000));
 
         assertExists(completedHandler, false);
         assertExists(pendingHandler, true);

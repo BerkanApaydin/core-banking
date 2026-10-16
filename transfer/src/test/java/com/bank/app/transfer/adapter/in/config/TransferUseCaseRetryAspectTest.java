@@ -16,6 +16,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -202,7 +203,7 @@ class TransferUseCaseRetryAspectTest {
                 }
 
                 @Override
-                public <T> T executeRequiresNew(java.util.function.Supplier<T> action, int timeoutSeconds) {
+                public <T> T executeRequiresNew(Supplier<T> action, int timeoutSeconds) {
                     return action.get();
                 }
             };

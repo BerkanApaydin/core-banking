@@ -2,6 +2,7 @@ package com.bank.app.account.domain;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +59,7 @@ class LedgerEntryTest {
     void shouldRejectZeroAmount() {
         assertThatThrownBy(() -> new LedgerEntry(null, new TransactionRef("ref"), 1L, LedgerDirection.DEBIT,
                 Money.of("0.00", Currency.TRY), BALANCE, LocalDateTime.now()))
-                .isExactlyInstanceOf(IllegalArgumentException.class);
+                .isExactlyInstanceOf(InvalidAmountException.class);
     }
 
     @Test

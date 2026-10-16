@@ -255,12 +255,20 @@ Currency.TRY), TransferStatus.COMPLETED, now);
 
     @Test
     void shouldComputeOffsetFromPageAndSize() {
-        when(springDataRepo.findHistoryPage(eq(100L), eq(10), eq(20L))).thenReturn(List.of());
+        // P-1: deeper pages use the window-free rows query + separate count.
+        LocalDateTime now = LocalDateTime.now();
+        TransferJpaEntity entity = createEntity(3L, 100L, 200L, new BigDecimal("300.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
+        when(springDataRepo.findHistoryRows(eq(100L), eq(10), eq(20L))).thenReturn(List.of(entity));
+        when(springDataRepo.countHistory(eq(100L))).thenReturn(5L);
 
-        repository.findHistoryPage(100L, 2, 10);
+        var result = repository.findHistoryPage(100L, 2, 10);
 
         // Offset is page * size (not page * (size + 1)); limit is the page size.
-        verify(springDataRepo).findHistoryPage(eq(100L), eq(10), eq(20L));
+        verify(springDataRepo).findHistoryRows(eq(100L), eq(10), eq(20L));
+        verify(springDataRepo).countHistory(eq(100L));
+        verify(springDataRepo, never()).findHistoryPage(eq(100L), eq(10), eq(20L));
+        assertEquals(1, result.items().size());
+        assertEquals(5L, result.totalElements());
     }
 
     @Test

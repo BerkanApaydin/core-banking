@@ -87,7 +87,11 @@ jobs:
         JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Targeted mutation (advisory)
-      run: mvn -B -ntp pitest:mutationCoverage -pl "${{ steps.modules.outputs.modules }}" -Dpitest.skip=false -T 4
+      # Advisory means no thresholds: the root pom pins mutationThreshold=80 /
+      # coverageThreshold=85, which would otherwise make this PR workflow fail
+      # exactly like the blocking nightly gate. Zeroing both keeps the nightly
+      # gate the single blocking number while PRs still get the report.
+      run: mvn -B -ntp pitest:mutationCoverage -pl "${{ steps.modules.outputs.modules }}" -Dpitest.skip=false -DmutationThreshold=0 -DcoverageThreshold=0 -T 4
       env:
         DB_HOST: localhost
         DB_PORT: 5432

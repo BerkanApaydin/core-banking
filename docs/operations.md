@@ -110,12 +110,13 @@ own handlers. Operator cheat-sheet:
 
 | Failure kind (`BusinessFailureKind`) | HTTP | Typical `ErrorCode` |
 |---|---|---|
-| `RULE_VIOLATION` | 400 | `VALIDATION_FAILED`, `INVALID_ARGUMENT`, `INVALID_FORMAT`, `INVALID_ENUM_VALUE` |
+| `RULE_VIOLATION` | 400 | `VALIDATION_FAILED`, `INVALID_ARGUMENT`, `INVALID_FORMAT`, `INVALID_ENUM_VALUE`, `INVALID_AMOUNT` |
 | `NOT_FOUND` | 404 | `RESOURCE_NOT_FOUND` (also used for other-owned IDs/IBANs: no IDOR oracle) |
 | `CONFLICT` | 409 | `OPTIMISTIC_LOCK_CONFLICT`, `UNIQUE_CONSTRAINT_VIOLATION`, `DB_INTEGRITY_VIOLATION`, `CONCURRENT_REQUEST` |
 | `AUTHENTICATION_FAILED` | 401 | `AUTHENTICATION_FAILED` |
 | `ACCESS_DENIED` | 403 | `ACCESS_DENIED` |
 | `RATE_LIMITED` | 429 (+ `Retry-After`) | `RATE_LIMIT_EXCEEDED` |
+| oversized body | 413 | `REQUEST_BODY_TOO_LARGE` (global 2MB cap, `app.security.request-body.max-bytes`) |
 
 Infrastructure signals outside the domain map: revocation-store outage →
 503 `SECURITY_BACKEND_UNAVAILABLE` (fail-closed); unknown throwables → 500

@@ -12,6 +12,7 @@ import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.Currency;
@@ -49,6 +50,9 @@ class AdjustAccountBalancesUseCaseImplTest {
     private ClockProviderPort clockProvider;
 
     @Mock
+    private IdGeneratorPort idGenerator;
+
+    @Mock
     private DomainEventPublisherService domainEventPublisherService;
 
     @Mock
@@ -75,7 +79,7 @@ class AdjustAccountBalancesUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider,
+        useCase = new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider, idGenerator,
                 domainEventPublisherService, auditEventPort, ledgerPort);
         senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
                 "Sender", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
@@ -85,6 +89,8 @@ class AdjustAccountBalancesUseCaseImplTest {
 
     private void stubClockAndSave() {
         when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        // D-1: seeded ref — one move() consumes exactly one ID.
+        when(idGenerator.newId()).thenReturn("test-operation-ref");
         // 7.2: the adapter echoes the saved aggregate (with bumped version);
         // the use case must keep using the returned instances.
         when(saveAccountPort.save(any(Account.class)))

@@ -2,6 +2,7 @@ package com.bank.app.account.domain;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Double-entry operation reference: the two journal legs (debit + credit) of
@@ -29,6 +30,17 @@ public record TransactionRef(String value) {
     /** Groups the legs of one business operation (debit + credit share it). */
     public static TransactionRef newRef() {
         return new TransactionRef(UUID.randomUUID().toString());
+    }
+
+    /**
+     * D-1: testable overload — production callers pass
+     * {@code IdGeneratorPort::newId} so tests can seed exact refs instead of
+     * racing random UUIDs. The no-arg variant stays for non-production paths
+     * (tests, tooling).
+     */
+    public static TransactionRef newRef(Supplier<String> idSupplier) {
+        Objects.requireNonNull(idSupplier, "ID supplier must not be null");
+        return new TransactionRef(Objects.requireNonNull(idSupplier.get(), "Generated ref must not be null"));
     }
 
     @Override

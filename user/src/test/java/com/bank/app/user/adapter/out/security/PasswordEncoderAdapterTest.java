@@ -24,4 +24,20 @@ class PasswordEncoderAdapterTest {
 
         assertEquals("encodedPass", result);
     }
+
+    @Test
+    void shouldDelegateMatches() {
+        PasswordEncoderAdapter adapter = new PasswordEncoderAdapter(passwordEncoder);
+        when(passwordEncoder.matches("raw", "enc")).thenReturn(true);
+
+        assertEquals(true, adapter.matches("raw", "enc"));
+    }
+
+    @Test
+    void shouldFailClosedOnNullMatchesInput() {
+        PasswordEncoderAdapter adapter = new PasswordEncoderAdapter(passwordEncoder);
+
+        assertEquals(false, adapter.matches(null, "enc"));
+        assertEquals(false, adapter.matches("raw", null));
+    }
 }

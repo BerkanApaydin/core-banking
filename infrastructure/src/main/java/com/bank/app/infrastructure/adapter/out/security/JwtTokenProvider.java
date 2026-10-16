@@ -109,7 +109,11 @@ public class JwtTokenProvider implements JwtPort {
         final byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(secretKey);
-        } catch (IllegalArgumentException invalidBase64) {
+        } catch (IllegalArgumentException | JwtException invalidBase64) {
+            // jjwt's Decoders throw DecodingException (a JwtException, NOT an
+            // IllegalArgumentException), so both must be caught: otherwise a
+            // non-Base64 secret fails with a raw stack trace instead of the
+            // actionable message below.
             throw new IllegalStateException(
                 "JWT secret must be valid Base64 (generate: openssl rand -base64 32).",
                 invalidBase64);

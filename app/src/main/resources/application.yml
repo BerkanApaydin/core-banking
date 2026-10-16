@@ -64,6 +64,13 @@ spring:
       keepalive-time: 60000
       leak-detection-threshold: 10000
       read-only: false
+  jackson:
+    # F-3 (UTC contract, part 1): business timestamps are zoneless TIMESTAMP
+    # columns written from a UTC clock — pin serialization and JDBC binding to
+    # UTC as well so a non-UTC host JVM can never shift an instant. The full
+    # TIMESTAMPTZ migration stays a documented decision (expand-contract);
+    # this makes the current UTC-only contract explicit and enforced.
+    time-zone: UTC
   jpa:
     open-in-view: false
     hibernate:
@@ -71,6 +78,8 @@ spring:
     properties:
       hibernate:
         format_sql: false
+        jdbc:
+          time_zone: UTC
     show-sql: false
   flyway:
     # Never auto-baseline in any environment: adopting a non-empty schema
@@ -145,6 +154,11 @@ app:
       backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
       min-ttl-ms: ${TOKEN_BLACKLIST_MIN_TTL_MS:1000}
       max-ttl-ms: ${TOKEN_BLACKLIST_MAX_TTL_MS:2592000000}
+  request-body:
+    # SE-4: global JSON body-size cap enforced by RequestBodySizeLimitFilter
+    # (Tomcat's max-swallow-size only constrains form posts). 2MB matches the
+    # container settings above; every real request body is a few KB.
+    max-bytes: ${REQUEST_BODY_MAX_BYTES:2097152}
   idempotency:
     # Cron single-source: this yml is authoritative. Code @Scheduled defaults
     # (e.g. OrphanIntegrityReporter, AuditRetentionScheduler) must stay in sync

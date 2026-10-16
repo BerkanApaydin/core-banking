@@ -4,6 +4,7 @@ import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
@@ -75,7 +76,7 @@ public class Transfer extends BaseAggregateRoot {
 
     private static void requireNonZero(Money amount) {
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Transfer amount must not be zero");
+            throw new InvalidAmountException("Transfer amount must not be zero");
         }
     }
 

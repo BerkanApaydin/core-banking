@@ -13,6 +13,8 @@ import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
+import com.bank.app.user.application.port.out.PasswordEncoderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.user.application.port.out.AuthenticationPort.AuthenticatedUser;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
@@ -43,6 +45,8 @@ class LoginUserUseCaseTest {
     @Mock private JwtPort jwtPort;
     @Mock private LoginAttemptPort loginAttemptPort;
     @Mock private RefreshTokenPort refreshTokenPort;
+    @Mock private PasswordEncoderPort passwordEncoderPort;
+    @Mock private IdGeneratorPort idGenerator;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
     private LoginUserUseCase loginUserUseCase;
@@ -55,7 +59,7 @@ class LoginUserUseCaseTest {
     @BeforeEach
     void setUp() {
         loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort,
-                refreshTokenPort, clockProvider, auditEventPort);
+                refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort);
     }
 
     @Nested
@@ -74,6 +78,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(idGenerator.newId()).thenReturn("family-1");
 
             AuthResponse response = loginUserUseCase.execute(request);
 
@@ -123,6 +128,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(idGenerator.newId()).thenReturn("family-1");
 
             AuthResponse response = loginUserUseCase.execute(request, CLIENT_IP);
 
@@ -171,6 +177,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(idGenerator.newId()).thenReturn("family-1");
             doThrow(new RuntimeException("session store down"))
                     .when(refreshTokenPort).save(anyString(), eq(100L), anyString(), any());
 
@@ -261,6 +268,10 @@ class LoginUserUseCaseTest {
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             verify(authenticationPort).authenticate(anyString(), anyString());
+            // SE-5: unknown-user path burns one dummy BCrypt compare so the
+            // timing matches a real password mismatch.
+            verify(passwordEncoderPort).encode("login-timing-oracle-dummy");
+            verify(passwordEncoderPort).matches(eq(PASSWORD), any());
             // Kills the auditLogin VoidMethodCall mutant on the unknown-user path.
             var captor = ArgumentCaptor.forClass(AuditEvent.class);
             verify(auditEventPort).publish(captor.capture());

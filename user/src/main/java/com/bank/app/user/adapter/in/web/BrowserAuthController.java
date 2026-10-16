@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.Duration;
 
@@ -37,6 +38,7 @@ import java.time.Duration;
 @RestController
 @ApiVersion("v1")
 @RequestMapping("/auth/browser")
+@Tag(name = "Auth API", description = "User registration and authentication API")
 public class BrowserAuthController {
     private static final Logger log = LoggerFactory.getLogger(BrowserAuthController.class);
 

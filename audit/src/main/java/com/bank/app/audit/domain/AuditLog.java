@@ -32,6 +32,16 @@ public class AuditLog {
         this.actorUserId = actorUserId;
     }
 
+    /**
+     * D-2: kept for tests and tooling only. Production paths must pass an
+     * explicit {@link Clock} via {@link #create(String, AuditAction, String, Clock)}
+     * (injected as {@code ClockProviderPort}) so timestamps stay deterministic
+     * and UTC-pinned — a hidden {@code Clock.systemUTC()} default is a purity
+     * trap for future production callers.
+     *
+     * @deprecated test/tooling use only; production code passes a Clock.
+     */
+    @Deprecated(forRemoval = false)
     public static AuditLog create(String username, AuditAction action, String details) {
         return create(username, action, details, Clock.systemUTC());
     }

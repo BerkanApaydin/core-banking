@@ -10,6 +10,7 @@ import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.exception.InvalidAmountException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -121,7 +122,7 @@ public class Account extends BaseAggregateRoot {
     public void debit(Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Debit amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Debit amount must not be zero");
+            throw new InvalidAmountException("Debit amount must not be zero");
         }
         if (!isActive()) {
             throw new AccountNotActiveException(this.iban.value());
@@ -141,7 +142,7 @@ public class Account extends BaseAggregateRoot {
     public void credit(Money amount, Clock clock) {
         Objects.requireNonNull(amount, "Credit amount must not be null");
         if (amount.isZero()) {
-            throw new IllegalArgumentException("Credit amount must not be zero");
+            throw new InvalidAmountException("Credit amount must not be zero");
         }
         if (!isActive()) {
             throw new AccountNotActiveException(this.iban.value());

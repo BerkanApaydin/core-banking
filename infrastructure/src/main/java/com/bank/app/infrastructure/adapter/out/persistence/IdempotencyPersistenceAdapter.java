@@ -67,13 +67,32 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
         return repository.failStalePending(threshold);
     }
 
+    /**
+     * P-3: retention batch size. One batch is one short transaction; the loop
+     * stops at the first short batch, so steady-state cleanup is exactly one
+     * round trip and only a real backlog pages.
+     */
+    static final int RETENTION_BATCH_SIZE = 1000;
+
     @Override
     public int deleteExpired(LocalDateTime threshold) {
-        return repository.deleteExpiredTerminalRequests(threshold);
+        int total = 0;
+        int deleted;
+        do {
+            deleted = repository.deleteExpiredTerminalRequestsBatch(threshold, RETENTION_BATCH_SIZE);
+            total += deleted;
+        } while (deleted >= RETENTION_BATCH_SIZE);
+        return total;
     }
 
     @Override
     public int deleteExpiredHandlerKeys(LocalDateTime threshold) {
-        return repository.deleteExpiredHandlerKeys(threshold);
+        int total = 0;
+        int deleted;
+        do {
+            deleted = repository.deleteExpiredHandlerKeysBatch(threshold, RETENTION_BATCH_SIZE);
+            total += deleted;
+        } while (deleted >= RETENTION_BATCH_SIZE);
+        return total;
     }
 }

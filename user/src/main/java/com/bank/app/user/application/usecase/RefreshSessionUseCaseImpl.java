@@ -105,7 +105,26 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         String newAccessToken = jwtPort.generateToken(
                 verified.userId(), verified.username(), verified.role(), user.getTokenVersion());
         String newHash = TokenDigest.sha256Hex(newRefreshToken);
-        refreshTokenPort.markRotated(hash, newHash);
+        try {
+            refreshTokenPort.markRotated(hash, newHash);
+        } catch (IllegalArgumentException lostRace) {
+            // C-1: conditional rotation lost — a concurrent refresh rotated
+            // first (or the row vanished). Re-read once: an already-rotated
+            // row means the other request won, which per policy is
+            // indistinguishable from theft, so the same family-revoke path
+            // applies. Anything else is a stale/unknown token.
+            StoredRefresh current = refreshTokenPort.findByTokenHash(hash).orElse(null);
+            if (current != null && current.revoked() && current.replacedByHash() != null) {
+                refreshTokenPort.revokeFamily(stored.familyId());
+                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
+                        "Refresh token reuse detected; token family revoked.",
+                        LocalDateTime.now(clockProvider.clock()), verified.username(),
+                        verified.userId()));
+                log.warn("Refresh token reuse detected: family revoked");
+                throw new RefreshTokenReuseException();
+            }
+            throw new AuthenticationFailedException("Invalid refresh token.");
+        }
         refreshTokenPort.save(newHash, verified.userId(), stored.familyId(),
                 LocalDateTime.now(clockProvider.clock())
                         .plus(jwtPort.getRefreshExpirationMs(), ChronoUnit.MILLIS));

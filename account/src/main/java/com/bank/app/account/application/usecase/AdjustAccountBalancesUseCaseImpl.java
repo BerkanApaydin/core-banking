@@ -14,6 +14,7 @@ import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.OrderedPair;
@@ -29,6 +30,7 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
     private final LoadAccountPort loadAccountPort;
     private final SaveAccountPort saveAccountPort;
     private final ClockProviderPort clockProvider;
+    private final IdGeneratorPort idGenerator;
     private final DomainEventPublisherService domainEventPublisherService;
     private final AuditEventPort auditEventPort;
     private final SaveLedgerPort ledgerPort;
@@ -36,12 +38,14 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
     public AdjustAccountBalancesUseCaseImpl(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
             ClockProviderPort clockProvider,
+            IdGeneratorPort idGenerator,
             DomainEventPublisherService domainEventPublisherService,
             AuditEventPort auditEventPort,
             SaveLedgerPort ledgerPort) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.clockProvider = clockProvider;
+        this.idGenerator = idGenerator;
         this.domainEventPublisherService = domainEventPublisherService;
         this.auditEventPort = auditEventPort;
         this.ledgerPort = ledgerPort;
@@ -90,7 +94,9 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
             MovementDirection direction, Clock clock, Account savedSender, Account savedReceiver) {
         // Double-entry journal: both legs share one ref and join this
         // transaction, so they net to zero or the money rolls back with them.
-        TransactionRef operationRef = LedgerEntry.newTransactionRef();
+        // D-1: ref comes from the ID port (seedable in tests), never from a
+        // hidden UUID call inside the domain.
+        TransactionRef operationRef = LedgerEntry.newTransactionRef(idGenerator::newId);
         if (direction.isOutflow()) {
             ledgerPort.save(LedgerEntry.debit(senderId, amount, savedSender.getBalance(),
                     operationRef, clock));

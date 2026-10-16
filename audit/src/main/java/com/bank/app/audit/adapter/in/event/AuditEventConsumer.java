@@ -30,7 +30,7 @@ public class AuditEventConsumer {
     // deadlock (seen with 10 threads on a 3-connection pool). If this listener
     // ever needs the database again, make the observation asynchronous
     // instead of transactional.
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onAuditEvent(AuditEvent event) {
         try {
             // The row was already persisted synchronously by the AuditEventPort

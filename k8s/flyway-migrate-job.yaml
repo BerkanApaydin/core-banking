@@ -1,6 +1,10 @@
 # Flyway migration gate: runs BEFORE the application Deployment rolls out, so
 # schema changes never race application startup across replicas.
 #
+# Supply chain (O-7): the image below floats on flyway/flyway:11-alpine in git
+# for dev convenience; the release workflow resolves and pins the DEPLOYED
+# manifest (and k8s/.flyway-digest) to @sha256. Never hand-edit a digest here.
+#
 # Operator setup (once per release — migrations live in
 # common/src/main/resources/db/migration):
 #   kubectl create configmap bank-flyway-migrations \

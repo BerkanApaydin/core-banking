@@ -22,10 +22,39 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      * One range scan returns the page rows plus the total match count
      * (window function, same value on every row): no second COUNT query.
      * Each element is {@code Object[]{TransferJpaEntity, Long totalCount}}.
+     *
+     * <p>P-1: kept for the first page (hot path + emptiness probe). Deeper
+     * pages use {@link #findHistoryRows} + {@link #countHistory} so a full
+     * count/sort is not paid on every page request.
      */
     List<Object[]> findHistoryPage(@Param("accountId") Long accountId,
                                    @Param("limit") int limit,
                                    @Param("offset") long offset);
+
+    /**
+     * P-1: rows-only history page (no {@code COUNT(*) OVER()} window), for
+     * pages past the first. Same UNION ALL per-side branches and ordering as
+     * the windowed query, minus the global count.
+     */
+    @Query(value = "SELECT u.* FROM ("
+            + "SELECT t.* FROM transfers t WHERE t.sender_account_id = :accountId "
+            + "UNION ALL "
+            + "SELECT t.* FROM transfers t WHERE t.receiver_account_id = :accountId) u "
+            + "ORDER BY u.created_at DESC, u.id DESC LIMIT :limit OFFSET :offset",
+            nativeQuery = true)
+    List<TransferJpaEntity> findHistoryRows(@Param("accountId") Long accountId,
+                                            @Param("limit") int limit,
+                                            @Param("offset") long offset);
+
+    /**
+     * P-1: standalone history total (covering-index count, no row sort).
+     */
+    @Query(value = "SELECT COUNT(*) FROM ("
+            + "SELECT t.id FROM transfers t WHERE t.sender_account_id = :accountId "
+            + "UNION ALL "
+            + "SELECT t.id FROM transfers t WHERE t.receiver_account_id = :accountId) u",
+            nativeQuery = true)
+    long countHistory(@Param("accountId") Long accountId);
 
     // Business-time filter on business_created_at (V20, NOT NULL since V28).
     // The previous COALESCE(business_created_at, created_at) fallback defeated

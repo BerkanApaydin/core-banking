@@ -23,6 +23,7 @@ import com.bank.app.account.application.port.out.IbanGeneratorPort;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
@@ -89,9 +90,10 @@ public class AccountBeanConfig {
     @Bean
     public AdjustAccountBalancesUseCase adjustAccountBalancesUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort, ClockProviderPort clockProvider,
+            IdGeneratorPort idGenerator,
             DomainEventPublisherService domainEventPublisherService, AuditEventPort auditEventPort,
             SaveLedgerPort ledgerPort) {
-        return new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider,
+        return new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider, idGenerator,
                 domainEventPublisherService, auditEventPort, ledgerPort);
     }
 
