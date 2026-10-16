@@ -56,9 +56,16 @@ class BacklogMetricsIntegrationTest extends AbstractIntegrationTest {
         // Pre-cutover the default partition does not exist: the drift gauge
         // must read 0, not fail the scan (see AUDIT_DEFAULT_PARTITION_SQL).
         assertEquals(0, gauge(registry, "audit.default_partition.rows"));
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
+        // F-DB-1/V51: the V27 string-prefix partial
+        // (idx_idempotency_pending_http_created_at) was superseded by the V38
+        // kind-based partial and dropped — it must NOT exist, while the V38
+        // replacement must.
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
                 + "WHERE tablename = 'idempotency_keys' "
                 + "AND indexname = 'idx_idempotency_pending_http_created_at'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_indexes "
+                + "WHERE tablename = 'idempotency_keys' "
+                + "AND indexname = 'idx_idempotency_pending_http_kind'", Integer.class));
     }
 
     private void insertOutbox(String id, LocalDateTime createdAt, boolean processed, boolean deadLetter) {

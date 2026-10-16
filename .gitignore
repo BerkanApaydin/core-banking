@@ -67,4 +67,6 @@ __pycache__/
 !/code
 /audit-work/
 *.log
+hs_err*.log
+replay_pid*.log
 run.err

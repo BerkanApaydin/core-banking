@@ -1,8 +1,11 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.adapter.in.api.PublicApiPaths;
+import com.bank.app.infrastructure.adapter.in.web.RequestPathResolver;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 
 /**
  * Pure request-classification predicates for the JWT filter chain.
@@ -53,14 +56,46 @@ final class FilterRequestDecisions {
     }
 
     static String requestPath(HttpServletRequest request) {
+        // SEC-02: must agree with Spring Security's decoded matching. Every
+        // other prefix guard (rate limit, idempotency, API version) resolves
+        // via RequestPathResolver (decoded, context-stripped); the JWT filter
+        // used the raw getRequestURI(), so "/api/v1/%61dmin/..." skipped the
+        // admin token-version re-check while SecurityConfig's decoded
+        // "/api/v1/admin/**" matcher still granted the ADMIN role — a stale
+        // admin token stayed valid for ~15 min on the encoded alias.
+        try {
+            String resolved = RequestPathResolver.resolve(request);
+            if (resolved != null && !resolved.isEmpty() && !"/".equals(resolved)) {
+                return resolved;
+            }
+            // Fall through for bare Mockito mocks that only stub
+            // getServletPath() (UrlPathHelper yields "/" there); real
+            // containers always provide getRequestURI().
+        } catch (Exception ignored) {
+            // Never break authentication on path resolution; use legacy path.
+        }
         String uri = request.getRequestURI();
+        String raw;
         if (uri == null) {
             String servletPath = request.getServletPath();
-            return servletPath == null ? "" : servletPath;
+            raw = servletPath == null ? "" : servletPath;
+        } else {
+            String contextPath = request.getContextPath();
+            raw = contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
+                    ? uri.substring(contextPath.length()) : uri;
         }
-        String contextPath = request.getContextPath();
-        return contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
-                ? uri.substring(contextPath.length()) : uri;
+        return decodePath(raw);
+    }
+
+    private static String decodePath(String raw) {
+        if (raw == null || raw.isEmpty() || raw.indexOf('%') < 0) {
+            return raw == null ? "" : raw;
+        }
+        try {
+            return UriUtils.decode(raw, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return raw;
+        }
     }
 
     static String cookieValue(HttpServletRequest request, String name) {

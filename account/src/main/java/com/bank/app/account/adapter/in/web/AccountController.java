@@ -14,6 +14,7 @@ import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -78,7 +79,9 @@ public class AccountController {
     public ResponseEntity<PageResponse<AccountResponse>> listAccounts(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(getAccountsByUserQuery.execute(page, size));
+        // F-SEC-4: authenticated money reads must never be heuristically cached.
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(getAccountsByUserQuery.execute(page, size));
     }
 
     @GetMapping("/{id}")
@@ -89,9 +92,10 @@ public class AccountController {
         AccountResponse body = getAccountByIdQuery.execute(id);
         String etag = etagFor(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
+                    .cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().eTag(etag).body(body);
+        return ResponseEntity.ok().eTag(etag).cacheControl(CacheControl.noStore()).body(body);
     }
 
     @GetMapping("/iban/{iban}")
@@ -102,9 +106,10 @@ public class AccountController {
         AccountResponse body = getAccountByIbanQuery.execute(iban);
         String etag = etagFor(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
+                    .cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().eTag(etag).body(body);
+        return ResponseEntity.ok().eTag(etag).cacheControl(CacheControl.noStore()).body(body);
     }
 
     /**

@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -22,6 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @Order(UseCaseAspectOrders.IDEMPOTENCY)
 public class IdempotencyAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotencyAspect.class);
 
     private final IdempotencyClaimer claimer;
     private final IdempotentRetryExecutor retryExecutor;
@@ -46,10 +50,17 @@ public class IdempotencyAspect {
     }
 
     // K5/D15: the 70-line handler is now claim → decide → execute.
+    // P-2: non-HTTP invocations (no RequestContextHolder: scheduler, direct
+    // unit calls) bypass idempotency by design today — @Idempotent lives on
+    // web controllers which always have a request in production. Fail-fast
+    // would break direct use-case unit tests, so log-and-proceed with a
+    // grep-able tripwire instead; if a non-HTTP @Idempotent caller ever
+    // appears, this line is where to enforce rejection.
     @Around("@annotation(idempotent)")
     public Object handleIdempotency(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
+            log.warn("Idempotency bypassed: no HTTP request bound (non-HTTP caller); proceeding without claim");
             return joinPoint.proceed();
         }
         return switch (claimer.claim(attributes, idempotent, joinPoint.getArgs())) {

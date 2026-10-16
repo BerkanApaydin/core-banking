@@ -60,7 +60,9 @@ public class TransferCommandController {
 
     @PostMapping("/{id}/cancel")
     @Idempotent(required = true)
-    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within the configured cancellation window by transfer ID and refunds balances. Idempotency-Key header is required.")
+    @Operation(summary = "Cancels an existing transfer", description = "Cancels a completed transfer within the configured cancellation window by transfer ID and refunds balances. "
+            + "Reversal debits the receiver: if the receiver no longer covers the amount, the whole cancellation rolls back with 400 INSUFFICIENT_BALANCE and the transfer stays COMPLETED. "
+            + "Idempotency-Key header is required.")
     @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
             description = "Required de-duplication key; missing header is rejected with 409.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {

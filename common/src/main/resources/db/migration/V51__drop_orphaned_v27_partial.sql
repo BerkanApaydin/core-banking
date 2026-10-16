@@ -1,0 +1,13 @@
+-- Owner: infra
+-- Reason: drop orphaned V27 idempotency partial superseded by V38 kind index
+--
+-- V51__drop_orphaned_v27_partial.sql
+--
+-- F-DB-1: V27 created idx_idempotency_pending_http_created_at
+--   (WHERE status = 'PENDING' AND left(key_value, 5) = 'http_').
+-- V38 replaced the string-prefix discriminator with the explicit key_kind
+-- column + idx_idempotency_pending_http_kind, but V41 dropped a never-created
+-- name (idx_pending_http_idempotency) — the IF EXISTS masked the typo, so the
+-- V27 index kept charging maintenance on every idempotency insert.
+-- Drop the real orphaned name here. The V38 kind-based partial stays.
+DROP INDEX IF EXISTS idx_idempotency_pending_http_created_at;

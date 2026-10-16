@@ -16,6 +16,7 @@ import com.bank.app.transfer.application.service.TransferReportEtagService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -69,9 +70,10 @@ public class TransferQueryController {
         TransferDetailResponse body = getTransferDetailQuery.execute(id);
         String etag = etagForDetail(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
+                    .cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().eTag(etag).body(body);
+        return ResponseEntity.ok().eTag(etag).cacheControl(CacheControl.noStore()).body(body);
     }
 
     /**
@@ -94,7 +96,9 @@ public class TransferQueryController {
             @PathVariable Long accountId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(getTransferHistoryQuery.execute(accountId, page, size));
+        // F-SEC-4: authenticated money reads must never be heuristically cached.
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(getTransferHistoryQuery.execute(accountId, page, size));
     }
 
     @GetMapping("/report")
@@ -118,9 +122,10 @@ public class TransferQueryController {
                 : generateTransferReportQuery.execute(criteria);
         String etag = TransferReportEtagService.etagFor(body);
         if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
+                    .cacheControl(CacheControl.noStore()).build();
         }
-        return ResponseEntity.ok().eTag(etag).body(body);
+        return ResponseEntity.ok().eTag(etag).cacheControl(CacheControl.noStore()).body(body);
     }
 
     /**
@@ -149,6 +154,7 @@ public class TransferQueryController {
         TransferReportResponse body = generateTransferReportWithTotalsQuery.execute(criteria);
         return ResponseEntity.ok()
                 .eTag(TransferReportEtagService.etagFor(body))
+                .cacheControl(CacheControl.noStore())
                 .header("Deprecation", "true")
                 .header("Sunset", COMBINED_SUNSET_HTTP_DATE)
                 .header("Link", "</api/v1/transfers/report?includeTotals=true>; rel=\"successor-version\"")
@@ -162,7 +168,7 @@ public class TransferQueryController {
             @RequestParam Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
-        return ResponseEntity.ok(generateTransferReportTotalsQuery
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(generateTransferReportTotalsQuery
                 .execute(new ReportCriteria(accountId, startDate, endDate)));
     }
 }

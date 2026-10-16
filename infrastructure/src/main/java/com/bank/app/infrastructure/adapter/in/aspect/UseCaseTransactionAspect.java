@@ -4,12 +4,15 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 
@@ -17,6 +20,8 @@ import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 @Component
 @Order(UseCaseAspectOrders.USE_CASE_TRANSACTION)
 public class UseCaseTransactionAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(UseCaseTransactionAspect.class);
 
     /**
      * Upper bound for a single use-case transaction. Programmatic transactions do not
@@ -99,6 +104,15 @@ public class UseCaseTransactionAspect {
     }
 
     private Object executeWithTransaction(ProceedingJoinPoint joinPoint, DefaultTransactionDefinition def) throws Throwable {
+        // P-1: PROPAGATION_REQUIRED joins an existing transaction and silently
+        // ignores the inner isolation/timeout hints. Nested @TransactionalUseCase
+        // calls (PlaceTransfer -> AdjustAccountBalances) are safe on a single
+        // DataSource, but a second DataSource/saga would break here — log the
+        // join so the future split has a grep-able tripwire.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            log.debug("Joining existing transaction for {} (propagation REQUIRED; inner isolation/timeout hints ignored)",
+                    joinPoint.getSignature().toShortString());
+        }
         TransactionStatus status = transactionManager.getTransaction(def);
         Object result;
         try {
