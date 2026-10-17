@@ -288,7 +288,7 @@ jobs:
 
     - name: Upload JaCoCo Coverage Report
       if: always()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: jacoco-reports
         path: |
@@ -297,21 +297,21 @@ jobs:
 
     - name: Upload PIT Mutation Report
       if: always()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: pit-reports
         path: '**/target/pit-reports/'
 
     - name: Upload Test Results
       if: always()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: test-results
         path: '**/target/surefire-reports/'
 
     - name: Upload Failsafe Integration Test Results
       if: always()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: failsafe-reports
         path: '**/target/failsafe-reports/'
