@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -187,7 +188,7 @@ class RedisRateLimitConfigurationTest {
 
         RedisProperties withCluster = new RedisProperties();
         RedisProperties.Cluster cluster = new RedisProperties.Cluster();
-        cluster.setNodes(java.util.List.of("localhost:6379"));
+        cluster.setNodes(List.of("localhost:6379"));
         withCluster.setCluster(cluster);
         assertThatThrownBy(() -> configuration.redisConnectionFactory(withCluster))
                 .isInstanceOf(IllegalArgumentException.class);

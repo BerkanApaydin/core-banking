@@ -29,7 +29,8 @@ public class UserDetailsAdapter implements UserDetailsService {
                 user.getUsername(),
                 user.getPassword(),
                 List.of(new SimpleGrantedAuthority(user.getRole().name())),
-                user.getTokenVersion()
+                user.getTokenVersion(),
+                user.isMfaEnabled()
         );
     }
 }

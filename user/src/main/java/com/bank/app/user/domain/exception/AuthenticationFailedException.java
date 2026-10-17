@@ -2,6 +2,7 @@ package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.messages.MessageKeys;
 
 public class AuthenticationFailedException extends BusinessException {
     private static final long serialVersionUID = 1L;
@@ -21,7 +22,7 @@ public class AuthenticationFailedException extends BusinessException {
      * exception (D11/K13 — latent user-enumeration guard).
      */
     public AuthenticationFailedException() {
-        super("error.authentication_failed", new Object[]{}, "Authentication failed.");
+        super(MessageKeys.AUTHENTICATION_FAILED, new Object[]{}, "Authentication failed.");
     }
 
     /**
@@ -29,10 +30,10 @@ public class AuthenticationFailedException extends BusinessException {
      * Never pass framework exception messages or user input here.
      */
     public AuthenticationFailedException(String staticDetail) {
-        super("error.authentication_failed", new Object[]{}, "Authentication failed: " + staticDetail);
+        super(MessageKeys.AUTHENTICATION_FAILED, new Object[]{}, "Authentication failed: " + staticDetail);
     }
 
     public AuthenticationFailedException(Throwable cause) {
-        super("error.authentication_failed", new Object[]{}, "Authentication failed.", cause);
+        super(MessageKeys.AUTHENTICATION_FAILED, new Object[]{}, "Authentication failed.", cause);
     }
 }

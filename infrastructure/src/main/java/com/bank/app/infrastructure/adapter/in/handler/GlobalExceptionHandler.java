@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -40,10 +41,10 @@ public class GlobalExceptionHandler {
         String message;
         ErrorCode code;
         if (isUniqueViolation(ex)) {
-            message = messages.resolveMessage("error.unique_constraint_violation");
+            message = messages.resolveMessage(MessageKeys.UNIQUE_CONSTRAINT_VIOLATION);
             code = ErrorCode.UNIQUE_CONSTRAINT_VIOLATION;
         } else {
-            message = messages.resolveMessage("error.db_integrity_violation");
+            message = messages.resolveMessage(MessageKeys.DB_INTEGRITY_VIOLATION);
             code = ErrorCode.DB_INTEGRITY_VIOLATION;
         }
         return ProblemDetailFactory.create(code, message, request);
@@ -61,7 +62,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGeneralException(Exception ex, WebRequest request) {
         log.error("Unexpected error occurred: ", ex);
-        String message = messages.resolveMessage("error.general_internal_error");
+        String message = messages.resolveMessage(MessageKeys.GENERAL_INTERNAL_ERROR);
         return ProblemDetailFactory.create(ErrorCode.GENERAL_INTERNAL_ERROR, message, request);
     }
 }

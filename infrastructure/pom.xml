@@ -141,7 +141,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.infrastructure.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.infrastructure}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.infrastructure}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.infrastructure.*</param>

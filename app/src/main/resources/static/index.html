@@ -139,12 +139,51 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label for="login-totp" class="form-label" data-i18n="auth.totp">Authenticator code (if MFA is enabled)</label>
+                            <div class="input-affix">
+                                <input type="text" class="form-control has-affix" id="login-totp" name="totpCode" autocomplete="one-time-code" inputmode="numeric" maxlength="8"
+                                    data-i18n="auth.totp.placeholder" placeholder="6-digit code from your authenticator app (optional)">
+                            </div>
+                        </div>
                         <button type="submit" class="btn btn-primary btn-block btn-large mt-4" id="btn-login-submit">
                             <span data-i18n="auth.login.submit">Secure Login</span>
                             <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                             <span class="spinner d-none" id="login-spinner"></span>
                         </button>
                         <p class="auth-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg><span data-i18n="auth.secure_hint">Protected by rate-limiting &amp; brute-force guard.</span></p>
+                        <p class="auth-alt"><button type="button" class="link-btn" id="btn-show-reset" data-i18n="auth.forgot">Forgot password?</button></p>
+                    </form>
+
+                    <form id="reset-request-form" class="d-none" novalidate>
+                        <h3 class="form-title" data-i18n="reset.request_title">Reset your password</h3>
+                        <p class="form-note" data-i18n="reset.request_note">Enter your username. If the account exists, a single-use reset token is sent to your registered contact.</p>
+                        <div class="form-group">
+                            <label for="reset-username" class="form-label" data-i18n="auth.username">Username</label>
+                            <input type="text" class="form-control" id="reset-username" name="username" autocomplete="username" maxlength="255" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block" id="btn-reset-request-submit">
+                            <span data-i18n="reset.request_submit">Send reset token</span>
+                            <span class="spinner d-none" id="reset-request-spinner"></span>
+                        </button>
+                        <p class="auth-alt"><button type="button" class="link-btn" id="btn-hide-reset" data-i18n="reset.back_to_login">Back to login</button></p>
+                    </form>
+
+                    <form id="reset-confirm-form" class="d-none" novalidate>
+                        <h3 class="form-title" data-i18n="reset.confirm_title">Set a new password</h3>
+                        <div class="form-group">
+                            <label for="reset-token" class="form-label" data-i18n="reset.token">Reset token</label>
+                            <input type="text" class="form-control" id="reset-token" name="token" autocomplete="off" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reset-new-password" class="form-label" data-i18n="auth.password">Password</label>
+                            <input type="password" class="form-control" id="reset-new-password" name="newPassword" autocomplete="new-password" maxlength="72" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block" id="btn-reset-confirm-submit">
+                            <span data-i18n="reset.confirm_submit">Set new password</span>
+                            <span class="spinner d-none" id="reset-confirm-spinner"></span>
+                        </button>
+                        <p class="auth-alt"><button type="button" class="link-btn" id="btn-hide-reset-2" data-i18n="reset.back_to_login">Back to login</button></p>
                     </form>
 
                     <form id="register-form" class="d-none" autocomplete="on" novalidate>
@@ -222,6 +261,12 @@
                         <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                     <span data-i18n="nav.reports">Reports & Analytics</span>
+                </button>
+                <button class="nav-item" data-target="security-section">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" aria-hidden="true">
+                        <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+                    </svg>
+                    <span data-i18n="nav.security">Security</span>
                 </button>
             </nav>
             <div class="user-profile" id="user-profile-badge">
@@ -573,6 +618,62 @@
                     </div>
                 </div>
             </section>
+            <section id="security-section" class="tab-content" data-i18n-aria="nav.security" aria-label="Security">
+                <div class="section-head-row">
+                    <div>
+                        <h1 class="section-title" data-i18n="security.title">Security</h1>
+                        <p class="section-subtitle" data-i18n="security.subtitle">Protect your account with a second factor and manage recovery.</p>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="security-row">
+                        <div>
+                            <h3 class="tab-title" data-i18n="mfa.title">Two-factor authentication</h3>
+                            <p class="form-note" data-i18n="mfa.note">Use an authenticator app (TOTP) as a second factor at login.</p>
+                        </div>
+                        <span class="status-pill off" id="mfa-status-pill" data-i18n="mfa.off">Off</span>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-mfa-enable" type="button">
+                        <span data-i18n="mfa.enable">Enable MFA</span>
+                    </button>
+
+                    <div id="mfa-enroll-box" class="d-none">
+                        <p class="form-note" data-i18n="mfa.enroll_note">Scan this secret into your authenticator app (or enter it manually), then confirm with a code. MFA stays off until confirmed.</p>
+                        <div class="security-row">
+                            <div class="mono-box" id="mfa-secret-text" aria-live="polite"></div>
+                            <button class="btn btn-secondary" id="btn-mfa-copy" type="button">
+                                <span data-i18n="mfa.copy">Copy</span>
+                            </button>
+                        </div>
+                        <form id="mfa-confirm-form" novalidate>
+                            <div class="form-group">
+                                <label for="mfa-confirm-code" class="form-label" data-i18n="mfa.code">Authenticator code</label>
+                                <input type="text" class="form-control" id="mfa-confirm-code" name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="8" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-mfa-confirm-submit">
+                                <span data-i18n="mfa.confirm">Confirm &amp; enable</span>
+                                <span class="spinner d-none" id="mfa-confirm-spinner"></span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <form id="mfa-disable-form" class="d-none" novalidate>
+                        <div class="form-group">
+                            <label for="mfa-disable-password" class="form-label" data-i18n="auth.password">Password</label>
+                            <input type="password" class="form-control" id="mfa-disable-password" name="password" autocomplete="current-password" maxlength="72" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mfa-disable-code" class="form-label" data-i18n="mfa.code">Authenticator code</label>
+                            <input type="text" class="form-control" id="mfa-disable-code" name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="8" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="btn-mfa-disable-submit">
+                            <span data-i18n="mfa.disable">Disable MFA</span>
+                            <span class="spinner d-none" id="mfa-disable-spinner"></span>
+                        </button>
+                    </form>
+                </div>
+            </section>
         </main>
 
         <footer class="app-footer corp-footer">
@@ -608,6 +709,7 @@
             <button class="nav-item active" data-target="accounts-section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span data-i18n="nav.accounts">Accounts</span></button>
             <button class="nav-item" data-target="transfer-section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" aria-hidden="true"><path d="M17 3L21 7L17 11M7 21L3 17L7 13"/><path d="M3 17H21M21 7H3"/></svg><span data-i18n="nav.transfer">Money Transfer</span></button>
             <button class="nav-item" data-target="reports-section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span data-i18n="nav.reports">Reports & Analytics</span></button>
+            <button class="nav-item" data-target="security-section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg><span data-i18n="nav.security">Security</span></button>
         </nav>
     </div>
 

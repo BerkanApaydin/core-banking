@@ -48,7 +48,7 @@ class DomainEventOutboxAdapterTest {
     void setUp() {
         adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
                 () -> UUID.randomUUID().toString(),
-                new OutboxProperties(5, 50, 0, 2000, 30));
+                new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.messages.MessageKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -67,7 +68,7 @@ public class IdempotencyAspect {
             case IdempotencyClaimer.Decision.Proceed ignored -> joinPoint.proceed();
             case IdempotencyClaimer.Decision.Replay replay -> responseCodec.replay(replay.reservation());
             case IdempotencyClaimer.Decision.Contended ignored -> throw new ConcurrentRequestException(
-                    "error.concurrent_request", null,
+                    MessageKeys.CONCURRENT_REQUEST, null,
                     "This operation is currently being processed. Please wait.");
             case IdempotencyClaimer.Decision.Guarded guarded ->
                     retryExecutor.execute(guarded.key(), joinPoint);

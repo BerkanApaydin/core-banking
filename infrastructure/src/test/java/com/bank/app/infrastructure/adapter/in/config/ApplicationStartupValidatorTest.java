@@ -22,6 +22,9 @@ class ApplicationStartupValidatorTest {
                 .withProperty("app.security.failed-login.backend", "redis")
                 .withProperty("app.security.rate-limit.backend", "redis")
                 .withProperty("app.cache.caffeine.account-info.backend", "redis")
+                // Audit (MFA): production must pin a real secret-encryption key.
+                .withProperty("app.security.mfa.encryption-key-base64",
+                        "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=")
                 .withProperty("spring.profiles.active", "prod");
     }
 
@@ -144,6 +147,21 @@ class ApplicationStartupValidatorTest {
     @Test
     void rejectsZeroAuditRetentionDays() {
         var environment = validProductionEnvironment().withProperty("app.audit.retention-days", "0");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("positive value");
+    }
+
+    @Test
+    void rejectsMissingMfaEncryptionKeyInProduction() {
+        var environment = validProductionEnvironment()
+                .withProperty("app.security.mfa.encryption-key-base64", "");
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA_ENCRYPTION_KEY");
+    }
+
+    @Test
+    void rejectsNonPositiveMfaPeriodInProduction() {
+        var environment = validProductionEnvironment().withProperty("app.security.mfa.period-seconds", "0");
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("positive value");
     }

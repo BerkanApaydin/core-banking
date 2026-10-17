@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +33,7 @@ public class ProblemDetailAuthenticationEntryPoint implements AuthenticationEntr
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException authException) throws IOException {
-        String message = messageSource.getMessage("error.unauthorized", null,
+        String message = messageSource.getMessage(MessageKeys.UNAUTHORIZED, null,
                 "Unauthorized", LocaleContextHolder.getLocale());
         ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.UNAUTHORIZED,
                 ErrorCode.AUTHENTICATION_FAILED.code(), message, request.getRequestURI());

@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.in.scheduler;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.event.AuditEvent;
@@ -46,6 +47,8 @@ class TransferPendingReaperTest {
     @Mock
     private AuditEventPort auditEventPort;
     @Mock
+    private DomainEventPublisherService domainEventPublisherService;
+    @Mock
     private ClockProviderPort clockProvider;
 
     private final Clock fixedClock = Clock.systemUTC();
@@ -56,6 +59,7 @@ class TransferPendingReaperTest {
     void setUp() {
         meters = new SimpleMeterRegistry();
         reaper = new TransferPendingReaper(loadTransferPort, saveTransferPort, auditEventPort,
+                domainEventPublisherService,
                 new TransferReaperProperties(true, Duration.ofMinutes(15), 50, 30), clockProvider, meters);
     }
 
@@ -83,6 +87,9 @@ class TransferPendingReaperTest {
             reaper.reap();
 
             verify(saveTransferPort).save(any(Transfer.class));
+            // FAILED must reach the outbox from the same transaction so
+            // TransferFailedOutboxRelay can deliver it downstream.
+            verify(domainEventPublisherService).publishEvents(any(Transfer.class));
             verify(auditEventPort).publish(any(AuditEvent.class));
             assertThat(meters.counter(TransferPendingReaper.REAPED_COUNTER).count()).isOne();
         }
@@ -114,6 +121,7 @@ class TransferPendingReaperTest {
 
             verify(saveTransferPort, never()).save(any());
             verify(auditEventPort, never()).publish(any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
             assertThat(meters.counter(TransferPendingReaper.CONFLICT_COUNTER).count()).isOne();
         }
 

@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
@@ -37,7 +38,7 @@ public class SecurityProblemHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ProblemDetail> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
         log.warn("Authentication failed: {}", ex.getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.authentication_failed", "Authentication failed.");
+        String message = messages.resolveOrDefault(MessageKeys.AUTHENTICATION_FAILED, "Authentication failed.");
         return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
     }
 
@@ -46,7 +47,7 @@ public class SecurityProblemHandler {
             LoginAttemptStoreUnavailableException ex, WebRequest request) {
         log.warn("Failed-login security backend unavailable: {}",
                 ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.security_backend_unavailable",
+        String message = messages.resolveOrDefault(MessageKeys.SECURITY_BACKEND_UNAVAILABLE,
                 "Security service temporarily unavailable. Please try again later.");
         return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
     }
@@ -56,7 +57,7 @@ public class SecurityProblemHandler {
             AuthenticationBackendUnavailableException ex, WebRequest request) {
         log.warn("Authentication backend unavailable: {}",
                 ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.security_backend_unavailable",
+        String message = messages.resolveOrDefault(MessageKeys.SECURITY_BACKEND_UNAVAILABLE,
                 "Security service temporarily unavailable. Please try again later.");
         return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
     }
@@ -66,7 +67,7 @@ public class SecurityProblemHandler {
             RevocationStoreUnavailableException ex, WebRequest request) {
         log.warn("Token revocation backend unavailable: {}",
                 ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.security_backend_unavailable",
+        String message = messages.resolveOrDefault(MessageKeys.SECURITY_BACKEND_UNAVAILABLE,
                 "Security service temporarily unavailable. Please try again later.");
         return ProblemDetailFactory.create(ErrorCode.SECURITY_BACKEND_UNAVAILABLE, message, request);
     }
@@ -74,7 +75,7 @@ public class SecurityProblemHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ProblemDetail> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
         log.warn("Access denied: {}", ex.getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.access_denied", "Access denied.");
+        String message = messages.resolveOrDefault(MessageKeys.ACCESS_DENIED, "Access denied.");
         return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, message, request);
     }
 }

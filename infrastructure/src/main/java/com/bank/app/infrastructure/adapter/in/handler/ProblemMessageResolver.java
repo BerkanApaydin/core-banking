@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.BusinessException;
+import com.bank.app.common.messages.MessageKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -64,6 +65,6 @@ public class ProblemMessageResolver {
         log.warn("Missing problem message for key '{}' (code {}); detail: {}",
                 ex.getMessageKey(), ex.getErrorCode(), ex.getMessage());
         return resolveOrDefault(
-                "error.general_internal_error", "Request could not be completed.");
+                MessageKeys.GENERAL_INTERNAL_ERROR, "Request could not be completed.");
     }
 }

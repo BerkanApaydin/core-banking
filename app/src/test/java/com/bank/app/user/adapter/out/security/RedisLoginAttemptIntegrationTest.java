@@ -36,7 +36,7 @@ class RedisLoginAttemptIntegrationTest {
             redisTemplate = new StringRedisTemplate(factory);
             redisTemplate.afterPropertiesSet();
         }
-        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(3, 15));
+        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(3, 15, 10000));
         adapter.reset("10.0.0.1");
         adapter.resetByUsername("testuser");
     }

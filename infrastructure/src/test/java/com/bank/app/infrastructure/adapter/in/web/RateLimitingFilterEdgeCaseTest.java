@@ -41,7 +41,7 @@ class RateLimitingFilterEdgeCaseTest {
         objectMapper = new ObjectMapper();
         clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
         filter = new RateLimitingFilter(rateLimiter, messageSource,
-                new RateLimitProperties(null, null, 10, 10_000, 120, 60000), objectMapper, clientIpResolver);
+                new RateLimitProperties(null, null, 10, 10_000, 120, 60000, 10000), objectMapper, clientIpResolver);
     }
 
     @Test

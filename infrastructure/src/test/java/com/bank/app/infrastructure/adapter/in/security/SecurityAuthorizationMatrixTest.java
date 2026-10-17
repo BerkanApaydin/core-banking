@@ -75,7 +75,7 @@ class SecurityAuthorizationMatrixTest {
     static class TestConfig {
         @Bean
         SecurityProperties securityProperties() {
-            return new SecurityProperties(null);
+            return new SecurityProperties(null, 12, 31536000L);
         }
 
         @Bean

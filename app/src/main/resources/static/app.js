@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTransferForm();
     initReportSection();
     initAuth();
+    initSecurity();
     initDetailModals();
     initUxEnhancements();
     checkAuthStatus();
@@ -156,6 +157,190 @@ function showAlert(message, type = 'success') {
     });
 }
 
+// --- Security (MFA + password reset) ---
+// TOTP codes are 6-8 ASCII digits; anything else never reaches the server
+// (the backend @Pattern mirrors this, this is only a client courtesy).
+function isTotpLike(value) {
+    return typeof value === 'string' && /^\d{6,8}$/.test(value.trim());
+}
+
+// Audit (MFA): the authenticator code rides along only when the user typed
+// a well-formed one — non-enrolled logins send no totpCode at all.
+function buildLoginBody(username, password, totp) {
+    const body = { username, password };
+    if (isTotpLike(totp)) {
+        body.totpCode = totp.trim();
+    }
+    return body;
+}
+
+async function refreshMfaStatus() {
+    const pill = document.getElementById('mfa-status-pill');
+    const enableBtn = document.getElementById('btn-mfa-enable');
+    const enrollBox = document.getElementById('mfa-enroll-box');
+    const disableForm = document.getElementById('mfa-disable-form');
+    if (!pill) return;
+    try {
+        const status = await fetchApi('/auth/mfa/status');
+        const on = status && status.mfaEnabled === true;
+        pill.textContent = on ? __('mfa.on') : __('mfa.off');
+        pill.classList.toggle('on', on);
+        pill.classList.toggle('off', !on);
+        if (enableBtn) enableBtn.classList.toggle('d-none', on);
+        if (enrollBox && on) enrollBox.classList.add('d-none');
+        if (disableForm) disableForm.classList.toggle('d-none', !on);
+    } catch (err) {
+        // Status is informational: a failed read must not break the section.
+        // Leave the enable path visible (server re-validates everything).
+        if (enableBtn) enableBtn.classList.remove('d-none');
+    }
+}
+
+function initSecurity() {
+    // --- Password-reset panel (unauthenticated, on the login tab) ---
+    const loginForm = document.getElementById('login-form');
+    const showReset = document.getElementById('btn-show-reset');
+    const requestForm = document.getElementById('reset-request-form');
+    const confirmForm = document.getElementById('reset-confirm-form');
+    const showLoginView = () => {
+        if (loginForm) loginForm.classList.remove('d-none');
+        if (requestForm) requestForm.classList.add('d-none');
+        if (confirmForm) confirmForm.classList.add('d-none');
+    };
+    if (showReset && requestForm) {
+        showReset.addEventListener('click', () => {
+            if (loginForm) loginForm.classList.add('d-none');
+            requestForm.classList.remove('d-none');
+            if (confirmForm) confirmForm.classList.add('d-none');
+        });
+    }
+    ['btn-hide-reset', 'btn-hide-reset-2'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', showLoginView);
+    });
+    if (requestForm) {
+        requestForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('reset-username').value.trim();
+            if (!username) return;
+            const spinner = document.getElementById('reset-request-spinner');
+            if (spinner) spinner.classList.remove('d-none');
+            try {
+                await fetchApi('/auth/password/reset/request', {
+                    method: 'POST',
+                    body: JSON.stringify({ username })
+                });
+                // Always the same message (enumeration-safe by API contract).
+                showAlert(__('reset.request_sent'));
+                requestForm.classList.add('d-none');
+                if (confirmForm) confirmForm.classList.remove('d-none');
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            } finally {
+                if (spinner) spinner.classList.add('d-none');
+            }
+        });
+    }
+    if (confirmForm) {
+        confirmForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = document.getElementById('reset-token').value.trim();
+            const newPassword = document.getElementById('reset-new-password').value;
+            if (!token || !newPassword) return;
+            const spinner = document.getElementById('reset-confirm-spinner');
+            if (spinner) spinner.classList.remove('d-none');
+            try {
+                await fetchApi('/auth/password/reset/confirm', {
+                    method: 'POST',
+                    body: JSON.stringify({ token, newPassword })
+                });
+                showAlert(__('reset.confirm_success'));
+                confirmForm.reset();
+                showLoginView();
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            } finally {
+                if (spinner) spinner.classList.add('d-none');
+            }
+        });
+    }
+
+    // --- MFA enrollment (authenticated) ---
+    const enableBtn = document.getElementById('btn-mfa-enable');
+    const enrollBox = document.getElementById('mfa-enroll-box');
+    const secretText = document.getElementById('mfa-secret-text');
+    const copyBtn = document.getElementById('btn-mfa-copy');
+    const confirmMfaForm = document.getElementById('mfa-confirm-form');
+    const disableForm = document.getElementById('mfa-disable-form');
+    if (enableBtn && enrollBox) {
+        enableBtn.addEventListener('click', async () => {
+            try {
+                const enrollment = await fetchApi('/auth/mfa/enable', { method: 'POST' });
+                if (secretText) secretText.textContent = enrollment.base32Secret || '';
+                enrollBox.classList.remove('d-none');
+                enableBtn.classList.add('d-none');
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            }
+        });
+    }
+    if (copyBtn && secretText) {
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(secretText.textContent || '');
+                showAlert(__('mfa.copied'));
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            }
+        });
+    }
+    if (confirmMfaForm) {
+        confirmMfaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const code = document.getElementById('mfa-confirm-code').value.trim();
+            if (!isTotpLike(code)) return;
+            const spinner = document.getElementById('mfa-confirm-spinner');
+            if (spinner) spinner.classList.remove('d-none');
+            try {
+                await fetchApi('/auth/mfa/confirm', {
+                    method: 'POST',
+                    body: JSON.stringify({ code })
+                });
+                showAlert(__('mfa.confirm_success'));
+                enrollBox.classList.add('d-none');
+                await refreshMfaStatus();
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            } finally {
+                if (spinner) spinner.classList.add('d-none');
+            }
+        });
+    }
+    if (disableForm) {
+        disableForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('mfa-disable-password').value;
+            const code = document.getElementById('mfa-disable-code').value.trim();
+            if (!password || !isTotpLike(code)) return;
+            const spinner = document.getElementById('mfa-disable-spinner');
+            if (spinner) spinner.classList.remove('d-none');
+            try {
+                await fetchApi('/auth/mfa/disable', {
+                    method: 'POST',
+                    body: JSON.stringify({ password, code })
+                });
+                showAlert(__('mfa.disable_success'));
+                disableForm.reset();
+                await refreshMfaStatus();
+            } catch (err) {
+                showAlert(err.message, 'danger');
+            } finally {
+                if (spinner) spinner.classList.add('d-none');
+            }
+        });
+    }
+}
+
 // --- Navigation ---
 function initNavigation() {
     navItems.forEach(item => {
@@ -194,6 +379,8 @@ function switchTab(tabId) {
         populateTransferDropdowns();
     } else if (tabId === 'reports-section') {
         populateReportDropdown();
+    } else if (tabId === 'security-section') {
+        refreshMfaStatus();
     }
 }
 
@@ -1242,6 +1429,7 @@ function initAuth() {
         e.preventDefault();
         const usernameVal = document.getElementById('login-username').value.trim();
         const passwordVal = document.getElementById('login-password').value;
+        const totpVal = document.getElementById('login-totp').value.trim();
         if (!usernameVal) {
             showAlert(__('auth.username.required'), 'warning');
             return;
@@ -1252,9 +1440,11 @@ function initAuth() {
         btnLoginSubmit.setAttribute('aria-busy', 'true');
 
         try {
+            // Audit (MFA): the authenticator code rides along only when the
+            // user typed one — non-enrolled logins send no totpCode at all.
             const result = await fetchApi('/auth/browser/login', {
                 method: 'POST',
-                body: JSON.stringify({ username: usernameVal, password: passwordVal })
+                body: JSON.stringify(buildLoginBody(usernameVal, passwordVal, totpVal))
             });
 
             authenticated = true;

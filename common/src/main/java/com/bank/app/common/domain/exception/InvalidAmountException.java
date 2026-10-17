@@ -1,4 +1,5 @@
 package com.bank.app.common.domain.exception;
+import com.bank.app.common.messages.MessageKeys;
 
 /**
  * D-4: typed zero-amount rejection.
@@ -16,6 +17,6 @@ public class InvalidAmountException extends BusinessException {
     public String getErrorCode() { return "INVALID_AMOUNT"; }
 
     public InvalidAmountException(String message) {
-        super("error.invalid_amount", null, message);
+        super(MessageKeys.INVALID_AMOUNT, null, message);
     }
 }

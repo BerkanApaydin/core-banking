@@ -77,7 +77,7 @@ public class BrowserAuthController {
     public ResponseEntity<BrowserUser> login(@Valid @RequestBody AuthWebRequest webRequest,
             HttpServletRequest request, HttpServletResponse response) {
         AuthRequest command = new AuthRequest(webRequest.username(), webRequest.password(),
-                webRequest.email(), webRequest.phone());
+                webRequest.email(), webRequest.phone(), webRequest.totpCode());
         String ip = clientIpResolver.resolveClientIp(
                 request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
         AuthResponse authenticated = loginUserUseCase.execute(command, ip);

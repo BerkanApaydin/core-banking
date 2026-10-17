@@ -9,7 +9,14 @@ import com.bank.app.infrastructure.adapter.in.handler.ProblemMessageResolver;
 import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
 import com.bank.app.infrastructure.adapter.in.web.ProxyProperties;
 import com.bank.app.user.application.port.in.LogoutUseCase;
+import com.bank.app.user.application.port.in.MfaStatusUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
+import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
+import com.bank.app.user.application.port.in.ConfirmPasswordResetUseCase;
+import com.bank.app.user.application.port.in.DisableMfaUseCase;
+import com.bank.app.user.application.port.in.EnableMfaUseCase;
+import com.bank.app.user.application.port.in.RequestPasswordResetUseCase;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
@@ -72,6 +79,27 @@ class AuthControllerIpResolverTest {
 
     @MockitoBean
     private RefreshSessionUseCase refreshSessionUseCase;
+
+    @MockitoBean
+    private MfaStatusUseCase mfaStatusUseCase;
+
+    @MockitoBean
+    private EnableMfaUseCase enableMfaUseCase;
+
+    @MockitoBean
+    private ConfirmMfaUseCase confirmMfaUseCase;
+
+    @MockitoBean
+    private DisableMfaUseCase disableMfaUseCase;
+
+    @MockitoBean
+    private RequestPasswordResetUseCase requestPasswordResetUseCase;
+
+    @MockitoBean
+    private ConfirmPasswordResetUseCase confirmPasswordResetUseCase;
+
+    @MockitoBean
+    private UserContextService userContextService;
 
     @Test
     void shouldUseXForwardedForHeaderWhenPresent() throws Exception {

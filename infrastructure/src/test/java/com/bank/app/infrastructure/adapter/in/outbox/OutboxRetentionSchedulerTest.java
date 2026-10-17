@@ -33,7 +33,7 @@ class OutboxRetentionSchedulerTest {
     @Test
     void shouldDeleteProcessedRowsBeforeHandlerKeysWithSameCutoff() {
         var scheduler = new OutboxRetentionScheduler(outboxPort, idempotencyPort,
-                new OutboxProperties(5, 50, 2, 2000, 30));
+                new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.deleteProcessedBefore(any())).thenReturn(12);
         when(idempotencyPort.deleteExpiredHandlerKeys(any())).thenReturn(34);
 
@@ -54,7 +54,7 @@ class OutboxRetentionSchedulerTest {
     @Test
     void shouldHonorConfiguredRetentionDays() {
         var scheduler = new OutboxRetentionScheduler(outboxPort, idempotencyPort,
-                new OutboxProperties(5, 50, 2, 2000, 7));
+                new OutboxProperties(5, 50, 2, 2000, 7, 4, 12, 30));
 
         scheduler.retainProcessed();
 

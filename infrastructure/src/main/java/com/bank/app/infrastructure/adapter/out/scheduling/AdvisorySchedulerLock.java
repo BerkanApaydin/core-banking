@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.scheduling;
 
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,7 @@ public class AdvisorySchedulerLock {
 
     @Autowired
     public AdvisorySchedulerLock(JdbcTemplate jdbc, PlatformTransactionManager transactionManager,
-            com.bank.app.infrastructure.adapter.in.config.TransactionProperties transactionProperties) {
+            TransactionProperties transactionProperties) {
         this.jdbc = jdbc;
         TransactionTemplate template = new TransactionTemplate(transactionManager);
         template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);

@@ -44,6 +44,11 @@
         <project.build.outputTimestamp>2026-09-27T00:00:00Z</project.build.outputTimestamp>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.12.0</mockito.version>
+        <!-- F-09: mockito 5.12.0 is pinned (not Boot-managed) on purpose: it is the
+             newest version vendored in the offline build cache and verified against
+             the 1.812-test suite. Removing the pin floats to Boot's managed version
+             on the next upgrade — re-verify IdempotencyAspectTest/Mockito strictness
+             then. byte-buddy below MUST stay aligned with mockito's requirement. -->
         <!-- F-01: 1.17.5 -> 1.17.8 minimum. 1.17.8 fixes dynamic attach on
              Windows ("Fix dynamic attach on Windows when a service user is
              active"); on <=1.17.7 every surefire JVM falls back to the
@@ -63,6 +68,11 @@
         <jacoco.version>0.8.15</jacoco.version>
         <postgresql.image.tag>15-alpine</postgresql.image.tag>
         <testcontainers.version>1.20.6</testcontainers.version>
+        <!-- F-10: flyway.version is declared explicitly (not left to Boot's BOM) so
+             the migration dialect is a deliberate, reviewable choice. Must match
+             spring-boot-dependencies' managed Flyway for Boot 3.5.x (11.7.x);
+             bump together with the Boot parent. -->
+        <flyway.version>11.7.2</flyway.version>
         <pitest.version>1.19.1</pitest.version>
         <jacoco.skip>false</jacoco.skip>
         <jjwt.version>0.12.7</jjwt.version>
@@ -73,6 +83,22 @@
         <awaitility.version>4.2.2</awaitility.version>
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
         <pitest-junit5-plugin.version>1.2.2</pitest-junit5-plugin.version>
+        <!-- Audit #6: per-module PIT targetClasses live in module poms but resolve
+             through THESE properties (single source of truth). The pitest-domain
+             profile below redefines them to domain-only patterns, so the nightly
+             85% domain gate no longer depends on a -DtargetClasses CLI flag
+             (kept in mutation-nightly.yml as a harmless explicit override).
+             Domain-free modules resolve to patterns that match nothing; the
+             profile also sets failWhenNoMutations=false so they pass. -->
+        <pitest.targetClasses.account>com.bank.app.account.*</pitest.targetClasses.account>
+        <pitest.targetClasses.accountApi>com.bank.app.accountapi.*</pitest.targetClasses.accountApi>
+        <pitest.targetClasses.app>com.bank.app.*</pitest.targetClasses.app>
+        <pitest.targetClasses.audit>com.bank.app.audit.*</pitest.targetClasses.audit>
+        <pitest.targetClasses.common>com.bank.app.common.*</pitest.targetClasses.common>
+        <pitest.targetClasses.infrastructure>com.bank.app.infrastructure.*</pitest.targetClasses.infrastructure>
+        <pitest.targetClasses.persistence>com.bank.app.persistence.*</pitest.targetClasses.persistence>
+        <pitest.targetClasses.transfer>com.bank.app.transfer.*</pitest.targetClasses.transfer>
+        <pitest.targetClasses.user>com.bank.app.user.*</pitest.targetClasses.user>
         <jacoco.argLine/>
     </properties>
 
@@ -275,6 +301,29 @@
                                          dependency:analyze output is advisory (starter
                                          aggregation noise); convergence is enforced. -->
                                     <dependencyConvergence />
+                                    <!-- Audit #5: fail the build when a transitive version
+                                         outranks the managed one (silent downgrade risk) and
+                                         ban legacy logging bridges that split the log
+                                         pipeline (log4j-over-slf4j/slf4j-log4j12 style
+                                         loops and commons-logging duplicates).
+                                         requireUpperBoundDeps is WARN (not ERROR) until the
+                                         known springdoc/swagger vs managed-BOM drift is aligned
+                                         online: swagger-core-jakarta:2.2.27 requires
+                                         jackson-dataformat-yaml:2.16.2/snakeyaml:2.5 and
+                                         jakarta.validation-api:3.1.0 while the reactor
+                                         manages 2.21.7/2.4 and 3.0.2 (see F-10). Resolved
+                                         artifacts stay on the managed versions; WARN keeps the
+                                         drift visible without red-blocking offline builds. -->
+                                    <requireUpperBoundDeps>
+                                        <level>WARN</level>
+                                    </requireUpperBoundDeps>
+                                    <bannedDependencies>
+                                        <excludes>
+                                            <exclude>commons-logging:commons-logging</exclude>
+                                            <exclude>log4j:log4j</exclude>
+                                        </excludes>
+                                        <message>Legacy logging bridge detected: use spring-jcl + logback only.</message>
+                                    </bannedDependencies>
                                 </rules>
                             </configuration>
                         </execution>
@@ -367,16 +416,26 @@
         </plugins>
     </build>
 
-    <!-- Uzun vade #8: domain mutasyon hedefi %85. Global esik %80 kalir (CI yesil).
-         NOT: her modul pom'u kendi targetClasses degerini sabitler, bu yuzden
-         asagidaki domain filtresi pluginManagement'te etkisiz kalir. Nightly
-         (mutation-nightly.yml) -DtargetClasses ile acikca override eder; bu
-         profili bu sekilde calistirmadan kosmak tum modullerin adapter'larini %85 ile
-         olcer (istenmeyen). Dogru kullanim:
-         mvn pitest:mutationCoverage -Ppitest-domain -DtargetClasses='com.bank.app.*.domain.*,com.bank.app.common.domain.*' -DfailWhenNoMutations=false -Dpitest.skip=false -->
+    <!-- Long term #8: domain mutation target is 85%. The global threshold stays at 80% (CI stays green).
+         Module poms resolve ${pitest.targetClasses.*} properties for targetClasses;
+         this profile narrows those properties to domain-only patterns, so the
+         profile alone measures the correct scope (the CLI -DtargetClasses override
+         is no longer required, kept in nightly as an explicitly stated extra safeguard).
+         targetTests stay as they are in the module poms. -->
     <profiles>
         <profile>
             <id>pitest-domain</id>
+            <properties>
+                <pitest.targetClasses.account>com.bank.app.account.domain.*</pitest.targetClasses.account>
+                <pitest.targetClasses.accountApi>com.bank.app.accountapi.domain.*</pitest.targetClasses.accountApi>
+                <pitest.targetClasses.app>com.bank.app.app.domain.*</pitest.targetClasses.app>
+                <pitest.targetClasses.audit>com.bank.app.audit.domain.*</pitest.targetClasses.audit>
+                <pitest.targetClasses.common>com.bank.app.common.domain.*</pitest.targetClasses.common>
+                <pitest.targetClasses.infrastructure>com.bank.app.infrastructure.domain.*</pitest.targetClasses.infrastructure>
+                <pitest.targetClasses.persistence>com.bank.app.persistence.domain.*</pitest.targetClasses.persistence>
+                <pitest.targetClasses.transfer>com.bank.app.transfer.domain.*</pitest.targetClasses.transfer>
+                <pitest.targetClasses.user>com.bank.app.user.domain.*</pitest.targetClasses.user>
+            </properties>
             <build>
                 <pluginManagement>
                     <plugins>
@@ -386,10 +445,10 @@
                             <configuration>
                                 <mutationThreshold>85</mutationThreshold>
                                 <coverageThreshold>85</coverageThreshold>
-                                <targetClasses>
-                                    <param>com.bank.app.*.domain.*</param>
-                                    <param>com.bank.app.common.domain.*</param>
-                                </targetClasses>
+                                <!-- Domain-free modules (infrastructure, app, persistence,
+                                     account-api) match zero classes under the narrowed
+                                     patterns above; they must pass instead of failing. -->
+                                <failWhenNoMutations>false</failWhenNoMutations>
                             </configuration>
                         </plugin>
                     </plugins>

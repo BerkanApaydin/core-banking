@@ -53,7 +53,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.common.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.common}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.common}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.common.*</param>

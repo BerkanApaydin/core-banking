@@ -47,7 +47,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.audit.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.audit}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.audit}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.audit.*</param>

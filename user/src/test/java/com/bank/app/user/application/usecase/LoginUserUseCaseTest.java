@@ -12,6 +12,10 @@ import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
+import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
+import com.bank.app.user.domain.Totp;
+import com.bank.app.user.domain.TotpPolicy;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;
@@ -29,6 +33,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
 
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +56,9 @@ class LoginUserUseCaseTest {
     @Mock private IdGeneratorPort idGenerator;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
+    @Mock private MfaSecretPort mfaSecretPort;
+    private final AesGcmMfaEncryptor mfaEncryptor = AesGcmMfaEncryptor.ephemeral();
+    private final TotpPolicy totpPolicy = new TotpPolicy(30, 6, 1);
     private LoginUserUseCase loginUserUseCase;
 
     private static final String USERNAME = "testuser";
@@ -59,7 +69,8 @@ class LoginUserUseCaseTest {
     @BeforeEach
     void setUp() {
         loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort,
-                refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort);
+                refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort,
+                mfaSecretPort, mfaEncryptor, totpPolicy);
     }
 
     @Nested
@@ -502,8 +513,7 @@ class LoginUserUseCaseTest {
 
         @Test
         @DisplayName("should publish LOGIN_FAILED when username is blocked")
-        void shouldPublishLoginFailedWhenUsernameBlocked() {
-            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+        void shouldPublishLoginFailedWhenUsernameBlocked() {            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
             when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(true);
             when(loginAttemptPort.getWindowMinutes()).thenReturn(15);
@@ -518,6 +528,114 @@ class LoginUserUseCaseTest {
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
             verifyNoInteractions(authenticationPort);
             verify(loginAttemptPort, never()).recordFailure(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("MFA second factor")
+    class MfaSecondFactor {
+
+        private static final Clock MFA_FIXED =
+                Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"),
+                        ZoneOffset.UTC);
+
+        private AuthenticatedUser mfaUser() {
+            return new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER, 0L, true);
+        }
+
+        private void stubSuccess() {
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(mfaUser());
+        }
+
+        private void stubMinting() {
+            when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
+            when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
+            when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+            when(jwtPort.getExpirationMs()).thenReturn(900000L);
+            when(clockProvider.clock()).thenReturn(MFA_FIXED);
+            when(idGenerator.newId()).thenReturn("family-1");
+        }
+
+        private String currentCode(byte[] secret) {
+            long step = MFA_FIXED.millis() / 1000L / 30L;
+            return Totp.generateCode(secret, step, 6);
+        }
+
+        @Test
+        @DisplayName("should login with a correct TOTP code")
+        void shouldLoginWithCorrectCode() {
+            byte[] secret = Totp.generateSecret();
+            stubSuccess();
+            stubMinting();
+            when(mfaSecretPort.findSecret(100L))
+                    .thenReturn(Optional.of(mfaEncryptor.encryptToBase64(secret)));
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, currentCode(secret));
+
+            AuthResponse response = loginUserUseCase.execute(request, CLIENT_IP);
+
+            assertThat(response.token()).isEqualTo("mock-jwt-token");
+        }
+
+        @Test
+        @DisplayName("should reject a missing code with the generic message and record the failure")
+        void shouldRejectMissingCode() {
+            stubSuccess();
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should reject a wrong code with the generic message")
+        void shouldRejectWrongCode() {
+            byte[] secret = Totp.generateSecret();
+            stubSuccess();
+            when(clockProvider.clock()).thenReturn(MFA_FIXED);
+            when(mfaSecretPort.findSecret(100L))
+                    .thenReturn(Optional.of(mfaEncryptor.encryptToBase64(secret)));
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "000000");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should fail closed when the secret is missing or undecryptable")
+        void shouldFailClosedOnMissingSecret() {
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(mfaUser());
+            when(mfaSecretPort.findSecret(100L)).thenReturn(Optional.empty());
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "123456");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should skip the second factor for non-enrolled users")
+        void shouldSkipForNonEnrolledUsers() {
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
+            AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
+            when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
+            when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
+            when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+            when(jwtPort.getExpirationMs()).thenReturn(900000L);
+            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(idGenerator.newId()).thenReturn("family-1");
+
+            AuthResponse response = loginUserUseCase.execute(request);
+
+            assertThat(response.token()).isEqualTo("mock-jwt-token");
+            verifyNoInteractions(mfaSecretPort);
         }
     }
 

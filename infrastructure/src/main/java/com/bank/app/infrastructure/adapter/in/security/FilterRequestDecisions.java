@@ -43,10 +43,16 @@ final class FilterRequestDecisions {
         if (!"POST".equals(request.getMethod())) return false;
         // REGISTER is permitAll (see SecurityProperties): a stale/expired
         // session cookie on a shared browser must not 401 a new registration
-        // before it reaches the controller.
+        // before it reaches the controller. Password-reset endpoints are
+        // likewise permitAll (users without a session reset passwords): the
+        // same stale-cookie guard applies, otherwise a leftover cookie turns
+        // a public reset request into a 401 before SecurityConfig's
+        // permitAll is ever evaluated (filter runs before authorization).
         return PublicApiPaths.LOGIN.equals(path)
                 || PublicApiPaths.BROWSER_LOGIN.equals(path)
-                || PublicApiPaths.REGISTER.equals(path);
+                || PublicApiPaths.REGISTER.equals(path)
+                || PublicApiPaths.PASSWORD_RESET_REQUEST.equals(path)
+                || PublicApiPaths.PASSWORD_RESET_CONFIRM.equals(path);
     }
 
     static boolean isRefreshRequest(HttpServletRequest request, String path) {

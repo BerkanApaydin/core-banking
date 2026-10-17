@@ -5,6 +5,7 @@ import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.common.domain.BalanceLimits;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.exception.InvalidAmountException;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.transfer.domain.exception.TransferAlreadyCancelledException;
 import com.bank.app.transfer.domain.exception.SameAccountTransferException;
 import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
@@ -172,7 +173,7 @@ public class Transfer extends BaseAggregateRoot {
                 default -> "Only completed transfers can be cancelled. Current status: " + this.status;
             };
             throw new TransferNotCancellableException(
-                "error.transfer_not_cancellable",
+                MessageKeys.TRANSFER_NOT_CANCELLABLE,
                 new Object[]{this.status},
                 detail
             );
@@ -180,7 +181,7 @@ public class Transfer extends BaseAggregateRoot {
         LocalDateTime now = LocalDateTime.now(clock);
         if (this.createdAt.plus(cancellationWindow).isBefore(now)) {
             throw new TransferNotCancellableException(
-                "error.transfer_cancellation_window_expired",
+                MessageKeys.TRANSFER_CANCELLATION_WINDOW_EXPIRED,
                 new Object[]{this.createdAt, cancellationWindow.toHours()},
                 "Transfer was created " + cancellationWindow.toHours() + " hours ago, cancellation window has passed. Created at: " + this.createdAt
             );

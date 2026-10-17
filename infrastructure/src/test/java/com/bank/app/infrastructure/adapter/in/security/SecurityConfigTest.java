@@ -33,7 +33,7 @@ class SecurityConfigTest {
 
     @BeforeEach
     void setUp() {
-        securityProperties = new SecurityProperties(null);
+        securityProperties = new SecurityProperties(null, 12, 31536000L);
         securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService, securityProperties, authenticationEntryPoint, accessDeniedHandler);
     }
 

@@ -36,6 +36,16 @@ removing all three, which is the actual cost:
 - `Transfer.cancel()` keeps rejecting FAILED transfers explicitly
   (`TransferNotCancellableException`), so the retained state cannot be
   misused as cancellable.
+- Update (R-2, audit): `TransferPendingReaper` now publishes the FAILED
+  transition to the outbox in the same `REQUIRES_NEW` row transaction
+  (atomic commit — a publish failure rolls the FAILED row back and the
+  next schedule retries), and `TransferFailedOutboxRelay` delivers it to
+  `TransferEventConsumer` (at-least-once + persistent dedup, same contract
+  as COMPLETED/CANCELLED). `AsyncTransferFailedEvent.from(transfer)` keeps
+  the legacy creation-time fallback; new code uses
+  `from(transfer, failedAt)` with the actual failure instant.
+  The "no FAILED consumer" gap is closed; the audit row remains as the
+  human-readable trail.
 - If async placement is still absent after the next two release cycles,
   revisit: delete the method, keep the enum value (DB CHECK/enum compat).
 

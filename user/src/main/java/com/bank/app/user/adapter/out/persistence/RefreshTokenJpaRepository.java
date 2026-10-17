@@ -32,7 +32,10 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
             + "WHERE e.familyId = :familyId AND e.revoked = false")
     int revokeFamilyBulk(@Param("familyId") String familyId);
 
-    @Modifying
+    // Audit (P2): sibling bulk statements declare clearAutomatically +
+    // flushAutomatically so the persistence context never serves stale
+    // entities after the bulk write; this delete was the only exception.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM RefreshTokenJpaEntity e WHERE e.expiresAt < :cutoff")
     int deleteExpiredBefore(@Param("cutoff") LocalDateTime cutoff);
 }

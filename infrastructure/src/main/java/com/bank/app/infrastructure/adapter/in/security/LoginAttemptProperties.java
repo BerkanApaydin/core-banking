@@ -19,12 +19,20 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.security.failed-login")
 public record LoginAttemptProperties(
         @DefaultValue("5") int maxAttempts,
-        @DefaultValue("15") long windowMinutes
+        @DefaultValue("15") long windowMinutes,
+        // Audit: the Caffeine counter-cache bound was a magic literal (10000,
+        // twice) in CaffeineLoginAttemptAdapter. Sized for peak tracked
+        // IPs/usernames per window; eviction is time-based, this is only a
+        // memory guard.
+        @DefaultValue("10000") int cacheMaxSize
 ) {
     public LoginAttemptProperties {
         if (windowMinutes <= 0 || windowMinutes > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(
                     "Failed-login window must be a positive number of minutes");
+        }
+        if (cacheMaxSize <= 0) {
+            throw new IllegalArgumentException("Failed-login cache size must be positive");
         }
     }
 }

@@ -2,6 +2,7 @@ package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.messages.MessageKeys;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,7 +22,7 @@ public class WeakPasswordException extends BusinessException {
     public String getErrorCode() { return "WEAK_PASSWORD"; }
 
     public WeakPasswordException(List<String> violations) {
-        super("error.weak_password", new Object[]{join(violations)}, join(violations));
+        super(MessageKeys.WEAK_PASSWORD, new Object[]{join(violations)}, join(violations));
     }
 
     private static String join(List<String> violations) {

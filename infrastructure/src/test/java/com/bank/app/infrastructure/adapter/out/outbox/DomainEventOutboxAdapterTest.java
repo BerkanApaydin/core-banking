@@ -48,7 +48,7 @@ class DomainEventOutboxAdapterTest {
         void setUp() throws Exception {
             adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
                     () -> UUID.randomUUID().toString(),
-                    new OutboxProperties(5, 50, 0, 2000, 30));
+                    new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
         }
 
         private void stubSerializer() throws Exception {
@@ -166,7 +166,7 @@ class DomainEventOutboxAdapterTest {
             ObjectMapper realMapper = new ObjectMapper();
             adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> Clock.systemUTC(),
                     () -> UUID.randomUUID().toString(),
-                    new OutboxProperties(5, 50, 0, 2000, 30));
+                    new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
             DomainEvent event = new DomainEvent() {
                 @Override public LocalDateTime occurredAt() { return LocalDateTime.of(2024, 1, 15, 10, 30); }
                 @Override public String aggregateType() { return "TestAggregate"; }

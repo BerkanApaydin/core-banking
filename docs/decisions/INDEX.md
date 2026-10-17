@@ -23,14 +23,15 @@ is the single map: ID → file → one-sentence decision.
 | R-1 | `docs/decisions/pending-reaper.md` | Crash-window reaper marks stale PENDING transfers FAILED via the domain; no distributed lock, version conflicts counted. |
 | T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
 | K19 | `docs/decisions/api-versioning.md` | URL versioning via `@ApiVersion` + additive-change rules; published language evolves by addition only. |
-| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout), observe-after-commit (dispatch). |
+| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout/MFA/reset), observe-after-commit (dispatch). |
 | K17 | `docs/decisions/cross-bc-read-model.md` | Transfer reads account via published language + snapshot cache; projection direction when that stops being enough. |
 | — | `docs/decisions/dependency-review.md` | OSV gate on the SBOM + accepted risks in the allowlist, re-reviewed on Boot upgrades. |
 | — | `docs/decisions/infrastructure-split.md` | Roadmap: split `infrastructure` into web/security/outbox/observability modules. |
 | K18 | `docs/decisions/saga-readiness.md` | Documented (not implemented) saga path; tripwire comments at the ACL calls. |
 | — | `docs/decisions/test-placement.md` | Spring-context tests live in `app`; unit tests live in their owning modules. |
 | — | `docs/decisions/transaction-strategy.md` | Marker-aspect programmatic tx for use cases; declarative `@Transactional` for single-boundary adapters. |
-| S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained (reachable via the pending reaper); revisit if async placement stays absent. |
+| S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained (reachable via the pending reaper); R-2 relay (`TransferFailedOutboxRelay`) closed the consumer gap; revisit if async placement stays absent. |
+| S11/D23 | `docs/decisions/mfa-totp.md` | TOTP MFA (per-user opt-in, AES-GCM secrets, fail-fast prod key) + enumeration-safe password reset; authenticated MFA failures are 400 (`MFA_CODE_INVALID`), login stays uniform 401. |
 
 ## Newly added decisions (this improvement round)
 

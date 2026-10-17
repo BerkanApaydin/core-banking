@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.common.messages.MessageKeys;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -50,10 +51,10 @@ public class SecurityContextAdapter implements SecurityContextPort {
     @Override
     public void checkUserAuthorization(Long resourceUserId, String errorMessage) {
         Long currentUserId = getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
+                .orElseThrow(() -> new AuthorizationException(MessageKeys.SESSION_NOT_FOUND, null,
                         "Session not found. Please log in again."));
         if (!currentUserId.equals(resourceUserId)) {
-            throw new AuthorizationException("error.not_resource_owner", null, errorMessage);
+            throw new AuthorizationException(MessageKeys.NOT_RESOURCE_OWNER, null, errorMessage);
         }
     }
 

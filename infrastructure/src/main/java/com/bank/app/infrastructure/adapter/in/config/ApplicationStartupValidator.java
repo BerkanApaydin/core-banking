@@ -7,6 +7,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Base64;
 import java.util.Locale;
 
 public class ApplicationStartupValidator {
@@ -98,6 +99,34 @@ public class ApplicationStartupValidator {
         // partition-count 0 is the legal unpartitioned mode (single thread);
         // only negatives (typos) are rejected.
         requireNonNegative("app.outbox.partition-count", 2L);
+        // Audit (MFA): TOTP secrets are AES-GCM-encrypted at rest. An ephemeral
+        // fallback key (blank MFA_ENCRYPTION_KEY) makes enrolled secrets
+        // unreadable after restart — acceptable for dev, never for prod.
+        requireMfaEncryptionKey();
+        requirePositive("app.security.mfa.period-seconds", 30L);
+        requirePositive("app.security.mfa.reset-token-validity-minutes", 15L);
+    }
+
+    private void requireMfaEncryptionKey() {
+        String mfaKey = environment.getProperty("app.security.mfa.encryption-key-base64", "");
+        if (mfaKey == null || mfaKey.isBlank()) {
+            throw new IllegalStateException(
+                    "Production requires an MFA secret-encryption key: "
+                    + "set MFA_ENCRYPTION_KEY (Base64, 32 bytes).");
+        }
+        final byte[] decoded;
+        try {
+            decoded = Base64.getDecoder().decode(mfaKey.strip());
+        } catch (IllegalArgumentException badBase64) {
+            throw new IllegalStateException(
+                    "Production MFA secret-encryption key is not valid Base64: "
+                    + "set MFA_ENCRYPTION_KEY to 'openssl rand -base64 32' output.");
+        }
+        if (decoded.length != 32) {
+            throw new IllegalStateException(
+                    "Production MFA secret-encryption key must decode to 32 bytes (AES-256), got "
+                    + decoded.length + ". Regenerate with: openssl rand -base64 32");
+        }
     }
 
     private void requireRedisBackend(String property) {

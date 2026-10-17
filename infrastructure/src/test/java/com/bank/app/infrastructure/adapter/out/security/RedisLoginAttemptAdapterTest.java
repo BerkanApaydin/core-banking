@@ -39,7 +39,7 @@ class RedisLoginAttemptAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 15));
+        adapter = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 15, 10000));
     }
 
     private void stubOpsForValue() {
@@ -80,12 +80,12 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldReturnFalseWhenIpBlockingDisabled() {
-        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15)).isIpBlocked(TEST_IP)).isFalse();
+        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15, 10000)).isIpBlocked(TEST_IP)).isFalse();
     }
 
     @Test
     void shouldBlockIpWhenMaxAttemptsIsZeroAndCountPresent() {
-        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
         stubOpsForValue();
         when(valueOps.get("login_attempt:ip:" + TEST_IP)).thenReturn("0");
 
@@ -94,7 +94,7 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldNotBlockIpWhenMaxAttemptsIsZeroAndNoCount() {
-        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
         stubOpsForValue();
         when(valueOps.get("login_attempt:ip:" + TEST_IP)).thenReturn(null);
 
@@ -135,12 +135,12 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldReturnFalseWhenUsernameBlockingDisabled() {
-        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15)).isUsernameBlocked(TEST_USERNAME)).isFalse();
+        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15, 10000)).isUsernameBlocked(TEST_USERNAME)).isFalse();
     }
 
     @Test
     void shouldBlockUsernameWhenMaxAttemptsIsZeroAndCountPresent() {
-        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
         stubOpsForValue();
         when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("0");
 
@@ -149,7 +149,7 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldReturnFalseForNullUsernameEvenWithZeroThreshold() {
-        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15));
+        var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
 
         assertThat(zeroThreshold.isUsernameBlocked(null)).isFalse();
     }
@@ -188,9 +188,9 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldRejectNonPositiveWindowBecauseCountersMustExpire() {
-        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 0)))
+        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, 0, 10000)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, -1)))
+        assertThatThrownBy(() -> new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(5, -1, 10000)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

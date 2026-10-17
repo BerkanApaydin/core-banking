@@ -6,6 +6,7 @@ import com.bank.app.audit.application.port.out.LoadAuditLogPort;
 import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
+import com.bank.app.common.messages.MessageKeys;
 import java.util.List;
 
 /**
@@ -63,10 +64,10 @@ public class GetAuditLogsQueryImpl implements GetAuditLogsQuery {
 
     private void requireAdmin() {
         userContextService.getCurrentUserId()
-                .orElseThrow(() -> new AuthorizationException("error.login_required", null,
+                .orElseThrow(() -> new AuthorizationException(MessageKeys.LOGIN_REQUIRED, null,
                         "You must be logged in to perform this action."));
         if (!userContextService.hasRole(ADMIN_ROLE)) {
-            throw new AuthorizationException("error.admin_required", null, "Admin role required.");
+            throw new AuthorizationException(MessageKeys.ADMIN_REQUIRED, null, "Admin role required.");
         }
     }
 

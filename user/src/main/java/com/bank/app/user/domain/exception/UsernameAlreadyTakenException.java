@@ -2,6 +2,7 @@ package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.messages.MessageKeys;
 
 public class UsernameAlreadyTakenException extends BusinessException {
     private static final long serialVersionUID = 1L;
@@ -13,6 +14,6 @@ public class UsernameAlreadyTakenException extends BusinessException {
     public String getErrorCode() { return "USERNAME_TAKEN"; }
 
     public UsernameAlreadyTakenException(String username) {
-        super("error.username_taken", new Object[]{username}, "Username is already in use: " + username);
+        super(MessageKeys.USERNAME_TAKEN, new Object[]{username}, "Username is already in use: " + username);
     }
 }

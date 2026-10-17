@@ -40,15 +40,46 @@ public abstract class IdempotentOutboxRelay implements OutboxEventPort {
     @Override
     public final void handle(EventEntry event) {
         Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
-        if (!idempotencyPort.tryCreate(dedupKeyPrefix + event.id(), LocalDateTime.now(clock))) {
-            onDuplicateSkipped(event);
-            return;
+        String dedupKey = dedupKeyPrefix + event.id();
+        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now(clock))) {
+            // The key already exists: a previous attempt claimed it. A FAILED
+            // claim is reopened exactly once per retry (tryResetFailed is
+            // conditional on FAILED, so racing workers cannot double-deliver);
+            // any other state is a genuine duplicate and is skipped.
+            if (!reopenFailed(dedupKey, clock)) {
+                onDuplicateSkipped(event);
+                return;
+            }
         }
         try {
             deliver(event);
+            // Terminal reservation (audit P2): retention deletes only
+            // non-PENDING handler keys, so success must leave the key
+            // COMPLETED behind — a perpetual PENDING key would accumulate
+            // forever and defeat handler-key retention.
+            idempotencyPort.markCompleted(dedupKey, event.eventType(), 200);
         } catch (Exception e) {
+            // Audit P2: PENDING→FAILED so a later retry reopens the key via
+            // tryResetFailed instead of mistaking it for a delivered duplicate
+            // (which would mark the event processed without delivery).
+            //
+            // Transaction note: OutboxProcessor invokes relays inside its own
+            // REQUIRES_NEW transaction, so on failure this FAILED write rolls
+            // back together with the claim — the next retry tryCreates fresh
+            // and redelivers (verified, no silent skip in the current wiring).
+            // The FAILED branch above still matters for non-transactional
+            // callers and survives any future split of the key lifecycle into
+            // its own transaction.
+            idempotencyPort.markFailed(dedupKey);
             onDeliveryFailed(event, e);
         }
+    }
+
+    private boolean reopenFailed(String dedupKey, Clock clock) {
+        boolean failed = idempotencyPort.findById(dedupKey)
+                .map(entry -> "FAILED".equals(entry.status()))
+                .orElse(false);
+        return failed && idempotencyPort.tryResetFailed(dedupKey, LocalDateTime.now(clock));
     }
 
     /**

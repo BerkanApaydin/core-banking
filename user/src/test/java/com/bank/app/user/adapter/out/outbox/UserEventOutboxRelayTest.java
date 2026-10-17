@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -185,6 +186,31 @@ class UserEventOutboxRelayTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             UserRegisteredEvent captured = eventCaptor.getValue();
             assertEquals("1", captured.userId());
+            // Shared lifecycle (audit P2/DRY): success completes the key so
+            // handler-key retention can delete it (no perpetual PENDING).
+            verify(idempotencyPort).markCompleted(
+                    eq("outbox_handler_UserEventOutboxHandler_evt-1"), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("should redeliver when the previous attempt failed instead of skipping")
+        void shouldRedeliverAfterFailedAttempt() throws Exception {
+            String json = objectMapper.writeValueAsString(new UserRegisteredEvent(
+                    "1", "testuser", "ROLE_USER", LocalDateTime.now()));
+            OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-10", "User",
+                    "1", "UserRegisteredEvent", json, 0, false, false, null, 0, LocalDateTime.now());
+
+            when(idempotencyPort.tryCreate(eq("outbox_handler_UserEventOutboxHandler_evt-10"), any(LocalDateTime.class)))
+                    .thenReturn(false);
+            when(idempotencyPort.findById("outbox_handler_UserEventOutboxHandler_evt-10"))
+                    .thenReturn(Optional.of(new IdempotencyPort.Entry(
+                            "outbox_handler_UserEventOutboxHandler_evt-10", "FAILED", null, null, LocalDateTime.now())));
+            when(idempotencyPort.tryResetFailed(eq("outbox_handler_UserEventOutboxHandler_evt-10"), any(LocalDateTime.class)))
+                    .thenReturn(true);
+
+            handler.handle(event);
+
+            verify(eventPublisher).publishEvent(any(UserRegisteredEvent.class));
         }
     }
 }

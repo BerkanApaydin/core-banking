@@ -1,5 +1,6 @@
 package com.bank.app.transfer.application.service;
 
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.common.application.service.ResourceOwnershipPolicy;
@@ -42,9 +43,9 @@ public class TransferAuthorizationService {
 
     public void authorizeTransferAccess(Long senderUserId, Long receiverUserId, String errorMessage) {
         ownershipPolicy.requireParticipant(senderUserId, receiverUserId,
-                new AuthorizationException("error.session_not_found", null,
+                new AuthorizationException(MessageKeys.SESSION_NOT_FOUND, null,
                         "Session not found. Please log in again."),
-                new AuthorizationException("error.not_resource_owner", null, errorMessage));
+                new AuthorizationException(MessageKeys.NOT_RESOURCE_OWNER, null, errorMessage));
     }
 
     public String getCurrentUsername() {

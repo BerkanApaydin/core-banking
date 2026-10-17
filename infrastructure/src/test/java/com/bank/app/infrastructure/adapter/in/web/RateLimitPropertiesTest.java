@@ -11,13 +11,15 @@ class RateLimitPropertiesTest {
 
     @Test
     void shouldUseDefaultValues() {
-        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
 
-        assertEquals(11, props.paths().size());
+        assertEquals(13, props.paths().size());
         assertTrue(props.paths().contains("/api/v1/auth/login"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/login"));
         assertTrue(props.paths().contains("/api/v1/auth/refresh"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/refresh"));
+        assertTrue(props.paths().contains("/api/v1/auth/password/reset/request"));
+        assertTrue(props.paths().contains("/api/v1/auth/password/reset/confirm"));
         assertTrue(props.paths().contains("/api/v1/auth/logout"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/logout"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/session"));
@@ -31,15 +33,15 @@ class RateLimitPropertiesTest {
 
     @Test
     void shouldFallBackToDefaultsOnNull() {
-        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
 
-        assertEquals(11, props.paths().size());
+        assertEquals(13, props.paths().size());
         assertEquals("caffeine", props.backend());
     }
 
     @Test
     void shouldKeepCustomValues() {
-        RateLimitProperties props = new RateLimitProperties(List.of("/api/v1/custom"), "redis", 100, 60000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(List.of("/api/v1/custom"), "redis", 100, 60000, 120, 60000, 10000);
 
         assertEquals(List.of("/api/v1/custom"), props.paths());
         assertEquals("redis", props.backend());
@@ -49,14 +51,14 @@ class RateLimitPropertiesTest {
 
     @Test
     void shouldKeepExplicitEmptyPathsAsKillSwitch() {
-        RateLimitProperties props = new RateLimitProperties(List.of(), "caffeine", 10, 10000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(List.of(), "caffeine", 10, 10000, 120, 60000, 10000);
 
         assertTrue(props.paths().isEmpty());
     }
 
     @Test
     void shouldApplyTightAuthTierAndLooseResourceTier() {
-        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
 
         assertTrue(props.isAuthTier("/api/v1/auth/login"));
         assertTrue(props.isAuthTier("/api/v1/auth/browser/session"));
@@ -71,7 +73,7 @@ class RateLimitPropertiesTest {
 
     @Test
     void shouldKeepExplicitZeroMaxRequests() {
-        RateLimitProperties props = new RateLimitProperties(null, null, 0, 10000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 0, 10000, 120, 60000, 10000);
 
         assertEquals(0, props.maxRequests());
     }

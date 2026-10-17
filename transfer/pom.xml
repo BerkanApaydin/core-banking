@@ -76,7 +76,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.transfer.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.transfer}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.transfer}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.transfer.*</param>

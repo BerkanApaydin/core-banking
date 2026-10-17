@@ -41,4 +41,13 @@ class AuthWebRequestTest {
 
         assertFalse(validator.validate(request).isEmpty());
     }
+
+    @Test
+    void shouldRejectOversizedPhone() {
+        // PhoneNumber VO caps at 20 chars (+ optional '+'); the wire shape
+        // must reject longer input up front.
+        var request = new AuthWebRequest("alice", "Secret123", "alice@example.com", "+" + "1".repeat(21));
+
+        assertFalse(validator.validate(request).isEmpty());
+    }
 }

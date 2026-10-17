@@ -40,7 +40,7 @@ public class AuthenticationAdapter implements AuthenticationPort {
                 // a standard message instead of bypassing Role validation.
                 Role role = Role.require(authenticated.getAuthorities().iterator().next().getAuthority());
                 return new AuthenticatedUser(new UserId(principal.getId()), principal.getUsername(), role,
-                        principal.getTokenVersion());
+                        principal.getTokenVersion(), principal.isMfaEnabled());
             } catch (IllegalArgumentException | NullPointerException invalidIdentity) {
                 throw new AuthenticationServiceException("Authentication provider returned an invalid identity", invalidIdentity);
             }

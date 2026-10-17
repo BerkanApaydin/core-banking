@@ -12,7 +12,15 @@ import com.bank.app.infrastructure.adapter.in.handler.RequestProblemHandler;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemMessageResolver;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
+import com.bank.app.user.application.dto.MfaEnrollment;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
+import com.bank.app.user.application.port.in.MfaStatusUseCase;
+import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
+import com.bank.app.user.application.port.in.ConfirmPasswordResetUseCase;
+import com.bank.app.user.application.port.in.DisableMfaUseCase;
+import com.bank.app.user.application.port.in.EnableMfaUseCase;
+import com.bank.app.user.application.port.in.RequestPasswordResetUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
@@ -30,8 +38,11 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -66,6 +77,27 @@ class AuthControllerWebMvcTest {
 
     @MockitoBean
     private RefreshSessionUseCase refreshSessionUseCase;
+
+    @MockitoBean
+    private MfaStatusUseCase mfaStatusUseCase;
+
+    @MockitoBean
+    private EnableMfaUseCase enableMfaUseCase;
+
+    @MockitoBean
+    private ConfirmMfaUseCase confirmMfaUseCase;
+
+    @MockitoBean
+    private DisableMfaUseCase disableMfaUseCase;
+
+    @MockitoBean
+    private RequestPasswordResetUseCase requestPasswordResetUseCase;
+
+    @MockitoBean
+    private ConfirmPasswordResetUseCase confirmPasswordResetUseCase;
+
+    @MockitoBean
+    private UserContextService userContextService;
 
     @BeforeEach
     void setUp() {
@@ -344,6 +376,133 @@ class AuthControllerWebMvcTest {
                     .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"));
 
             verifyNoInteractions(logoutUseCase);
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/auth/mfa/*")
+    class Mfa {
+
+        @Test
+        @DisplayName("should return enrollment status for an authenticated user")
+        void shouldReturnStatus() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+            when(mfaStatusUseCase.isEnabled(7L)).thenReturn(true);
+
+            mockMvc.perform(get("/api/v1/auth/mfa/status"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mfaEnabled").value(true));
+
+            verify(mfaStatusUseCase).isEnabled(7L);
+        }
+
+        @Test
+        @DisplayName("should return 401 on status without authentication")
+        void shouldReturn401OnStatusWithoutAuth() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+            mockMvc.perform(get("/api/v1/auth/mfa/status"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(mfaStatusUseCase);
+        }
+
+        @Test
+        @DisplayName("should return enrollment on enable for an authenticated user")
+        void shouldReturnEnrollmentOnEnable() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+            when(enableMfaUseCase.execute(7L)).thenReturn(
+                    new MfaEnrollment(
+                            "otpauth://totp/x", "JBSWY3DPEHPK3PXP"));
+
+            mockMvc.perform(post("/api/v1/auth/mfa/enable"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.base32Secret").value("JBSWY3DPEHPK3PXP"));
+
+            verify(enableMfaUseCase).execute(7L);
+        }
+
+        @Test
+        @DisplayName("should return 401 on enable without authentication")
+        void shouldReturn401OnEnableWithoutAuth() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+            mockMvc.perform(post("/api/v1/auth/mfa/enable"))
+                    .andExpect(status().isUnauthorized());
+
+            verifyNoInteractions(enableMfaUseCase);
+        }
+
+        @Test
+        @DisplayName("should return 204 on confirm")
+        void shouldReturn204OnConfirm() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+            doNothing().when(confirmMfaUseCase).execute(eq(7L), eq("123456"));
+
+            mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"code\": \"123456\"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(confirmMfaUseCase).execute(7L, "123456");
+        }
+
+        @Test
+        @DisplayName("should return 400 on confirm with a malformed code")
+        void shouldReturn400OnMalformedCode() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+
+            mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"code\": \"abc\"}"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(confirmMfaUseCase);
+        }
+
+        @Test
+        @DisplayName("should return 204 on disable")
+        void shouldReturn204OnDisable() throws Exception {
+            when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+            doNothing().when(disableMfaUseCase).execute(eq(7L), eq("Secret123"), eq("123456"));
+
+            mockMvc.perform(post("/api/v1/auth/mfa/disable")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\": \"Secret123\", \"code\": \"123456\"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(disableMfaUseCase).execute(7L, "Secret123", "123456");
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/auth/password/reset/*")
+    class PasswordReset {
+
+        @Test
+        @DisplayName("should return 202 on reset request regardless of account existence")
+        void shouldReturn202OnRequest() throws Exception {
+            doNothing().when(requestPasswordResetUseCase).execute("alice");
+
+            mockMvc.perform(post("/api/v1/auth/password/reset/request")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"username\": \"alice\"}"))
+                    .andExpect(status().isAccepted());
+
+            verify(requestPasswordResetUseCase).execute("alice");
+        }
+
+        @Test
+        @DisplayName("should return 204 on reset confirm")
+        void shouldReturn204OnConfirm() throws Exception {
+            doNothing().when(confirmPasswordResetUseCase).execute(eq("token-value"), eq("NewStr0ngPass!"));
+
+            mockMvc.perform(post("/api/v1/auth/password/reset/confirm")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"token\": \"token-value\", \"newPassword\": \"NewStr0ngPass!\"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(confirmPasswordResetUseCase).execute("token-value", "NewStr0ngPass!");
         }
     }
 }

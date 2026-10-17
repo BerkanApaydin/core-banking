@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -42,7 +43,7 @@ class PrincipalRateLimitingFilterTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RateLimitProperties props =
-            new RateLimitProperties(null, null, 10, 10_000, 120, 60_000);
+            new RateLimitProperties(null, null, 10, 10_000, 120, 60_000, 10000);
 
     private PrincipalRateLimitingFilter filter() {
         return new PrincipalRateLimitingFilter(rateLimiter, messageSource, props, objectMapper);
@@ -218,8 +219,8 @@ class PrincipalRateLimitingFilterTest {
 
     @Test
     void userIdPrincipalUsesIdBucket() throws Exception {
-        com.bank.app.common.application.port.out.AuthenticatedPrincipalPort port =
-                mock(com.bank.app.common.application.port.out.AuthenticatedPrincipalPort.class);
+        AuthenticatedPrincipalPort port =
+                mock(AuthenticatedPrincipalPort.class);
         when(port.getAuthenticatedUserId()).thenReturn(42L);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(port, null,
@@ -236,8 +237,8 @@ class PrincipalRateLimitingFilterTest {
 
     @Test
     void usernamePrincipalUsesNameBucket() throws Exception {
-        com.bank.app.common.application.port.out.AuthenticatedPrincipalPort port =
-                mock(com.bank.app.common.application.port.out.AuthenticatedPrincipalPort.class);
+        AuthenticatedPrincipalPort port =
+                mock(AuthenticatedPrincipalPort.class);
         when(port.getAuthenticatedUserId()).thenReturn(null);
         when(port.getAuthenticatedUsername()).thenReturn("carol");
         SecurityContextHolder.getContext().setAuthentication(
@@ -255,7 +256,7 @@ class PrincipalRateLimitingFilterTest {
 
     @Test
     void resourceTierRetryAfterComesFromResourceWindow() throws Exception {
-        RateLimitProperties tight = new RateLimitProperties(null, null, 10, 10_000, 2, 1_000);
+        RateLimitProperties tight = new RateLimitProperties(null, null, 10, 10_000, 2, 1_000, 10000);
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(tight);
         PrincipalRateLimitingFilter tightFilter =
                 new PrincipalRateLimitingFilter(limiter, messageSource, tight, objectMapper);

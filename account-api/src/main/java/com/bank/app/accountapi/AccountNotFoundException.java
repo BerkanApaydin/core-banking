@@ -3,6 +3,7 @@ package com.bank.app.accountapi;
 import com.bank.app.common.domain.IbanLogMask;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.messages.MessageKeys;
 
 /**
  * Not-found signal of the Account published language.
@@ -24,12 +25,12 @@ public class AccountNotFoundException extends BusinessException {
     public BusinessFailureKind getFailureKind() { return BusinessFailureKind.NOT_FOUND; }
 
     public AccountNotFoundException(Long id) {
-        super("error.account_not_found_id", new Object[]{id}, "Account not found. ID: " + id);
+        super(MessageKeys.ACCOUNT_NOT_FOUND_ID, new Object[]{id}, "Account not found. ID: " + id);
     }
 
     public AccountNotFoundException(String iban) {
         // O-12: never echo the full IBAN to logs or API responses.
-        super("error.account_not_found_iban", new Object[]{IbanLogMask.mask(iban)},
+        super(MessageKeys.ACCOUNT_NOT_FOUND_IBAN, new Object[]{IbanLogMask.mask(iban)},
                 "Account not found. IBAN: " + IbanLogMask.mask(iban));
     }
 }

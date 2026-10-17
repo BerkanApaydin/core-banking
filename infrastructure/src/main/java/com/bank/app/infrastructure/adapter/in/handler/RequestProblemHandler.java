@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class RequestProblemHandler {
         // is unauthenticated — 401, never the 500 fallback. The header name is
         // returned; the header value is never echoed.
         log.warn("Missing required header: {}", ex.getHeaderName());
-        String message = messages.resolveOrDefault("error.authentication_failed", "Authentication failed.");
+        String message = messages.resolveOrDefault(MessageKeys.AUTHENTICATION_FAILED, "Authentication failed.");
         return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
     }
 
@@ -131,7 +132,7 @@ public class RequestProblemHandler {
         // Never echo raw exception messages: they may carry SQL fragments,
         // paths, or validation internals. Log the detail, return a generic key.
         log.warn("Invalid argument rejected: {}", ex.getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.invalid_argument", "Invalid request argument.");
+        String message = messages.resolveOrDefault(MessageKeys.INVALID_ARGUMENT, "Invalid request argument.");
         return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
     }
 
@@ -141,13 +142,13 @@ public class RequestProblemHandler {
         // (BigDecimal divide/remainder/setScale with UNNECESSARY). A decimal
         // shape failure is a client input error (400), never a 500.
         log.warn("Arithmetic rejected: {}", ex.getClass().getSimpleName());
-        String message = messages.resolveOrDefault("error.invalid_argument", "Invalid request argument.");
+        String message = messages.resolveOrDefault(MessageKeys.INVALID_ARGUMENT, "Invalid request argument.");
         return ProblemDetailFactory.create(ErrorCode.INVALID_ARGUMENT, message, request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ProblemDetail> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex, WebRequest request) {
-        String message = messages.resolveMessage("error.invalid_format");
+        String message = messages.resolveMessage(MessageKeys.INVALID_FORMAT);
         ErrorCode code = ErrorCode.INVALID_FORMAT;
         if (ex.getCause() instanceof InvalidFormatException invalidFormatException) {
             if (invalidFormatException.getTargetType() != null && invalidFormatException.getTargetType().isEnum()) {
@@ -156,7 +157,7 @@ public class RequestProblemHandler {
                 // safe to render. The rejected value goes to the log only.
                 log.warn("Invalid enum value rejected for {}",
                         invalidFormatException.getTargetType().getSimpleName());
-                message = messages.resolveMessage("error.invalid_enum_value",
+                message = messages.resolveMessage(MessageKeys.INVALID_ENUM_VALUE,
                         new Object[]{Arrays.toString(
                                 invalidFormatException.getTargetType().getEnumConstants())});
                 code = ErrorCode.INVALID_ENUM_VALUE;
@@ -167,7 +168,7 @@ public class RequestProblemHandler {
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ProblemDetail> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex, WebRequest request) {
-        String message = messages.resolveMessage("error.unsupported_media_type",
+        String message = messages.resolveMessage(MessageKeys.UNSUPPORTED_MEDIA_TYPE,
                 new Object[]{ex.getContentType()});
         return ProblemDetailFactory.create(ErrorCode.UNSUPPORTED_MEDIA_TYPE, message, request);
     }
@@ -177,7 +178,7 @@ public class RequestProblemHandler {
         // D12/K13: never echo ex.getMessage() — it reflects the request
         // method and supported methods. Fixed catalog message instead.
         log.warn("Method not supported: {}", ex.getMethod());
-        String message = messages.resolveOrDefault("error.method_not_allowed",
+        String message = messages.resolveOrDefault(MessageKeys.METHOD_NOT_ALLOWED,
                 "Request method is not supported for this endpoint.");
         return ProblemDetailFactory.create(ErrorCode.METHOD_NOT_ALLOWED, message, request);
     }
@@ -187,7 +188,7 @@ public class RequestProblemHandler {
         // D12/K13: never echo ex.getMessage() — it reflects the request path
         // (reflected content). Fixed catalog message instead.
         log.warn("No resource found for HTTP method: {}", ex.getHttpMethod());
-        String message = messages.resolveOrDefault("error.resource_not_found",
+        String message = messages.resolveOrDefault(MessageKeys.RESOURCE_NOT_FOUND,
                 "The requested resource was not found.");
         return ProblemDetailFactory.create(ErrorCode.RESOURCE_NOT_FOUND, message, request);
     }

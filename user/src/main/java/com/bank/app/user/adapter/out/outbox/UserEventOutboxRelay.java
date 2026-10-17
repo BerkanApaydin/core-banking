@@ -1,8 +1,8 @@
 package com.bank.app.user.adapter.out.outbox;
 
+import com.bank.app.common.application.outbox.IdempotentOutboxRelay;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
-import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
 import com.bank.app.user.domain.UserRegisteredEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,11 +11,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
-
+/**
+ * Relay for {@code UserRegisteredEvent}.
+ *
+ * <p>Audit DRY follow-up: this relay hand-rolled the claim-then-deliver dedup
+ * instead of inheriting it, duplicating {@link IdempotentOutboxRelay} line by
+ * line (minus the key lifecycle). It now extends the shared skeleton and only
+ * owns its event type, payload mapping and log lines — including the delivery
+ * lifecycle fix (markCompleted/markFailed + FAILED reopen) for free.
+ */
 @Component
-public class UserEventOutboxRelay implements OutboxEventPort {
+public class UserEventOutboxRelay extends IdempotentOutboxRelay {
 
     private static final Logger log = LoggerFactory.getLogger(UserEventOutboxRelay.class);
     // NOTE: literal intentionally keeps the pre-rename handler name: dedup keys are
@@ -24,17 +30,14 @@ public class UserEventOutboxRelay implements OutboxEventPort {
 
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
-    private final IdempotencyPort idempotencyPort;
-    private final ClockProviderPort clockProvider;
 
     public UserEventOutboxRelay(ObjectMapper objectMapper,
                                    ApplicationEventPublisher eventPublisher,
                                    IdempotencyPort idempotencyPort,
                                    ClockProviderPort clockProvider) {
+        super(idempotencyPort, clockProvider, DEDUP_KEY_PREFIX);
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
-        this.idempotencyPort = idempotencyPort;
-        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -43,23 +46,22 @@ public class UserEventOutboxRelay implements OutboxEventPort {
     }
 
     @Override
-    public void handle(EventEntry event) {
-        String dedupKey = DEDUP_KEY_PREFIX + event.id();
-        Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
-        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now(clock))) {
-            log.info("Duplicate outbox event detected, skipping. handler=UserEventOutboxRelay, eventId={}", event.id());
-            return;
-        }
+    protected void deliver(EventEntry event) throws Exception {
+        UserRegisteredEvent userEvent = objectMapper.readValue(
+                event.payload(), UserRegisteredEvent.class);
+        eventPublisher.publishEvent(userEvent);
+        log.debug("Published UserRegisteredEvent: id={}", event.id());
+    }
 
-        try {
-            UserRegisteredEvent userEvent = objectMapper.readValue(
-                    event.payload(), UserRegisteredEvent.class);
-            eventPublisher.publishEvent(userEvent);
-            log.debug("Published UserRegisteredEvent: id={}", event.id());
-        } catch (Exception e) {
-            log.error("Failed to handle UserRegisteredEvent: id={}, failureType={}",
-                    event.id(), e.getClass().getName());
-            throw new RuntimeException("UserEventOutboxRelay failed", e);
-        }
+    @Override
+    protected void onDuplicateSkipped(EventEntry event) {
+        log.info("Duplicate outbox event detected, skipping. handler=UserEventOutboxRelay, eventId={}", event.id());
+    }
+
+    @Override
+    protected void onDeliveryFailed(EventEntry event, Exception failure) {
+        log.error("Failed to handle UserRegisteredEvent: id={}, failureType={}",
+                event.id(), failure.getClass().getName());
+        super.onDeliveryFailed(event, failure);
     }
 }

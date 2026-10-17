@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
@@ -82,7 +83,7 @@ public class RequestBodySizeLimitFilter implements Filter {
 
     private void reject(HttpServletResponse httpResponse, String path, long maxBytes) throws IOException {
         log.warn("Oversized request body rejected: path={}, limitBytes={}", path, maxBytes);
-        String message = messageSource.getMessage("error.request_body_too_large", null,
+        String message = messageSource.getMessage(MessageKeys.REQUEST_BODY_TOO_LARGE, null,
                 "Request body is too large.", LocaleContextHolder.getLocale());
         ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.PAYLOAD_TOO_LARGE,
                 "REQUEST_BODY_TOO_LARGE", message, path);

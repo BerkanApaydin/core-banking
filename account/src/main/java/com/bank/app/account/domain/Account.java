@@ -11,6 +11,7 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.common.domain.exception.InvalidAmountException;
+import com.bank.app.common.messages.MessageKeys;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -57,7 +58,7 @@ public class Account extends BaseAggregateRoot {
         this.status = Objects.requireNonNull(status, "Account status must not be null");
         if (status == AccountStatus.CLOSED && !balance.isZero()) {
             throw new InsufficientBalanceException(
-                "error.account_close_balance_not_zero",
+                MessageKeys.ACCOUNT_CLOSE_BALANCE_NOT_ZERO,
                 new Object[]{this.balance.amount(), this.balance.currency().name()},
                 "Balance must be zero for closure. Current: " + this.balance.amount() + " " + this.balance.currency()
             );
@@ -142,7 +143,7 @@ public class Account extends BaseAggregateRoot {
         }
         if (!this.balance.isGreaterThanOrEqual(amount)) {
             throw new InsufficientBalanceException(
-                "error.insufficient_balance",
+                MessageKeys.INSUFFICIENT_BALANCE,
                 new Object[]{this.balance.amount(), this.balance.currency().name(), amount.amount(), amount.currency().name()},
                 "Insufficient balance. Current: " + this.balance.amount() + " " + this.balance.currency() +
                 ", Requested: " + amount.amount() + " " + amount.currency()
@@ -166,7 +167,7 @@ public class Account extends BaseAggregateRoot {
         Money updated = this.balance.add(amount);
         if (updated.amount().compareTo(BalanceLimits.MAX_BALANCE_AMOUNT) > 0) {
             throw new AccountBalanceLimitExceededException(
-                "error.account_balance_limit_exceeded",
+                MessageKeys.ACCOUNT_BALANCE_LIMIT_EXCEEDED,
                 new Object[]{BalanceLimits.MAX_BALANCE_AMOUNT, updated.amount()},
                 "Crediting would exceed the maximum balance of " + BalanceLimits.MAX_BALANCE
                     + ": " + updated.amount() + " " + updated.currency());
@@ -192,7 +193,7 @@ public class Account extends BaseAggregateRoot {
         }
         if (!this.balance.isZero()) {
             throw new InsufficientBalanceException(
-                "error.account_close_balance_not_zero",
+                MessageKeys.ACCOUNT_CLOSE_BALANCE_NOT_ZERO,
                 new Object[]{this.balance.amount(), this.balance.currency().name()},
                 "Balance must be zero for closure. Current: " + this.balance.amount() + " " + this.balance.currency()
             );

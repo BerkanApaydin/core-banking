@@ -55,6 +55,9 @@ public final class ProblemDetailFactory {
      */
     static void renderOnto(ProblemDetail problemDetail, ProblemBody body) {
         // No explicit setTitle: forStatusAndDetail already carries the reason phrase.
+        // Semantic type (audit: previously about:blank): derived from the wire
+        // code via ProblemBody so both renderers stay identical.
+        problemDetail.setType(URI.create(body.problemType()));
         if (body.instance() != null) {
             try {
                 problemDetail.setInstance(URI.create(body.instance()));

@@ -216,7 +216,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.app}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.app}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.*</param>

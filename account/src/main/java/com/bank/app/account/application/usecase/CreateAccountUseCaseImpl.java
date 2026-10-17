@@ -21,6 +21,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.exception.AuthorizationException;
+import com.bank.app.common.messages.MessageKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
@@ -64,7 +65,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
         accountAuthorizationService.authorizeUserAction(request.userId(), "You cannot create an account on behalf of another user.");
 
         if (!demoFundingEnabled && request.initialBalance().compareTo(BigDecimal.ZERO) > 0) {
-            throw new AuthorizationException("error.demo_funding_disabled", null,
+            throw new AuthorizationException(MessageKeys.DEMO_FUNDING_DISABLED, null,
                     "Initial funding is available only in demo mode.");
         }
 

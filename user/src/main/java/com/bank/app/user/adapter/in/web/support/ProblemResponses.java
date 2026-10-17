@@ -57,6 +57,9 @@ public final class ProblemResponses {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, message);
         // No explicit setTitle: forStatusAndDetail already carries the reason
         // phrase, so a duplicate call would be an equivalent mutant.
+        // Semantic type (audit: previously about:blank): same derivation as
+        // ProblemDetailFactory via ProblemBody — the shape contract pins both.
+        detail.setType(URI.create(body.problemType()));
         if (body.instance() != null) {
             try {
                 detail.setInstance(URI.create(body.instance()));

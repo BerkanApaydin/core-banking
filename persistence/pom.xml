@@ -29,7 +29,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.persistence.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.persistence}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.persistence}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.persistence.*</param>

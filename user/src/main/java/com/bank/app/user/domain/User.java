@@ -22,6 +22,13 @@ public class User extends BaseAggregateRoot {
      * outstanding session at its next refresh (see RefreshSessionUseCaseImpl).
      */
     private long tokenVersion;
+    /**
+     * MFA enrollment flag (V54): when true, login additionally requires a
+     * TOTP code verified against the secret stored (encrypted) on the users
+     * row. The secret itself never enters the domain — it travels through
+     * {@code MfaSecretPort} only.
+     */
+    private boolean mfaEnabled;
 
     public User(UserId id, String username, String password, Role role) {
         this(id, username, password, role, null, null);
@@ -163,6 +170,31 @@ public class User extends BaseAggregateRoot {
     public void assignRole(Role newRole) {
         this.role = Objects.requireNonNull(newRole, "Role must not be null");
         this.tokenVersion++;
+    }
+
+    /**
+     * Marks MFA enrollment complete (called after the TOTP code confirms the
+     * user actually enrolled the secret). This setter is a plain state flip;
+     * the use-case layer guards re-confirmation with
+     * {@code MfaAlreadyEnabledException} (409), so callers must check
+     * {@link #isMfaEnabled()} first instead of relying on idempotence here.
+     */
+    public void enableMfa() {
+        this.mfaEnabled = true;
+    }
+
+    /**
+     * Removes the second factor (the encrypted secret is deleted through
+     * {@code MfaSecretPort} by the same flow). Disabling is effective on the
+     * next login — outstanding sessions keep working until refresh, same as
+     * the G-2 trade-off for role changes.
+     */
+    public void disableMfa() {
+        this.mfaEnabled = false;
+    }
+
+    public boolean isMfaEnabled() {
+        return mfaEnabled;
     }
 
     public boolean hasRole(Role requiredRole) {

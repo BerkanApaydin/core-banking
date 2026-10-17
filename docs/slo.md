@@ -42,10 +42,11 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
   traffic).
 - Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG
   ≥200 or PgBouncer (`k8s/bank-app.yaml:106-111`, `docs/operations.md`).
-  Post-parallelization outbox ceiling is ~100-200 ev/s (4 workers per
+  Post-parallelization outbox ceiling is ~100-200 ev/s (default 4 workers per
   partition, capped at 12 total so `REQUIRES_NEW` workers can never exhaust
   the 20-connection Hikari pool — raising `partition-count` past 3 no longer
-  adds workers, only scan sharding); beyond that, the
+  adds workers, only scan sharding; both bounds are now configurable via
+  `app.outbox.worker-threads-per-partition` / `app.outbox.max-worker-threads`); beyond that, the
   `docs/decisions/kafka-readiness.md` trigger applies.
 - Reconciliation: `LedgerReconciliationJob` (03:30 cron) + `ledger.nonzero`
   counter; nonzero pages (critical), drill procedure in

@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.in.scheduler;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
+import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
@@ -39,10 +40,13 @@ import org.springframework.stereotype.Component;
  * up as {@code TransferNotPendingException} / optimistic-lock failure. Those
  * are counted, not retried: the other writer won legitimately.
  *
- * <p>No domain-event publish: there is no outbox relay for FAILED yet, and an
- * unhandled event type would poison the outbox (see
- * {@code docs/decisions/transfer-failed-state.md}). The audit row below is
- * the trail until a FAILED consumer lands.
+ * <p>Domain-event publish: the FAILED transition is published to the outbox
+ * from the same REQUIRES_NEW transaction (see {@code doReapRow}), so
+ * downstream consumers learn about reaped transfers through
+ * {@code TransferFailedOutboxRelay} instead of only the audit trail.
+ * The save and the publish commit atomically: if outbox persistence
+ * throws, the FAILED row rolls back with it and the next schedule
+ * retries the row (no silent loss, no half-published state).
  *
  * <p>Transactionality: each row is processed in its own
  * {@code REQUIRES_NEW} transaction through {@link TransactionBoundaryPort},
@@ -65,6 +69,7 @@ public class TransferPendingReaper {
     private final LoadTransferPort loadTransferPort;
     private final SaveTransferPort saveTransferPort;
     private final AuditEventPort auditEventPort;
+    private final DomainEventPublisherService domainEventPublisherService;
     private final TransferReaperProperties properties;
     private final ClockProviderPort clockProvider;
     private final MeterRegistry meterRegistry;
@@ -73,9 +78,11 @@ public class TransferPendingReaper {
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
             AuditEventPort auditEventPort,
+            DomainEventPublisherService domainEventPublisherService,
             TransferReaperProperties properties,
             ClockProviderPort clockProvider) {
-        this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, null, null);
+        this(loadTransferPort, saveTransferPort, auditEventPort, domainEventPublisherService,
+                properties, clockProvider, null, null);
     }
 
     /**
@@ -85,16 +92,19 @@ public class TransferPendingReaper {
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
             AuditEventPort auditEventPort,
+            DomainEventPublisherService domainEventPublisherService,
             TransferReaperProperties properties,
             ClockProviderPort clockProvider,
             @Nullable MeterRegistry meterRegistry) {
-        this(loadTransferPort, saveTransferPort, auditEventPort, properties, clockProvider, meterRegistry, null);
+        this(loadTransferPort, saveTransferPort, auditEventPort, domainEventPublisherService,
+                properties, clockProvider, meterRegistry, null);
     }
 
     @Autowired
     public TransferPendingReaper(LoadTransferPort loadTransferPort,
             SaveTransferPort saveTransferPort,
             AuditEventPort auditEventPort,
+            DomainEventPublisherService domainEventPublisherService,
             TransferReaperProperties properties,
             ClockProviderPort clockProvider,
             @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
@@ -102,6 +112,7 @@ public class TransferPendingReaper {
         this.loadTransferPort = loadTransferPort;
         this.saveTransferPort = saveTransferPort;
         this.auditEventPort = auditEventPort;
+        this.domainEventPublisherService = domainEventPublisherService;
         this.properties = properties;
         this.clockProvider = clockProvider;
         this.meterRegistry = meterRegistry;
@@ -170,6 +181,13 @@ public class TransferPendingReaper {
         }
         locked.markFailed(clock);
         saveTransferPort.save(locked);
+        // Publish AFTER the save but INSIDE the same REQUIRES_NEW transaction
+        // (atomic commit — a publish failure rolls the FAILED row back with it
+        // and the next schedule retries the row; see transfer-failed-state.md).
+        // markFailed registered the event on locked (which carries the ID);
+        // the bulk-UPDATE save returns a fresh aggregate without events, so
+        // publishing from locked is required, not from the save result.
+        domainEventPublisherService.publishEvents(locked);
         auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_MARKED_FAILED,
                 "Stale PENDING transfer marked FAILED by reaper. Transfer ID: " + id,
                 LocalDateTime.now(clock), "system"));

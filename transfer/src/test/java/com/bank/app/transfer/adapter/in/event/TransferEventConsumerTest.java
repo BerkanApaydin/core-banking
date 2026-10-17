@@ -5,6 +5,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,17 @@ class TransferEventConsumerTest {
 
         verify(email).notifyTransferCancelled(event);
         verify(sms).notifyTransferCancelled(event);
+    }
+
+    @Test
+    void shouldFanOutFailedToEveryChannel() {
+        AsyncTransferFailedEvent event = new AsyncTransferFailedEvent(4L, 10L, 20L,
+                Money.of("25.00", Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
+
+        new TransferEventConsumer(List.of(email, sms)).handleTransferFailed(event);
+
+        verify(email).notifyTransferFailed(event);
+        verify(sms).notifyTransferFailed(event);
     }
 
     @Test

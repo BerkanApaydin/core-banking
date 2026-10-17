@@ -197,6 +197,7 @@ jobs:
         python3 scripts/check_test_injection.py
         python3 scripts/check_error_keys.py
         python3 scripts/check_migration_timeouts.py
+        python3 scripts/check_code_health.py
         grep -q "kind: HorizontalPodAutoscaler" k8s/bank-app.yaml
         grep -q "kind: PodDisruptionBudget" k8s/bank-app.yaml
         test -f docker-compose.prod.yml

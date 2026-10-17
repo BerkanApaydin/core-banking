@@ -76,6 +76,20 @@ spec:
                 secretKeyRef:
                   name: bank-jwt-secret
                   key: secret
+            # Audit (MFA, S11/D23): AES-256 key (Base64, 32 bytes) for
+            # TOTP-secret encryption at rest. REQUIRED in prod: with the
+            # shipped SPRING_PROFILES_ACTIVE=prod,
+            # ApplicationStartupValidator refuses to boot without it.
+            # Create alongside the other secrets, e.g.:
+            # kubectl create secret generic bank-mfa-secret \
+            #   --from-literal=encryption-key="$(openssl rand -base64 32)"
+            # Rotating this key invalidates every enrolled secret (AES-GCM):
+            # enrolled users must re-enroll — see docs/decisions/secret-management.md.
+            - name: MFA_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-mfa-secret
+                  key: encryption-key
             - name: REDIS_HOST
               value: redis
             - name: REDIS_PORT

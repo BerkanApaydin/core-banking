@@ -30,7 +30,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.accountapi.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.accountApi}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.accountApi}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.accountapi.*</param>

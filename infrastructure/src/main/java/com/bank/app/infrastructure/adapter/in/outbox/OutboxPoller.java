@@ -69,13 +69,15 @@ public class OutboxPoller {
         verifyPendingPartitionsAreCovered(partitionCount);
 
         int threadCount = partitionCount <= 0 ? 1 : partitionCount;
-        // PERF-8: 4 workers per partition (I/O-bound handler work), capped at
-        // 12 — not 32. Each worker holds a REQUIRES_NEW transaction (one Hikari
-        // connection), and the pool is 20: 32 workers plus poller/HTTP threads
-        // saturate Hikari, so recordFailure's connection is skipped and
+        // PERF-8: workers per partition (I/O-bound handler work), capped at
+        // maxWorkerThreads — not 32. Each worker holds a REQUIRES_NEW transaction
+        // (one Hikari connection), and the pool is 20: 32 workers plus poller/HTTP
+        // threads saturate Hikari, so recordFailure's connection is skipped and
         // retry/dead-letter accounting silently drops. 12 workers (3x default
-        // 2 partitions x 4) leaves headroom for web traffic.
-        int workerThreads = Math.min(Math.max(threadCount * 4, 4), 12);
+        // 2 partitions x 4) leaves headroom for web traffic. Both bounds live in
+        // OutboxProperties (audit: previously magic literals here).
+        int workerThreads = Math.min(Math.max(threadCount * outboxProperties.workerThreadsPerPartition(), 4),
+                outboxProperties.maxWorkerThreads());
         workers = Executors.newFixedThreadPool(workerThreads, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger();
             @Override
@@ -221,11 +223,13 @@ public class OutboxPoller {
         for (Future<?> f : futures) {
             try {
                 // PERF-8: bounded wait — an untimed get() parks the partition
-                // thread for the full 30s tx timeout when a handler hangs.
-                f.get(30, TimeUnit.SECONDS);
+                // thread for the full tx timeout when a handler hangs. Bound
+                // lives in OutboxProperties (audit: previously a magic 30s here).
+                f.get(outboxProperties.workerTimeoutSeconds(), TimeUnit.SECONDS);
             } catch (TimeoutException timeout) {
                 f.cancel(true);
-                log.warn("Outbox worker timed out after 30s; task cancelled");
+                log.warn("Outbox worker timed out after {}s; task cancelled",
+                        outboxProperties.workerTimeoutSeconds());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

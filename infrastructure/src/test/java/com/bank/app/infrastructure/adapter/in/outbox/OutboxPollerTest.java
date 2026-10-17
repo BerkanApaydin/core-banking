@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -39,7 +40,7 @@ class OutboxPollerTest {
 
     private OutboxPoller outboxPoller;
 
-    private final OutboxProperties outboxProperties = new OutboxProperties(5, 50, 0, 2000, 30);
+    private final OutboxProperties outboxProperties = new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30);
 
     @BeforeEach
     void setUp() {
@@ -84,7 +85,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldProcessEachPartitionWhenPartitionCountIsPositive() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30, 4, 12, 30));
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(event("e0")));
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
         when(outboxPort.findAndLockUnprocessed(50, 2)).thenReturn(List.of(event("e2")));
@@ -96,7 +97,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldSkipEmptyPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of());
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
 
@@ -107,7 +108,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldRefuseStartupWhenPendingEventsUseUnpolledPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(3L);
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, outboxPoller::start);
@@ -120,7 +121,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldRefuseManualPollingWhenPendingEventsUseUnpolledPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(1L);
 
         assertThrows(IllegalStateException.class, outboxPoller::pollAndProcessEvents);
@@ -168,7 +169,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldFanOutBatchAcrossWorkersWhenPoolAvailable() throws Exception {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         List<EventEntry> events = List.of(event("w1"), event("w2"), event("w3"));
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(events);
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of());
@@ -193,7 +194,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldRecordFailureFromWorkerThreadWithoutSkippingBatch() throws Exception {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 1, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 1, 2000, 30, 4, 12, 30));
         EventEntry ok = event("ok");
         EventEntry bad = event("bad");
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(ok, bad));
@@ -250,7 +251,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldIgnorePendingOutsideRangeWhenUnpartitioned() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 0, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
         // Unpartitioned mode never queries the pending-range guard; lenient so the
         // boundary mutant (<=0 -> <0, which would query and throw on 5L) still fails.
         lenient().when(outboxPort.countPendingOutsidePartitionRange(0)).thenReturn(5L);
@@ -263,7 +264,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldProcessExactlyPartitionCountPartitions() {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(0L);
         when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(event("e0")));
         when(outboxPort.findAndLockUnprocessed(50, 1)).thenReturn(List.of(event("e1")));
@@ -278,7 +279,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldStartPartitionedPollerAndStop() throws Exception {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30));
         when(outboxPort.countPendingOutsidePartitionRange(2)).thenReturn(0L);
 
         outboxPoller.start();
@@ -295,14 +296,14 @@ class OutboxPollerTest {
 
     @Test
     void shouldSizeWorkerPoolAtTwelveForThreePartitions() throws Exception {
-        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30));
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor, new OutboxProperties(5, 50, 3, 2000, 30, 4, 12, 30));
         when(outboxPort.countPendingOutsidePartitionRange(3)).thenReturn(0L);
 
         outboxPoller.start();
         try {
             var field = OutboxPoller.class.getDeclaredField("workers");
             field.setAccessible(true);
-            var workers = (java.util.concurrent.ThreadPoolExecutor) field.get(outboxPoller);
+            var workers = (ThreadPoolExecutor) field.get(outboxPoller);
             assertEquals(12, workers.getCorePoolSize());
         } finally {
             outboxPoller.stop();

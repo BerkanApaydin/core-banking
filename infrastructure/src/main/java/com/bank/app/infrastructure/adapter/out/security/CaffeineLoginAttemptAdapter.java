@@ -25,11 +25,11 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
         this.windowMinutes = properties.windowMinutes();
         this.ipCache = Caffeine.newBuilder()
                 .expireAfterWrite(windowMinutes, TimeUnit.MINUTES)
-                .maximumSize(10000)
+                .maximumSize(properties.cacheMaxSize())
                 .build();
         this.usernameCache = Caffeine.newBuilder()
                 .expireAfterWrite(windowMinutes, TimeUnit.MINUTES)
-                .maximumSize(10000)
+                .maximumSize(properties.cacheMaxSize())
                 .build();
     }
 

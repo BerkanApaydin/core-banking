@@ -35,10 +35,17 @@ transfers and `Transfer.markFailed()` had no production caller (see
    15 min) stays far above the 30 s use-case transaction timeout so slow
    placements are never reaped. Covered by
    `TransferPendingReaperIntegrationTest` against real PostgreSQL.
-3. **No domain-event publish.** There is no outbox relay for FAILED yet; an
-   unhandled event type would poison the outbox. The `TRANSFER_MARKED_FAILED`
-   audit row is the trail until a FAILED consumer lands (then wire
-   `DomainEventPublisherService` + relay first).
+3. **FAILED is published to the outbox from the same row transaction**
+   (R-2, audit follow-up): the `markFailed` event rides
+   `DomainEventPublisherService` into the outbox alongside the status save
+   and the audit row, and `TransferFailedOutboxRelay` delivers it to
+   `TransferEventConsumer` (at-least-once + persistent dedup, same contract
+   as COMPLETED/CANCELLED). Save and publish commit **atomically** in the
+   same `REQUIRES_NEW` transaction: if outbox persistence throws, the
+   FAILED row rolls back with it and the next schedule retries the row
+   (no silent loss, no half-published state). Previously this point read
+   "a publish failure still leaves the FAILED row behind" — that was
+   inaccurate for this wiring and has been corrected.
 4. **Per-row isolation:** one poisoned row never starves the batch; a failed
    scan only delays detection (next schedule retries). Counters
    `transfer.pending.reaped` / `transfer.pending.reap-conflicts` feed the
@@ -62,3 +69,4 @@ transfers and `Transfer.markFailed()` had no production caller (see
 - Raw-SQL status flip: rejected — bypasses the domain transition guard and
   the `@Version` check; a racing completion could be silently overwritten.
 - FAILED over outbox publish: rejected until a relay exists (poison risk).
+  (Superseded by R-2: `TransferFailedOutboxRelay` landed; see point 3.)

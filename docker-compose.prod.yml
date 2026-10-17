@@ -6,6 +6,8 @@
 #  - SPRING_PROFILES_ACTIVE is pinned to prod (no dev fallback, no insecure secret).
 #  - JWT_SECRET and DB_PASSWORD are REQUIRED: the ${VAR:?message} form fails
 #    fast with a readable error instead of booting a publicly-known key.
+#  - MFA_ENCRYPTION_KEY is REQUIRED too: prod boots with fail-fast validation
+#    and TOTP secrets cannot encrypt without it (generate: openssl rand -base64 32).
 #  - No published database ports: the DB is reachable only inside the compose
 #    network (no localhost exposure). The app keeps :8080 for smoke checks.
 #  - Token-blacklist / rate-limit / cache backends are Redis (prod contract,
@@ -49,6 +51,10 @@ services:
       # Generate with: openssl rand -base64 32 (must decode to >= 32 bytes).
       JWT_SECRET: ${JWT_SECRET:?prod requires JWT_SECRET}
       JWT_ALLOW_DEFAULT_SECRET: "false"
+      # TOTP-secret encryption at rest (AES-256, Base64, 32 bytes). Same
+      # fail-fast contract as JWT_SECRET above; see
+      # docs/decisions/secret-management.md (rotation invalidates enrollments).
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?prod requires MFA_ENCRYPTION_KEY}
       FAILED_LOGIN_BACKEND: redis
       RATE_LIMIT_BACKEND: redis
       TOKEN_BLACKLIST_BACKEND: hybrid

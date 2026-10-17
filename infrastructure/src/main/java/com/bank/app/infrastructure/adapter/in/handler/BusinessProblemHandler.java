@@ -4,6 +4,7 @@ import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,7 @@ public class BusinessProblemHandler {
         } else {
             log.trace("Optimistic lock conflict (unmetered): {}", ex.getClass().getSimpleName());
         }
-        String message = messages.resolveMessage("error.optimistic_lock_conflict");
+        String message = messages.resolveMessage(MessageKeys.OPTIMISTIC_LOCK_CONFLICT);
         return ProblemDetailFactory.create(ErrorCode.OPTIMISTIC_LOCK_CONFLICT, message, request);
     }
 

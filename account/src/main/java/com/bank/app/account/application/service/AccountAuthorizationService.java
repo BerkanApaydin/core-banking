@@ -3,6 +3,7 @@ package com.bank.app.account.application.service;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.domain.exception.AuthorizationException;
+import com.bank.app.common.messages.MessageKeys;
 
 public class AccountAuthorizationService {
 
@@ -26,7 +27,7 @@ public class AccountAuthorizationService {
     }
 
     public Long getCurrentUserId() {
-        return ownershipPolicy.currentUserIdOrThrow(new AuthorizationException("error.login_required", null,
+        return ownershipPolicy.currentUserIdOrThrow(new AuthorizationException(MessageKeys.LOGIN_REQUIRED, null,
                 "You must be logged in to perform this action."));
     }
 

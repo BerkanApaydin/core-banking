@@ -84,6 +84,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
+    // Audit #4: doFilterInternal was a 133-line long method with five interleaved
+    // decisions (refresh bypass, token extraction, signature, blacklist, token
+    // type, admin version, CSRF). Each decision below is now a named predicate
+    // that either rejects (writing the response, returning true) or passes
+    // (returning false); doFilterInternal only orchestrates. Behavior is
+    // unchanged — every branch keeps its original status/code/message.
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -91,7 +97,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         final String authHeader = request.getHeader(HEADER_AUTHORIZATION);
-        final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
         final String path = FilterRequestDecisions.requestPath(request);
         // Refresh endpoints own their authentication entirely (refresh token
         // in body or cookie, validated by the controller): an expired or
@@ -101,18 +106,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        // The browser session cookie is for API calls. Browsers also send it
-        // with / and static assets; an expired cookie must not prevent the
-        // public application shell from loading so it can show the login UI.
-        // Refresh endpoints authenticate with the refresh token itself (like
-        // login authenticates with a password), so they never require a
-        // valid session up front.
-        final boolean browserAuth = authHeader == null
-                && path.startsWith("/api/")
-                && !FilterRequestDecisions.isPublicLogin(request, path)
-                && !FilterRequestDecisions.isRefreshRequest(request, path);
-        final String jwt = bearerAuth ? authHeader.substring(BEARER_PREFIX.length())
-                : browserAuth ? FilterRequestDecisions.cookieValue(request, browserSessionCookies.sessionCookieName()) : null;
+        final String jwt = extractJwt(request, path, authHeader);
 
         if (jwt == null) {
             filterChain.doFilter(request, response);
@@ -132,19 +126,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
-            // A previously successful logout may lose its HTTP response. Let
-            // only this exact action re-submit a still-valid signed token so
-            // revocation can be retried idempotently; every other route must
-            // continue enforcing the blacklist.
-            if (!FilterRequestDecisions.isLogoutRequest(request, path) && tokenBlacklistPort.isBlacklisted(jwt)) {
-                rejectUnauthorized(response, request.getRequestURI());
+            if (rejectIfBlacklisted(request, path, jwt, response)) {
                 return;
             }
-            // Refresh tokens authenticate only the refresh endpoints: a leaked
-            // long-lived token must never pass as API authorization.
-            if (JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
-                    && !FilterRequestDecisions.isRefreshRequest(request, path)) {
-                rejectUnauthorized(response, request.getRequestURI());
+            if (rejectIfRefreshTokenMisused(request, path, jwt, response)) {
                 return;
             }
             Long userId = verified.userId();
@@ -164,37 +149,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }
-            if (FilterRequestDecisions.isAdminRequest(path)) {
-                try {
-                    if (!tokenVersionValidator.hasCurrentTokenVersion(jwt, userId)) {
-                        rejectUnauthorized(response, request.getRequestURI());
-                        return;
-                    }
-                } catch (RuntimeException storeUnavailable) {
-                    // Fail closed like the revocation backend: an unreadable
-                    // user store must never silently authorize a possibly
-                    // demoted admin.
-                    log.warn("User store unavailable during admin token-version check");
-                    SecurityContextHolder.clearContext();
-                    reject(response, HttpStatus.SERVICE_UNAVAILABLE,
-                            ErrorCode.SECURITY_BACKEND_UNAVAILABLE.code(),
-                            "Security service temporarily unavailable. Please try again later.",
-                            request.getRequestURI());
-                    return;
-                }
+            if (rejectIfAdminVersionStale(request, path, jwt, userId, response)) {
+                return;
             }
-            // K7/D8: CSRF bound to the server-verified user id — a transplanted
-            // cookie minted for another user fails even with a matching header.
-            // (Legacy 43-char cookies from before the rollout fail closed here;
-            // affected browsers re-login once and receive bound tokens.)
-            if (!bearerAuth && BrowserSessionCookies.requiresCsrf(request.getMethod())
-                    && !csrfBinding.verifyCsrfToken(
-                            request.getHeader(BrowserSessionCookies.CSRF_HEADER),
-                            FilterRequestDecisions.cookieValue(request, browserSessionCookies.csrfCookieName()),
-                            String.valueOf(userId))) {
-                reject(response, HttpStatus.FORBIDDEN,
-                        ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token",
-                        request.getRequestURI());
+            final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
+            if (rejectIfCsrfInvalid(request, bearerAuth, userId, response)) {
                 return;
             }
             SecurityContextPopulator.establish(verified, role, request);
@@ -217,6 +176,121 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } finally {
             SecurityContextPopulator.clear();
         }
+    }
+
+    /**
+     * Selects the credential for this request: Bearer header wins; otherwise the
+     * browser session cookie authenticates API calls (but never the public shell
+     * or login/refresh endpoints, so an expired cookie cannot lock the login UI).
+     */
+    private String extractJwt(HttpServletRequest request, String path, String authHeader) {
+        final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
+        // The browser session cookie is for API calls. Browsers also send it
+        // with / and static assets; an expired cookie must not prevent the
+        // public application shell from loading so it can show the login UI.
+        // Refresh endpoints authenticate with the refresh token itself (like
+        // login authenticates with a password), so they never require a
+        // valid session up front.
+        final boolean browserAuth = authHeader == null
+                && path.startsWith("/api/")
+                && !FilterRequestDecisions.isPublicLogin(request, path)
+                && !FilterRequestDecisions.isRefreshRequest(request, path);
+        if (bearerAuth) {
+            return authHeader.substring(BEARER_PREFIX.length());
+        }
+        if (browserAuth) {
+            return FilterRequestDecisions.cookieValue(request, browserSessionCookies.sessionCookieName());
+        }
+        return null;
+    }
+
+    /**
+     * A previously successful logout may lose its HTTP response. Let only this
+     * exact action re-submit a still-valid signed token so revocation can be
+     * retried idempotently; every other route must continue enforcing the
+     * blacklist.
+     *
+     * @return {@code true} when the request was rejected.
+     */
+    private boolean rejectIfBlacklisted(HttpServletRequest request, String path,
+            String jwt, HttpServletResponse response) throws IOException {
+        if (!FilterRequestDecisions.isLogoutRequest(request, path) && tokenBlacklistPort.isBlacklisted(jwt)) {
+            rejectUnauthorized(response, request.getRequestURI());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Refresh tokens authenticate only the refresh endpoints: a leaked
+     * long-lived token must never pass as API authorization.
+     *
+     * @return {@code true} when the request was rejected.
+     */
+    private boolean rejectIfRefreshTokenMisused(HttpServletRequest request, String path,
+            String jwt, HttpServletResponse response) throws IOException {
+        if (JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
+                && !FilterRequestDecisions.isRefreshRequest(request, path)) {
+            rejectUnauthorized(response, request.getRequestURI());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Admin paths re-validate the token generation against the user store
+     * (SEC-01), closing the G-2 demotion window where it matters most. An
+     * unreadable store fails closed, never silently authorizing a possibly
+     * demoted admin.
+     *
+     * @return {@code true} when the request was rejected.
+     */
+    private boolean rejectIfAdminVersionStale(HttpServletRequest request, String path,
+            String jwt, Long userId, HttpServletResponse response) throws IOException {
+        if (!FilterRequestDecisions.isAdminRequest(path)) {
+            return false;
+        }
+        try {
+            if (!tokenVersionValidator.hasCurrentTokenVersion(jwt, userId)) {
+                rejectUnauthorized(response, request.getRequestURI());
+                return true;
+            }
+        } catch (RuntimeException storeUnavailable) {
+            // Fail closed like the revocation backend: an unreadable
+            // user store must never silently authorize a possibly
+            // demoted admin.
+            log.warn("User store unavailable during admin token-version check");
+            SecurityContextHolder.clearContext();
+            reject(response, HttpStatus.SERVICE_UNAVAILABLE,
+                    ErrorCode.SECURITY_BACKEND_UNAVAILABLE.code(),
+                    "Security service temporarily unavailable. Please try again later.",
+                    request.getRequestURI());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * K7/D8: CSRF bound to the server-verified user id — a transplanted cookie
+     * minted for another user fails even with a matching header. (Legacy 43-char
+     * cookies from before the rollout fail closed here; affected browsers
+     * re-login once and receive bound tokens.)
+     *
+     * @return {@code true} when the request was rejected.
+     */
+    private boolean rejectIfCsrfInvalid(HttpServletRequest request, boolean bearerAuth,
+            Long userId, HttpServletResponse response) throws IOException {
+        if (!bearerAuth && BrowserSessionCookies.requiresCsrf(request.getMethod())
+                && !csrfBinding.verifyCsrfToken(
+                        request.getHeader(BrowserSessionCookies.CSRF_HEADER),
+                        FilterRequestDecisions.cookieValue(request, browserSessionCookies.csrfCookieName()),
+                        String.valueOf(userId))) {
+            reject(response, HttpStatus.FORBIDDEN,
+                    ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token",
+                    request.getRequestURI());
+            return true;
+        }
+        return false;
     }
 
     private void rejectUnauthorized(HttpServletResponse response, String path) throws IOException {

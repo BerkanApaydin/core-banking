@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.in.event;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -36,6 +37,21 @@ public class TransferEventConsumer {
         for (SendNotificationPort port : notificationPorts) {
             try {
                 port.notifyTransferCancelled(event);
+            } catch (RuntimeException e) {
+                if (failure == null) failure = e;
+                else failure.addSuppressed(e);
+            }
+        }
+        if (failure != null) throw failure;
+    }
+
+    // Called by TransferFailedOutboxRelay. A failed channel leaves the source
+    // event retryable instead of acknowledging it before delivery has run.
+    public void handleTransferFailed(AsyncTransferFailedEvent event) {
+        RuntimeException failure = null;
+        for (SendNotificationPort port : notificationPorts) {
+            try {
+                port.notifyTransferFailed(event);
             } catch (RuntimeException e) {
                 if (failure == null) failure = e;
                 else failure.addSuppressed(e);

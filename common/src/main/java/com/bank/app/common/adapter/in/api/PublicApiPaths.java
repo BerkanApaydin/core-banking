@@ -24,6 +24,11 @@ public final class PublicApiPaths {
     public static final String LOGOUT = "/api/v1/auth/logout";
     public static final String BROWSER_LOGOUT = "/api/v1/auth/browser/logout";
     public static final String BROWSER_SESSION = "/api/v1/auth/browser/session";
+    // Audit (password reset): unauthenticated by necessity — users without a
+    // session reset passwords. Abuse-contained by the auth-tier rate budget
+    // (AUTH_PREFIX), enumeration-safe generic responses and audit.
+    public static final String PASSWORD_RESET_REQUEST = "/api/v1/auth/password/reset/request";
+    public static final String PASSWORD_RESET_CONFIRM = "/api/v1/auth/password/reset/confirm";
 
     public static final String ACCOUNTS = "/api/v1/accounts";
     public static final String TRANSFERS = "/api/v1/transfers";

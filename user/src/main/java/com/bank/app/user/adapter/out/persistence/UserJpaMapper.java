@@ -24,6 +24,10 @@ public class UserJpaMapper {
                 user.getVersion()
         );
         entity.setTokenVersion(user.getTokenVersion());
+        entity.setMfaEnabled(user.isMfaEnabled());
+        // mfa_secret_encrypted is intentionally NOT mapped here: ciphertext
+        // travels only through MfaSecretPort's dedicated statements, so a
+        // generic user save can never overwrite or leak it.
         return entity;
     }
 
@@ -35,7 +39,7 @@ public class UserJpaMapper {
         Role role = entity.getRole();
         EmailAddress email = entity.getEmail() != null ? new EmailAddress(entity.getEmail()) : null;
         PhoneNumber phone = entity.getPhone() != null ? new PhoneNumber(entity.getPhone()) : null;
-        return new User(
+        User user = new User(
                 new UserId(entity.getId()),
                 entity.getUsername(),
                 entity.getPassword(),
@@ -45,6 +49,10 @@ public class UserJpaMapper {
                 entity.getVersion(),
                 entity.getTokenVersion()
         );
+        if (entity.isMfaEnabled()) {
+            user.enableMfa();
+        }
+        return user;
     }
 
     public void updateJpaEntity(UserJpaEntity entity, User user) {
@@ -57,6 +65,7 @@ public class UserJpaMapper {
         entity.setEmail(user.getEmail() != null ? user.getEmail().value() : null);
         entity.setPhone(user.getPhone() != null ? user.getPhone().value() : null);
         entity.setTokenVersion(user.getTokenVersion());
+        entity.setMfaEnabled(user.isMfaEnabled());
         // The managed version belongs to Hibernate; the adapter checks the expected version.
     }
 }

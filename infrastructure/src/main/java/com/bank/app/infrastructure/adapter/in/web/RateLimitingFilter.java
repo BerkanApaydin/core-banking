@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
+import com.bank.app.common.messages.MessageKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
@@ -119,7 +120,7 @@ public class RateLimitingFilter implements Filter {
             // A Redis-backed limiter cannot make a trustworthy allow/deny decision.
             // Filters run before MVC exception advice, so write the response here.
             log.warn("Rate limiting backend unavailable: {}", ex.getClass().getSimpleName());
-            String message = messageSource.getMessage("error.security_backend_unavailable", null,
+            String message = messageSource.getMessage(MessageKeys.SECURITY_BACKEND_UNAVAILABLE, null,
                     "Security service temporarily unavailable. Please try again later.",
                     LocaleContextHolder.getLocale());
             ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.SERVICE_UNAVAILABLE,
@@ -127,7 +128,7 @@ public class RateLimitingFilter implements Filter {
             return;
         }
         if (!acquired) {
-            String message = messageSource.getMessage("error.rate_limit_exceeded", null,
+            String message = messageSource.getMessage(MessageKeys.RATE_LIMIT_EXCEEDED, null,
                     "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
             // Literal code (equals ErrorCode.RATE_LIMIT_EXCEEDED.code()): the web layer must
             // not depend on the domain.exception package (see ArchitectureTest).

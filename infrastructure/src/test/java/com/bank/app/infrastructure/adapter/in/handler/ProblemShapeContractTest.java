@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.adapter.in.api.ProblemBody;
 import com.bank.app.user.adapter.in.web.support.ProblemResponses;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,5 +72,22 @@ class ProblemShapeContractTest {
         assertThat(fromResponses.getBody().getProperties()).doesNotContainKey("correlationId");
         assertThat(fromFactory.getBody().getProperties())
                 .isEqualTo(fromResponses.getBody().getProperties());
+    }
+
+    @Test
+    @DisplayName("both render the same semantic problem type (never about:blank)")
+    void bothRenderSemanticProblemType() {
+        ProblemDetailFactory.setClockForTests(FIXED);
+        ProblemResponses.setClockForTests(FIXED);
+
+        ResponseEntity<ProblemDetail> fromFactory = ProblemDetailFactory.create(
+                ErrorCode.AUTHENTICATION_FAILED, "No active browser session.", null);
+        ResponseEntity<ProblemDetail> fromResponses =
+                ProblemResponses.unauthorized("No active browser session.", null);
+
+        assertThat(fromFactory.getBody().getType())
+                .hasToString(ProblemBody.PROBLEM_TYPE_BASE + "authentication_failed");
+        assertThat(fromResponses.getBody().getType())
+                .isEqualTo(fromFactory.getBody().getType());
     }
 }

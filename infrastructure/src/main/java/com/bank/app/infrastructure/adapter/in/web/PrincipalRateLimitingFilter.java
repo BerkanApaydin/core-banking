@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
@@ -117,7 +118,7 @@ public class PrincipalRateLimitingFilter implements Filter {
         } catch (DataAccessException ex) {
             log.warn("Principal rate limiting backend unavailable: {}",
                     ex.getClass().getSimpleName());
-            String message = messageSource.getMessage("error.security_backend_unavailable", null,
+            String message = messageSource.getMessage(MessageKeys.SECURITY_BACKEND_UNAVAILABLE, null,
                     "Security service temporarily unavailable. Please try again later.",
                     LocaleContextHolder.getLocale());
             ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.SERVICE_UNAVAILABLE,
@@ -125,7 +126,7 @@ public class PrincipalRateLimitingFilter implements Filter {
             return;
         }
         if (!acquired) {
-            String message = messageSource.getMessage("error.rate_limit_exceeded", null,
+            String message = messageSource.getMessage(MessageKeys.RATE_LIMIT_EXCEEDED, null,
                     "Too many requests. Please try again later.", LocaleContextHolder.getLocale());
             long windowSeconds = Math.max(1, tierWindowMs / 1000);
             httpResponse.setHeader("Retry-After", String.valueOf(windowSeconds));

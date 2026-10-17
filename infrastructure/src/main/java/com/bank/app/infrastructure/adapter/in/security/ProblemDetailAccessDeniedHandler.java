@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.domain.exception.ErrorCode;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +36,7 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
             AccessDeniedException accessDeniedException) throws IOException {
-        String message = messageSource.getMessage("error.access_denied", null,
+        String message = messageSource.getMessage(MessageKeys.ACCESS_DENIED, null,
                 "Access denied.", LocaleContextHolder.getLocale());
         ProblemDetailFactory.writeProblem(response, objectMapper, HttpStatus.FORBIDDEN,
                 ErrorCode.ACCESS_DENIED.code(), message, request.getRequestURI());

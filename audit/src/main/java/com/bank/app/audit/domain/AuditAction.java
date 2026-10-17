@@ -20,7 +20,14 @@ public enum AuditAction {
     // transitioned to FAILED. Missing this value broke the reaper's audit
     // write (UnknownAuditActionException rolled back the FAILED transition);
     // DB value added in V50.
-    TRANSFER_MARKED_FAILED;
+    TRANSFER_MARKED_FAILED,
+    // MFA lifecycle + password reset (V54/V55): enrollment, removal and
+    // reset-request/completion are security-sensitive and audited. DB values
+    // added in V55.
+    MFA_ENABLED,
+    MFA_DISABLED,
+    PASSWORD_RESET_REQUESTED,
+    PASSWORD_RESET_COMPLETED;
 
     public static AuditAction fromString(String value) {
         if (value == null) {

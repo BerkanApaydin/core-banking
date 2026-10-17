@@ -15,7 +15,12 @@ public record RateLimitProperties(
         @DefaultValue("10") int maxRequests,
         @DefaultValue("10000") int timeWindowMs,
         @DefaultValue("120") int resourceMaxRequests,
-        @DefaultValue("60000") int resourceTimeWindowMs
+        @DefaultValue("60000") int resourceTimeWindowMs,
+        // Audit: the Caffeine deque-cache bound was a magic literal (10000) in
+        // CaffeineRateLimiter (twice: default shards and tier shards). Sized for
+        // peak concurrent client buckets; eviction is time-based, this is only
+        // a memory guard so it comfortably exceeds the request budget.
+        @DefaultValue("10000") int cacheMaxSize
 ) {
     /**
      * Resource-tier defaults: dashboard-style authenticated traffic (accounts,
@@ -37,6 +42,8 @@ public record RateLimitProperties(
                     PublicApiPaths.REGISTER,
                     PublicApiPaths.REFRESH,
                     PublicApiPaths.BROWSER_REFRESH,
+                    PublicApiPaths.PASSWORD_RESET_REQUEST,
+                    PublicApiPaths.PASSWORD_RESET_CONFIRM,
                     PublicApiPaths.LOGOUT,
                     PublicApiPaths.BROWSER_LOGOUT,
                     PublicApiPaths.BROWSER_SESSION,

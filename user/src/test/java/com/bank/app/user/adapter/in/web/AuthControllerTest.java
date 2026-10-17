@@ -5,7 +5,14 @@ import com.bank.app.user.adapter.in.web.dto.RefreshTokenRequest;
 import com.bank.app.user.adapter.in.web.dto.RegisterWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
+import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
+import com.bank.app.user.application.port.in.MfaStatusUseCase;
+import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
+import com.bank.app.user.application.port.in.ConfirmPasswordResetUseCase;
+import com.bank.app.user.application.port.in.DisableMfaUseCase;
+import com.bank.app.user.application.port.in.EnableMfaUseCase;
+import com.bank.app.user.application.port.in.RequestPasswordResetUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -46,6 +53,13 @@ class AuthControllerTest {
     @Mock private ClientIpResolverPort clientIpResolver;
     @Mock private LogoutUseCase logoutUseCase;
     @Mock private RefreshSessionUseCase refreshSessionUseCase;
+    @Mock private MfaStatusUseCase mfaStatusUseCase;
+    @Mock private EnableMfaUseCase enableMfaUseCase;
+    @Mock private ConfirmMfaUseCase confirmMfaUseCase;
+    @Mock private DisableMfaUseCase disableMfaUseCase;
+    @Mock private RequestPasswordResetUseCase requestPasswordResetUseCase;
+    @Mock private ConfirmPasswordResetUseCase confirmPasswordResetUseCase;
+    @Mock private UserContextService userContextService;
 
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -54,7 +68,9 @@ class AuthControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(
                 registerUserUseCase, loginUserUseCase, clientIpResolver,
-                logoutUseCase, refreshSessionUseCase)).build();
+                logoutUseCase, refreshSessionUseCase, mfaStatusUseCase, enableMfaUseCase, confirmMfaUseCase,
+                disableMfaUseCase, requestPasswordResetUseCase, confirmPasswordResetUseCase,
+                userContextService)).build();
     }
 
     @Test

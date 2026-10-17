@@ -6,7 +6,12 @@ public record AuthRequest(
     String username,
     String password,
     String email,
-    String phone
+    String phone,
+    // Audit (MFA): second factor for MFA-enrolled users. Nullable — most
+    // callers (registration, tests, seeders) have no code; login passes the
+    // web-layer field through. Blank is treated as absent (missing code fails
+    // with the generic authentication message when MFA is on).
+    String totpCode
 ) {
     public AuthRequest {
         Objects.requireNonNull(username, "Username must not be null");
@@ -24,6 +29,10 @@ public record AuthRequest(
     }
 
     public AuthRequest(String username, String password) {
-        this(username, password, null, null);
+        this(username, password, null, null, null);
+    }
+
+    public AuthRequest(String username, String password, String email, String phone) {
+        this(username, password, email, phone, null);
     }
 }

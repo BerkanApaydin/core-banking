@@ -52,8 +52,24 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         this.auditEventPort = auditEventPort;
     }
 
+    // Audit: execute was a 79-line long method with five interleaved decisions
+    // (token validity, reuse/theft, expiry, generation, rotation-race). Each
+    // decision is now a named helper; execute only orchestrates. Behavior —
+    // statuses, messages, audit rows — is unchanged.
     @Override
     public AuthResponse execute(String refreshToken) {
+        JwtPort.VerifiedToken verified = verifyRefreshToken(refreshToken);
+        String hash = TokenDigest.sha256Hex(refreshToken);
+        StoredRefresh stored = refreshTokenPort.findByTokenHash(hash)
+                .orElseThrow(() -> new AuthenticationFailedException("Invalid refresh token."));
+        LocalDateTime now = LocalDateTime.now(clockProvider.clock());
+        rejectIfReused(stored, verified);
+        rejectIfExpired(stored, now);
+        User user = loadUserForRotation(verified, refreshToken);
+        return rotateTokens(stored, verified, user, hash, now);
+    }
+
+    private JwtPort.VerifiedToken verifyRefreshToken(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AuthenticationFailedException("Refresh token is required.");
         }
@@ -61,29 +77,30 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         if (verified == null || !"refresh".equals(jwtPort.extractTokenType(refreshToken))) {
             throw new AuthenticationFailedException("Invalid refresh token.");
         }
-        String hash = TokenDigest.sha256Hex(refreshToken);
-        StoredRefresh stored = refreshTokenPort.findByTokenHash(hash)
-                .orElseThrow(() -> new AuthenticationFailedException("Invalid refresh token."));
-        LocalDateTime now = LocalDateTime.now(clockProvider.clock());
-        if (stored.revoked()) {
-            if (stored.replacedByHash() != null) {
-                // Reuse of a rotated token: probable theft. Kill the family.
-                refreshTokenPort.revokeFamily(stored.familyId());
-                // Theft response joins this transaction (K11/D4): if the audit
-                // write fails, the family revocation rolls back with it — a
-                // half-revoked family with no audit trail is worse than retry.
-                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
-                        "Refresh token reuse detected; token family revoked.",
-                        LocalDateTime.now(clockProvider.clock()), verified.username(),
-                        verified.userId()));
-                log.warn("Refresh token reuse detected: family revoked");
-                throw new RefreshTokenReuseException();
-            }
-            throw new AuthenticationFailedException("Refresh token is no longer valid.");
+        return verified;
+    }
+
+    private void rejectIfReused(StoredRefresh stored, JwtPort.VerifiedToken verified) {
+        if (!stored.revoked()) {
+            return;
         }
+        if (stored.replacedByHash() != null) {
+            // Reuse of a rotated token: probable theft. Kill the family.
+            revokeFamilyWithAudit(stored.familyId(), verified,
+                    "Refresh token reuse detected; token family revoked.",
+                    "Refresh token reuse detected: family revoked");
+            throw new RefreshTokenReuseException();
+        }
+        throw new AuthenticationFailedException("Refresh token is no longer valid.");
+    }
+
+    private static void rejectIfExpired(StoredRefresh stored, LocalDateTime now) {
         if (stored.expiresAt() == null || !stored.expiresAt().isAfter(now)) {
             throw new AuthenticationFailedException("Refresh token has expired.");
         }
+    }
+
+    private User loadUserForRotation(JwtPort.VerifiedToken verified, String refreshToken) {
         // Token-generation enforcement (V39): a role or password change bumps
         // the user's generation, so a refresh minted before the bump is
         // rejected here and the client must re-authenticate. Access tokens
@@ -100,6 +117,11 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
                     verified.userId()));
             throw new AuthenticationFailedException("Session is no longer valid. Please log in again.");
         }
+        return user;
+    }
+
+    private AuthResponse rotateTokens(StoredRefresh stored, JwtPort.VerifiedToken verified,
+            User user, String hash, LocalDateTime now) {
         String newRefreshToken = jwtPort.generateRefreshToken(
                 verified.userId(), verified.username(), verified.role(), user.getTokenVersion());
         String newAccessToken = jwtPort.generateToken(
@@ -115,21 +137,29 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
             // applies. Anything else is a stale/unknown token.
             StoredRefresh current = refreshTokenPort.findByTokenHash(hash).orElse(null);
             if (current != null && current.revoked() && current.replacedByHash() != null) {
-                refreshTokenPort.revokeFamily(stored.familyId());
-                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
+                revokeFamilyWithAudit(stored.familyId(), verified,
                         "Refresh token reuse detected; token family revoked.",
-                        LocalDateTime.now(clockProvider.clock()), verified.username(),
-                        verified.userId()));
-                log.warn("Refresh token reuse detected: family revoked");
+                        "Refresh token reuse detected: family revoked");
                 throw new RefreshTokenReuseException();
             }
             throw new AuthenticationFailedException("Invalid refresh token.");
         }
         refreshTokenPort.save(newHash, verified.userId(), stored.familyId(),
-                LocalDateTime.now(clockProvider.clock())
-                        .plus(jwtPort.getRefreshExpirationMs(), ChronoUnit.MILLIS));
+                now.plus(jwtPort.getRefreshExpirationMs(), ChronoUnit.MILLIS));
         log.info("Session refreshed: userId={}", verified.userId());
         return new AuthResponse(newAccessToken, newRefreshToken, verified.userId(),
                 verified.username(), jwtPort.getExpirationMs());
+    }
+
+    private void revokeFamilyWithAudit(String familyId, JwtPort.VerifiedToken verified,
+            String auditDetails, String logMessage) {
+        refreshTokenPort.revokeFamily(familyId);
+        // Theft response joins this transaction (K11/D4): if the audit
+        // write fails, the family revocation rolls back with it — a
+        // half-revoked family with no audit trail is worse than retry.
+        auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED, auditDetails,
+                LocalDateTime.now(clockProvider.clock()), verified.username(),
+                verified.userId()));
+        log.warn(logMessage);
     }
 }

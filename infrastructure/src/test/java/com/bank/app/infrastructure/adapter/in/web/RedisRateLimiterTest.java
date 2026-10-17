@@ -24,7 +24,7 @@ class RedisRateLimiterTest {
 
     @BeforeEach
     void setUp() {
-        RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000);
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000, 10000);
         rateLimiter = new RedisRateLimiter(
                 redisTemplate,
                 props);

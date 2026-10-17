@@ -19,6 +19,7 @@ public class CaffeineRateLimiter implements RateLimiter {
 
     private final int maxRequests;
     private final long timeWindowMs;
+    private final int maxCacheSize;
     private final Cache<String, ConcurrentLinkedDeque<Long>> cache;
     private final Clock clock;
     private final AtomicLong hitCount = new AtomicLong();
@@ -32,17 +33,20 @@ public class CaffeineRateLimiter implements RateLimiter {
 
     @Autowired
     public CaffeineRateLimiter(RateLimitProperties rateLimitProperties, ClockProviderPort clockProvider) {
-        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(), 10000,
+        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(),
+                rateLimitProperties.cacheMaxSize(),
                 clockProvider != null ? clockProvider.clock() : Clock.systemUTC());
     }
 
     public CaffeineRateLimiter(RateLimitProperties rateLimitProperties) {
-        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(), 10000, Clock.systemUTC());
+        this(rateLimitProperties.maxRequests(), rateLimitProperties.timeWindowMs(),
+                rateLimitProperties.cacheMaxSize(), Clock.systemUTC());
     }
 
     CaffeineRateLimiter(int maxRequests, long timeWindowMs, int maxCacheSize, Clock clock) {
         this.maxRequests = maxRequests;
         this.timeWindowMs = timeWindowMs;
+        this.maxCacheSize = maxCacheSize;
         this.clock = clock;
         this.cache = Caffeine.newBuilder()
                 .expireAfterWrite(timeWindowMs * 2, TimeUnit.MILLISECONDS)
@@ -94,7 +98,7 @@ public class CaffeineRateLimiter implements RateLimiter {
             return this;
         }
         return tierShards.computeIfAbsent(new LimitTier(maxRequests, timeWindowMs),
-                tier -> new CaffeineRateLimiter(tier.max(), tier.window(), 10000, clock));
+                tier -> new CaffeineRateLimiter(tier.max(), tier.window(), maxCacheSize, clock));
     }
 
     private record LimitTier(int max, long window) {}

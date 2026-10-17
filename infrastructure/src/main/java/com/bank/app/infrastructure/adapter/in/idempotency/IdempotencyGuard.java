@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.messages.MessageKeys;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import org.springframework.stereotype.Service;
@@ -66,7 +67,7 @@ public class IdempotencyGuard {
 
     private IdempotencyResult claimOrReadExisting(String key, String requestHash, Entry entry) {
         if (requestHash != null && !requestHash.equals(entry.requestHash())) {
-            throw new ConcurrentRequestException("error.idempotency_payload_conflict", null,
+            throw new ConcurrentRequestException(MessageKeys.IDEMPOTENCY_PAYLOAD_CONFLICT, null,
                     "Idempotency-Key was already used with a different request.");
         }
         return switch (entry.status()) {

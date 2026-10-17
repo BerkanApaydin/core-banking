@@ -2,6 +2,7 @@ package com.bank.app.common.adapter.in.api;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -47,4 +48,18 @@ public record ProblemBody(
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
+
+    /**
+     * Audit: error bodies previously left {@code type} at Spring's
+     * {@code about:blank} default, so clients could not distinguish problem
+     * kinds without parsing the proprietary {@code code} property. The type is
+     * derived from the wire {@code code} (lower-cased) under a stable base, so
+     * both renderers emit identical semantic types with no drift. The URI is a
+     * stable identifier per RFC 9457 (it does not have to resolve).
+     */
+    public String problemType() {
+        return PROBLEM_TYPE_BASE + code.toLowerCase(Locale.ROOT);
+    }
+
+    public static final String PROBLEM_TYPE_BASE = "https://api.bank/problems/";
 }

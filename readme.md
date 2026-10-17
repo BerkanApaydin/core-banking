@@ -54,7 +54,7 @@ plus one supporting module (`audit`).
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
 - **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports; production revocations are stored durably in PostgreSQL and checked alongside legacy Redis records), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
-- **`user`** [BC]: User registration, authentication, token lifecycle. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login uses short read-only transactions for credential/user lookup; login-attempt state is handled outside those DB transactions (Redis in production, Caffeine locally).
+- **`user`** [BC]: User registration, authentication, token lifecycle, TOTP-based MFA (opt-in enrollment/confirmation/removal + code-enforced login) and enumeration-safe password reset. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login uses short read-only transactions for credential/user lookup; login-attempt state is handled outside those DB transactions (Redis in production, Caffeine locally).
 - **`account`** [BC]: Bank account lifecycle, balance mutations, and details. Implements `account-api`. Publishes its own domain events; callers only see the opaque `AccountAdjustmentResult`.
 - New account creation derives the owning user from the authenticated principal and generates a checksum-valid, simulation-only Turkish IBAN. Earlier format-only records remain readable; see [IBAN rollout](docs/iban-checksum-rollout.md) before using an existing database.
 - **`transfer`** [BC]: Simulated transfers, conditional cancellations (a configurable window and sufficient recipient balance), and paginated reporting. Talks to `account` only via the `account-api` published language; transfer and cancellation endpoints require `Idempotency-Key`.
@@ -115,14 +115,20 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints and both refresh endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session). Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create and transfer paths have rate limits. Mutating requests larger than 2 MB (`app.security.request-body.max-bytes`) are rejected with `413` before authentication.
+All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints, both refresh endpoints and both password-reset endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session; reset endpoints are rate-limited and enumeration-safe). Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create and transfer paths have rate limits. Mutating requests larger than 2 MB (`app.security.request-body.max-bytes`) are rejected with `413` before authentication. MFA (TOTP) is per-user opt-in; see [MFA decision](docs/decisions/mfa-totp.md). Production requires `MFA_ENCRYPTION_KEY` (Base64, 32 bytes) for TOTP-secret encryption at rest.
 
 | Module | Endpoint | Method | Description / notes |
 | :--- | :--- | :--- | :--- |
 | User | `/auth/register` | `POST` | Register; `Idempotency-Key` recommended. |
-| User | `/auth/login` | `POST` | Obtain a bearer JWT for API clients. |
+| User | `/auth/login` | `POST` | Obtain a bearer JWT for API clients. MFA-enrolled users must also send `totpCode`. |
 | User | `/auth/refresh` | `POST` | Rotate tokens with a valid refresh token. |
 | User | `/auth/logout` | `POST` | Revoke the bearer JWT. |
+| User | `/auth/mfa/enable` | `POST` | Start TOTP enrollment (auth); returns authenticator material. MFA stays off until confirmed. |
+| User | `/auth/mfa/status` | `GET` | Read MFA enrollment status for the authenticated user (drives the UI). |
+| User | `/auth/mfa/confirm` | `POST` | Confirm enrollment with a TOTP code; enables MFA for subsequent logins. |
+| User | `/auth/mfa/disable` | `POST` | Remove MFA after password re-authentication + current TOTP code. |
+| User | `/auth/password/reset/request` | `POST` | Public. Always 202 (no enumeration); sends a single-use token out-of-band. |
+| User | `/auth/password/reset/confirm` | `POST` | Public. Consume the token, set the new password, retire sessions. |
 | User | `/auth/browser/login` | `POST` | Set `HttpOnly` session and readable CSRF cookies; no token in JSON. |
 | User | `/auth/browser/refresh` | `POST` | Same rotation over cookies for the bundled UI. |
 | User | `/auth/browser/session` | `GET` | Restore the browser session. |

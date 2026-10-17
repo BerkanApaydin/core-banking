@@ -64,7 +64,9 @@
                 <configuration>
                     <argLine/>
                     <targetClasses>
-                        <param>com.bank.app.user.*</param>
+                        <!-- Resolves via root ${pitest.targetClasses.user}; the
+                             pitest-domain profile narrows it to domain-only. -->
+                        <param>${pitest.targetClasses.user}</param>
                     </targetClasses>
                     <targetTests>
                         <param>com.bank.app.user.*</param>

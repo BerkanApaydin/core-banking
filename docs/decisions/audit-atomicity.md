@@ -15,10 +15,12 @@ movement with it: money without its audit trail must never commit.
 `readme.md` ("Mandatory audit records … rolls the movement back") states the
 user-visible contract.
 
-## 2. `best-effort-auth` — login / logout / refresh lifecycle
+## 2. `best-effort-auth` — login / logout / refresh / MFA / reset lifecycle
 
 `LoginUserUseCaseImpl.auditLogin` and `LogoutUseCaseImpl.auditLogout` catch
-every audit failure and only log a warning. This is the deliberate opposite of
+every audit failure and only log a warning. MFA enrollment/confirmation/
+removal and password-reset request/completion reuse the same best-effort
+shape. This is the deliberate opposite of
 mode 1: an audit-store outage must not lock users out of login or turn logout
 into a 500 after revocation already happened. The gap is observable (warn
 logs); it is not silent.

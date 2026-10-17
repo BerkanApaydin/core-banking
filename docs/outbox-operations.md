@@ -18,6 +18,41 @@ To change the count, first stop or quiesce event-producing requests, let the exi
 
 The startup check cannot identify a count change when there is no out-of-range pending row, and it does not prevent an old instance from writing with its old count after a new instance has started. Quiescing writers and switching instances together remains necessary.
 
+## Handlers
+
+`TransferCompletedEvent` and `TransferCancelledEvent` fan out to the
+notification channels via `TransferCompletedOutboxRelay` /
+`TransferCancelledOutboxRelay`; reaped transfers additionally publish
+`TransferFailedEvent` through `TransferFailedOutboxRelay` (R-2), and user
+registrations through `UserEventOutboxRelay` — all at-least-once with the
+key lifecycle below. A durable consumer inbox and explicit replay state
+machine are needed before general replay can be automated.
+
+## Key lifecycle
+
+Handler deduplication uses `idempotency_keys` entries with an `outbox_handler_`
+prefix (classified by the `key_kind` discriminator since V38, not by string
+matching). Each delivery follows a full key lifecycle in
+`IdempotentOutboxRelay` (shared skeleton for all relays): claim (`PENDING`)
+→ `COMPLETED` on success, `FAILED` on delivery failure (so retention, which
+deletes only non-`PENDING` handler keys, can reclaim them instead of leaking
+perpetual `PENDING` rows). A `FAILED` claim is reopened exactly once per
+retry (`tryResetFailed` is conditional on `FAILED`), so a failed delivery is
+retried instead of being mistaken for a delivered duplicate; any other
+existing state skips as a genuine duplicate. The generic HTTP idempotency
+cleanup preserves these entries, including `PENDING` entries (stuck
+reservations stay visible); outbox rows also remain.
+
+## Worker sizing
+
+Workers per partition and the cap moved from literals into
+`app.outbox.worker-threads-per-partition` (default 4) and
+`app.outbox.max-worker-threads` (default 12); the bounded worker wait is
+`app.outbox.worker-timeout-seconds` (default 30, aligned with the use-case
+transaction timeout). Env overrides: `OUTBOX_WORKERS_PER_PARTITION`,
+`OUTBOX_MAX_WORKERS`, `OUTBOX_WORKER_TIMEOUT_SECONDS` (see `.env.example`).
+Keep `workers-per-partition × partition-count` under the Hikari pool.
+
 ## Dead letters and replay
 
 Inspect dead letters and their error before deciding whether the handler can safely run again:
@@ -30,7 +65,7 @@ WHERE dead_letter = true
 ORDER BY created_at, id;
 ```
 
-Handler deduplication uses `idempotency_keys` entries with an `outbox_handler_` prefix (classified by the `key_kind` discriminator since V38, not by string matching). The generic HTTP idempotency cleanup preserves these entries, including `PENDING` entries; outbox rows also remain. A manual replay of an already processed event will therefore normally skip its handler. However, dedup entries deleted before this protection was deployed cannot be reconstructed from an outbox row, and a provider-facing side effect may have succeeded before a crash even when the outbox transaction rolled back. Confirm downstream state and dedup history before any manual replay. A durable consumer inbox and explicit replay state machine are needed before general replay can be automated.
+Handler deduplication uses `idempotency_keys` entries with an `outbox_handler_` prefix (see Key lifecycle above). A manual replay of an already processed event will therefore normally skip its handler. However, dedup entries deleted before this protection was deployed cannot be reconstructed from an outbox row, and a provider-facing side effect may have succeeded before a crash even when the outbox transaction rolled back. Confirm downstream state and dedup history before any manual replay. A durable consumer inbox and explicit replay state machine are needed before general replay can be automated.
 
 ## Retention
 

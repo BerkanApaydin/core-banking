@@ -8,13 +8,18 @@ public interface AuthenticationPort {
     /** Returns the identity from the credential check, without exposing a password or framework principal. */
     AuthenticatedUser authenticate(String username, String password);
 
-    record AuthenticatedUser(UserId id, String username, Role role, long tokenVersion) {
+    record AuthenticatedUser(UserId id, String username, Role role, long tokenVersion, boolean mfaEnabled) {
         public AuthenticatedUser {
             Objects.requireNonNull(id, "Authenticated user ID must not be null");
             Objects.requireNonNull(username, "Authenticated username must not be null");
             Objects.requireNonNull(role, "Authenticated role must not be null");
             if (username.isBlank()) throw new IllegalArgumentException("Authenticated username must not be blank");
             if (tokenVersion < 0) throw new IllegalArgumentException("Token version must not be negative");
+        }
+
+        /** Pre-MFA shape: users without enrollment carry mfaEnabled=false. */
+        public AuthenticatedUser(UserId id, String username, Role role, long tokenVersion) {
+            this(id, username, role, tokenVersion, false);
         }
 
         /** Legacy shape: pre-versioning identities carry generation 0. */

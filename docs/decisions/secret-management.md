@@ -3,12 +3,18 @@
 ## Current state
 
 Secrets reach the app exclusively through environment variables
-(`JWT_SECRET`, `DB_PASSWORD`, `SPRING_DATA_REDIS_PASSWORD`, … — see
-`.env.example`). Production fails fast without them:
+(`JWT_SECRET`, `DB_PASSWORD`, `SPRING_DATA_REDIS_PASSWORD`,
+`MFA_ENCRYPTION_KEY`, … — see `.env.example`). Production fails fast
+without them:
 
 - `jwt.secret: ${JWT_SECRET}` (no default) + `allow-default-secret: false`
   in `application-prod.yml`, enforced at boot by
   `ApplicationStartupValidator`;
+- `app.security.mfa.encryption-key-base64: ${MFA_ENCRYPTION_KEY}` (Base64,
+  32 bytes — TOTP-secret encryption at rest, see
+  `docs/decisions/mfa-totp.md`), likewise enforced at boot in `prod`. Blank
+  in dev/test means an ephemeral in-memory key (enrolled secrets die with
+  the JVM, loudly logged) — never valid in production;
 - CI (`ci.yml`, `mutation-nightly.yml`, `mutation-pr.yml`) prefers
   `secrets.JWT_SECRET` and otherwise mints a fresh ephemeral 256-bit key per
   run (`openssl rand -base64 32` into `GITHUB_ENV`) — no committed fallback
@@ -51,7 +57,12 @@ For any deployment beyond staging:
    the blast radius) and refresh tokens (clients re-login); DB password
    rotation briefly recycles the Hikari pool — watch
    `HikariPoolExhaustion` and `Http429RateHigh` during the rollout.
-4. Revoke the old value at the manager; verify no pod still references it
+4. MFA-key rotation is DESTRUCTIVE (unlike JWT): AES-GCM cannot decrypt old
+   secrets with a new key, so every enrolled user must re-enroll
+   (enable → confirm). There is no bulk re-encryption path by design —
+   announce the rotation, then verify `users` rows with `mfa_enabled = true`
+   re-enroll before decommissioning the old key.
+5. Revoke the old value at the manager; verify no pod still references it
    (`kubectl exec … env | grep -c` must be 0 for the old fingerprint —
    exact values never leave the manager).
 

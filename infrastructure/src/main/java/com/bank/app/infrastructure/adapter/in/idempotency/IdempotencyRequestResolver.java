@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.web.RequestPathResolver;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
@@ -34,7 +35,7 @@ final class IdempotencyRequestResolver {
         String header = request.getHeader(idempotent.headerName());
         if (header == null || header.isBlank()) {
             if (idempotent.required()) {
-                throw new ConcurrentRequestException("error.idempotency_key_required", null,
+                throw new ConcurrentRequestException(MessageKeys.IDEMPOTENCY_KEY_REQUIRED, null,
                         "Idempotency-Key header is required for this operation.");
             }
             return null;
@@ -53,11 +54,11 @@ final class IdempotencyRequestResolver {
             scope = "public";
         } else {
             userContextService.getCurrentUsername()
-                    .orElseThrow(() -> new AuthorizationException("error.login_required", null,
+                    .orElseThrow(() -> new AuthorizationException(MessageKeys.LOGIN_REQUIRED, null,
                             "You must be logged in."));
             subject = userContextService.getCurrentUserId()
                     .map(String::valueOf)
-                    .orElseThrow(() -> new AuthorizationException("error.session_not_found", null,
+                    .orElseThrow(() -> new AuthorizationException(MessageKeys.SESSION_NOT_FOUND, null,
                             "Authenticated user ID is required."));
             scope = "user";
         }

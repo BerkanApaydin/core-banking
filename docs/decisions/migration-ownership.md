@@ -3,7 +3,7 @@
 ## Current state
 
 All Flyway migrations live in one directory —
-`common/src/main/resources/db/migration/V1__…V53__.sql` — while the JPA
+`common/src/main/resources/db/migration/V1__…V55__.sql` — while the JPA
 entities they serve live in their bounded contexts (`account`, `transfer`,
 …). The `persistence` module carries the name but owns almost no schema.
 This is backwards from the module story (BCs own their tables) and makes
@@ -33,7 +33,11 @@ one transaction, so `SET LOCAL` applies). `CREATE INDEX CONCURRENTLY` is
 illegal inside Flyway's transaction — large indexes belong in
 `scripts/create_index_concurrently.sql` as an operator step instead.
 `scripts/check_migration_timeouts.py` (CI + `test-all.sh`) fails any heavy
-migration without the lift.
+migration without the lift. Table rewrites additionally need
+`SET LOCAL lock_timeout = '30s';` (fail fast on lock contention instead of
+wedging the deploy); migrations applied before that rule (V8, V10, V14, V30,
+V32, V46, V53) are grandfathered in the script — applied checksums are
+frozen and must not be edited.
 
 ## Long-term split plan (not yet executed — deliberate)
 

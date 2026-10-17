@@ -2,6 +2,7 @@ package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.messages.MessageKeys;
 
 /**
  * A rotated (already replaced) refresh token was presented again: probable
@@ -18,7 +19,7 @@ public class RefreshTokenReuseException extends BusinessException {
     public String getErrorCode() { return "REFRESH_TOKEN_REUSE_DETECTED"; }
 
     public RefreshTokenReuseException() {
-        super("error.refresh_token_reuse_detected", null,
+        super(MessageKeys.REFRESH_TOKEN_REUSE_DETECTED, null,
                 "Refresh token reuse detected. All sessions have been revoked; please log in again.");
     }
 }

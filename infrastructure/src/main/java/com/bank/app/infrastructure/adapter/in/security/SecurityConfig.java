@@ -80,7 +80,7 @@ public class SecurityConfig {
                 .frameOptions(frame -> frame.deny())
                 .httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true)
-                    .maxAgeInSeconds(31536000))
+                    .maxAgeInSeconds(securityProperties.hstsMaxAgeSeconds()))
                 .referrerPolicy(referrer -> referrer
                     .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                 .contentSecurityPolicy(csp -> csp
@@ -106,8 +106,9 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Cost 12 (~250ms/encode): existing hashes keep verifying (cost is
-        // embedded in the hash), only new encodings pay the higher price.
-        return new BCryptPasswordEncoder(12);
+        // Cost comes from SecurityProperties (~250ms/encode at 12): existing
+        // hashes keep verifying (cost is embedded in the hash), only new
+        // encodings pay the higher price.
+        return new BCryptPasswordEncoder(securityProperties.passwordEncoderStrength());
     }
 }

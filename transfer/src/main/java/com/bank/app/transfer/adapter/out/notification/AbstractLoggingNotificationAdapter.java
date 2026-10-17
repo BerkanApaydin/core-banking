@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.out.notification;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +35,16 @@ public abstract class AbstractLoggingNotificationAdapter implements SendNotifica
             return;
         }
         log.info("{} Notification: Transfer {} cancelled. Amount: {} {}",
+                channel(), event.transferId(), event.amount().amount(), event.amount().currency());
+    }
+
+    @Override
+    public void notifyTransferFailed(AsyncTransferFailedEvent event) {
+        if (event == null) {
+            log.warn("{} failure notification received null event, skipping.", channel());
+            return;
+        }
+        log.info("{} Notification: Transfer {} failed. Amount: {} {}",
                 channel(), event.transferId(), event.amount().amount(), event.amount().currency());
     }
 }

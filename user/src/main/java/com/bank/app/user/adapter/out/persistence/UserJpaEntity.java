@@ -51,6 +51,17 @@ public class UserJpaEntity extends AuditableJpaEntity {
     @Column(name = "token_version", nullable = false)
     private long tokenVersion = 0L;
 
+    /**
+     * MFA enrollment flag (V54). The TOTP secret itself is stored separately
+     * in {@code mfa_secret_encrypted} as AES-GCM ciphertext — never plaintext
+     * — and travels only through {@code MfaSecretPort}, never the domain.
+     */
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled = false;
+
+    @Column(name = "mfa_secret_encrypted", length = 512)
+    private String mfaSecretEncrypted;
+
     public UserJpaEntity() {
     }
 
@@ -126,5 +137,21 @@ public class UserJpaEntity extends AuditableJpaEntity {
 
     public void setTokenVersion(long tokenVersion) {
         this.tokenVersion = tokenVersion;
+    }
+
+    public boolean isMfaEnabled() {
+        return mfaEnabled;
+    }
+
+    public void setMfaEnabled(boolean mfaEnabled) {
+        this.mfaEnabled = mfaEnabled;
+    }
+
+    public String getMfaSecretEncrypted() {
+        return mfaSecretEncrypted;
+    }
+
+    public void setMfaSecretEncrypted(String mfaSecretEncrypted) {
+        this.mfaSecretEncrypted = mfaSecretEncrypted;
     }
 }
