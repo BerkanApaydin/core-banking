@@ -69,7 +69,7 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Guard against mutable image tags (K9/D7)
       # The release workflow pins k8s/bank-app.yaml to a digest; the default
