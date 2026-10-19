@@ -79,7 +79,13 @@ services:
       RATE_LIMIT_RESOURCE_MAX_REQUESTS: ${RATE_LIMIT_RESOURCE_MAX_REQUESTS:-120}
       RATE_LIMIT_RESOURCE_TIME_WINDOW_MS: ${RATE_LIMIT_RESOURCE_TIME_WINDOW_MS:-60000}
       TOKEN_BLACKLIST_BACKEND: ${TOKEN_BLACKLIST_BACKEND:-hybrid}
-      CACHE_ACCOUNT_INFO_BACKEND: redis
+      # The account snapshot cache. Redis by default (shared with the rate
+      # limiter and the login-attempt tracker, so one broker to run).
+      # Override with CACHE_ACCOUNT_INFO_BACKEND=caffeine to exercise the
+      # single-JVM path locally — that backend is per-process, so it must
+      # never be used with more than one replica (see
+      # docs/account-snapshot-cache.md).
+      CACHE_ACCOUNT_INFO_BACKEND: ${CACHE_ACCOUNT_INFO_BACKEND:-redis}
       # Local tracing: the collector below receives OTLP/HTTP spans. Prod
       # keeps TRACING_ENABLED=false until a collector is deployed (D22).
       TRACING_ENABLED: ${TRACING_ENABLED:-true}

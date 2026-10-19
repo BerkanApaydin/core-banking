@@ -1,10 +1,11 @@
 name: Mutation PR (targeted, advisory)
 
 # I-07: fast mutation feedback on pull requests. The full-domain 85% gate
-# stays in mutation-nightly (weekly, blocking-forward); this workflow runs
-# PIT only for top-level modules with changed production sources so authors
-# see surviving mutants on their own code within the PR. Advisory
-# (no threshold): the nightly gate remains the single blocking number.
+# lives in mutation-nightly, whose weekly schedule is disabled (2026-10-19)
+# and therefore runs only on manual dispatch; this workflow runs PIT for
+# top-level modules with changed production sources so authors see surviving
+# mutants on their own code within the PR. Advisory (no threshold): the main
+# ci.yml gate (80% mutation / 85% coverage) remains the blocking number.
 on:
   pull_request:
     branches: [ main, master ]
@@ -89,8 +90,8 @@ jobs:
     - name: Targeted mutation (advisory)
       # Advisory means no thresholds: the root pom pins mutationThreshold=80 /
       # coverageThreshold=85, which would otherwise make this PR workflow fail
-      # exactly like the blocking nightly gate. Zeroing both keeps the nightly
-      # gate the single blocking number while PRs still get the report.
+      # exactly like the blocking ci.yml gate. Zeroing both keeps the main
+      # pipeline the single blocking number while PRs still get the report.
       run: mvn -B -ntp pitest:mutationCoverage -pl "${{ steps.modules.outputs.modules }}" -Dpitest.skip=false -DmutationThreshold=0 -DcoverageThreshold=0 -T 4
       env:
         DB_HOST: localhost

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AccountSnapshotCacheDefaultsTest {
 
@@ -47,11 +48,15 @@ class AccountSnapshotCacheDefaultsTest {
     }
 
     @Test
-    void shouldDelegateGranularEvictionToEvictAllByDefault() {
+    void shouldRejectGranularEvictionInsteadOfWipingTheWholeRegion() {
+        // A backend that forgets evictById must fail loudly. The previous
+        // default delegated to evictAll(), which silently wiped every cached
+        // account — a database stampede whose blast radius grows with the
+        // account count.
         CountingCache cache = new CountingCache();
 
-        cache.evictById(1L);
+        assertThrows(UnsupportedOperationException.class, () -> cache.evictById(1L));
 
-        assertEquals(1, cache.evictAllCalls);
+        assertEquals(0, cache.evictAllCalls);
     }
 }

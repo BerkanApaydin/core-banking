@@ -24,6 +24,7 @@ import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
@@ -101,8 +102,10 @@ public class AccountBeanConfig {
     public SuspendAccountUseCase suspendAccountUseCase(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort, UserContextService userContextService,
             ClockProviderPort clockProvider, DomainEventPublisherService domainEventPublisherService,
-            AuditEventPort auditEventPort, AccountSnapshotCache snapshotCache) {
+            AuditEventPort auditEventPort, AccountSnapshotCache snapshotCache,
+            TransactionBoundaryPort transactionBoundary) {
         return new SuspendAccountUseCaseImpl(loadAccountPort, saveAccountPort, userContextService,
-                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache);
+                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache,
+                transactionBoundary);
     }
 }

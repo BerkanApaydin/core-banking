@@ -33,6 +33,15 @@ spring:
         size: 4
   profiles:
     default: prod
+    # The hosted demo runs the production posture plus simulated opening
+    # balances. Making `simulation` imply `prod` means a deployment that
+    # activates only `simulation` still gets the production secrets, secure
+    # cookies, Redis backends and startup validation — instead of silently
+    # inheriting the base file (Caffeine cache, insecure cookies, per-pod
+    # rate-limit budgets). `prod,simulation` keeps working unchanged: the
+    # group only adds a profile that was already active.
+    group:
+      simulation: prod
   application:
     name: clean-architecture-bank
   messages:

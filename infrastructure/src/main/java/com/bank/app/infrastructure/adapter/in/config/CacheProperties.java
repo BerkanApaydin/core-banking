@@ -25,7 +25,20 @@ public record CacheProperties(AccountInfoCache accountInfo) {
 
     public record AccountInfoCache(
             @DefaultValue("caffeine") String backend,
+            /**
+             * Entry-count cap of the <em>Caffeine</em> backend only. The Redis
+             * backend has no entry-count cap: its region is bounded by the TTL
+             * instead (memory is roughly the write rate multiplied by
+             * {@code expireAfterWrite}). Do not read this key as a bound on
+             * the shared cache — size the broker with {@code maxmemory}.
+             */
             @DefaultValue("1000") long maximumSize,
+            /**
+             * Time-to-live of a cached snapshot, in seconds. Applies to both
+             * backends and is the upper bound on how long a stale entry can
+             * survive an invalidation that never happened (a Redis outage, a
+             * missed eviction).
+             */
             @DefaultValue("60") long expireAfterWrite,
             @DefaultValue("500") long evictionBatchSize
     ) {

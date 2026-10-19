@@ -10,6 +10,7 @@ import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
@@ -21,10 +22,10 @@ import java.util.Objects;
 
 /**
  * First caller of {@link Account#suspend}: suspends an account as an admin
- * operation and evicts its snapshot in the same class, so the
+ * operation and evicts its snapshot after commit in the same class, so the
  * cache-invalidation invariant holds structurally (see
- * CacheInvalidationArchitectureTest — a suspend path that forgets to evict
- * fails the build).
+ * CacheInvalidationArchitectureTest — a suspend path that forgets to evict,
+ * or evicts before commit, fails the build).
  *
  * <p>Idempotent: re-suspending an already suspended account succeeds without
  * side effects beyond re-persisting the unchanged aggregate.
@@ -41,6 +42,7 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
     private final DomainEventPublisherService domainEventPublisherService;
     private final AuditEventPort auditEventPort;
     private final AccountSnapshotCache snapshotCache;
+    private final TransactionBoundaryPort transactionBoundary;
 
     public SuspendAccountUseCaseImpl(LoadAccountPort loadAccountPort,
             SaveAccountPort saveAccountPort,
@@ -48,7 +50,8 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
             ClockProviderPort clockProvider,
             DomainEventPublisherService domainEventPublisherService,
             AuditEventPort auditEventPort,
-            AccountSnapshotCache snapshotCache) {
+            AccountSnapshotCache snapshotCache,
+            TransactionBoundaryPort transactionBoundary) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.userContextService = userContextService;
@@ -56,6 +59,8 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
         this.domainEventPublisherService = domainEventPublisherService;
         this.auditEventPort = auditEventPort;
         this.snapshotCache = Objects.requireNonNull(snapshotCache, "AccountSnapshotCache must not be null");
+        this.transactionBoundary = Objects.requireNonNull(transactionBoundary,
+                "TransactionBoundaryPort must not be null");
     }
 
     @Override
@@ -75,9 +80,27 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
                 adminId));
         // Same-class eviction (F-04): a stale ACTIVE snapshot must never
         // authorize this account again, not even within the cache TTL.
-        snapshotCache.evictById(saved.getId());
+        evictSnapshotAfterCommit(saved.getId());
         return new AccountInfo(saved.getId(), saved.getUserId().value(),
                 saved.getBalance().currency().name(), saved.getStatus().name());
+    }
+
+    /**
+     * Deferred invalidation (F-04/F-11): evicting before commit lets a
+     * concurrent read-through repopulate the cache from pre-commit (still
+     * ACTIVE) state, and that stale snapshot then survives the eviction for
+     * the full TTL. Mirrors {@code AccountApiAdapter.evictSnapshotsAfterCommit}:
+     * eviction runs after commit when a transaction is active, directly
+     * otherwise (tests, schedulers). The direct {@code evictById} call stays
+     * in this class so {@code CacheInvalidationArchitectureTest} remains
+     * structural instead of incidental.
+     */
+    private void evictSnapshotAfterCommit(Long accountId) {
+        if (transactionBoundary.isTransactionActive()) {
+            transactionBoundary.runAfterCommit(() -> snapshotCache.evictById(accountId));
+        } else {
+            snapshotCache.evictById(accountId);
+        }
     }
 
     private Long requireAdmin() {

@@ -9,6 +9,7 @@ import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class AccountBeanConfigTest {
     @Mock private AccountAuthorizationService accountAuthorizationService;
     @Mock private ClockProviderPort clockProvider;
     @Mock private IdGeneratorPort idGenerator;
+    @Mock private TransactionBoundaryPort transactionBoundary;
 
     @Test
     void shouldCreateAccountAuthorizationServiceBean() {
@@ -105,6 +107,7 @@ class AccountBeanConfigTest {
     void shouldCreateSuspendAccountUseCaseBean() {
         AccountBeanConfig config = new AccountBeanConfig();
         assertNotNull(config.suspendAccountUseCase(loadAccountPort, saveAccountPort, userContextService,
-                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache));
+                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache,
+                transactionBoundary));
     }
 }

@@ -27,7 +27,6 @@ class SnapshotKeysTest {
         String ibanKey = SnapshotKeys.ibanKey("TR770006200000000000000111");
         String mapKey = SnapshotKeys.mapKey(42L);
         String index = SnapshotKeys.ibansByIdIndex(42L);
-        String reverseIndex = SnapshotKeys.idByIbanIndex("abc");
         String scan = SnapshotKeys.scanPattern();
 
         // Assert
@@ -35,7 +34,6 @@ class SnapshotKeysTest {
         assertThat(ibanKey).startsWith(SnapshotKeys.ibanKeyPrefix());
         assertThat(mapKey).startsWith(SnapshotKeys.KEY_PREFIX);
         assertThat(index).startsWith(SnapshotKeys.KEY_PREFIX);
-        assertThat(reverseIndex).startsWith(SnapshotKeys.idByIbanPrefix());
         assertThat(scan).isEqualTo(SnapshotKeys.KEY_PREFIX + "*");
     }
 

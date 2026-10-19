@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -203,5 +205,153 @@ class AbstractAccountSnapshotCacheTest {
         assertThat(cache.getById(1L)).isEmpty();
         assertThat(cache.getByIban("TR1")).isEmpty();
         assertThat(cache.getIbans(Set.of(1L))).isEmpty();
+    }
+
+    /**
+     * A write that is paused between the snapshot write and the reverse-index
+     * registration must not be able to have its index entry dropped by a
+     * concurrent eviction of the same account: the eviction waits for the
+     * write to finish, so the IBAN entry it drops is the one that exists.
+     */
+    @Test
+    void shouldNotInterleaveEvictionWithIbanRegistration() throws Exception {
+        BlockingTestCache blocking = new BlockingTestCache();
+        blocking.blockNextIbanWrite = true;
+
+        Thread writer = daemonThread(() -> blocking.putByIban("TR1", SNAPSHOT_1));
+        writer.start();
+        assertThat(blocking.writeStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        var evictionDone = new CountDownLatch(1);
+        Thread evictor = daemonThread(() -> {
+            blocking.evictById(1L);
+            evictionDone.countDown();
+        });
+        evictor.start();
+
+        try {
+            // The eviction of the SAME account must wait for the write.
+            assertThat(evictionDone.await(200, TimeUnit.MILLISECONDS))
+                    .as("eviction of the same account must not interleave with the IBAN registration")
+                    .isFalse();
+        } finally {
+            blocking.releaseWrite.countDown();
+        }
+        writer.join(5_000);
+        evictor.join(5_000);
+
+        // The write completed, so the eviction removed the IBAN snapshot.
+        assertThat(blocking.getByIban("TR1")).isEmpty();
+    }
+
+    /**
+     * The per-account lock must not become an instance-wide monitor: an
+     * eviction of an unrelated account proceeds while another account's write
+     * is in flight.
+     */
+    @Test
+    void shouldNotBlockUnrelatedAccounts() throws Exception {
+        BlockingTestCache blocking = new BlockingTestCache();
+        blocking.blockNextIbanWrite = true;
+
+        Thread writer = daemonThread(() -> blocking.putByIban("TR1", SNAPSHOT_1));
+        writer.start();
+        assertThat(blocking.writeStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        var evictionDone = new CountDownLatch(1);
+        Thread evictor = daemonThread(() -> {
+            blocking.evictById(2L);
+            evictionDone.countDown();
+        });
+        evictor.start();
+
+        try {
+            assertThat(evictionDone.await(5, TimeUnit.SECONDS))
+                    .as("an eviction of an unrelated account must not wait for another account's write")
+                    .isTrue();
+        } finally {
+            blocking.releaseWrite.countDown();
+        }
+        writer.join(5_000);
+        evictor.join(5_000);
+    }
+
+    /**
+     * A full reset is a global barrier: it must not interleave with an
+     * in-flight per-account write.
+     */
+    @Test
+    void shouldMakeEvictAllWaitForAnInFlightWrite() throws Exception {
+        BlockingTestCache blocking = new BlockingTestCache();
+        blocking.blockNextIbanWrite = true;
+
+        Thread writer = daemonThread(() -> blocking.putByIban("TR1", SNAPSHOT_1));
+        writer.start();
+        assertThat(blocking.writeStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        var resetDone = new CountDownLatch(1);
+        Thread resetter = daemonThread(() -> {
+            blocking.evictAll();
+            resetDone.countDown();
+        });
+        resetter.start();
+
+        try {
+            assertThat(resetDone.await(200, TimeUnit.MILLISECONDS))
+                    .as("evict-all must wait for the in-flight write")
+                    .isFalse();
+        } finally {
+            blocking.releaseWrite.countDown();
+        }
+        writer.join(5_000);
+        resetter.join(5_000);
+    }
+
+    /**
+     * The account locks must be free again after a full reset and after a
+     * granular eviction — otherwise the next mutation would block forever.
+     */
+    @Test
+    void shouldReleaseAccountLocksAfterEvictAllAndEvictById() throws Exception {
+        cache.evictById(1L);
+        cache.evictAll();
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            cache.evictById(1L);
+            done.countDown();
+        });
+        worker.start();
+
+        assertThat(done.await(5, TimeUnit.SECONDS))
+                .as("the account lock must be released after eviction")
+                .isTrue();
+        worker.join(5_000);
+    }
+
+    private static Thread daemonThread(Runnable body) {
+        Thread thread = new Thread(body);
+        thread.setDaemon(true);
+        return thread;
+    }
+
+    /** Pauses an IBAN snapshot write after the snapshot itself is stored. */
+    static class BlockingTestCache extends TestCache {
+        final CountDownLatch writeStarted = new CountDownLatch(1);
+        final CountDownLatch releaseWrite = new CountDownLatch(1);
+        volatile boolean blockNextIbanWrite;
+
+        @Override
+        protected void writeSnapshot(String key, AccountSnapshot snapshot) {
+            super.writeSnapshot(key, snapshot);
+            if (blockNextIbanWrite && key.startsWith("iban-")) {
+                writeStarted.countDown();
+                try {
+                    releaseWrite.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
     }
 }

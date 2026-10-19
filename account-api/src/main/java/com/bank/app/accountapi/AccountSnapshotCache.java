@@ -55,9 +55,17 @@ public interface AccountSnapshotCache {
      * <p>There is intentionally no IBAN-keyed eviction: IBANs are immutable, so
      * evicting by account id (which also drops the account's IBAN snapshot
      * entries via the reverse index) covers every mutation path.
+     *
+     * <p>Deliberately NOT defaulted to {@link #evictAll()}: a silent
+     * full-region wipe is a cache stampede on every unrelated account, and
+     * the blast radius of that mistake grows with the account count. A new
+     * backend must implement granular eviction explicitly — failing loudly at
+     * the first call is the intended signal.
      */
     default void evictById(Long accountId) {
-        evictAll();
+        throw new UnsupportedOperationException(
+                getClass().getName() + " must implement evictById(Long): falling back to evictAll() "
+                        + "would wipe every cached account and stampede the database.");
     }
 
     static String ibanKey(String ibanValue) {

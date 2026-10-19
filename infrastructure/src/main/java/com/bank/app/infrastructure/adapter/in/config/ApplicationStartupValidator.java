@@ -27,6 +27,14 @@ public class ApplicationStartupValidator {
         String jwtSecret = environment.getProperty("jwt.secret", DEFAULT_JWT_SECRET);
         String dbPassword = environment.getProperty("spring.datasource.password", "");
 
+        // Backend selection is validated in EVERY profile, not just prod: an
+        // unknown value (a typo such as "rediss") used to select the
+        // single-JVM Caffeine backend silently, and a per-JVM cache in a
+        // multi-replica deployment serves stale account snapshots to every
+        // replica that did not perform the invalidation — with nothing in
+        // the logs to say so.
+        validateSnapshotCacheBackend();
+
         if (!isProdProfile()) {
             if (DEFAULT_JWT_SECRET.equals(jwtSecret)) {
                 log.warn("Default JWT secret is being used in non-prod environment. "
@@ -75,6 +83,14 @@ public class ApplicationStartupValidator {
                     "Production requires a shared Redis backend: app.cache.account-info.backend "
                     + "(canonical; legacy app.cache.caffeine.account-info.backend still honored as fallback)");
         }
+        // maximum-size is a Caffeine-only setting: the Redis backend has no
+        // entry-count cap, so the region is bounded by the TTL instead
+        // (memory ~= write rate x TTL). Saying so once at startup beats an
+        // operator discovering it from a full broker.
+        log.info("Account snapshot cache: shared Redis backend. 'maximum-size' ({}) applies to the "
+                        + "Caffeine backend only — the Redis region is bounded by its TTL ({}s). Size the "
+                        + "broker with maxmemory, not with this key.",
+                snapshotCache.maximumSize(), snapshotCache.expireAfterWrite());
         requireProdCors();
         requirePositive("app.security.failed-login.max-attempts", 5L);
         requirePositive("app.security.failed-login.window-minutes", 15L);
@@ -133,6 +149,36 @@ public class ApplicationStartupValidator {
         if (!"redis".equals(environment.getProperty(property))) {
             throw new IllegalStateException("Production requires a shared Redis backend: " + property);
         }
+    }
+
+    /**
+     * Rejects an unknown snapshot-cache backend in every profile and warns
+     * when a shared deployment would run on the per-JVM backend.
+     */
+    private void validateSnapshotCacheBackend() {
+        CacheProperties.AccountInfoCache snapshotCache = CacheBackendResolution.resolve(environment);
+        String backend = snapshotCache.backend();
+        if (!CacheBackendResolution.KNOWN_BACKENDS.contains(backend.toLowerCase(Locale.ROOT))) {
+            throw new IllegalStateException(
+                    "Unknown account snapshot cache backend '" + backend + "'. Supported values: "
+                    + CacheBackendResolution.KNOWN_BACKENDS + ". Set "
+                    + CacheBackendResolution.CANONICAL_PREFIX + ".backend.");
+        }
+        if (!"redis".equalsIgnoreCase(backend) && !isLocalOnlyProfile()) {
+            log.warn("Account snapshot cache backend '{}' is per-JVM: an eviction on one replica never "
+                    + "reaches another, so account status/currency reads go stale cluster-wide for up to "
+                    + "the TTL. Use {}.backend=redis for any deployment with more than one replica.",
+                    backend, CacheBackendResolution.CANONICAL_PREFIX);
+        }
+    }
+
+    /**
+     * Profiles that are single-JVM by definition (local development, tests).
+     * Any other profile may run on more than one replica, so it must use the
+     * shared Redis backend.
+     */
+    private boolean isLocalOnlyProfile() {
+        return environment.acceptsProfiles(Profiles.of("dev", "demo", "test", "testcontainers"));
     }
 
     private void requireProdCors() {

@@ -2,6 +2,9 @@ package com.bank.app.infrastructure.adapter.in.config;
 
 import org.springframework.core.env.Environment;
 
+import java.util.Locale;
+import java.util.Set;
+
 /**
  * Canonical snapshot-cache key resolution.
  *
@@ -22,6 +25,14 @@ public final class CacheBackendResolution {
 
     public static final String CANONICAL_PREFIX = "app.cache.account-info";
     public static final String LEGACY_PREFIX = "app.cache.caffeine.account-info";
+
+    /**
+     * The only accepted backend values. Anything else is a configuration
+     * mistake and must fail at startup — a typo like {@code rediss} used to
+     * select the single-JVM Caffeine backend silently, which is exactly the
+     * wrong behaviour in a multi-replica deployment.
+     */
+    public static final Set<String> KNOWN_BACKENDS = Set.of("caffeine", "redis");
 
     private CacheBackendResolution() {
     }
@@ -47,6 +58,15 @@ public final class CacheBackendResolution {
 
     public static boolean isRedis(Environment environment) {
         return "redis".equalsIgnoreCase(resolve(environment).backend());
+    }
+
+    /**
+     * Whether the resolved backend value is one this build knows how to wire.
+     * An unknown value must abort startup instead of falling back to a
+     * single-JVM backend.
+     */
+    public static boolean isKnownBackend(Environment environment) {
+        return KNOWN_BACKENDS.contains(resolve(environment).backend().toLowerCase(Locale.ROOT));
     }
 
     private static CacheProperties.AccountInfoCache read(Environment environment, String prefix) {

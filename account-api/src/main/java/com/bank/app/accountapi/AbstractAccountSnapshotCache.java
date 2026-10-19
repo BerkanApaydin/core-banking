@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Shared base for {@link AccountSnapshotCache} backends.
@@ -18,9 +19,36 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Threading: single-key reads and writes delegate straight to the backend
  * ({@code ConcurrentHashMap}, Caffeine and Redis are all thread-safe for
- * single keys), so reads never block each other. Only the compound
- * invalidations (read-then-remove across the id, IBAN and mapping namespaces)
- * synchronize on the instance.
+ * single keys), so reads never block each other and the hot read path never
+ * takes a lock.
+ *
+ * <p>The two <em>compound</em> operations must not interleave for the same
+ * account: {@link #putByIban} writes a snapshot and registers its reverse
+ * index, {@link #evictById} removes a snapshot across the id, IBAN and
+ * mapping namespaces. If they overlapped, an eviction could drop the index
+ * entry while the write was still registering it, stranding an IBAN snapshot
+ * that no later eviction can reach.
+ *
+ * <p>They therefore take a per-account lock, striped over a small fixed
+ * array ({@link #LOCK_STRIPES}) instead of the instance monitor. An
+ * instance-wide monitor is correct but wrong in two ways: it serializes
+ * every account's writes behind one monitor (unrelated accounts never
+ * overlap in practice, so that is pure added latency on the mutation path),
+ * and it lets a long {@link #evictAll()} region clear block the write path
+ * for its whole duration. Striping keeps unrelated accounts independent;
+ * two accounts that happen to share a stripe contend only for the
+ * microseconds a compound operation holds it.
+ *
+ * <p>{@link #evictAll()} takes every stripe in a fixed order, so it acts as
+ * a global barrier that no per-account operation can interleave with. The
+ * order is fixed and no other path holds more than one stripe, so the
+ * acquisition cannot deadlock.
+ *
+ * <p>What the locks deliberately do <em>not</em> cover: the read-through
+ * race between a database read and the cache write that follows it. That
+ * race lives above this class — the database read happens outside any cache
+ * lock — and is documented in docs/account-snapshot-cache.md. No lock inside
+ * the cache can close it.
  */
 public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCache {
 
@@ -53,6 +81,32 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
      */
     private final ConcurrentHashMap<Long, Set<String>> ibanKeysByAccount = new ConcurrentHashMap<>();
 
+    /**
+     * Number of account-lock stripes. A power of two so the stripe index is a
+     * cheap mask; 64 keeps false sharing between unrelated accounts rare
+     * while bounding the overhead to 64 lock objects per cache instance.
+     */
+    private static final int LOCK_STRIPES = 64;
+
+    private final ReentrantLock[] accountLocks = createAccountLocks();
+
+    private static ReentrantLock[] createAccountLocks() {
+        ReentrantLock[] locks = new ReentrantLock[LOCK_STRIPES];
+        for (int i = 0; i < locks.length; i++) {
+            locks[i] = new ReentrantLock();
+        }
+        return locks;
+    }
+
+    /**
+     * Lock guarding the compound operations of one account. The id is never
+     * null here: {@code evictById} rejects it up front and
+     * {@code AccountSnapshot} requires a non-null id.
+     */
+    private ReentrantLock lockFor(Long accountId) {
+        return accountLocks[Math.floorMod(accountId.hashCode(), accountLocks.length)];
+    }
+
     @Override
     public Optional<AccountSnapshot> getById(Long accountId) {
         if (accountId == null) {
@@ -82,11 +136,19 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
         if (ibanValue == null || snapshot == null) {
             return;
         }
-        String key = AccountSnapshotCache.ibanKey(ibanValue);
-        writeSnapshot("iban-" + key, snapshot);
-        if (snapshot.id() != null) {
-            ibanKeysByAccount.computeIfAbsent(snapshot.id(), id -> ConcurrentHashMap.newKeySet())
-                    .add("iban-" + key);
+        // Same stripe as evictById(snapshot.id()) -> the write and the
+        // eviction of one account are mutually exclusive.
+        ReentrantLock lock = lockFor(snapshot.id());
+        lock.lock();
+        try {
+            String key = AccountSnapshotCache.ibanKey(ibanValue);
+            writeSnapshot("iban-" + key, snapshot);
+            if (snapshot.id() != null) {
+                ibanKeysByAccount.computeIfAbsent(snapshot.id(), id -> ConcurrentHashMap.newKeySet())
+                        .add("iban-" + key);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -126,21 +188,39 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
     }
 
     @Override
-    public synchronized void evictAll() {
-        clearStorage();
-        ibanKeysByAccount.clear();
+    public void evictAll() {
+        // Global barrier: every stripe is held (fixed order) so no per-account
+        // operation can interleave with the region clear. No other path holds
+        // more than one stripe, so the acquisition cannot deadlock.
+        for (ReentrantLock lock : accountLocks) {
+            lock.lock();
+        }
+        try {
+            clearStorage();
+            ibanKeysByAccount.clear();
+        } finally {
+            for (int i = accountLocks.length - 1; i >= 0; i--) {
+                accountLocks[i].unlock();
+            }
+        }
     }
 
     @Override
-    public synchronized void evictById(Long accountId) {
+    public void evictById(Long accountId) {
         if (accountId == null) {
             return;
         }
-        removeSnapshot("id-" + accountId);
-        Set<String> ibanKeys = ibanKeysByAccount.remove(accountId);
-        if (ibanKeys != null) {
-            ibanKeys.forEach(this::removeSnapshot);
+        ReentrantLock lock = lockFor(accountId);
+        lock.lock();
+        try {
+            removeSnapshot("id-" + accountId);
+            Set<String> ibanKeys = ibanKeysByAccount.remove(accountId);
+            if (ibanKeys != null) {
+                ibanKeys.forEach(this::removeSnapshot);
+            }
+            removeIbanMapping(accountId);
+        } finally {
+            lock.unlock();
         }
-        removeIbanMapping(accountId);
     }
 }

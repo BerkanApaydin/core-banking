@@ -137,8 +137,42 @@ class ApplicationStartupValidatorTest {
     }
 
     @Test
-    void rejectsZeroCanonicalEvictionBatchSize() {
-        var environment = validProductionEnvironment()
+    void rejectsUnknownSnapshotCacheBackendInEveryProfile() {
+        // A typo such as "rediss" used to select the single-JVM Caffeine
+        // backend silently. In a multi-replica deployment that is the one
+        // failure mode nobody can see in the logs: an eviction on one replica
+        // never reaches another, so account status reads stay stale for the
+        // whole TTL. The value must be rejected in every profile, not only
+        // in prod.
+        for (String profile : new String[]{"dev", "demo", "test", "staging"}) {
+            var environment = new MockEnvironment()
+                    .withProperty("app.cache.account-info.backend", "rediss");
+            environment.setActiveProfiles(profile);
+
+            assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                    .as("profile %s must reject an unknown cache backend", profile)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Unknown account snapshot cache backend");
+        }
+    }
+
+    @Test
+    void permitsCaffeineBackendInLocalOnlyProfiles() {
+        // dev/demo/test/testcontainers are single-JVM by definition, so the
+        // per-JVM Caffeine backend stays valid there.
+        for (String profile : new String[]{"dev", "demo", "test", "testcontainers"}) {
+            var environment = new MockEnvironment()
+                    .withProperty("app.cache.account-info.backend", "caffeine");
+            environment.setActiveProfiles(profile);
+
+            assertThatCode(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                    .as("profile %s must accept the single-JVM cache backend", profile)
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void rejectsZeroCanonicalEvictionBatchSize() {        var environment = validProductionEnvironment()
                 .withProperty("app.cache.account-info.eviction-batch-size", "0");
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .hasMessageContaining("eviction-batch-size");

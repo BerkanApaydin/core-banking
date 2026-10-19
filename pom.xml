@@ -421,6 +421,9 @@
          this profile narrows those properties to domain-only patterns, so the
          profile alone measures the correct scope (the CLI -DtargetClasses override
          is no longer required, kept in nightly as an explicitly stated extra safeguard).
+         The nightly workflow's weekly schedule is disabled (2026-10-19), so this
+         profile is now exercised by manual dispatch only — the 85% domain number
+         is reproducible on demand but is no longer enforced automatically.
          targetTests stay as they are in the module poms. -->
     <profiles>
         <profile>

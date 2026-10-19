@@ -34,13 +34,19 @@ public class TransferAccountAclConfiguration {
      * never activate there. The profile check below is defense in depth: if
      * the wiring ever degrades, prod fails fast at startup instead of serving
      * stale snapshots silently.
+     *
+     * <p>{@code simulation} is checked explicitly as well. The
+     * {@code simulation} profile group already implies {@code prod}, so the
+     * check is redundant today — but it keeps the guard meaningful even if
+     * the group is ever removed, and the hosted demo is exactly the
+     * multi-replica deployment that must never fall back to a per-JVM cache.
      */
     @Bean
     @ConditionalOnMissingBean(AccountSnapshotCache.class)
     public AccountSnapshotCache accountInfoCachePort(Environment environment) {
-        if (environment.matchesProfiles("prod")) {
+        if (environment.matchesProfiles("prod") || environment.matchesProfiles("simulation")) {
             throw new IllegalStateException(
-                    "InMemoryAccountInfoCacheAdapter must not run with the prod profile: "
+                    "InMemoryAccountInfoCacheAdapter must not run with the prod/simulation profile: "
                     + "no shared AccountSnapshotCache backend is registered, so per-JVM "
                     + "caches would go stale across replicas. Fix "
                     + "app.cache.account-info.backend=redis instead.");

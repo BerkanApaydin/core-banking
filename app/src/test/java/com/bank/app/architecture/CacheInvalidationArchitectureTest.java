@@ -3,6 +3,7 @@ package com.bank.app.architecture;
 import com.bank.app.account.domain.Account;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -38,6 +39,22 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
         ArchRule rule = classes()
                 .that(callAccountStatusMutator())
                 .should(evictSnapshots())
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void accountStatusMutatorsMustDeferEvictionToAfterCommit() {
+        // Evicting before commit lets a concurrent read-through repopulate the
+        // cache from pre-commit (still ACTIVE) state; the stale snapshot then
+        // survives the eviction for the full TTL. Status mutators must route
+        // eviction through TransactionBoundaryPort.runAfterCommit (which runs
+        // immediately when no transaction is active, so tests and schedulers
+        // keep working).
+        ArchRule rule = classes()
+                .that(callAccountStatusMutator())
+                .should(deferEvictionToAfterCommit())
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);
@@ -83,6 +100,27 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
                                         || call.getName().equals("close")));
             }
         };
+    }
+
+    private static ArchCondition<JavaClass> deferEvictionToAfterCommit() {
+        return new ArchCondition<>("defer snapshot eviction to after commit") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                boolean defers = javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(CacheInvalidationArchitectureTest::isRunAfterCommitCall);
+                if (!defers) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                            javaClass.getName()
+                                    + " changes Account status without deferring snapshot eviction"
+                                    + " to TransactionBoundaryPort.runAfterCommit"));
+                }
+            }
+        };
+    }
+
+    private static boolean isRunAfterCommitCall(JavaMethodCall call) {
+        return call.getTargetOwner().getName().equals(TransactionBoundaryPort.class.getName())
+                && call.getName().equals("runAfterCommit");
     }
 
     private static ArchCondition<JavaClass> evictSnapshots() {

@@ -50,30 +50,37 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     private static final Logger log = LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
 
     /**
+     * Bounded retries for the eviction path. One dropped connection must not
+     * leave a committed mutation's snapshot alive for the whole TTL.
+     */
+    private static final int EVICTION_ATTEMPTS = 3;
+
+    /**
      * Single-round-trip eviction: the SMEMBERS index read and the DEL run
      * server-side, so a balance mutation costs 1 RTT per account instead of
      * read-then-delete (2 RTT). KEYS = [idKey, mapKey, idxKey],
-     * ARGV = [ibanKeyPrefix, idByIbanPrefix].
+     * ARGV = [ibanKeyPrefix].
      */
     private static final String LUA_EVICT_BY_ID =
         "local members = redis.call('SMEMBERS', KEYS[3])\n" +
         "local del = {KEYS[1], KEYS[2], KEYS[3]}\n" +
         "for _, m in ipairs(members) do\n" +
         "    del[#del + 1] = ARGV[1] .. m\n" +
-        "    del[#del + 1] = ARGV[2] .. m\n" +
         "end\n" +
         "return redis.call('DEL', unpack(del))";
 
     /**
-     * Single-round-trip index write: the id-to-IBAN reverse entry, its TTL,
-     * and the forward lookup are applied server-side in one EVAL instead of
-     * SADD + EXPIRE + SET (3 RTT). KEYS = [idxKey, idByIbanKey],
-     * ARGV = [ttlSeconds, ibanKey, accountId].
+     * Single-round-trip atomic write: the IBAN snapshot and its id-to-IBAN
+     * reverse-index set (with TTL) land together in one EVAL. A partial
+     * failure can therefore never strand an un-indexed IBAN snapshot that
+     * {@code evictById} would not reach. KEYS = [ibanKey, idxKey],
+     * ARGV = [ttlSeconds, ibanKeyRaw, encodedSnapshot].
      */
-    private static final String LUA_TRACK_IBAN =
-        "redis.call('SADD', KEYS[1], ARGV[2])\n" +
-        "redis.call('EXPIRE', KEYS[1], ARGV[1])\n" +
-        "redis.call('SETEX', KEYS[2], ARGV[1], ARGV[3])\n" +
+    private static final String LUA_PUT_BY_IBAN =
+        "local ttl = tonumber(ARGV[1])\n" +
+        "redis.call('SETEX', KEYS[1], ttl, ARGV[3])\n" +
+        "redis.call('SADD', KEYS[2], ARGV[2])\n" +
+        "redis.call('EXPIRE', KEYS[2], ttl)\n" +
         "return 1";
 
     /**
@@ -94,7 +101,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     private final int evictionBatchSize;
     private final DefaultRedisScript<Long> evictByIdScript;
     private final DefaultRedisScript<Long> putIbansScript;
-    private final DefaultRedisScript<Long> trackIbanScript;
+    private final DefaultRedisScript<Long> putByIbanScript;
 
     public RedisAccountSnapshotCacheAdapter(StringRedisTemplate redisTemplate,
             CacheProperties.AccountInfoCache resolvedAccountInfoCache) {
@@ -103,7 +110,7 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         this.evictionBatchSize = Math.toIntExact(resolvedAccountInfoCache.evictionBatchSize());
         this.evictByIdScript = new DefaultRedisScript<>(LUA_EVICT_BY_ID, Long.class);
         this.putIbansScript = new DefaultRedisScript<>(LUA_PUT_IBANS, Long.class);
-        this.trackIbanScript = new DefaultRedisScript<>(LUA_TRACK_IBAN, Long.class);
+        this.putByIbanScript = new DefaultRedisScript<>(LUA_PUT_BY_IBAN, Long.class);
     }
 
     @Override
@@ -136,8 +143,19 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             return;
         }
         String ibanKey = AccountSnapshotCache.ibanKey(ibanValue);
-        writeSnapshot(SnapshotKeys.ibanKeyRaw(ibanKey), snapshot);
-        trackIban(snapshot.id(), ibanKey);
+        String accountId = String.valueOf(snapshot.id());
+        try {
+            // One EVAL: the snapshot and the index entry it is reachable by
+            // land together or not at all. A half-applied write would strand
+            // an IBAN snapshot that evictById could never reach.
+            List<String> keys = List.of(
+                    SnapshotKeys.ibanKeyRaw(ibanKey),
+                    SnapshotKeys.ibansByIdIndex(accountId));
+            redisTemplate.execute(putByIbanScript, keys,
+                    String.valueOf(ttlSeconds), ibanKey, SnapshotCodec.encode(snapshot));
+        } catch (RuntimeException e) {
+            log.warn("Redis snapshot write failed: {}", e.getClass().getSimpleName());
+        }
     }
 
     @Override
@@ -233,17 +251,36 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         if (accountId == null) {
             return;
         }
-        try {
-            // One server-side Lua (SMEMBERS + DEL) instead of N+1 singles:
-            // eviction runs inside the request path of every balance mutation.
-            List<String> keys = List.of(
-                    SnapshotKeys.idKey(accountId),
-                    SnapshotKeys.mapKey(accountId),
-                    SnapshotKeys.ibansByIdIndex(accountId));
-            redisTemplate.execute(evictByIdScript, keys,
-                    SnapshotKeys.ibanKeyPrefix(), SnapshotKeys.idByIbanPrefix());
-        } catch (RuntimeException e) {
-            log.warn("Redis snapshot evict-by-id failed: {}", e.getClass().getSimpleName());
+        // Bounded retry: eviction is the only thing standing between a
+        // committed mutation and a stale snapshot, so a single dropped
+        // connection must not leave the entry alive for the whole TTL. The
+        // read path stays fail-open (a cache outage costs DB load, never a
+        // 500); here the operation is retried and, if it still fails, logged
+        // at ERROR so it is visible to alerting instead of hiding in a WARN.
+        //
+        // The retries are immediate on purpose: a blocking sleep would park
+        // the request thread (CodingRulesArchitectureTest forbids
+        // Thread.sleep in production code), and a transient failure is
+        // usually a stale pooled connection that Lettuce replaces on the
+        // next command anyway.
+        for (int attempt = 1; attempt <= EVICTION_ATTEMPTS; attempt++) {
+            try {
+                // One server-side Lua (SMEMBERS + DEL) instead of N+1 singles:
+                // eviction runs inside the request path of every balance
+                // mutation.
+                List<String> keys = List.of(
+                        SnapshotKeys.idKey(accountId),
+                        SnapshotKeys.mapKey(accountId),
+                        SnapshotKeys.ibansByIdIndex(accountId));
+                redisTemplate.execute(evictByIdScript, keys, SnapshotKeys.ibanKeyPrefix());
+                return;
+            } catch (RuntimeException e) {
+                if (attempt == EVICTION_ATTEMPTS) {
+                    log.error("Redis snapshot evict-by-id failed after {} attempts; account {} keeps a "
+                                    + "stale snapshot for up to the cache TTL ({}s).",
+                            EVICTION_ATTEMPTS, accountId, ttlSeconds, e);
+                }
+            }
         }
     }
 
@@ -261,16 +298,6 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             redisTemplate.opsForValue().set(key, SnapshotCodec.encode(snapshot), ttlSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException e) {
             log.warn("Redis snapshot write failed: {}", e.getClass().getSimpleName());
-        }
-    }
-
-    private void trackIban(Long accountId, String ibanKey) {
-        try {
-            String idxKey = SnapshotKeys.ibansByIdIndex(accountId);
-            redisTemplate.execute(trackIbanScript, List.of(idxKey, SnapshotKeys.idByIbanIndex(ibanKey)),
-                    String.valueOf(ttlSeconds), ibanKey, String.valueOf(accountId));
-        } catch (RuntimeException e) {
-            log.warn("Redis snapshot index write failed: {}", e.getClass().getSimpleName());
         }
     }
 

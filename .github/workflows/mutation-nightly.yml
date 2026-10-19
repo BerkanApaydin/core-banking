@@ -1,12 +1,25 @@
-name: Mutation Nightly (domain 85%)
+name: Mutation Nightly (domain 85%, manual only)
 
 # R6 follow-up: the main CI mutation gate stays at 80% for speed; this
-# scheduled job enforces the stricter 85% domain-mutation target from the
-# `pitest-domain` profile (root pom) on a weekly cadence plus manual dispatch.
-# Failure notifies without blocking PRs — fix forward within the week.
+# workflow enforces the stricter 85% domain-mutation target from the
+# `pitest-domain` profile (root pom).
+#
+# SCHEDULE DISABLED (2026-10-19): the weekly cron trigger is removed, so
+# this job no longer runs unattended and no longer consumes CI minutes.
+# The file is kept — not deleted — so the 85% domain gate stays
+# reproducible on demand via "Run workflow", and so the workflow stays
+# visible in the repository's CI inventory. To restore the weekly
+# cadence, re-add:
+#
+#   schedule:
+#     - cron: '0 2 * * 1' # Monday 02:00 UTC
+#
+# What is lost: only the stricter domain-only mutation number stopped
+# being enforced automatically. The main CI gate (ci.yml — 80% mutation,
+# 85% aggregate coverage) is untouched and still runs on every push, and
+# mutation-pr.yml still reports the changed modules' survivors on every
+# pull request.
 on:
-  schedule:
-    - cron: '0 2 * * 1' # Monday 02:00 UTC
   workflow_dispatch:
 
 concurrency:

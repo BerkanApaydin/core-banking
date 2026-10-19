@@ -78,4 +78,20 @@ class CacheBackendResolutionTest {
         assertTrue(new CacheProperties(null).accountInfo().isDefault());
         assertFalse(new CacheProperties.AccountInfoCache("redis", 1000, 60, 500).isDefault());
     }
+
+    @Test
+    void knownBackendsAreTheOnlyAcceptedValues() {
+        MockEnvironment caffeine = new MockEnvironment()
+                .withProperty("app.cache.account-info.backend", "caffeine");
+        MockEnvironment redis = new MockEnvironment()
+                .withProperty("app.cache.account-info.backend", "redis");
+        MockEnvironment typo = new MockEnvironment()
+                .withProperty("app.cache.account-info.backend", "rediss");
+
+        assertTrue(CacheBackendResolution.isKnownBackend(caffeine));
+        assertTrue(CacheBackendResolution.isKnownBackend(redis));
+        // A typo must be visible to the startup validator, not silently
+        // degraded to the single-JVM backend.
+        assertFalse(CacheBackendResolution.isKnownBackend(typo));
+    }
 }

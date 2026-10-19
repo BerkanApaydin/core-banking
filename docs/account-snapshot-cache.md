@@ -18,18 +18,88 @@ Contract guard: `AccountSnapshotContractTest` pins the record shape; adding a
 |---|---|
 | `transfer` → `debitAndCredit` / `reverseForCancellation` (via `AccountApiAdapter`) | `AccountApiAdapter.evictSnapshotsAfterCommit` evicts **both legs by id** after commit (granular; unrelated entries never stampede). Ownership lives on the Account boundary — `AccountAclAdapter` must not double-evict (see its class javadoc) |
 | Account open (`POST /accounts`) | Nothing to evict: the id is new, and the per-id IBAN map only gains entries |
-| Account suspend | `SuspendAccountUseCaseImpl` evicts the id directly; status reads fall back to DB on TTL expiry |
+| Account suspend | `SuspendAccountUseCaseImpl` defers the id eviction to after commit (`TransactionBoundaryPort.runAfterCommit`, same pattern as `AccountApiAdapter`); status reads fall back to DB on TTL expiry |
+
+**Eviction always happens after the commit, never inside the transaction.**
+Evicting before the commit opens a window: a concurrent read-through can
+read the pre-commit (still `ACTIVE`) row and write it back into the cache
+*after* the eviction, and that stale entry then survives for the whole TTL.
+Deferring the eviction to `AFTER_COMMIT` shrinks the window from "the
+transaction duration" to "the eviction round trip" and is pinned by
+`CacheInvalidationArchitectureTest.accountStatusMutatorsMustDeferEvictionToAfterCommit`.
+
+## The residual read-through race (known, bounded, and not a decision input)
+
+The cache-aside read-through is
+
+```
+cache.get(id) → miss → database read → cache.put(id, value)
+```
+
+The database read happens *outside* the cache, so no lock inside the cache
+can order it against a concurrent eviction. A reader that read the row
+before a mutation committed can still write its stale value back after the
+eviction, and that entry then lives for the TTL (60 s by default).
+
+Properties of this race in this codebase:
+
+- **Bounded.** The window is the duration of one projection query plus one
+  cache write — milliseconds, not the TTL. Every subsequent read of that
+  account sees the fresh value.
+- **Not a decision input today.** The only mutable field in the snapshot is
+  `status`, and nothing in the transfer context reads it. The
+  authorization decision is made by `Account.debit()` on the aggregate
+  re-read under `PESSIMISTIC_WRITE`, so a stale `ACTIVE` snapshot can
+  never authorize a suspended account.
+- **Would need a fencing token to close.** The industry-standard fix is a
+  monotonic revision on the snapshot plus a compare-and-set write (the
+  cache rejects a write whose revision is older than the last invalidation
+  for that account). That requires either a new component on the published
+  `AccountSnapshot` (currently pinned to `id|userId|currency|status` by
+  `AccountSnapshotContractTest`) or moving the read-through into the cache
+  so the cache owns the token. It is deliberately not implemented: the
+  contract test pins the published shape on purpose, and the field the race
+  could affect is not read for any decision. Revisit it if a consumer
+  starts branching on the cached status.
+
+## Locking inside the cache
+
+`AbstractAccountSnapshotCache` guards the two *compound* operations —
+`putByIban` (snapshot write + reverse-index registration) and `evictById`
+(removal across the id, IBAN and mapping namespaces) — with a
+**per-account lock, striped over 64 slots**. A single instance-wide monitor
+would also be correct, but it serializes every account's writes behind one
+monitor and lets a long `evictAll()` region clear block the write path for
+its whole duration. Reads and single-key writes take no lock at all.
+
+The Redis backend needs no Java-level lock for the same reason: each
+mutation is a single Lua script, and Redis executes scripts atomically.
+
+## Capacity: `maximum-size` applies to Caffeine only
+
+`app.cache.account-info.maximum-size` caps the entry count of the
+**Caffeine** backend. The Redis backend has no entry-count cap: its region
+is bounded by the TTL instead, so its memory is roughly
+`write rate x expire-after-write`. Size the broker with `maxmemory` and a
+`maxmemory-policy`, not with this key. The application logs this once at
+startup in prod so the difference is never a surprise.
 
 Cross-replica: the Redis backend keeps the id↔IBAN index in Redis too
-(sets + reverse keys, same TTL), so an `evictById` on one pod drops IBAN
-entries written by other pods. The Caffeine backend is single-JVM
+(sets + reverse keys, same TTL), so an `evictById` on one pod also drops
+IBAN entries written by other pods. The Caffeine backend is single-JVM
 (dev/test/single instance) — never use it with >1 replica.
 
-## Failure mode: fail-open
+## Failure mode: fail-open (reads) / fail-loud (evictions)
 
 Every Redis call is guarded: on outage, reads return `Optional.empty()`
-(callers fall back to the DB) and writes/evicts become no-ops. A cache outage
-costs extra DB load, never a 500. Eviction loss is self-healing via TTL.
+(callers fall back to the DB) and writes become no-ops. A cache outage
+costs extra DB load, never a 500.
+
+**Eviction is the exception.** It is the only thing standing between a
+committed mutation and a stale snapshot, so a failed eviction is retried
+(bounded, 3 attempts) and, if it still fails, logged at `ERROR` with the
+account id — the request still succeeds, but the loss is visible instead
+of hiding in a `WARN`. Eviction loss is otherwise self-healing via the TTL.
 
 ## Rules for future changes
 
@@ -39,10 +109,18 @@ costs extra DB load, never a 500. Eviction loss is self-healing via TTL.
    overdraft protection.
 2. **Every new balance-mutation path must evict its accounts** — follow
    `AccountApiAdapter.evictSnapshotsAfterCommit` (by id after commit, not `evictAll`).
+   Never evict before commit: a concurrent read-through could repopulate the
+   cache from pre-commit state and the stale snapshot would survive the
+   eviction for the full TTL.
    Pinned by `CacheInvalidationArchitectureTest.accountApiMutationsMustEvictSnapshots`
-   (new `AccountApi` mutators) and `.accountStatusMutatorsMustEvictSnapshots`
-   (status mutators).
+   (new `AccountApi` mutators), `.accountStatusMutatorsMustEvictSnapshots`
+   (status mutators) and `.accountStatusMutatorsMustDeferEvictionToAfterCommit`
+   (status mutators must route eviction through `runAfterCommit`).
 3. Keep index keys on the same TTL as data keys (see `SnapshotKeys`).
+4. **A new backend must implement `evictById` explicitly.** The port default
+   throws `UnsupportedOperationException` on purpose: the previous default
+   delegated to `evictAll()`, which silently wiped every cached account —
+   a database stampede whose blast radius grows with the account count.
 
 ## Which backend runs, and why the in-memory one never should
 
@@ -54,8 +132,8 @@ conflict; see `CacheBackendResolution`):
 | Value | Bean | Where |
 |---|---|---|
 | `redis` (production) | `RedisAccountSnapshotCacheAdapter` | `SnapshotCacheRedisCondition` (+ `RedisRateLimitConfiguration.SnapshotCacheRedis` for the connection factory) |
-| anything else | none registered → `TransferBeanConfig.accountInfoCachePort()` falls back to `InMemoryAccountInfoCacheAdapter` | `@ConditionalOnMissingBean(AccountSnapshotCache.class)` |
-| — | `AbstractAccountSnapshotCache` | shared invalidation logic, not a backend |
+| `caffeine` (dev/test, single JVM) | `CaffeineAccountInfoCacheAdapter` | `SnapshotCacheCaffeineCondition` |
+| anything else | **nothing registers** — startup fails | `ApplicationStartupValidator` rejects the unknown value |
 
 `application-prod.yml` sets both keys to the **literal** `redis` (not
 `${CACHE_ACCOUNT_INFO_BACKEND:redis}` as the base file does). That matters: a
@@ -73,9 +151,15 @@ the absence of a `${...}` placeholder, so this cannot regress silently.
 
 Two additional tripwires sit directly on the fallback: it logs a `WARN` on every
 activation (a per-JVM cache serving traffic is always worth a log line), and it
-refuses to start at all under the `prod` profile (`IllegalStateException`,
-pinned by `TransferBeanConfigTest`). Either signal fires before a single stale
-snapshot is served.
+refuses to start at all under the `prod` or `simulation` profiles
+(`IllegalStateException`, pinned by `TransferBeanConfigTest`). Either signal
+fires before a single stale snapshot is served.
+
+A **typo in the backend value** (`rediss`, `redis2`) is a third tripwire: it
+used to select the Caffeine backend silently, which is the one failure mode
+nobody can see in the logs. Unknown values are now rejected at startup in
+*every* profile, and the backend conditions match exactly (`caffeine` /
+`redis`) instead of "anything that is not redis".
 
 The fallback itself is still correct and intentional for dev, test and
 single-JVM use, where it removes a Redis dependency without changing

@@ -139,6 +139,18 @@ class TransferBeanConfigTest {
     }
 
     @Test
+    void shouldFailFastWhenFallbackWouldRunUnderSimulation() {
+        // The hosted demo (simulation profile) is exactly the multi-replica
+        // deployment that must never fall back to a per-JVM cache.
+        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
+        Environment simulation = mock(Environment.class);
+        when(simulation.matchesProfiles("prod")).thenReturn(false);
+        when(simulation.matchesProfiles("simulation")).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> config.accountInfoCachePort(simulation));
+    }
+
+    @Test
     void shouldCreateAccountAclPortBean() {
         TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
         assertNotNull(config.accountAclPort(accountApi, cachePort));

@@ -29,6 +29,7 @@ import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
@@ -52,6 +53,7 @@ class SuspendAccountUseCaseImplTest {
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private AuditEventPort auditEventPort;
     @Mock private AccountSnapshotCache snapshotCache;
+    @Mock private TransactionBoundaryPort transactionBoundary;
 
     @Captor private ArgumentCaptor<Account> accountCaptor;
     @Captor private ArgumentCaptor<AuditEvent> auditEventCaptor;
@@ -62,7 +64,8 @@ class SuspendAccountUseCaseImplTest {
     @BeforeEach
     void setUp() {
         useCase = new SuspendAccountUseCaseImpl(loadAccountPort, saveAccountPort, userContextService,
-                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache);
+                clockProvider, domainEventPublisherService, auditEventPort, snapshotCache,
+                transactionBoundary);
         activeAccount = new Account(1L, new UserId(10L), new Iban("TR450006100519786456841234"),
                 "Owner", Money.of("100.00", Currency.TRY), AccountStatus.ACTIVE);
     }
@@ -108,6 +111,29 @@ class SuspendAccountUseCaseImplTest {
             // F-04: the same class that mutates the status evicts the snapshot.
             verify(snapshotCache).evictById(1L);
             verify(snapshotCache, never()).evictAll();
+        }
+
+        @Test
+        void shouldDeferEvictionToAfterCommitWhenTransactionActive() {
+            asAdmin();
+            stubUsername();
+            stubClockAndSave();
+            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(activeAccount));
+            when(transactionBoundary.isTransactionActive()).thenReturn(true);
+            ArgumentCaptor<Runnable> deferredEviction = ArgumentCaptor.forClass(Runnable.class);
+
+            useCase.suspend(1L);
+
+            // F-04/F-11: never evict before commit — a concurrent read-through
+            // could otherwise repopulate the cache from pre-commit (still
+            // ACTIVE) state and the stale snapshot would survive the eviction
+            // for the full TTL.
+            verify(snapshotCache, never()).evictById(anyLong());
+            verify(transactionBoundary).runAfterCommit(deferredEviction.capture());
+
+            deferredEviction.getValue().run();
+
+            verify(snapshotCache).evictById(1L);
         }
 
         @Test

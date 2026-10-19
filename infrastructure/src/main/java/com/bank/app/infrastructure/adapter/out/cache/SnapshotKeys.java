@@ -16,18 +16,19 @@ final class SnapshotKeys {
     private static final String IBAN_PREFIX = "iban-";
     private static final String MAP_PREFIX = "iban-of:";
     private static final String IDX_IBANS_BY_ID_PREFIX = "idx:ibans-by-id:";
-    private static final String IDX_ID_BY_IBAN_PREFIX = "idx:id-by-iban:";
 
     private SnapshotKeys() {}
 
-    /** Prefix passed to the evict Lua script so key names live in one place. */
+    /**
+     * Prefix passed to the evict Lua script so key names live in one place.
+     *
+     * <p>There is deliberately no {@code idx:id-by-iban:} reverse key: the
+     * IBAN snapshot is read directly by its own key, so a second index
+     * would be written on every cache fill, deleted on every eviction and
+     * never read. One key per account less, one less command per mutation.
+     */
     static String ibanKeyPrefix() {
         return KEY_PREFIX + IBAN_PREFIX;
-    }
-
-    /** Prefix passed to the evict Lua script so key names live in one place. */
-    static String idByIbanPrefix() {
-        return KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX;
     }
 
     static String scanPattern() {
@@ -57,9 +58,5 @@ final class SnapshotKeys {
     /** Reverse-lookup path hands the id back as a stored string; keep it opaque. */
     static String ibansByIdIndex(String accountId) {
         return KEY_PREFIX + IDX_IBANS_BY_ID_PREFIX + accountId;
-    }
-
-    static String idByIbanIndex(String ibanKey) {
-        return KEY_PREFIX + IDX_ID_BY_IBAN_PREFIX + ibanKey;
     }
 }

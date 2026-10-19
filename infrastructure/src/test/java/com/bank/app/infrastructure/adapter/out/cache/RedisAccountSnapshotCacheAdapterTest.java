@@ -3,11 +3,16 @@ package com.bank.app.infrastructure.adapter.out.cache;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.accountapi.AccountSnapshotCache;
 import com.bank.app.infrastructure.adapter.in.config.CacheProperties;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
@@ -92,21 +97,21 @@ class RedisAccountSnapshotCacheAdapterTest {
     }
 
     @Test
-    void shouldPutByIbanAndMaintainDistributedIndex() {
-        stubValueOps();
+    void shouldPutByIbanAndMaintainDistributedIndexInOneAtomicWrite() {
         adapter.putByIban("tr45 0006 1005 1978 6456 8412 34", SNAPSHOT);
 
         String ibanKey = AccountSnapshotCache.ibanKey("tr45 0006 1005 1978 6456 8412 34");
-        verify(valueOps).set("account-snapshot:iban-" + ibanKey, "1|10|TRY|ACTIVE", 60L, TimeUnit.SECONDS);
-        // Single server-side EVAL (SADD + EXPIRE + SETEX): 1 RTT instead of 3.
+        // One server-side EVAL (SETEX snapshot + SADD/EXPIRE index): the
+        // snapshot and its distributed index land together or not at all, so a
+        // partial failure can never strand an un-indexed IBAN snapshot that
+        // evictById would not reach.
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
                 eq(List.of(
-                        "account-snapshot:idx:ibans-by-id:1",
-                        "account-snapshot:idx:id-by-iban:" + ibanKey)),
-                eq("60"), eq(ibanKey), eq("1"));
+                        "account-snapshot:iban-" + ibanKey,
+                        "account-snapshot:idx:ibans-by-id:1")),
+                eq("60"), eq(ibanKey), eq("1|10|TRY|ACTIVE"));
+        verify(valueOps, never()).set(anyString(), anyString(), anyLong(), any());
         verify(setOps, never()).add(anyString(), anyString());
-        verify(redisTemplate, never()).expire(anyString(), anyLong(), any());
-        verify(valueOps, never()).set(anyString(), eq("1"), anyLong(), any());
     }
 
     @Test
@@ -122,21 +127,73 @@ class RedisAccountSnapshotCacheAdapterTest {
     void shouldEvictByIdInSingleLuaRoundTrip() {
         // Index written by another pod is still visible because SMEMBERS runs
         // server-side inside the Lua script (no client-side read-then-delete).
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(), any()))
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
                 .thenReturn(5L);
 
         adapter.evictById(1L);
 
-        // One EVAL with the base keys + key prefixes: 1 round trip on the
-        // mutation hot path instead of SMEMBERS + DEL.
+        // One EVAL with the base keys + the IBAN key prefix: 1 round trip on
+        // the mutation hot path instead of SMEMBERS + DEL.
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
                 eq(List.of(
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",
                         "account-snapshot:idx:ibans-by-id:1")),
-                eq("account-snapshot:iban-"),
-                eq("account-snapshot:idx:id-by-iban:"));
+                eq("account-snapshot:iban-"));
         verify(redisTemplate, never()).delete(anyList());
+    }
+
+    @Test
+    void shouldRetryEvictionBeforeGivingUp() {
+        // Eviction is the only thing standing between a committed mutation
+        // and a stale snapshot, so a dropped connection must be retried
+        // instead of silently leaving the entry alive for the whole TTL.
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+                .thenThrow(new RuntimeException("connection refused"))
+                .thenThrow(new RuntimeException("connection refused"))
+                .thenReturn(5L);
+
+        adapter.evictById(1L);
+
+        verify(redisTemplate, times(3)).execute(any(DefaultRedisScript.class), anyList(), any());
+    }
+
+    @Test
+    void shouldNotPropagateEvictionFailureAfterRetries() {
+        // Fail-open for the request path: a cache outage must never turn a
+        // committed mutation into a 500. The failure is logged at ERROR so it
+        // is visible to alerting.
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        assertDoesNotThrow(() -> adapter.evictById(1L));
+
+        verify(redisTemplate, times(3)).execute(any(DefaultRedisScript.class), anyList(), any());
+    }
+
+    @Test
+    void shouldLogEvictionFailureExactlyOnceAfterTheLastAttempt() {
+        // One ERROR line per failed eviction, emitted after the retries are
+        // exhausted — not one per attempt (that would flood the log on every
+        // mutation while Redis is down).
+        Logger logger = (Logger) LoggerFactory.getLogger(RedisAccountSnapshotCacheAdapter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+                    .thenThrow(new RuntimeException("connection refused"));
+
+            adapter.evictById(1L);
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        var errors = appender.list.stream()
+                .filter(event -> event.getLevel() == Level.ERROR)
+                .toList();
+        assertEquals(1, errors.size());
+        assertTrue(errors.get(0).getFormattedMessage().contains("evict-by-id failed after 3 attempts"));
     }
 
     @Test
@@ -187,8 +244,7 @@ class RedisAccountSnapshotCacheAdapterTest {
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",
                         "account-snapshot:idx:ibans-by-id:1")),
-                eq("account-snapshot:iban-"),
-                eq("account-snapshot:idx:id-by-iban:"));
+                eq("account-snapshot:iban-"));
     }
 
     @Test

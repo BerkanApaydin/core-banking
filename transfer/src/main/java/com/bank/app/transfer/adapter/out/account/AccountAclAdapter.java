@@ -11,7 +11,9 @@ import com.bank.app.transfer.application.port.out.AccountAclPort;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 
 /**
@@ -33,26 +35,69 @@ public class AccountAclAdapter implements AccountAclPort {
     private final AccountSnapshotCache cache;
 
     /**
-     * Singleflight guards: one lock per cache key collapses a thundering herd
+     * Singleflight guards: one flight per cache key collapses a thundering herd
      * (N threads missing the same TTL window) into one backend read. Locks are
      * striped by key and removed after use; the map never grows beyond the
      * number of concurrently missing keys.
+     *
+     * <p>Implemented with a shared future rather than a lock object: the
+     * leader completes the future and every waiter observes the same result
+     * (or the same failure). The earlier lock-object version removed the
+     * lock from the map while still holding it, so a third caller could
+     * start a second flight for the same key while a second caller was still
+     * waiting on the first — two concurrent database reads for one key.
      */
-    private final ConcurrentHashMap<String, Object> inflight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<AccountSnapshot>> inflight = new ConcurrentHashMap<>();
 
     public AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache) {
         this.accountApi = Objects.requireNonNull(accountApi, "AccountApi must not be null");
         this.cache = Objects.requireNonNull(cache, "AccountSnapshotCache must not be null");
     }
 
-    private <T> T singleflight(String key, Supplier<T> loader) {
-        Object lock = inflight.computeIfAbsent(key, k -> new Object());
-        synchronized (lock) {
-            try {
-                return loader.get();
-            } finally {
-                inflight.remove(key, lock);
+    /**
+     * Runs {@code loader} once per key while a flight for that key is in
+     * progress; concurrent callers share its outcome. The original failure
+     * is rethrown unwrapped, so callers keep seeing the published-language
+     * exception type (e.g. AccountNotFoundException) rather than a
+     * CompletionException wrapper.
+     */
+    private AccountSnapshot singleflight(String key, Supplier<AccountSnapshot> loader) {
+        CompletableFuture<AccountSnapshot> mine = new CompletableFuture<>();
+        CompletableFuture<AccountSnapshot> running = inflight.putIfAbsent(key, mine);
+        if (running != null) {
+            return await(running);
+        }
+        try {
+            AccountSnapshot value = loader.get();
+            mine.complete(value);
+            return value;
+        } catch (RuntimeException | Error failure) {
+            mine.completeExceptionally(failure);
+            throw failure;
+        } finally {
+            // Removed only after the outcome is published: a caller that
+            // arrives after this point starts a fresh flight, a caller that
+            // arrived before it is already waiting on `mine`.
+            inflight.remove(key, mine);
+        }
+    }
+
+    private static AccountSnapshot await(CompletableFuture<AccountSnapshot> flight) {
+        try {
+            return flight.get();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for an in-flight account lookup",
+                    interrupted);
+        } catch (ExecutionException failed) {
+            Throwable cause = failed.getCause();
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
             }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("In-flight account lookup failed", cause);
         }
     }
 

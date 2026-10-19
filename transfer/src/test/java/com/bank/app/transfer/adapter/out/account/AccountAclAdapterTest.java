@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.out.account;
 
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.accountapi.AccountApi;
+import com.bank.app.accountapi.AccountNotFoundException;
 import com.bank.app.accountapi.AccountSnapshot;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -16,6 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import com.bank.app.common.domain.AccountId;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -186,6 +190,204 @@ class AccountAclAdapterTest {
 
             assertTrue(cache.getById(99L).isEmpty());
             verifyNoMoreInteractions(accountApi);
+        }
+    }
+
+    @Nested
+    @DisplayName("singleflight")
+    class Singleflight {
+        @Test
+        void shouldCollapseConcurrentMissesIntoOneBackendRead() throws Exception {
+            // A thundering herd on the same key must cost one database read,
+            // not one per waiting thread.
+            when(accountApi.getSnapshotById(1L)).thenReturn(new AccountSnapshot(1L, 10L, "TRY", "ACTIVE"));
+
+            int callers = 8;
+            var start = new CountDownLatch(1);
+            var done = new CountDownLatch(callers);
+            var results = new java.util.concurrent.ConcurrentHashMap<Long, AccountAclPort.AccountInfo>();
+
+            for (int i = 0; i < callers; i++) {
+                Thread caller = new Thread(() -> {
+                    try {
+                        start.await();
+                        results.put(Thread.currentThread().getId(),
+                                adapter.getAccountInfo(new AccountId(1L)));
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+                caller.start();
+            }
+            start.countDown();
+
+            assertTrue(done.await(5, TimeUnit.SECONDS));
+            verify(accountApi, times(1)).getSnapshotById(1L);
+            assertEquals(callers, results.size());
+        }
+
+        @Test
+        void shouldPropagateTheOriginalFailureUnwrapped() {
+            // A waiter must see the published-language exception type, not a
+            // CompletionException wrapper — the transfer use cases translate
+            // AccountNotFoundException into a 404.
+            when(accountApi.getSnapshotById(1L)).thenThrow(new AccountNotFoundException(1L));
+
+            assertThrows(AccountNotFoundException.class, () -> adapter.getAccountInfo(new AccountId(1L)));
+        }
+
+        @Test
+        void shouldShareTheLeadersFailureWithWaitingCallers() throws Exception {
+            // The waiter must observe the leader's failure unwrapped. The
+            // leader blocks in the loader until the waiter has joined the
+            // flight, so the waiter really takes the shared-future path
+            // instead of starting a second flight.
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getSnapshotById(1L)).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                throw new AccountNotFoundException(1L);
+            });
+
+            var counting = new CountingLookupCache();
+            var shared = new AccountAclAdapter(accountApi, counting);
+            var leaderFailure = new AtomicReference<Throwable>();
+            var waiterFailure = new AtomicReference<Throwable>();
+
+            Thread leader = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable failure) {
+                    leaderFailure.set(failure);
+                }
+            });
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Thread waiter = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable failure) {
+                    waiterFailure.set(failure);
+                }
+            });
+            waiter.start();
+            // Three lookups: the leader probes twice (outside and inside the
+            // flight), the waiter probes once before joining the flight.
+            assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
+            Thread.sleep(100);
+            releaseLoader.countDown();
+            leader.join(5_000);
+            waiter.join(5_000);
+
+            assertTrue(leaderFailure.get() instanceof AccountNotFoundException);
+            assertTrue(waiterFailure.get() instanceof AccountNotFoundException,
+                    "the waiting caller must see the leader's failure unwrapped, got: " + waiterFailure.get());
+        }
+
+        @Test
+        void shouldShareAnErrorWithWaitingCallers() throws Exception {
+            // An Error (not a RuntimeException) must reach the waiter as an
+            // Error too — rewrapping it in an ExecutionException would hide
+            // a fatal condition behind a checked wrapper.
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getSnapshotById(1L)).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                throw new AssertionError("boom");
+            });
+
+            var counting = new CountingLookupCache();
+            var shared = new AccountAclAdapter(accountApi, counting);
+            var waiterFailure = new AtomicReference<Throwable>();
+
+            Thread leader = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable ignored) {
+                    // the leader sees the Error directly
+                }
+            });
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Thread waiter = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable failure) {
+                    waiterFailure.set(failure);
+                }
+            });
+            waiter.start();
+            assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
+            Thread.sleep(100);
+            releaseLoader.countDown();
+            leader.join(5_000);
+            waiter.join(5_000);
+
+            assertTrue(waiterFailure.get() instanceof AssertionError,
+                    "an Error must not be rewrapped, got: " + waiterFailure.get());
+        }
+
+        @Test
+        void shouldSurfaceInterruptionToWaitingCallers() throws Exception {
+            // A waiting caller that is interrupted must not block forever on
+            // the shared flight: the interrupt is re-raised and the caller
+            // gets a failure instead of a hang.
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getSnapshotById(1L)).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                return new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+            });
+
+            var counting = new CountingLookupCache();
+            var shared = new AccountAclAdapter(accountApi, counting);
+            var waiterFailure = new AtomicReference<Throwable>();
+
+            Thread leader = daemonThread(() -> shared.getAccountInfo(new AccountId(1L)));
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Thread waiter = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable failure) {
+                    waiterFailure.set(failure);
+                }
+            });
+            waiter.start();
+            assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
+            waiter.interrupt();
+            waiter.join(5_000);
+
+            assertTrue(waiterFailure.get() instanceof IllegalStateException,
+                    "an interrupted waiter must fail instead of hanging, got: " + waiterFailure.get());
+            // The interrupt must be re-raised, otherwise the caller's own
+            // cancellation handling never sees it.
+            assertTrue(waiter.isInterrupted(), "the interrupt flag must be restored");
+            releaseLoader.countDown();
+        }
+
+        private static Thread daemonThread(Runnable body) {            Thread thread = new Thread(body);
+            thread.setDaemon(true);
+            return thread;
+        }
+
+        /** Counts the cache lookups so a test can tell when a waiter joined the flight. */
+        static class CountingLookupCache extends InMemoryAccountInfoCacheAdapter {
+            final CountDownLatch lookups = new CountDownLatch(3);
+
+            @Override
+            public java.util.Optional<AccountSnapshot> getById(Long accountId) {
+                lookups.countDown();
+                return super.getById(accountId);
+            }
         }
     }
 }
