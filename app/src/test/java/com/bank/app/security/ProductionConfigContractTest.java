@@ -299,25 +299,30 @@ class ProductionConfigContractTest {
     }
 
     /**
-     * Answers the open question from finding 14.1: does
-     * {@code InMemoryAccountInfoCacheAdapter} reach production?
+     * Answers the open question from finding 14.1: can a per-JVM snapshot
+     * cache ever reach production?
      *
-     * <p>{@code TransferBeanConfig} registers it as
-     * {@code @ConditionalOnMissingBean(AccountSnapshotCache.class)}, so the
-     * infrastructure backend wins whenever it is wired. That backend is
-     * {@code RedisAccountSnapshotCacheAdapter}, enabled by
-     * {@code SnapshotCacheRedisCondition} on the resolved backend
+     * <p>No — structurally, not conditionally. There used to be a
+     * {@code @ConditionalOnMissingBean(AccountSnapshotCache.class)} fallback
+     * in the transfer module that would have taken over whenever no shared
+     * backend was wired. That fallback is gone: the per-JVM implementation
+     * is a test double in the transfer module's test sources and is not on
+     * the production classpath, and the only module allowed to implement
+     * {@code AccountSnapshotCache} is {@code infrastructure}
+     * (pinned by an ArchUnit rule).
+     *
+     * <p>The runtime backend is {@code RedisAccountSnapshotCacheAdapter},
+     * enabled by {@code SnapshotCacheRedisCondition} on the resolved backend
      * (canonical {@code app.cache.account-info.backend}, legacy
      * {@code app.cache.caffeine.account-info.backend} as fallback).
      *
-     * <p>The silent-failure path this guards is: if the prod value ever degrades
-     * away from {@code redis}, no backend bean is registered, the conditional
-     * fallback quietly takes over, and a per-JVM map serves all replicas. HPA runs
-     * up to six pods, so a snapshot cached on pod A would never be invalidated by
-     * an eviction on pod B — stale account status/currency up to the 60s TTL,
-     * cross-pod, with nothing in the logs to say so. {@code docs/account-snapshot-cache.md}
-     * documents that Caffeine/InMemory must never be used with more than one
-     * replica; this assertion makes the config unable to do it by accident.
+     * <p>The silent-failure path this guards is: if the prod value ever
+     * degrades away from {@code redis}, no backend bean is registered and
+     * the application fails to start — loudly, at boot — instead of serving
+     * a per-JVM map to every replica. {@code docs/account-snapshot-cache.md}
+     * documents that Caffeine/InMemory must never be used with more than
+     * one replica; this assertion makes the config unable to do it by
+     * accident.
      */
     @Nested
     @DisplayName("14.1 — snapshot cache backend selection")
@@ -328,12 +333,12 @@ class ProductionConfigContractTest {
         void productionMustUseSharedSnapshotCacheBackend() {
             assertThat(property("app.cache.account-info.backend", ""))
                     .as("production must use redis for the account snapshot cache. Anything else "
-                            + "leaves TransferBeanConfig's @ConditionalOnMissingBean fallback "
-                            + "(InMemoryAccountInfoCacheAdapter) active, which is a per-JVM map: "
-                            + "with >1 replica, an eviction on one pod never reaches another, so "
-                            + "account status/currency reads go stale across the cluster "
-                            + "(14.1). The prod value is a literal, not an env placeholder, so an "
-                            + "environment override cannot flip it by accident")
+                            + "registers no backend at all, and the application refuses to start "
+                            + "rather than serving a per-JVM map: with >1 replica, an eviction on "
+                            + "one pod never reaches another, so account status/currency reads "
+                            + "would go stale across the cluster (14.1). The prod value is a "
+                            + "literal, not an env placeholder, so an environment override cannot "
+                            + "flip it by accident")
                     .isEqualTo("redis");
             assertThat(property("app.cache.caffeine.account-info.backend", ""))
                     .as("legacy alias must mirror the canonical prod pin so raw-key readers "
@@ -348,8 +353,8 @@ class ProductionConfigContractTest {
 
             assertThat(raw)
                     .as("if this were ${CACHE_ACCOUNT_INFO_BACKEND:caffeine} the env var would "
-                            + "override it in prod and could silently reinstate the in-memory "
-                            + "fallback; a literal keeps the Redis decision non-negotiable")
+                            + "override it in prod and could point the deployment at a backend that "
+                            + "is not shared; a literal keeps the Redis decision non-negotiable")
                     .doesNotContain("${");
             assertThat(rawProperty("app.cache.caffeine.account-info.backend"))
                     .as("legacy alias must be a literal for the same reason")

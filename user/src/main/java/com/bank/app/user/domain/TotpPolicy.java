@@ -2,6 +2,7 @@ package com.bank.app.user.domain;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 /**
  * TOTP verification policy (domain view of {@code MfaProperties}): step size,
@@ -30,5 +31,18 @@ public record TotpPolicy(
         Objects.requireNonNull(secret, "Secret must not be null");
         Objects.requireNonNull(clock, "Clock must not be null");
         return Totp.verify(secret, code, clock, periodSeconds, digits, allowedSkewWindows);
+    }
+
+    /**
+     * Verifies a code and returns the TOTP step counter that matched, so the
+     * caller can persist it and reject a replay of the same code (see
+     * {@code users.mfa_last_totp_counter}, V56).
+     *
+     * @return the matched step counter, or empty when the code is invalid
+     */
+    public OptionalLong verifyCounter(byte[] secret, String code, Clock clock) {
+        Objects.requireNonNull(secret, "Secret must not be null");
+        Objects.requireNonNull(clock, "Clock must not be null");
+        return Totp.verifyWithCounter(secret, code, clock, periodSeconds, digits, allowedSkewWindows);
     }
 }

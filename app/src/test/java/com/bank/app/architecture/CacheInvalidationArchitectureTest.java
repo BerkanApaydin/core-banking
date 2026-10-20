@@ -1,5 +1,6 @@
 package com.bank.app.architecture;
 
+import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.account.domain.Account;
 import com.bank.app.accountapi.AccountApi;
 import com.bank.app.accountapi.AccountSnapshotCache;
@@ -84,6 +85,80 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
                                 });
                     }
                 })
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void balanceMutationMayOnlyBeInvokedThroughTheAccountBoundary() {
+        // The balance-mutation use case is a public port.in bean, so a future
+        // caller could invoke it directly and BYPASS the snapshot eviction
+        // that AccountApiAdapter owns. A stale snapshot would then authorize
+        // a suspended/moved account for up to the TTL.
+        //
+        // Structural answer: the use case is reachable only through the
+        // Account boundary, which is where the invalidation lives.
+        ArchRule rule = classes()
+                .that(callBalanceMutationUseCase())
+                .should(new ArchCondition<>("invoke the balance mutation only through the Account boundary") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        if (!ACCOUNT_BOUNDARY.equals(javaClass.getName())) {
+                            events.add(SimpleConditionEvent.violated(javaClass,
+                                    javaClass.getName()
+                                            + " calls AdjustAccountBalancesUseCase directly; the AccountApi"
+                                            + " boundary owns the snapshot eviction and must be the only caller"));
+                        }
+                    }
+                })
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    /** The Account boundary adapter that owns cache invalidation. */
+    private static final String ACCOUNT_BOUNDARY =
+            "com.bank.app.account.adapter.out.api.AccountApiAdapter";
+
+    private static DescribedPredicate<JavaClass> callBalanceMutationUseCase() {
+        return new DescribedPredicate<>("call AdjustAccountBalancesUseCase") {
+            @Override
+            public boolean test(JavaClass javaClass) {
+                return javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner().getName()
+                                .equals(AdjustAccountBalancesUseCase.class.getName()));
+            }
+        };
+    }
+
+    @Test
+    void onlyTheInfrastructureModuleMayImplementTheSnapshotCache() {
+        // The per-JVM cache must never be reachable in production. An
+        // earlier version provided it as a
+        // @ConditionalOnMissingBean(AccountSnapshotCache.class) fallback: a
+        // deployment that wired no shared backend would silently serve
+        // per-pod snapshots — stale account status and currency across the
+        // cluster, with nothing in the logs to say so. The fallback is GONE,
+        // so the invariant is structural: the only module allowed to
+        // provide a CONCRETE cache is the one that owns the shared backends.
+        //
+        // The abstract base (accountapi.AbstractAccountSnapshotCache) stays
+        // in the published-language module on purpose: it carries the
+        // shared invalidation semantics, not a storage backend. The
+        // per-JVM implementation (InMemoryAccountInfoCacheAdapter) now lives
+        // in the transfer module's TEST sources, so it is not among the
+        // imported production classes at all.
+        ArchRule rule = classes()
+                .that().implement(AccountSnapshotCache.class)
+                .and(new DescribedPredicate<JavaClass>("are concrete implementations") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !javaClass.getModifiers().contains(JavaModifier.ABSTRACT)
+                                && !javaClass.isInterface();
+                    }
+                })
+                .should().resideInAPackage("..infrastructure..")
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);

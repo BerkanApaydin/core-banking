@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
@@ -36,6 +37,10 @@ public class OutboxPoller {
     private final OutboxProcessor outboxProcessor;
     private final OutboxProperties outboxProperties;
     private final MeterRegistry meterRegistry;
+    // Used only to read the Hikari pool size, so the worker count can be
+    // capped against the shared connection budget. Nullable: unit tests
+    // construct the poller without a DataSource.
+    private final DataSource dataSource;
     // Perf-2: partition-local parallel batch workers. SKIP LOCKED selection is
     // already safe for concurrent processing of the same partition, so batch
     // rows fan out to workers instead of processing sequentially (~25 ev/s cap).
@@ -44,15 +49,26 @@ public class OutboxPoller {
     private ScheduledExecutorService executor;
 
     public OutboxPoller(OutboxPort outboxPort, OutboxProcessor outboxProcessor, OutboxProperties outboxProperties) {
-        this(outboxPort, outboxProcessor, outboxProperties, null);
+        this(outboxPort, outboxProcessor, outboxProperties, null, null);
+    }
+
+    /**
+     * Convenience constructor for callers that do not need the metrics
+     * registry and the connection pool probe.
+     */
+    public OutboxPoller(OutboxPort outboxPort, OutboxProcessor outboxProcessor,
+            OutboxProperties outboxProperties, MeterRegistry meterRegistry) {
+        this(outboxPort, outboxProcessor, outboxProperties, meterRegistry, null);
     }
 
     @Autowired
     public OutboxPoller(OutboxPort outboxPort, OutboxProcessor outboxProcessor, OutboxProperties outboxProperties,
-            @Autowired(required = false) @Nullable MeterRegistry meterRegistry) {
+            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
+            @Autowired(required = false) @Nullable DataSource dataSource) {
         this.outboxPort = outboxPort;
         this.outboxProcessor = outboxProcessor;
         this.outboxProperties = outboxProperties;
+        this.dataSource = dataSource;
         // Nullable like OutboxProcessor's registry: unit tests and non-metered
         // deployments pass null; production alerting keys on the series counted
         // below (see k8s/prometheus-rules.yaml).
@@ -74,10 +90,25 @@ public class OutboxPoller {
         // (one Hikari connection), and the pool is 20: 32 workers plus poller/HTTP
         // threads saturate Hikari, so recordFailure's connection is skipped and
         // retry/dead-letter accounting silently drops. 12 workers (3x default
-        // 2 partitions x 4) leaves headroom for web traffic. Both bounds live in
-        // OutboxProperties (audit: previously magic literals here).
+        // 2 partitions x 4) leaves headroom for web traffic. Both bounds live
+        // in OutboxProperties (audit: previously magic literals here).
         int workerThreads = Math.min(Math.max(threadCount * outboxProperties.workerThreadsPerPartition(), 4),
                 outboxProperties.maxWorkerThreads());
+        // The worker count alone is not the budget: workers AND web traffic
+        // share ONE Hikari pool. Cap the workers at
+        // (pool size - web reserve) so a busy outbox can never starve the
+        // money path. The old code checked the workers in isolation
+        // ("8 < 20"), which ignored that the web path needs the other 12.
+        int poolSize = connectionPoolSize();
+        if (poolSize > 0) {
+            int cap = Math.max(1, poolSize - outboxProperties.webConnectionReserve());
+            if (workerThreads > cap) {
+                log.warn("Capping outbox workers at {} (pool size {} minus web reserve {}): "
+                                + "outbox workers and request threads share one connection pool",
+                        cap, poolSize, outboxProperties.webConnectionReserve());
+                workerThreads = cap;
+            }
+        }
         workers = Executors.newFixedThreadPool(workerThreads, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger();
             @Override
@@ -147,6 +178,26 @@ public class OutboxPoller {
     private static long initialJitter(long pollDelayMs) {
         if (pollDelayMs <= 0) return 0;
         return ThreadLocalRandom.current().nextLong(0, pollDelayMs + 1);
+    }
+
+    /**
+     * The Hikari pool size, or {@code -1} when it cannot be determined
+     * (no DataSource, or a non-Hikari pool). Used to keep the outbox worker
+     * count inside the pool budget together with the web traffic.
+     */
+    private int connectionPoolSize() {
+        if (dataSource == null) {
+            return -1;
+        }
+        try {
+            if (dataSource instanceof com.zaxxer.hikari.HikariDataSource hikari) {
+                return hikari.getMaximumPoolSize();
+            }
+            return -1;
+        } catch (RuntimeException e) {
+            log.debug("Outbox pool-size probe failed: {}", e.getClass().getSimpleName());
+            return -1;
+        }
     }
 
     public void pollAndProcessEvents() {
@@ -220,12 +271,28 @@ public class OutboxPoller {
         for (EventEntry event : unprocessedEvents) {
             futures.add(w.submit(() -> processOne(event, maxRetries)));
         }
+        long deadlineNanos = System.nanoTime()
+                + TimeUnit.SECONDS.toNanos(outboxProperties.workerTimeoutSeconds());
         for (Future<?> f : futures) {
+            // PERF-8: bounded wait — an untimed get() parks the partition
+            // thread for the full tx timeout when a handler hangs. Bound
+            // lives in OutboxProperties (audit: previously a magic 30s here).
+            //
+            // The bound is a BATCH deadline, not a per-future one: with a
+            // per-future timeout a batch of 50 hanging handlers stalled the
+            // partition thread for ceil(50 / workers) x timeout (~3.5 minutes
+            // with the defaults), because every future was given the full
+            // timeout again. One deadline for the whole batch bounds the
+            // stall to workerTimeoutSeconds regardless of the batch size.
+            long remaining = deadlineNanos - System.nanoTime();
+            if (remaining <= 0) {
+                f.cancel(true);
+                log.warn("Outbox batch deadline exceeded after {}s; remaining tasks cancelled",
+                        outboxProperties.workerTimeoutSeconds());
+                continue;
+            }
             try {
-                // PERF-8: bounded wait — an untimed get() parks the partition
-                // thread for the full tx timeout when a handler hangs. Bound
-                // lives in OutboxProperties (audit: previously a magic 30s here).
-                f.get(outboxProperties.workerTimeoutSeconds(), TimeUnit.SECONDS);
+                f.get(remaining, TimeUnit.NANOSECONDS);
             } catch (TimeoutException timeout) {
                 f.cancel(true);
                 log.warn("Outbox worker timed out after {}s; task cancelled",

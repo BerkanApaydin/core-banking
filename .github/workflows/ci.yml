@@ -115,15 +115,21 @@ jobs:
         JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Generate aggregate CycloneDX SBOM
+      # `makeAggregateBom` aggregates the CURRENT project's dependency tree.
+      # Run at the ROOT it saw only the root pom's own test-scoped
+      # dependencies (the nine modules are declared as <modules>, not
+      # <dependencies>), so the uploaded BOM contained no application
+      # dependency. The app module depends on every other module, so the
+      # aggregate is produced there.
       run: |
-        mvn -B -ntp org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom
-        test -s target/bom.json
+        mvn -B -ntp -pl app org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom
+        test -s app/target/bom.json
 
     - name: Upload CycloneDX SBOM
       uses: actions/upload-artifact@v6
       with:
         name: cyclonedx-sbom
-        path: target/bom.json
+        path: app/target/bom.json
         if-no-files-found: error
 
     - name: Dependency review (OSV gate)
@@ -133,6 +139,13 @@ jobs:
 
     - name: Check aggregate coverage for every module
       run: python3 scripts/check_aggregate_coverage.py app/target/site/jacoco-aggregate/jacoco.xml
+
+    - name: Check Kubernetes manifest against the prod contract
+      # The manifest is the only description of a deployment, and the app
+      # fails fast on several prod preconditions. A manifest that omits one
+      # does not fail the build — it fails the deployment as a
+      # CrashLoopBackOff.
+      run: python3 scripts/check_k8s_manifest_contract.py
 
     - name: Check load-test acceptance criteria
       run: python3 -m unittest load_tests.test_runner -v
@@ -305,7 +318,12 @@ jobs:
       # Wildcard (not an explicit class list): a new *ArchitectureTest must
       # run in CI without editing this file. Verified pattern covers all
       # architecture rules including future additions.
-      run: mvn test -pl app -am -Dtest="*ArchitectureTest,PersistenceScanPackagesTest" -Dsurefire.failIfNoSpecifiedTests=false -q
+      #
+      # No `-am`: the earlier `clean install` already built and installed
+      # every module, so the reactor was rebuilt from scratch a second time
+      # for no new coverage. `-pl app` alone resolves the sibling modules
+      # from the local repository.
+      run: mvn test -pl app -Dtest="*ArchitectureTest,PersistenceScanPackagesTest" -Dsurefire.failIfNoSpecifiedTests=false -q
 
     - name: Dependency Analysis (advisory — starter aggregation causes false positives)
       run: mvn dependency:analyze -q

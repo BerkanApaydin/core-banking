@@ -11,6 +11,7 @@ import com.bank.app.user.application.port.in.ConfirmPasswordResetUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
+import com.bank.app.user.application.port.out.MfaAttemptPort;
 import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
@@ -24,6 +25,7 @@ import com.bank.app.user.application.usecase.DisableMfaUseCaseImpl;
 import com.bank.app.user.application.usecase.EnableMfaUseCaseImpl;
 import com.bank.app.user.application.usecase.MfaStatusUseCaseImpl;
 import com.bank.app.user.application.usecase.RequestPasswordResetUseCaseImpl;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,11 +82,10 @@ public class UserBeanConfig {
                                              LoginAttemptPort loginAttemptPort, RefreshTokenPort refreshTokenPort,
                                              PasswordEncoderPort passwordEncoderPort, IdGeneratorPort idGenerator,
                                              ClockProviderPort clockProvider, AuditEventPort auditEventPort,
-                                             MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort mfaEncryptor,
-                                             TotpPolicy totpPolicy) {
+                                             MfaCodeVerificationService mfaCodeVerification) {
         return new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort, refreshTokenPort,
                 passwordEncoderPort, idGenerator, clockProvider, auditEventPort,
-                mfaSecretPort, mfaEncryptor, totpPolicy);
+                mfaCodeVerification);
     }
 
     @Bean
@@ -125,6 +126,21 @@ public class UserBeanConfig {
         return new MfaStatusUseCaseImpl(loadUserPort);
     }
 
+    /**
+     * Single place where a TOTP code is verified and consumed: brute-force
+     * bound, replay protection and the uniform failure contract. Login,
+     * enrollment confirmation and MFA removal all go through it.
+     */
+    @Bean
+    public MfaCodeVerificationService mfaCodeVerificationService(MfaSecretPort mfaSecretPort,
+                                                               MfaSecretEncryptorPort mfaEncryptor,
+                                                               TotpPolicy totpPolicy,
+                                                               MfaAttemptPort mfaAttemptPort,
+                                                               ClockProviderPort clockProvider) {
+        return new MfaCodeVerificationService(mfaSecretPort, mfaEncryptor, totpPolicy,
+                mfaAttemptPort, clockProvider);
+    }
+
     @Bean
     public EnableMfaUseCase enableMfaUseCase(LoadUserPort loadUserPort, MfaSecretPort mfaSecretPort,
                                             MfaSecretEncryptorPort mfaEncryptor, MfaProperties mfaProperties,
@@ -137,20 +153,21 @@ public class UserBeanConfig {
 
     @Bean
     public ConfirmMfaUseCase confirmMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-                                              MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort mfaEncryptor,
-                                              TotpPolicy totpPolicy, ClockProviderPort clockProvider,
+                                              MfaSecretPort mfaSecretPort,
+                                              MfaCodeVerificationService mfaCodeVerification,
+                                              ClockProviderPort clockProvider,
                                               AuditEventPort auditEventPort) {
-        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaSecretPort, mfaEncryptor,
-                totpPolicy, clockProvider, auditEventPort);
+        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaSecretPort,
+                mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     @Bean
     public DisableMfaUseCase disableMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
                                                AuthenticationPort authenticationPort, MfaSecretPort mfaSecretPort,
-                                               MfaSecretEncryptorPort mfaEncryptor, TotpPolicy totpPolicy,
+                                               MfaCodeVerificationService mfaCodeVerification,
                                                ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         return new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort, mfaSecretPort,
-                mfaEncryptor, totpPolicy, clockProvider, auditEventPort);
+                mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     @Bean

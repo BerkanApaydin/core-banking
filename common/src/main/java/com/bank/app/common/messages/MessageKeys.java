@@ -59,6 +59,7 @@ public final class MessageKeys {
     public static final String MFA_ALREADY_ENABLED = "error.mfa_already_enabled";
     public static final String MFA_CODE_INVALID = "error.mfa_code_invalid";
     public static final String MFA_NOT_ENROLLED = "error.mfa_not_enrolled";
+    public static final String TOO_MANY_FAILED_MFA_ATTEMPTS = "error.too_many_failed_mfa_attempts";
     public static final String NOT_RESOURCE_OWNER = "error.not_resource_owner";
     public static final String OPTIMISTIC_LOCK_CONFLICT = "error.optimistic_lock_conflict";
     public static final String PASSWORD_RESET_TOKEN_INVALID = "error.password_reset_token_invalid";

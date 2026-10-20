@@ -12,8 +12,12 @@ public record CacheProperties(AccountInfoCache accountInfo) {
      * Legacy prefix binding ({@code app.cache.caffeine.*}). New deployments
      * should set only the canonical {@code app.cache.account-info.*} keys (see
      * {@link CacheBackendResolution}): canonical wins on conflict. This binding
-     * stays so existing deployments keep working. Runtime code must inject the
-     * resolved {@code AccountInfoCache} bean from
+     * stays so existing deployments keep working — and the shipped
+     * {@code application.yml} intentionally keeps the
+     * {@code CACHE_ACCOUNT_INFO_*} placeholders HERE, leaving the canonical
+     * keys unset, so presence-based resolution can still tell "operator set
+     * the canonical key" apart from "only the alias is configured". Runtime
+     * code must inject the resolved {@code AccountInfoCache} bean from
      * {@code AccountCacheAliasConfig} instead of this record, so behavior and
      * backend selection can never disagree.
      */

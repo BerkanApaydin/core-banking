@@ -10,6 +10,36 @@ metadata:
     app: bank-app
 spec:
   groups:
+    - name: connection-pool
+      interval: 30s
+      rules:
+        - alert: DatabaseConnectionPoolSaturation
+          # Pool starvation is the failure mode behind the 500-spike cliff:
+          # a use-case transaction holds its connection for up to
+          # app.transaction.timeout-seconds (30s) while it waits on a
+          # pessimistic row lock. Once the pool is exhausted, every further
+          # request queues on it. `hikaricp_connections_pending` is the
+          # number of threads WAITING for a connection — the leading
+          # indicator, available before any request has actually failed.
+          expr: max(hikaricp_connections_pending) > 5
+          for: 2m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Threads are waiting for a database connection — the pool is exhausted"
+            runbook_url: "docs/operations.md"
+        - alert: DatabaseConnectionAcquireSlow
+          # Time spent acquiring a connection. A high value with a LOW
+          # pending count means the pool itself is too small for the
+          # transaction budget; a high value with a high pending count
+          # points at slow or locked queries instead.
+          expr: max(hikaricp_connections_acquire_seconds_max) > 5
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Acquiring a database connection takes more than 5s"
+            runbook_url: "docs/operations.md"
     - name: outbox
       interval: 60s
       rules:
@@ -65,7 +95,11 @@ spec:
             summary: "Ledger legs do not net to zero — investigate unbalanced transaction_refs"
             runbook_url: "docs/slo.md"
         - alert: DatabaseOrphanAlarm
-          expr: sum(increase(db_orphan_alarm_total[1h])) by (type) > 0
+          # The counter carries NO `type` label (only the db_orphan_current
+          # gauge does), so `by (type)` grouped an empty label set and told
+          # the operator nothing. Same mistake the outbox dead-letter rule
+          # already documents for its own counter: drop the grouping.
+          expr: sum(increase(db_orphan_alarm_total[1h])) > 0
           for: 5m
           labels:
             severity: page

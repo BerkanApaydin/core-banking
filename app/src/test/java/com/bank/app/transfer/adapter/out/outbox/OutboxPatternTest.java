@@ -103,7 +103,9 @@ class OutboxPatternTest {
             return Optional.ofNullable(entityMap.get(id));
         });
 
-        when(idempotencyPort.tryCreate(anyString(), any())).thenReturn(true);
+        // The relay reserves its dedup key through tryCreateHandler: the kind is
+        // declared by the caller, not derived from the key text.
+        when(idempotencyPort.tryCreateHandler(anyString(), any())).thenReturn(true);
 
         handler = new TransferCompletedOutboxRelay(objectMapper, notificationConsumer, idempotencyPort, Clock::systemUTC);
         OutboxProcessor processor = new OutboxProcessor(outboxPort, List.of(handler));

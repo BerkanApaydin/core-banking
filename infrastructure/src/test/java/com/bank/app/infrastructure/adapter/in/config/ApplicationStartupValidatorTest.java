@@ -22,6 +22,11 @@ class ApplicationStartupValidatorTest {
                 .withProperty("app.security.failed-login.backend", "redis")
                 .withProperty("app.security.rate-limit.backend", "redis")
                 .withProperty("app.cache.caffeine.account-info.backend", "redis")
+                // BCrypt cost and HSTS max-age have silent floors and are
+                // required to be PRESENT in prod, so the valid baseline pins
+                // them explicitly (a missing key is rejected too).
+                .withProperty("app.security.password-encoder-strength", "12")
+                .withProperty("app.security.hsts-max-age-seconds", "31536000")
                 // Audit (MFA): production must pin a real secret-encryption key.
                 .withProperty("app.security.mfa.encryption-key-base64",
                         "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=")
@@ -327,5 +332,39 @@ class ApplicationStartupValidatorTest {
 
         String raw = (String) method.invoke(null, "notauri with spaces");
         org.assertj.core.api.Assertions.assertThat(raw).isEqualTo("notauri with spaces");
+    }
+
+    @Test
+    void rejectsMissingBcryptStrengthInProduction() throws Exception {
+        // A renamed/removed key must fail, not silently fall back to the floor.
+        var method = ApplicationStartupValidator.class.getDeclaredMethod(
+                "requireAtLeast", String.class, long.class);
+        method.setAccessible(true);
+        var validator = new ApplicationStartupValidator(new MockEnvironment());
+
+        assertThatThrownBy(() -> {
+            try {
+                method.invoke(validator, "app.security.password-encoder-strength", 12L);
+            } catch (InvocationTargetException e) {
+                sneakyThrow(e.getCause());
+            }
+        }).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.password-encoder-strength")
+                .hasMessageContaining("not set");
+    }
+
+    @Test
+    void rejectsUnknownLegacySnapshotCacheBackendWhileCanonicalUnset() {
+        // The shipped base configuration defines only the alias prefix, so an
+        // unknown legacy value must reach the validator. Before the fix the
+        // canonical block made "canonical is set" always true, shadowing the
+        // typo and selecting the single-JVM backend silently.
+        var environment = new MockEnvironment()
+                .withProperty("app.cache.caffeine.account-info.backend", "rediss");
+        environment.setActiveProfiles("staging");
+
+        assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unknown account snapshot cache backend");
     }
 }

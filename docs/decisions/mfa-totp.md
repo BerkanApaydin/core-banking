@@ -68,6 +68,42 @@ them.
   public reset request into a 401. Enrollment material (`mfa/enable`) is
   served `Cache-Control: no-store`; prod startup additionally rejects a
   non-Base64 or non-32-byte `MFA_ENCRYPTION_KEY` with an explicit message.
+- **MFA endpoints are rate-limited (2026-10)**: `/api/v1/auth/mfa/*` was
+  missing from `app.security.rate-limit.paths`, so the 6-digit code check
+  had no budget at all. It now inherits the tight auth tier (10 requests /
+  10s, IP-keyed) because it lives under the `/api/v1/auth` prefix.
+- **Per-account MFA attempt budget (2026-10)**: the IP-keyed budget cannot
+  contain a distributed guess, and an IP-keyed account lockout would let one
+  abusive client lock a victim out of their own second factor. A separate
+  ACCOUNT-keyed counter (`MfaAttemptPort`, `app.security.mfa.max-attempts`
+  / `window-minutes`, backed by the same Redis store as the login guard in
+  production) locks the account out after 5 failed codes for 15 minutes
+  and answers 429 (`TOO_MANY_FAILED_MFA_ATTEMPTS`). Every code check
+  consults `isBlocked` first: the management endpoints per request, and the
+  login endpoint after the password check (so the lockout cannot be
+  sidestepped through login, and an unauthenticated caller learns nothing).
+- **TOTP replay protection at login (2026-10, V56)**: a code is valid for
+  `2 * skew + 1` steps (90s with the default skew), so a captured code
+  could be replayed. `users.mfa_last_totp_counter` stores the step counter
+  of the last consumed code; the write is a CONDITIONAL update (only a
+  strictly newer counter is accepted), so the database — not the
+  application — arbitrates a replay and two concurrent replays cannot both
+  win. The counter is consumed by the LOGIN path only
+  (`MfaCodeVerificationService.verifyAndConsume`): the enrollment
+  confirmation and the MFA removal do not mint a session, and consuming the
+  counter there would reject the very next legitimate use of the same code
+  (confirm, then log in, inside one 30-second step). Those two paths use
+  `verify` (no consumption). The removal path accepts one residual window: a
+  captured, not-yet-consumed code stays usable for removal inside its
+  validity window. That is bounded by the removal flow itself requiring the
+  account password and an authenticated, CSRF-protected session; consuming
+  instead would reject a legitimate "log in, then disable MFA" sequence
+  inside one step.
+- **All three code checks share one service** (`MfaCodeVerificationService`):
+  the brute-force bound, the replay protection and the uniform failure
+  contract live in one place instead of being re-implemented per use case.
+  A secret-store outage still propagates as 503 and is NOT counted as a
+  failed attempt.
 
 ## Consequences
 
@@ -80,6 +116,11 @@ them.
   existing constructors delegate, no flag-day).
 - Reset tokens: one live per user, 15-minute default lifetime, SHA-256 digests
   at rest, `ON DELETE CASCADE` with the user.
+- New column `users.mfa_last_totp_counter` (V56) — the replay counter.
+- New port `MfaAttemptPort` (user BC) with a Caffeine backend (dev/test) and
+  a Redis backend (production); the store follows
+  `app.security.failed-login.backend` so the MFA budget is shared across
+  replicas in production and per-JVM only in dev/test.
 
 ## Alternatives considered
 

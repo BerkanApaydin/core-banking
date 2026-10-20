@@ -36,15 +36,20 @@ class HybridTokenBlacklistAdapterTest {
         when(redis.isBlacklisted("token")).thenReturn(true);
 
         assertThat(adapter.isBlacklisted("token")).isTrue();
-        verify(database).isBlacklisted("token");
+        // Redis is consulted BEFORE the durable store: every revocation
+        // written while the hybrid backend is active is in both, and the
+        // shared store is the cheaper lookup.
+        verify(redis).isBlacklisted("token");
+        verify(database, never()).isBlacklisted("token");
     }
 
     @Test
     void shouldHonorDurableRevocationWhenRedisLostItsData() {
+        when(redis.isBlacklisted("token")).thenReturn(false);
         when(database.isBlacklisted("token")).thenReturn(true);
 
         assertThat(adapter.isBlacklisted("token")).isTrue();
-        verify(redis, never()).isBlacklisted("token");
+        verify(database).isBlacklisted("token");
     }
 
     @Test
@@ -60,17 +65,16 @@ class HybridTokenBlacklistAdapterTest {
 
     @Test
     void shouldFailClosedWhenDurableLookupFails() {
+        when(redis.isBlacklisted("token")).thenReturn(false);
         when(database.isBlacklisted("token"))
                 .thenThrow(new RevocationStoreUnavailableException(new RuntimeException("down")));
 
         assertThatThrownBy(() -> adapter.isBlacklisted("token"))
                 .isInstanceOf(RevocationStoreUnavailableException.class);
-        verify(redis, never()).isBlacklisted("token");
     }
 
     @Test
     void shouldFailClosedWhenRedisReadFailsAfterDurableMiss() {
-        when(database.isBlacklisted("token")).thenReturn(false);
         when(redis.isBlacklisted("token"))
                 .thenThrow(new RedisConnectionFailureException("down"));
 

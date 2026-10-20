@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Set;
 
 public class ApplicationStartupValidator {
 
@@ -16,6 +17,15 @@ public class ApplicationStartupValidator {
 
     // Single-sourced from JwtTokenProvider: one literal, no silent divergence.
     private static final String DEFAULT_JWT_SECRET = JwtTokenProvider.DEFAULT_JWT_SECRET;
+
+    /**
+     * The token-blacklist backends this build knows how to wire. Anything
+     * else is a configuration mistake and must fail at startup — a typo used
+     * to select the single-JVM Caffeine backend silently, which makes a
+     * logout invisible to every other replica.
+     */
+    private static final Set<String> KNOWN_BLACKLIST_BACKENDS =
+            Set.of("caffeine", "redis", "database", "hybrid");
 
     private final Environment environment;
 
@@ -34,6 +44,7 @@ public class ApplicationStartupValidator {
         // replica that did not perform the invalidation — with nothing in
         // the logs to say so.
         validateSnapshotCacheBackend();
+        validateTokenBlacklistBackend();
 
         if (!isProdProfile()) {
             if (DEFAULT_JWT_SECRET.equals(jwtSecret)) {
@@ -65,6 +76,16 @@ public class ApplicationStartupValidator {
             throw new IllegalStateException(
                     "Production token revocations require the hybrid or database backend");
         }
+        // BCrypt cost and HSTS max-age are env-overridable, so a typo (or a
+        // copy-pasted dev value) could silently weaken the password hash or
+        // turn off downgrade protection. Existing hashes keep verifying after
+        // a cost change (the cost is embedded in the hash), so the floor is
+        // about the cost of NEW hashes.
+        requireAtLeast("app.security.password-encoder-strength", 12);
+        requireAtLeast("app.security.hsts-max-age-seconds", 31536000L);
+        requirePositive("app.security.failed-login.global-account-max-attempts", 50L);
+        requirePositive("app.security.mfa.max-attempts", 5L);
+        requirePositive("app.security.mfa.window-minutes", 15L);
         if (!environment.getProperty("app.security.browser-session.secure", Boolean.class, false)) {
             throw new IllegalStateException("Production browser sessions require Secure cookies");
         }
@@ -173,6 +194,35 @@ public class ApplicationStartupValidator {
     }
 
     /**
+     * Rejects an unknown token-blacklist backend in EVERY profile.
+     *
+     * <p>Only the {@code database} and {@code hybrid} backends are declared
+     * in {@code TokenBlacklistBackendConfig}; the local Caffeine adapter is
+     * an unconditional component. An unknown value (a typo such as
+     * {@code rediss}) therefore resolved to the per-JVM adapter SILENTLY —
+     * and in a multi-replica deployment a logout on one pod is invisible to
+     * the others until the token expires. The value is now checked before
+     * any bean is created, exactly like the snapshot-cache backend.
+     */
+    private void validateTokenBlacklistBackend() {
+        String backend = environment.getProperty("app.security.token-blacklist.backend", "caffeine");
+        if (backend == null || backend.isBlank()) {
+            backend = "caffeine";
+        }
+        if (!KNOWN_BLACKLIST_BACKENDS.contains(backend.toLowerCase(Locale.ROOT))) {
+            throw new IllegalStateException(
+                    "Unknown token blacklist backend '" + backend + "'. Supported values: "
+                    + KNOWN_BLACKLIST_BACKENDS + ". Set app.security.token-blacklist.backend.");
+        }
+        if (!"redis".equalsIgnoreCase(backend) && !"database".equalsIgnoreCase(backend)
+                && !"hybrid".equalsIgnoreCase(backend) && !isLocalOnlyProfile()) {
+            log.warn("Token blacklist backend '{}' is per-JVM: a logout on one replica is invisible "
+                    + "to the others until the token expires. Use redis/hybrid/database for any "
+                    + "deployment with more than one replica.", backend);
+        }
+    }
+
+    /**
      * Profiles that are single-JVM by definition (local development, tests).
      * Any other profile may run on more than one replica, so it must use the
      * shared Redis backend.
@@ -236,6 +286,28 @@ public class ApplicationStartupValidator {
     private void requirePositive(String property, long defaultValue) {
         if (environment.getProperty(property, Long.class, defaultValue) <= 0) {
             throw new IllegalStateException("Production requires a positive value: " + property);
+        }
+    }
+
+    /**
+     * Requires a value of at least {@code minimum}. Used for settings whose
+     * weakening is silent (BCrypt cost, HSTS max-age): a lower value does
+     * not fail anywhere, it just makes the deployment weaker.
+     *
+     * <p>An ABSENT key fails as well: the base configuration defines both
+     * keys, so a missing value means the property was renamed or dropped —
+     * treating that as "the floor" would quietly accept a deployment that
+     * no longer pins the setting at all.
+     */
+    private void requireAtLeast(String property, long minimum) {
+        Long value = environment.getProperty(property, Long.class);
+        if (value == null) {
+            throw new IllegalStateException(
+                    "Production requires " + property + " >= " + minimum + " (not set)");
+        }
+        if (value < minimum) {
+            throw new IllegalStateException(
+                    "Production requires " + property + " >= " + minimum + " (found: " + value + ")");
         }
     }
 

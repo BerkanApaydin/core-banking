@@ -14,12 +14,21 @@ backends.
 used by the `@Conditional` backend selection, the resolved settings bean and
 `ApplicationStartupValidator`):
 
-- Merging is per field: a canonical field set to a non-default value wins,
-  otherwise the legacy field applies. A canonical field left exactly at its
-  default is indistinguishable from unset.
+- Merging is per field and decided by PRESENCE, not by value: when the
+  canonical key is set — even to its default value — the canonical value
+  wins; otherwise the legacy value applies. (A value comparison would make
+  "set to the default" indistinguishable from "unset" and hand the field to
+  the legacy prefix — the exact inversion the canonical/legacy split is
+  meant to prevent. Changed 2026-10.)
 - Set every key under ONE prefix per deployment; prefer the canonical one for
   new configuration.
-- `application.yml` maps both prefixes to the same env placeholders
-  (`CACHE_ACCOUNT_INFO_*`), so they agree unless explicitly overridden.
-  `application-prod.yml` pins both to the literal `redis` (asserted by
-  `ProductionConfigContractTest`); canonical wins on conflict.
+- `application.yml` keeps the `CACHE_ACCOUNT_INFO_*` placeholders under the
+  legacy prefix ONLY and leaves the canonical keys unset: presence semantics
+  require "unset" to be reachable. An explicitly set canonical key always
+  wins (even at its default value); a legacy-only deployment — and a typo in
+  its backend value, which the startup validator rejects — still resolves
+  through the alias. `application-prod.yml` pins the canonical key to the
+  literal `redis` and mirrors it on the alias (both asserted by
+  `ProductionConfigContractTest`); canonical wins on conflict. Do not define
+  the canonical keys in the base file: every deployment would become
+  "canonical" and the fallback would silently die (2026-10).

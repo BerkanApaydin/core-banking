@@ -45,7 +45,7 @@ class RedisLoginAttemptIntegrationTest {
     void shouldRecordAndDetectFailure() {
         adapter.recordFailure("10.0.0.1", "testuser");
         assertThat(adapter.isIpBlocked("10.0.0.1")).isFalse();
-        assertThat(adapter.isUsernameBlocked("testuser")).isFalse();
+        assertThat(adapter.isUsernameBlocked("testuser", "10.0.0.1")).isFalse();
     }
 
     @Test
@@ -54,7 +54,9 @@ class RedisLoginAttemptIntegrationTest {
             adapter.recordFailure("10.0.0.2", "blocked_user");
         }
         assertThat(adapter.isIpBlocked("10.0.0.2")).isTrue();
-        assertThat(adapter.isUsernameBlocked("blocked_user")).isTrue();
+        // The tight budget is keyed on account+IP: the client that burned it
+        // is the one that is blocked.
+        assertThat(adapter.isUsernameBlocked("blocked_user", "10.0.0.2")).isTrue();
     }
 
     @Test
@@ -64,6 +66,9 @@ class RedisLoginAttemptIntegrationTest {
         }
         assertThat(adapter.isIpBlocked("10.0.0.3")).isTrue();
         assertThat(adapter.isIpBlocked("10.0.0.4")).isFalse();
+        // ...and the account is NOT locked for a different client: the
+        // account+IP budget keeps one abusive IP from locking a victim out.
+        assertThat(adapter.isUsernameBlocked("local_user", "10.0.0.4")).isFalse();
     }
 
     @Test
@@ -71,8 +76,8 @@ class RedisLoginAttemptIntegrationTest {
         for (int i = 0; i < 3; i++) {
             adapter.recordFailure("10.0.0.5", "user_a");
         }
-        assertThat(adapter.isUsernameBlocked("user_a")).isTrue();
-        assertThat(adapter.isUsernameBlocked("user_b")).isFalse();
+        assertThat(adapter.isUsernameBlocked("user_a", "10.0.0.5")).isTrue();
+        assertThat(adapter.isUsernameBlocked("user_b", "10.0.0.5")).isFalse();
     }
 
     @Test

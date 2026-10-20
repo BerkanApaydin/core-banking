@@ -1,23 +1,42 @@
 """Local equivalent of the CI dependency-review gate (high/critical fail).
 
-Reads the CycloneDX SBOM (target/bom.json), batches every library against
+Reads the CycloneDX SBOM (app/target/bom.json), batches every library against
 https://api.osv.dev (OSV covers Maven Central), rates each finding from its
 CVSS v3 score (HIGH >= 7.0, CRITICAL >= 9.0 — same bar as
 actions/dependency-review-action with fail-on-severity: high), and exits 1
 when a HIGH/CRITICAL issue exists. Network required (like CI).
 """
 import json
+import os
 import sys
 import urllib.request
 
-BOM = "target/bom.json"
+# The aggregate SBOM is produced in the app module (the module that depends
+# on every other one), so the artifact lands in app/target/. The root
+# location is kept as a fallback for a locally generated BOM.
+BOM_CANDIDATES = ("app/target/bom.json", "target/bom.json")
 OSV_URL = "https://api.osv.dev/v1/querybatch"
 OSV_VULN_URL = "https://api.osv.dev/v1/vulns/"
 ALLOWLIST = "scripts/dependency_allowlist.json"
 
 
+def resolve_bom():
+    for candidate in BOM_CANDIDATES:
+        if os.path.isfile(candidate):
+            return candidate
+    return BOM_CANDIDATES[0]
+
+
 def load_packages():
-    with open(BOM, encoding="utf-8") as fh:
+    bom_path = resolve_bom()
+    if not os.path.isfile(bom_path):
+        print(
+            f"SBOM not found: {bom_path}. Generate it with "
+            "'mvn -pl app org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom'.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    with open(bom_path, encoding="utf-8") as fh:
         bom = json.load(fh)
     packages = []
     for component in bom.get("components", []):
@@ -94,7 +113,7 @@ def load_allowlist():
 
 def main():
     packages = load_packages()
-    print(f"reviewing {len(packages)} libraries from {BOM} against OSV")
+    print(f"reviewing {len(packages)} libraries from {resolve_bom()} against OSV")
     try:
         findings = query_osv(packages)
     except Exception as exc:  # noqa: BLE001 - network is best-effort locally

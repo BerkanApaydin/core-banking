@@ -11,11 +11,12 @@ import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
-import com.bank.app.user.domain.TotpPolicy;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
+import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import java.util.Objects;
 
@@ -23,6 +24,9 @@ import java.util.Objects;
  * Removes the second factor. Both the password (re-authentication: disabling
  * MFA must never ride on a stale session alone) and a current TOTP code
  * (possession proof) are required.
+ *
+ * <p>The code check runs through {@link MfaCodeVerificationService}, which
+ * owns the brute-force bound and the TOTP replay protection.
  */
 @TransactionalUseCase
 public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
@@ -31,21 +35,19 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
     private final SaveUserPort saveUserPort;
     private final AuthenticationPort authenticationPort;
     private final MfaSecretPort mfaSecretPort;
-    private final MfaSecretEncryptorPort encryptor;
-    private final TotpPolicy totpPolicy;
+    private final MfaCodeVerificationService mfaCodeVerification;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public DisableMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
             AuthenticationPort authenticationPort, MfaSecretPort mfaSecretPort,
-            MfaSecretEncryptorPort encryptor, TotpPolicy totpPolicy,
+            MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
         this.authenticationPort = authenticationPort;
         this.mfaSecretPort = mfaSecretPort;
-        this.encryptor = encryptor;
-        this.totpPolicy = totpPolicy;
+        this.mfaCodeVerification = mfaCodeVerification;
         this.clockProvider = clockProvider;
         this.auditEventPort = auditEventPort;
     }
@@ -68,19 +70,19 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
         } catch (AuthenticationFailedException wrongPassword) {
             throw new InvalidMfaCodeException();
         }
-        String ciphertext = mfaSecretPort.findSecret(userId)
-                .orElseThrow(MfaNotEnrolledException::new);
-        final byte[] secret;
-        try {
-            secret = encryptor.decrypt(ciphertext);
-        } catch (AuthenticationBackendUnavailableException unavailable) {
-            throw unavailable;
-        } catch (RuntimeException decryptFailed) {
-            // Wrong rotation key / tampered row: fail closed as a wrong
-            // factor (400), never a 500.
-            throw new InvalidMfaCodeException();
+        if (mfaSecretPort.findSecret(userId).isEmpty()) {
+            throw new MfaNotEnrolledException();
         }
-        if (!totpPolicy.verify(secret, code, clockProvider.clock())) {
+        if (mfaCodeVerification.isBlocked(userId)) {
+            throw new TooManyFailedMfaAttemptsException(
+                    "Too many failed authenticator code attempts. Please try again in "
+                            + mfaCodeVerification.getWindowMinutes() + " minutes.");
+        }
+        // The code is verified but NOT consumed: removing the second factor
+        // does not mint a session, and consuming the step counter here would
+        // reject a legitimate removal right after a login in the same
+        // 30-second step.
+        if (!mfaCodeVerification.verify(userId, code)) {
             throw new InvalidMfaCodeException();
         }
         user.disableMfa();

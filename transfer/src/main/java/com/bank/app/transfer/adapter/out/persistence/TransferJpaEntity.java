@@ -4,16 +4,12 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.persistence.AuditableJpaEntity;
 import com.bank.app.transfer.domain.TransferStatus;
 import jakarta.persistence.Column;
-import jakarta.persistence.ColumnResult;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityResult;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.NamedNativeQuery;
-import jakarta.persistence.SqlResultSetMapping;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
@@ -23,25 +19,14 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "transfers")
-@SqlResultSetMapping(
-        name = "TransferHistoryPageMapping",
-        entities = @EntityResult(entityClass = TransferJpaEntity.class),
-        columns = @ColumnResult(name = "total_count", type = Long.class)
-)
-@NamedNativeQuery(
-        name = "TransferJpaEntity.findHistoryPage",
-        query = """
-                SELECT u.*, COUNT(*) OVER() AS total_count
-                FROM (
-                    SELECT t.* FROM transfers t WHERE t.sender_account_id = :accountId
-                    UNION ALL
-                    SELECT t.* FROM transfers t WHERE t.receiver_account_id = :accountId
-                ) u
-                ORDER BY u.created_at DESC, u.id DESC
-                LIMIT :limit OFFSET :offset
-                """,
-        resultSetMapping = "TransferHistoryPageMapping"
-)
+// The former `TransferJpaEntity.findHistoryPage` named query (COUNT(*) OVER()
+// over the whole sender/receiver union) is GONE on purpose. PostgreSQL can
+// only evaluate a window function after materialising and sorting the whole
+// union, so a 20-row page cost O(n) over the account's entire transfer
+// history on the hottest read path. The history page now uses the rows-only
+// query plus a separate index-only count (TransferJpaRepository
+// .findHistoryRows / .countHistory). The result-set mapping it needed went
+// with it.
 public class TransferJpaEntity extends AuditableJpaEntity {
 
     @Id

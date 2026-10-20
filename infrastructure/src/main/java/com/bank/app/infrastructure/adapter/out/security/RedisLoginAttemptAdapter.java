@@ -19,7 +19,8 @@ import java.util.function.Supplier;
 public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     private static final String IP_PREFIX = "login_attempt:ip:";
-    private static final String USERNAME_PREFIX = "login_attempt:user:";
+    private static final String ACCOUNT_IP_PREFIX = "login_attempt:account_ip:";
+    private static final String ACCOUNT_PREFIX = "login_attempt:user:";
     private static final String RECORD_FAILURE_SCRIPT = """
             local ttl = tonumber(ARGV[1])
             for i = 1, #KEYS do
@@ -35,8 +36,8 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
             return 1
             """;
 
-    private final StringRedisTemplate redisTemplate;
-    private final int maxAttempts;
+    private final StringRedisTemplate redisTemplate;    private final int maxAttempts;
+    private final int globalAccountMaxAttempts;
     private final long windowMinutes;
     private final DefaultRedisScript<Long> recordFailureScript;
 
@@ -45,6 +46,7 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
             LoginAttemptProperties properties) {
         this.redisTemplate = redisTemplate;
         this.maxAttempts = properties.maxAttempts();
+        this.globalAccountMaxAttempts = properties.globalAccountMaxAttempts();
         this.windowMinutes = properties.windowMinutes();
         this.recordFailureScript = new DefaultRedisScript<>(RECORD_FAILURE_SCRIPT, Long.class);
     }
@@ -60,12 +62,20 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    public boolean isUsernameBlocked(String username) {
+    public boolean isUsernameBlocked(String username, String ip) {
         if (maxAttempts < 0 || username == null)
             return false;
+        String normalized = normalizeUsername(username);
         return withRedis(() -> {
-            String count = redisTemplate.opsForValue().get(USERNAME_PREFIX + normalizeUsername(username));
-            return count != null && Long.parseLong(count) >= maxAttempts;
+            // Account + IP: the tight budget.
+            String pair = redisTemplate.opsForValue().get(accountIpKey(normalized, ip));
+            if (pair != null && Long.parseLong(pair) >= maxAttempts) {
+                return true;
+            }
+            // Account only: the loose budget that still stops a distributed
+            // attack across many IPs.
+            String account = redisTemplate.opsForValue().get(ACCOUNT_PREFIX + normalized);
+            return account != null && Long.parseLong(account) >= globalAccountMaxAttempts;
         });
     }
 
@@ -75,7 +85,9 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
         // the IP bucket is incremented, mirroring the Caffeine no-op.
         List<String> keys = username == null
                 ? List.of(IP_PREFIX + ip)
-                : List.of(IP_PREFIX + ip, USERNAME_PREFIX + normalizeUsername(username));
+                : List.of(IP_PREFIX + ip,
+                        accountIpKey(normalizeUsername(username), ip),
+                        ACCOUNT_PREFIX + normalizeUsername(username));
         Long result = withRedis(() -> redisTemplate.execute(
                 recordFailureScript, keys,
                 String.valueOf(TimeUnit.MINUTES.toMillis(windowMinutes))));
@@ -93,7 +105,35 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
     @Override
     public void resetByUsername(String username) {
         if (username == null) return;
-        withRedis(() -> redisTemplate.delete(USERNAME_PREFIX + normalizeUsername(username)));
+        String normalized = normalizeUsername(username);
+        withRedis(() -> {
+            redisTemplate.delete(ACCOUNT_PREFIX + normalized);
+            // Pair buckets carry the account in the key prefix, so they are
+            // cleared by pattern. SCAN, never KEYS: KEYS blocks the Redis
+            // main thread for the whole keyspace.
+            deleteByPattern(ACCOUNT_IP_PREFIX + normalized + "|*");
+            return Boolean.TRUE;
+        });
+    }
+
+    private void deleteByPattern(String pattern) {
+        java.util.Set<String> found = new java.util.LinkedHashSet<>();
+        try (org.springframework.data.redis.core.Cursor<String> cursor =
+                     redisTemplate.scan(org.springframework.data.redis.core.ScanOptions.scanOptions()
+                             .match(pattern).count(500).build())) {
+            // A null cursor is a misconfigured client, not an empty result:
+            // treating it as "nothing to delete" would silently keep the
+            // counter alive.
+            if (cursor == null) {
+                throw new IllegalStateException("Redis SCAN returned no cursor");
+            }
+            while (cursor.hasNext()) {
+                found.add(cursor.next());
+            }
+        }
+        if (!found.isEmpty()) {
+            redisTemplate.delete(found);
+        }
     }
 
     @Override
@@ -116,5 +156,9 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
      */
     static String normalizeUsername(String username) {
         return username == null ? null : username.toLowerCase(Locale.ROOT);
+    }
+
+    private static String accountIpKey(String normalizedUsername, String ip) {
+        return ACCOUNT_IP_PREFIX + normalizedUsername + "|" + (ip == null ? "-" : ip);
     }
 }

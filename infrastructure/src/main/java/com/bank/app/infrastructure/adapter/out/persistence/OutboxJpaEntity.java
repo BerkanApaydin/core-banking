@@ -59,6 +59,15 @@ public class OutboxJpaEntity implements Persistable<String> {
     @Column(nullable = false)
     private int partition;
 
+    /**
+     * Earliest time a failed event may be retried (V57). NULL = eligible
+     * now. Without it a poison event was retried on every poll cycle and
+     * burned all retries in seconds, so {@code max-retries} was a count and
+     * not a budget.
+     */
+    @Column(name = "next_attempt_at")
+    private LocalDateTime nextAttemptAt;
+
     public OutboxJpaEntity() {
     }
 
@@ -191,5 +200,13 @@ public class OutboxJpaEntity implements Persistable<String> {
 
     public void setPartition(int partition) {
         this.partition = partition;
+    }
+
+    public LocalDateTime getNextAttemptAt() {
+        return nextAttemptAt;
+    }
+
+    public void setNextAttemptAt(LocalDateTime nextAttemptAt) {
+        this.nextAttemptAt = nextAttemptAt;
     }
 }

@@ -13,13 +13,16 @@ class RateLimitPropertiesTest {
     void shouldUseDefaultValues() {
         RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
 
-        assertEquals(13, props.paths().size());
+        assertEquals(14, props.paths().size());
         assertTrue(props.paths().contains("/api/v1/auth/login"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/login"));
         assertTrue(props.paths().contains("/api/v1/auth/refresh"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/refresh"));
         assertTrue(props.paths().contains("/api/v1/auth/password/reset/request"));
         assertTrue(props.paths().contains("/api/v1/auth/password/reset/confirm"));
+        // The MFA code check is a brute-force target and inherits the tight
+        // auth-tier budget (it lives under the /api/v1/auth prefix).
+        assertTrue(props.paths().contains("/api/v1/auth/mfa"));
         assertTrue(props.paths().contains("/api/v1/auth/logout"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/logout"));
         assertTrue(props.paths().contains("/api/v1/auth/browser/session"));
@@ -35,7 +38,7 @@ class RateLimitPropertiesTest {
     void shouldFallBackToDefaultsOnNull() {
         RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
 
-        assertEquals(13, props.paths().size());
+        assertEquals(14, props.paths().size());
         assertEquals("caffeine", props.backend());
     }
 

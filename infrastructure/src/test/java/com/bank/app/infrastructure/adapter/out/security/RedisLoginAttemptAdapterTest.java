@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -17,6 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -104,66 +107,79 @@ class RedisLoginAttemptAdapterTest {
     @Test
     void shouldReturnFalseWhenUsernameNotPresent() {
         stubOpsForValue();
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP)).thenReturn(null);
         when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn(null);
 
-        assertThat(adapter.isUsernameBlocked(TEST_USERNAME)).isFalse();
+        assertThat(adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP)).isFalse();
     }
 
     @Test
     void shouldReturnFalseWhenUsernameBelowThreshold() {
         stubOpsForValue();
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP)).thenReturn("2");
         when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("2");
 
-        assertThat(adapter.isUsernameBlocked(TEST_USERNAME)).isFalse();
+        assertThat(adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP)).isFalse();
     }
 
     @Test
     void shouldReturnTrueWhenUsernameAtThreshold() {
+        // The tight budget is keyed on account+IP: the client that burned it
+        // is the one that is blocked. A different client keeps its budget.
         stubOpsForValue();
-        when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("5");
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP)).thenReturn("5");
 
-        assertThat(adapter.isUsernameBlocked(TEST_USERNAME)).isTrue();
+        assertThat(adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP)).isTrue();
     }
 
     @Test
-    void shouldReturnTrueWhenUsernameAboveThreshold() {
+    void shouldReturnTrueWhenAccountBudgetIsExhausted() {
+        // The loose account-only budget catches a distributed attempt that
+        // never exhausts any single pair bucket.
         stubOpsForValue();
-        when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("10");
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP)).thenReturn("1");
+        when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("50");
 
-        assertThat(adapter.isUsernameBlocked(TEST_USERNAME)).isTrue();
+        assertThat(adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP)).isTrue();
     }
 
     @Test
     void shouldReturnFalseWhenUsernameBlockingDisabled() {
-        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15, 10000)).isUsernameBlocked(TEST_USERNAME)).isFalse();
+        assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15, 10000)).isUsernameBlocked(TEST_USERNAME, TEST_IP)).isFalse();
     }
 
     @Test
     void shouldBlockUsernameWhenMaxAttemptsIsZeroAndCountPresent() {
         var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
         stubOpsForValue();
-        when(valueOps.get("login_attempt:user:" + TEST_USERNAME)).thenReturn("0");
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP)).thenReturn("0");
 
-        assertThat(zeroThreshold.isUsernameBlocked(TEST_USERNAME)).isTrue();
+        assertThat(zeroThreshold.isUsernameBlocked(TEST_USERNAME, TEST_IP)).isTrue();
     }
 
     @Test
     void shouldReturnFalseForNullUsernameEvenWithZeroThreshold() {
         var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
 
-        assertThat(zeroThreshold.isUsernameBlocked(null)).isFalse();
+        assertThat(zeroThreshold.isUsernameBlocked(null, TEST_IP)).isFalse();
     }
 
     @Test
     void shouldRecordFailure() {
+        // Three budgets are incremented in one atomic script: the IP bucket,
+        // the account+IP bucket and the account-only bucket.
         when(redisTemplate.execute(any(DefaultRedisScript.class),
-                eq(List.of("login_attempt:ip:" + TEST_IP, "login_attempt:user:" + TEST_USERNAME)),
+                eq(List.of("login_attempt:ip:" + TEST_IP,
+                        "login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP,
+                        "login_attempt:user:" + TEST_USERNAME)),
                 eq("900000"))).thenReturn(1L);
 
         adapter.recordFailure(TEST_IP, TEST_USERNAME);
 
         verify(redisTemplate).execute(any(DefaultRedisScript.class),
-                eq(List.of("login_attempt:ip:" + TEST_IP, "login_attempt:user:" + TEST_USERNAME)),
+                eq(List.of("login_attempt:ip:" + TEST_IP,
+                        "login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP,
+                        "login_attempt:user:" + TEST_USERNAME)),
                 eq("900000"));
     }
 
@@ -176,9 +192,23 @@ class RedisLoginAttemptAdapterTest {
 
     @Test
     void shouldResetByUsername() {
+        // The account+IP buckets carry the account in the key prefix, so they
+        // are cleared by a SCAN (never KEYS: KEYS blocks the Redis main
+        // thread for the whole keyspace).
+        Cursor<String> cursor = emptyCursor();
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+
         adapter.resetByUsername(TEST_USERNAME);
 
         verify(redisTemplate).delete("login_attempt:user:" + TEST_USERNAME);
+        verify(redisTemplate).scan(any(ScanOptions.class));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Cursor<String> emptyCursor() {
+        Cursor<String> cursor = mock(Cursor.class);
+        when(cursor.hasNext()).thenReturn(false);
+        return cursor;
     }
 
     @Test
@@ -208,10 +238,10 @@ class RedisLoginAttemptAdapterTest {
     @Test
     void shouldFailClosedWhenUsernameAttemptCountCannotBeRead() {
         stubOpsForValue();
-        when(valueOps.get("login_attempt:user:" + TEST_USERNAME))
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP))
                 .thenThrow(new RedisConnectionFailureException("Redis down"));
 
-        assertThatThrownBy(() -> adapter.isUsernameBlocked(TEST_USERNAME))
+        assertThatThrownBy(() -> adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP))
                 .isInstanceOf(LoginAttemptStoreUnavailableException.class)
                 .hasCauseInstanceOf(RedisConnectionFailureException.class);
     }

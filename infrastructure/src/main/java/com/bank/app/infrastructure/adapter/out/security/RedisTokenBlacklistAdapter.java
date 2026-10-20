@@ -4,6 +4,7 @@ import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
@@ -15,10 +16,36 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklistPort {
     private static final String KEY_PREFIX = "token_blacklist:";
     private static final String HASHED_KEY_PREFIX = KEY_PREFIX + "sha256:";
 
+    /**
+     * One round trip for the whole lookup.
+     *
+     * <p>The migration window needs two keys checked: the hashed key (what
+     * this build writes) and the legacy key (raw bearer token, written by
+     * older instances). Two separate {@code hasKey} calls meant two network
+     * round trips on EVERY authenticated request, on the single shared
+     * Lettuce connection. One Lua script checks both atomically and returns
+     * a single answer.
+     */
+    private static final String LOOKUP_SCRIPT = """
+            local hashed = redis.call('EXISTS', KEYS[1])
+            if hashed == 1 then
+                return 1
+            end
+            if ARGV[1] == '1' then
+                local legacy = redis.call('EXISTS', KEYS[2])
+                if legacy == 1 then
+                    return 1
+                end
+            end
+            return 0
+            """;
+
     private final StringRedisTemplate redisTemplate;
+    private final DefaultRedisScript<Long> lookupScript;
 
     public RedisTokenBlacklistAdapter(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
+        this.lookupScript = new DefaultRedisScript<>(LOOKUP_SCRIPT, Long.class);
     }
 
     @Override
@@ -29,27 +56,18 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklistPort {
 
     @Override
     public boolean isBlacklisted(String token) {
-        Boolean hashedPresent = redisTemplate.hasKey(hashedKey(token));
-        if (hashedPresent == null) {
-            throw new IllegalStateException("Redis revocation lookup returned no result");
-        }
-        if (hashedPresent) {
-            return true;
-        }
-        // Older instances wrote the bearer token into the key itself. Read those
-        // keys until their existing Redis TTL expires, but never create new ones.
         // SEC-05: skip oversized inputs so an attacker-controlled long string
         // can neither bloat the keyspace nor land a raw bearer in
         // monitor/slowlog output via the legacy branch. Remove this branch
         // entirely once the last legacy TTL has expired (migration window).
-        if (token.length() > 2048) {
-            return false;
+        boolean checkLegacy = token.length() <= 2048;
+        Long present = redisTemplate.execute(lookupScript,
+                java.util.List.of(hashedKey(token), KEY_PREFIX + token),
+                checkLegacy ? "1" : "0");
+        if (present == null) {
+            throw new IllegalStateException("Redis revocation lookup returned no result");
         }
-        Boolean legacyPresent = redisTemplate.hasKey(KEY_PREFIX + token);
-        if (legacyPresent == null) {
-            throw new IllegalStateException("Redis legacy revocation lookup returned no result");
-        }
-        return legacyPresent;
+        return present > 0;
     }
 
     private static String hashedKey(String token) {

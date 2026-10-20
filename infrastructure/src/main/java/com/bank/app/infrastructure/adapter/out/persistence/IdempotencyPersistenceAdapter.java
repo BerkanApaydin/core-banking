@@ -24,6 +24,14 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
      */
     static final int MAX_RESPONSE_BODY_CHARS = 10_000;
 
+    /**
+     * The {@code key_kind} discriminator (V38). Declared by the CALLER, not
+     * derived from the key text: the kind drives the retention split, so a
+     * misclassified key is deleted by the wrong sweep.
+     */
+    static final String KEY_KIND_HTTP = "HTTP";
+    static final String KEY_KIND_HANDLER = "HANDLER";
+
     private final IdempotencyKeyJpaRepository repository;
 
     public IdempotencyPersistenceAdapter(IdempotencyKeyJpaRepository repository) {
@@ -44,7 +52,12 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
 
     @Override
     public boolean tryCreate(String key, String requestHash, LocalDateTime now) {
-        return repository.tryInsert(key, requestHash, now) > 0;
+        return repository.tryInsert(key, requestHash, now, KEY_KIND_HTTP) > 0;
+    }
+
+    @Override
+    public boolean tryCreateHandler(String key, LocalDateTime now) {
+        return repository.tryInsert(key, null, now, KEY_KIND_HANDLER) > 0;
     }
 
     @Override

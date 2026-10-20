@@ -32,6 +32,11 @@ is the single map: ID → file → one-sentence decision.
 | — | `docs/decisions/transaction-strategy.md` | Marker-aspect programmatic tx for use cases; declarative `@Transactional` for single-boundary adapters. |
 | S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained (reachable via the pending reaper); R-2 relay (`TransferFailedOutboxRelay`) closed the consumer gap; revisit if async placement stays absent. |
 | S11/D23 | `docs/decisions/mfa-totp.md` | TOTP MFA (per-user opt-in, AES-GCM secrets, fail-fast prod key) + enumeration-safe password reset; authenticated MFA failures are 400 (`MFA_CODE_INVALID`), login stays uniform 401. |
+| MFA-1 (2026-10) | `docs/decisions/mfa-totp.md` | MFA code checks share one service: account-keyed attempt budget (429) enforced at every call site (the login path consults it after the password check), TOTP replay counter consumed by the login path only, `/api/v1/auth/mfa/*` in the tight rate-limit tier. |
+| OUTBOX-1 (2026-10) | `docs/decisions/retry-policy.md`, V57 | A failed outbox event waits for an exponential backoff before the next attempt: `max-retries` is a budget, not a count. |
+| REV-1 (2026-10) | `docs/token-revocation-migration.md` | Hybrid revocation: short-lived NEGATIVE cache for the durable lookup (the revocation check no longer competes with the money path for DB connections); the Redis lookup is one Lua round trip. |
+| LOCK-1 (2026-10) | `application.yml` (`DB_CONNECTION_TIMEOUT_MS`) | The connection wait must not be shorter than the use-case transaction budget: pool saturation becomes a 500 burst otherwise. |
+| MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
 
 ## Newly added decisions (this improvement round)
 
@@ -50,5 +55,5 @@ is the single map: ID → file → one-sentence decision.
 | O-3 | `docs/decisions/token-version.md` (2026-10 acceptance) | 15-min window accepted on money paths too; no per-request tokenVersion lookup in transfer. |
 | O-12 | `docs/decisions/iban-pii.md` | Raw IBANs masked at exception construction via `IbanLogMask`; never at the log site. |
 | TX-P | `docs/decisions/transaction-strategy.md` (boundary port) | Adapters observe tx state via `TransactionBoundaryPort`; no programmatic Spring TX in BCs (ArchUnit). |
-| CACHE-1 | `docs/decisions/cache-prefix-alias.md` | Canonical `app.cache.account-info.*` keys; legacy prefix deprecated fallback with canonical-wins merge. |
+| CACHE-1 | `docs/decisions/cache-prefix-alias.md` | Canonical `app.cache.account-info.*` keys win on presence; shipped defaults live on the deprecated legacy prefix (alias) and the resolver falls back to it. |
 | AUD-1 | `docs/decisions/audit-persistence.md` | `AuditLogJpaEntity` intentionally outside the shared auditing base; explicit `@PrePersist` only. |

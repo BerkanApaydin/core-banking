@@ -63,6 +63,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
@@ -78,6 +79,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
@@ -105,6 +107,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
@@ -120,6 +123,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now().minusMinutes(5), false, 0, false, null, 0));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(2, result.size());
@@ -136,6 +140,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 "{}", LocalDateTime.now(), false, 0, false, null, 1));
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(1, result.size());
@@ -171,6 +176,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         }
 
         List<OutboxJpaEntity> result = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 3));
 
         assertEquals(3, result.size());
@@ -195,6 +201,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
             new Thread(() -> {
                 List<OutboxJpaEntity> batch = tx.execute(status -> {
                     List<OutboxJpaEntity> locked = outboxJpaRepository.findAndLockUnprocessed(-1,
+                            LocalDateTime.now(),
                             PageRequest.of(0, 5));
                     for (OutboxJpaEntity e : locked) {
                         e.setProcessed(true);
@@ -226,6 +233,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
         List<OutboxJpaEntity> firstBatch = tx.execute(status ->
                 outboxJpaRepository.findAndLockUnprocessed(-1,
+                        LocalDateTime.now(),
                         PageRequest.of(0, 10)));
         assertEquals(3, firstBatch.size());
 
@@ -237,6 +245,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
 
         List<OutboxJpaEntity> secondBatch = tx.execute(status ->
                 outboxJpaRepository.findAndLockUnprocessed(-1,
+                        LocalDateTime.now(),
                         PageRequest.of(0, 10)));
         assertTrue(secondBatch.isEmpty(),
                 "Processed events should not be returned");
@@ -258,6 +267,7 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         outboxJpaRepository.save(toProcess);
 
         List<OutboxJpaEntity> remaining = outboxJpaRepository.findAndLockUnprocessed(-1,
+                LocalDateTime.now(),
                 PageRequest.of(0, 10));
 
         assertEquals(4, remaining.size());

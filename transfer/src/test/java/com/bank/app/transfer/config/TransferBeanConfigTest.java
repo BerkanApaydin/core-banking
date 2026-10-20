@@ -17,16 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
 import org.springframework.retry.annotation.EnableRetry;
 
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TransferBeanConfigTest {
@@ -115,39 +111,6 @@ class TransferBeanConfigTest {
         TransferAuthorizationService authService = config.transferAuthorizationService(accountAclPort, userContextService);
         TransferViewEnricher enricher = config.transferViewEnricher(accountAclPort);
         assertNotNull(config.getTransferHistoryQuery(loadTransferPort, enricher, authService));
-    }
-
-    @Test
-    void shouldCreateAccountInfoCachePortFallbackBean() {
-        // AV: adapter beans moved next to the adapters they construct.
-        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
-        Environment environment = mock(Environment.class);
-        assertNotNull(config.accountInfoCachePort(environment));
-    }
-
-    @Test
-    void shouldFailFastWhenFallbackWouldRunUnderProd() {
-        // Defense in depth: the prod profile pins the shared Redis backend via
-        // ProductionConfigContractTest, so this fallback must never activate
-        // there. If the wiring ever degrades, fail at startup instead of
-        // serving per-JVM snapshots silently across replicas.
-        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
-        Environment prod = mock(Environment.class);
-        when(prod.matchesProfiles("prod")).thenReturn(true);
-
-        assertThrows(IllegalStateException.class, () -> config.accountInfoCachePort(prod));
-    }
-
-    @Test
-    void shouldFailFastWhenFallbackWouldRunUnderSimulation() {
-        // The hosted demo (simulation profile) is exactly the multi-replica
-        // deployment that must never fall back to a per-JVM cache.
-        TransferAccountAclConfiguration config = new TransferAccountAclConfiguration();
-        Environment simulation = mock(Environment.class);
-        when(simulation.matchesProfiles("prod")).thenReturn(false);
-        when(simulation.matchesProfiles("simulation")).thenReturn(true);
-
-        assertThrows(IllegalStateException.class, () -> config.accountInfoCachePort(simulation));
     }
 
     @Test

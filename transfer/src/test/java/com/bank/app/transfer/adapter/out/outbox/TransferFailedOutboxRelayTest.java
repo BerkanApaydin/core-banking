@@ -79,7 +79,7 @@ class TransferFailedOutboxRelayTest {
     class Handle {
 
         private void mockDedupSuccess(String eventId) {
-            when(idempotencyPort.tryCreate(
+            when(idempotencyPort.tryCreateHandler(
                     eq("outbox_handler_TransferFailedOutboxRelay_" + eventId),
                     any(LocalDateTime.class)))
                     .thenReturn(true);
@@ -129,7 +129,7 @@ class TransferFailedOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-5", "Transfer",
                     "42", "TransferFailedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferFailedOutboxRelay_evt-5"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_TransferFailedOutboxRelay_evt-5"), any(LocalDateTime.class)))
                     .thenReturn(false);
 
             handler.handle(event);
@@ -186,7 +186,7 @@ class TransferFailedOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-9", "Transfer",
                     "42", "TransferFailedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferFailedOutboxRelay_evt-9"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_TransferFailedOutboxRelay_evt-9"), any(LocalDateTime.class)))
                     .thenReturn(false);
             when(idempotencyPort.findById("outbox_handler_TransferFailedOutboxRelay_evt-9"))
                     .thenReturn(Optional.of(new IdempotencyPort.Entry(

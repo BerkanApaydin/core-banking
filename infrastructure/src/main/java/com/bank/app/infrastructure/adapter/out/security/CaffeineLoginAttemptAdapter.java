@@ -16,20 +16,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
 
     private final Cache<String, AtomicInteger> ipCache;
-    private final Cache<String, AtomicInteger> usernameCache;
+    private final Cache<String, AtomicInteger> accountIpCache;
+    private final Cache<String, AtomicInteger> accountCache;
     private final int maxAttempts;
+    private final int globalAccountMaxAttempts;
     private final long windowMinutes;
 
     public CaffeineLoginAttemptAdapter(LoginAttemptProperties properties) {
         this.maxAttempts = properties.maxAttempts();
+        this.globalAccountMaxAttempts = properties.globalAccountMaxAttempts();
         this.windowMinutes = properties.windowMinutes();
-        this.ipCache = Caffeine.newBuilder()
+        this.ipCache = newCounterCache(properties.cacheMaxSize(), windowMinutes);
+        this.accountIpCache = newCounterCache(properties.cacheMaxSize(), windowMinutes);
+        this.accountCache = newCounterCache(properties.cacheMaxSize(), windowMinutes);
+    }
+
+    private static Cache<String, AtomicInteger> newCounterCache(long maximumSize, long windowMinutes) {
+        return Caffeine.newBuilder()
                 .expireAfterWrite(windowMinutes, TimeUnit.MINUTES)
-                .maximumSize(properties.cacheMaxSize())
-                .build();
-        this.usernameCache = Caffeine.newBuilder()
-                .expireAfterWrite(windowMinutes, TimeUnit.MINUTES)
-                .maximumSize(properties.cacheMaxSize())
+                .maximumSize(maximumSize)
                 .build();
     }
 
@@ -41,16 +46,25 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    public boolean isUsernameBlocked(String username) {
+    public boolean isUsernameBlocked(String username, String ip) {
         if (maxAttempts < 0 || username == null) return false;
-        AtomicInteger count = usernameCache.getIfPresent(normalizeUsername(username));
-        return count != null && count.get() >= maxAttempts;
+        String normalized = normalizeUsername(username);
+        // Account + IP: the tight budget. A failure from THIS client only
+        // blocks the account for THIS client.
+        AtomicInteger pair = accountIpCache.getIfPresent(pairKey(normalized, ip));
+        if (pair != null && pair.get() >= maxAttempts) {
+            return true;
+        }
+        // Account only: the loose budget that still stops a distributed
+        // attack, which the pair counter cannot see.
+        AtomicInteger account = accountCache.getIfPresent(normalized);
+        return account != null && account.get() >= globalAccountMaxAttempts;
     }
 
     @Override
     public void recordFailure(String ip, String username) {
         recordIpFailure(ip);
-        recordUsernameFailure(username);
+        recordUsernameFailure(username, ip);
     }
 
     public void recordIpFailure(String ip) {
@@ -58,17 +72,18 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
         // null): a missing username/ip must be a no-op, never an NPE that
         // masks the authentication result.
         if (ip == null) return;
-        ipCache.asMap().compute(ip, (k, v) -> {
-            if (v == null) return new AtomicInteger(1);
-            v.incrementAndGet();
-            return v;
-        });
+        increment(ipCache, ip);
     }
 
-    public void recordUsernameFailure(String username) {
+    public void recordUsernameFailure(String username, String ip) {
         if (username == null) return;
-        String key = normalizeUsername(username);
-        usernameCache.asMap().compute(key, (k, v) -> {
+        String normalized = normalizeUsername(username);
+        increment(accountIpCache, pairKey(normalized, ip));
+        increment(accountCache, normalized);
+    }
+
+    private static void increment(Cache<String, AtomicInteger> cache, String key) {
+        cache.asMap().compute(key, (k, v) -> {
             if (v == null) return new AtomicInteger(1);
             v.incrementAndGet();
             return v;
@@ -84,7 +99,9 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
     @Override
     public void resetByUsername(String username) {
         if (username == null) return;
-        usernameCache.invalidate(normalizeUsername(username));
+        String normalized = normalizeUsername(username);
+        accountCache.invalidate(normalized);
+        accountIpCache.asMap().keySet().removeIf(key -> key.startsWith(normalized + "|"));
     }
 
     @Override
@@ -94,5 +111,13 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
 
     static String normalizeUsername(String username) {
         return username == null ? null : username.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Account + IP key. A null IP yields a key without the IP segment, so an
+     * unresolvable client still consumes (and is bounded by) one bucket.
+     */
+    static String pairKey(String normalizedUsername, String ip) {
+        return normalizedUsername + "|" + (ip == null ? "-" : ip);
     }
 }

@@ -44,6 +44,12 @@ public record RateLimitProperties(
                     PublicApiPaths.BROWSER_REFRESH,
                     PublicApiPaths.PASSWORD_RESET_REQUEST,
                     PublicApiPaths.PASSWORD_RESET_CONFIRM,
+                    // MFA code verification is a brute-force target: the MFA
+                    // endpoints inherit the tight auth-tier budget. The
+                    // per-account attempt counter (MfaAttemptPort) is the
+                    // second layer — the IP-keyed budget alone cannot
+                    // contain a distributed guess.
+                    PublicApiPaths.MFA,
                     PublicApiPaths.LOGOUT,
                     PublicApiPaths.BROWSER_LOGOUT,
                     PublicApiPaths.BROWSER_SESSION,

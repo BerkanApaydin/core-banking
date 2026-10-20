@@ -55,18 +55,18 @@ class IdempotencyPersistenceAdapterTest {
     @Test
     void shouldTryCreateSuccessfully() {
         var now = LocalDateTime.now();
-        when(repository.tryInsert("key1", null, now)).thenReturn(1);
+        when(repository.tryInsert("key1", null, now, "HTTP")).thenReturn(1);
 
         boolean result = adapter.tryCreate("key1", now);
 
         assertThat(result).isTrue();
-        verify(repository).tryInsert("key1", null, now);
+        verify(repository).tryInsert("key1", null, now, "HTTP");
     }
 
     @Test
     void shouldReturnFalseWhenTryCreateFailsWithDuplicate() {
         var now = LocalDateTime.now();
-        when(repository.tryInsert("key1", null, now)).thenReturn(0);
+        when(repository.tryInsert("key1", null, now, "HTTP")).thenReturn(0);
 
         boolean result = adapter.tryCreate("key1", now);
 

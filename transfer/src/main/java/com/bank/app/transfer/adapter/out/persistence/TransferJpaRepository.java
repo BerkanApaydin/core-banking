@@ -19,22 +19,14 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     Optional<TransferJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * One range scan returns the page rows plus the total match count
-     * (window function, same value on every row): no second COUNT query.
-     * Each element is {@code Object[]{TransferJpaEntity, Long totalCount}}.
+     * Rows-only history page.
      *
-     * <p>P-1: kept for the first page (hot path + emptiness probe). Deeper
-     * pages use {@link #findHistoryRows} + {@link #countHistory} so a full
-     * count/sort is not paid on every page request.
-     */
-    List<Object[]> findHistoryPage(@Param("accountId") Long accountId,
-                                   @Param("limit") int limit,
-                                   @Param("offset") long offset);
-
-    /**
-     * P-1: rows-only history page (no {@code COUNT(*) OVER()} window), for
-     * pages past the first. Same UNION ALL per-side branches and ordering as
-     * the windowed query, minus the global count.
+     * <p>The former windowed variant ({@code COUNT(*) OVER()} over the whole
+     * sender/receiver union) was removed: PostgreSQL can only evaluate a
+     * window function after materialising and sorting the entire union, so a
+     * 20-row page cost O(n) over the account's whole transfer history on the
+     * hottest read path. The exact total comes from {@link #countHistory}
+     * (an index-only count, no sort) — the same shape every page uses.
      */
     @Query(value = "SELECT u.* FROM ("
             + "SELECT t.* FROM transfers t WHERE t.sender_account_id = :accountId "
@@ -113,9 +105,16 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     /**
      * Perf-1: single UPDATE ... WHERE id AND version for COMPLETED/CANCELLED
      * transitions — no preceding SELECT on the happy path.
+     *
+     * <p>{@code updatedAt} is refreshed here for the same reason the
+     * account twin refreshes it: the bulk path bypasses
+     * {@code AuditingEntityListener}, so without the explicit write the
+     * column would stay NULL and the transfer audit trail would lose its
+     * "last changed" information.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE TransferJpaEntity t SET t.status = :status, t.version = t.version + 1 "
+    @Query("UPDATE TransferJpaEntity t SET t.status = :status, t.version = t.version + 1, "
+            + "t.updatedAt = CURRENT_TIMESTAMP "
             + "WHERE t.id = :id AND t.version = :version")
     int updateStatusIfVersionMatch(@Param("id") Long id,
             @Param("version") Long version,

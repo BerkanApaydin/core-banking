@@ -190,8 +190,16 @@ public class BrowserAuthController {
     }
 
     /**
-     * Refresh cookie scoped to the refresh endpoint path: browsers only send
-     * it there, never on API calls (least exposure for the long-lived token).
+     * Refresh cookie scoped to the browser-auth endpoints: browsers send it
+     * to the login, session, refresh and logout endpoints, never to API
+     * calls (least exposure for the long-lived token).
+     *
+     * <p>The path covers the whole browser-auth prefix — not only the
+     * refresh endpoint — because the LOGOUT endpoint needs the refresh
+     * token to revoke the server-side session. With the previous
+     * single-endpoint path the browser never presented the refresh token
+     * on logout, so a logout left the server-side refresh session alive
+     * for its full lifetime.
      */
     private String refreshCookie(String value) {
         return refreshCookie(value, refreshLifetime);
@@ -200,7 +208,7 @@ public class BrowserAuthController {
     private String refreshCookie(String value, Duration age) {
         return ResponseCookie.from(cookies.refreshCookieName(), value)
                 .httpOnly(true).secure(cookies.secure()).sameSite("Strict")
-                .path("/api/v1/auth/browser/refresh").maxAge(age).build().toString();
+                .path("/api/v1/auth/browser").maxAge(age).build().toString();
     }
 
     private static String cookieValue(HttpServletRequest request, String name) {

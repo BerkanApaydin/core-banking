@@ -178,16 +178,24 @@
                         </goals>
                         <configuration>
                             <skip>${jacoco.skip}</skip>
-                            <!-- HIGH-3: the check must evaluate the AGGREGATE
-                                 report (all reactor modules), not this module's
-                                 5 bootstrap classes. dataFileIncludes pulls
-                                 every module's exec; the single source of
-                                 truth for thresholds stays in the root pom
-                                 (jacoco.line/branch.coverage) mirrored by
-                                 scripts/check_aggregate_coverage.py. -->
-                            <dataFileIncludes>
-                                <dataFileInclude>**/jacoco.exec</dataFileInclude>
-                            </dataFileIncludes>
+                            <!-- The `check` goal has NO dataFileIncludes
+                                 parameter (verified against
+                                 jacoco-maven-plugin 0.8.15 META-INF/maven/plugin.xml:
+                                 dataFile, excludes, haltOnFailure, includes,
+                                 project, rules, skip). A block declaring it
+                                 here is silently IGNORED by Maven, so the
+                                 BUNDLE rule was evaluated against this
+                                 module's own classes only ("Analyzed bundle
+                                 'app' with 6 classes") instead of the
+                                 nine-module aggregate.
+                                 The real aggregate gate is the
+                                 report-aggregate execution above plus
+                                 scripts/check_aggregate_coverage.py (per-module
+                                 LINE >= 0.90 / BRANCH >= 0.80, thresholds
+                                 mirrored from the root pom properties
+                                 jacoco.line.coverage / jacoco.branch.coverage),
+                                 which CI runs. Keep the thresholds in sync
+                                 with that script. -->
                             <haltOnFailure>true</haltOnFailure>
                             <rules>
                                 <rule>

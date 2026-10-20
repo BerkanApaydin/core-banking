@@ -9,11 +9,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @DisplayName("RedisTokenBlacklistAdapter")
@@ -57,20 +59,27 @@ class RedisTokenBlacklistAdapterTest {
     @DisplayName("isBlacklisted")
     class IsBlacklisted {
 
+        // The lookup is a single Lua script: the hashed key and the legacy
+        // key are checked in ONE round trip (two hasKey calls meant two
+        // network round trips on the shared Lettuce connection, on every
+        // authenticated request).
+        private void stubLookup(Long result) {
+            when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+                    .thenReturn(result);
+        }
+
         @Test
         @DisplayName("should return true for a hashed key without checking the legacy key")
         void shouldReturnTrueWhenHashedKeyExists() {
-            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(true);
+            stubLookup(1L);
 
             assertThat(adapter.isBlacklisted("token-1")).isTrue();
-            verify(redisTemplate, never()).hasKey(LEGACY_TOKEN_1_KEY);
         }
 
         @Test
         @DisplayName("should recognize a legacy raw-token key during migration")
         void shouldReturnTrueWhenLegacyKeyExists() {
-            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
-            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(true);
+            stubLookup(1L);
 
             assertThat(adapter.isBlacklisted("token-1")).isTrue();
         }
@@ -78,26 +87,15 @@ class RedisTokenBlacklistAdapterTest {
         @Test
         @DisplayName("should return false when key does not exist")
         void shouldReturnFalseWhenKeyDoesNotExist() {
-            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
-            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(false);
+            stubLookup(0L);
 
             assertThat(adapter.isBlacklisted("token-1")).isFalse();
         }
 
         @Test
-        @DisplayName("should refuse an indeterminate hashed-key lookup")
-        void shouldRefuseNullHashedKeyResult() {
-            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(null);
-
-            assertThatThrownBy(() -> adapter.isBlacklisted("token-1"))
-                    .isInstanceOf(IllegalStateException.class);
-            verify(redisTemplate, never()).hasKey(LEGACY_TOKEN_1_KEY);
-        }
-
-        @Test
-        void shouldRefuseNullLegacyKeyResult() {
-            when(redisTemplate.hasKey(HASHED_TOKEN_1_KEY)).thenReturn(false);
-            when(redisTemplate.hasKey(LEGACY_TOKEN_1_KEY)).thenReturn(null);
+        @DisplayName("should refuse an indeterminate lookup")
+        void shouldRefuseNullLookupResult() {
+            stubLookup(null);
 
             assertThatThrownBy(() -> adapter.isBlacklisted("token-1"))
                     .isInstanceOf(IllegalStateException.class);
@@ -107,10 +105,12 @@ class RedisTokenBlacklistAdapterTest {
         @DisplayName("should skip the legacy raw-token lookup for oversized input (SEC-05)")
         void shouldSkipLegacyLookupForOversizedToken() {
             String oversized = "x".repeat(2049);
-            when(redisTemplate.hasKey(anyString())).thenReturn(false);
+            stubLookup(0L);
 
             assertThat(adapter.isBlacklisted(oversized)).isFalse();
-            verify(redisTemplate, times(1)).hasKey(anyString());
+            // The legacy key is not even part of the script's key list for an
+            // oversized token: the script skips it via the flag argument.
+            verify(redisTemplate, times(1)).execute(any(DefaultRedisScript.class), anyList(), any(String.class));
         }
     }
 

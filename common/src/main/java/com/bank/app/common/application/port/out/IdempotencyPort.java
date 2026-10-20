@@ -7,6 +7,18 @@ public interface IdempotencyPort {
     Optional<Entry> findById(String key);
     boolean tryCreate(String key, LocalDateTime now);
     boolean tryCreate(String key, String requestHash, LocalDateTime now);
+
+    /**
+     * Reserves an OUTBOX-HANDLER dedup key.
+     *
+     * <p>The kind is declared by the caller, not derived from the key text.
+     * The kind drives the retention split (HTTP keys and handler keys are
+     * swept by different queries), so a misclassified key is deleted by the
+     * wrong sweep. V38 introduced the explicit {@code key_kind} column for
+     * exactly this reason.
+     */
+    boolean tryCreateHandler(String key, LocalDateTime now);
+
     boolean tryResetFailed(String key, LocalDateTime now);
     boolean tryResetFailed(String key, String requestHash, LocalDateTime now);
     void markCompleted(String key, String responseBody, int responseStatus);

@@ -136,9 +136,14 @@ conflict; see `CacheBackendResolution`):
 | anything else | **nothing registers** — startup fails | `ApplicationStartupValidator` rejects the unknown value |
 
 `application-prod.yml` sets both keys to the **literal** `redis` (not
-`${CACHE_ACCOUNT_INFO_BACKEND:redis}` as the base file does). That matters: a
-literal cannot be redirected by an environment variable, so the fallback
-cannot be switched on in production by accident.
+`${CACHE_ACCOUNT_INFO_BACKEND:redis}`). That matters: a literal cannot be
+redirected by an environment variable, so the fallback cannot be switched on
+in production by accident. The base `application.yml` deliberately keeps the
+`CACHE_ACCOUNT_INFO_*` placeholders on the alias prefix and leaves the
+canonical keys unset, so a legacy-only deployment still resolves through the
+fallback; do not add canonical defaults to the base file — with
+presence-based resolution every deployment would become canonical and the
+fallback would silently die.
 
 The silent-failure path this closes: if the prod value ever degrades away from
 `redis`, no backend bean registers, the `@ConditionalOnMissingBean` fallback

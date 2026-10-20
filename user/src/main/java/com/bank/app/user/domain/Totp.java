@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.OptionalLong;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -22,10 +23,14 @@ import javax.crypto.spec.SecretKeySpec;
  * the replay window beyond {@code 2 * skew + 1} codes. Comparison is
  * constant-time so a wrong code reveals nothing about the expected one.
  *
- * <p>Replay within a step (same code twice) is NOT tracked here: login codes
- * are single-shot by construction (a successful login mints tokens and the
- * code is never stored), and enrollment/disable confirmations are
- * user-initiated retries of the same pending action.
+ * <p>Replay within a step (same code twice) is NOT prevented by the
+ * algorithm itself — the verification window is {@code 2 * skew + 1} steps
+ * (90s with the default skew of 1), so a captured code would stay valid
+ * inside that window. Replay protection is therefore layered on top: the
+ * matched step counter is returned by {@link #verifyWithCounter} and the
+ * caller persists it (see {@code users.mfa_last_totp_counter}, V56). The
+ * persisted counter is advanced with a conditional UPDATE, so a replayed
+ * code is rejected by the database even when two requests race.
  */
 public final class Totp {
 
@@ -167,23 +172,49 @@ public final class Totp {
      */
     public static boolean verify(byte[] secret, String code, Clock clock,
             int periodSeconds, int digits, int allowedSkewWindows) {
+        return verifyWithCounter(secret, code, clock, periodSeconds, digits, allowedSkewWindows)
+                .isPresent();
+    }
+
+    /**
+     * Verifies a user-supplied code and returns the TOTP step counter that
+     * produced the match, so the caller can persist it and reject a replay
+     * of the same code.
+     *
+     * <p>The matched counter is the HIGHEST matching step: a code that is
+     * valid under several steps (only possible for a short, ambiguous code)
+     * must consume the most recent one, otherwise the next legitimate code
+     * would be rejected as a replay.
+     *
+     * <p>Every candidate step is evaluated (no early return) so the number of
+     * HMAC evaluations never reveals which step matched.
+     *
+     * @return the matched step counter, or empty when the code is invalid
+     */
+    public static OptionalLong verifyWithCounter(byte[] secret, String code, Clock clock,
+            int periodSeconds, int digits, int allowedSkewWindows) {
         Objects.requireNonNull(secret, "Secret must not be null");
         Objects.requireNonNull(clock, "Clock must not be null");
         if (code == null || periodSeconds <= 0 || allowedSkewWindows < 0) {
-            return false;
+            return OptionalLong.empty();
         }
         String candidate = code.strip();
         if (candidate.length() != digits || !candidate.chars().allMatch(Character::isDigit)) {
-            return false;
+            return OptionalLong.empty();
         }
         long step = clock.millis() / 1000L / periodSeconds;
         boolean ok = false;
+        long matched = Long.MIN_VALUE;
         // Evaluate every candidate step and fold with OR (no early return):
         // the number of HMAC evaluations must not reveal which step matched.
         for (long counter = step - allowedSkewWindows; counter <= step + allowedSkewWindows; counter++) {
-            ok |= constantTimeEquals(generateCode(secret, counter, digits), candidate);
+            boolean matches = constantTimeEquals(generateCode(secret, counter, digits), candidate);
+            ok |= matches;
+            if (matches) {
+                matched = counter;
+            }
         }
-        return ok;
+        return ok ? OptionalLong.of(matched) : OptionalLong.empty();
     }
 
     private static boolean constantTimeEquals(String a, String b) {

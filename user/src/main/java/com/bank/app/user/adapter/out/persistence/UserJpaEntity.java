@@ -62,6 +62,16 @@ public class UserJpaEntity extends AuditableJpaEntity {
     @Column(name = "mfa_secret_encrypted", length = 512)
     private String mfaSecretEncrypted;
 
+    /**
+     * TOTP step counter of the last accepted code (V56). Replay protection:
+     * a code is valid for {@code 2 * skew + 1} steps, so a captured code
+     * would otherwise stay usable inside that window. The counter is
+     * advanced only by a strictly newer value (conditional UPDATE), so the
+     * database — not the application — arbitrates a replay.
+     */
+    @Column(name = "mfa_last_totp_counter")
+    private Long mfaLastTotpCounter;
+
     public UserJpaEntity() {
     }
 
@@ -153,5 +163,13 @@ public class UserJpaEntity extends AuditableJpaEntity {
 
     public void setMfaSecretEncrypted(String mfaSecretEncrypted) {
         this.mfaSecretEncrypted = mfaSecretEncrypted;
+    }
+
+    public Long getMfaLastTotpCounter() {
+        return mfaLastTotpCounter;
+    }
+
+    public void setMfaLastTotpCounter(Long mfaLastTotpCounter) {
+        this.mfaLastTotpCounter = mfaLastTotpCounter;
     }
 }

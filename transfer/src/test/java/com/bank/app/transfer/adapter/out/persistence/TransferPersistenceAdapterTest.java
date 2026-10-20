@@ -178,25 +178,31 @@ Currency.TRY), TransferStatus.COMPLETED, now);
     }
 
     @Test
-    void shouldFindHistoryPageWithTotalFromSingleQuery() {
+    void shouldFindHistoryPageWithTotalFromSeparateCount() {
+        // The first page no longer rides on a COUNT(*) OVER() window: that
+        // made PostgreSQL materialise and sort the WHOLE union for a page of
+        // ten rows. The exact total comes from a separate index-only count.
         LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity1 = createEntity(1L, 100L, 200L, new BigDecimal("100.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
         TransferJpaEntity entity2 = createEntity(2L, 300L, 100L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
-        when(springDataRepo.findHistoryPage(eq(100L), eq(10), eq(0L)))
-                .thenReturn(List.<Object[]>of(new Object[]{entity1, 5L}, new Object[]{entity2, 5L}));
+        when(springDataRepo.findHistoryRows(eq(100L), eq(10), eq(0L)))
+                .thenReturn(List.of(entity1, entity2));
+        when(springDataRepo.countHistory(eq(100L))).thenReturn(5L);
 
         var result = repository.findHistoryPage(100L, 0, 10);
 
         assertEquals(2, result.items().size());
         assertEquals(5L, result.totalElements());
         assertEquals(new AccountId(100L), result.items().getFirst().getSenderAccountId());
-        verify(springDataRepo).findHistoryPage(eq(100L), eq(10), eq(0L));
+        verify(springDataRepo).findHistoryRows(eq(100L), eq(10), eq(0L));
+        verify(springDataRepo).countHistory(eq(100L));
     }
 
     @Test
     void shouldReturnEmptyHistoryPageWhenNotFound() {
-        when(springDataRepo.findHistoryPage(eq(999L), eq(10), eq(0L))).thenReturn(List.of());
+        when(springDataRepo.findHistoryRows(eq(999L), eq(10), eq(0L))).thenReturn(List.of());
+        when(springDataRepo.countHistory(eq(999L))).thenReturn(0L);
 
         var result = repository.findHistoryPage(999L, 0, 10);
 
@@ -266,7 +272,6 @@ Currency.TRY), TransferStatus.COMPLETED, now);
         // Offset is page * size (not page * (size + 1)); limit is the page size.
         verify(springDataRepo).findHistoryRows(eq(100L), eq(10), eq(20L));
         verify(springDataRepo).countHistory(eq(100L));
-        verify(springDataRepo, never()).findHistoryPage(eq(100L), eq(10), eq(20L));
         assertEquals(1, result.items().size());
         assertEquals(5L, result.totalElements());
     }

@@ -56,6 +56,16 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
     private static final int EVICTION_ATTEMPTS = 3;
 
     /**
+     * UNLINK instead of DEL for the bulk evict-all: DEL frees the key
+     * values on the Redis main thread, so a batch of hundreds of snapshot
+     * keys blocks every other client of the broker. UNLINK frees them in
+     * the background. Redis < 4.0 does not know UNLINK — the script then
+     * fails and the caller falls back to DEL.
+     */
+    private static final DefaultRedisScript<Long> UNLINK_SCRIPT =
+            new DefaultRedisScript<>("return redis.call('UNLINK', unpack(KEYS))", Long.class);
+
+    /**
      * Single-round-trip eviction: the SMEMBERS index read and the DEL run
      * server-side, so a balance mutation costs 1 RTT per account instead of
      * read-then-delete (2 RTT). KEYS = [idKey, mapKey, idxKey],
@@ -234,15 +244,33 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
             while (cursor.hasNext()) {
                 batch.add(cursor.next());
                 if (batch.size() == evictionBatchSize) {
-                    redisTemplate.delete(batch);
+                    unlink(batch);
                     batch.clear();
                 }
             }
             if (!batch.isEmpty()) {
-                redisTemplate.delete(batch);
+                unlink(batch);
             }
         } catch (RuntimeException e) {
             log.warn("Redis snapshot evict-all failed: {}", e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * UNLINK instead of DEL: DEL frees the key values on the Redis main
+     * thread, so a batch of hundreds of snapshot keys blocks every other
+     * client of the broker. UNLINK frees them in the background.
+     *
+     * <p>Falls back to DEL when the server does not support UNLINK (Redis
+     * < 4.0): the eviction must still happen.
+     */
+    private void unlink(Collection<String> keys) {
+        try {
+            redisTemplate.execute(UNLINK_SCRIPT, new ArrayList<>(keys));
+        } catch (RuntimeException e) {
+            log.debug("Redis UNLINK unavailable, falling back to DEL: {}",
+                    e.getClass().getSimpleName());
+            redisTemplate.delete(keys);
         }
     }
 

@@ -78,19 +78,15 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(size, 1);
         long offset = (long) safePage * safeSize;
-        if (safePage == 0) {
-            // Hot path unchanged: one range scan serves rows + exact total.
-            List<Object[]> rows = repository.findHistoryPage(accountId, safeSize, offset);
-            List<Transfer> items = rows.stream()
-                    .map(row -> mapper.toDomain((TransferJpaEntity) row[0]))
-                    .toList();
-            // Window function repeats the total on every row; empty page means zero.
-            long total = rows.isEmpty() ? 0L : ((Number) rows.get(0)[1]).longValue();
-            return new LoadTransferPort.HistoryPage(items, total);
-        }
-        // P-1: deeper pages skip the COUNT(*) OVER() window — rows stream
-        // without a global count/sort, and the total comes from a separate
-        // covering-index count instead of riding on every row.
+        // PERF: every page uses the rows-only query plus a separate
+        // covering-index count.
+        //
+        // The first page used to ride on a `COUNT(*) OVER()` window, which
+        // PostgreSQL can only evaluate AFTER materialising the WHOLE union
+        // and sorting it — so a 20-row page cost O(n) over the account's
+        // whole transfer history on the hottest read path. The standalone
+        // count is an index-only count over the two per-side indexes and
+        // does not sort, so the page is paid once instead of per request.
         List<Transfer> items = repository.findHistoryRows(accountId, safeSize, offset).stream()
                 .map(mapper::toDomain)
                 .toList();

@@ -2,6 +2,12 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: bank-postgres
+    # Resource ceilings: a compose stack on a developer laptop must not be
+    # able to starve the host. The k8s manifest is the production
+    # authority; these are local-dev guardrails.
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 512
     # K22: local query observability (dev only — production observability
     # belongs in the managed DB's parameter group, not in a compose file).
     # pg_stat_statements enables per-query stats; log_min_duration_statement
@@ -30,6 +36,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: bank-redis
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
     ports:
       - "127.0.0.1:6389:6379"
     restart: unless-stopped
@@ -97,6 +106,9 @@ services:
         condition: service_healthy
       otel-collector:
         condition: service_started
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 512
     restart: unless-stopped
 
   otel-collector:
@@ -107,6 +119,9 @@ services:
       - ./docker/otel-collector.yaml:/etc/otel/otel-collector.yaml:ro
     ports:
       - "127.0.0.1:4318:4318"
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 256
     restart: unless-stopped
 
 volumes:

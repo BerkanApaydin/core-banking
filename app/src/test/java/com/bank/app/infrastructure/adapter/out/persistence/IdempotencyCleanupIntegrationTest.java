@@ -78,24 +78,33 @@ class IdempotencyCleanupIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void tryInsertDerivesKeyKindFromPrefix() {
+    void tryInsertStoresTheExplicitKeyKind() {
         String suffix = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         String httpKey = "http_" + suffix;
         String handlerKey = "outbox_handler_Test_" + suffix;
+        // The kind is a CALLER decision, never derived from the key text: a
+        // handler key that does not carry the "outbox_handler_" prefix must
+        // still be stored as HANDLER, and an HTTP key that happens to look
+        // like one must stay HTTP.
+        String oddKey = "looks_like_a_handler_but_is_http_" + suffix;
 
-        assertEquals(1, repository.tryInsert(httpKey, "hash", now));
-        assertEquals(1, repository.tryInsert(handlerKey, "hash", now));
+        assertEquals(1, repository.tryInsert(httpKey, "hash", now, "HTTP"));
+        assertEquals(1, repository.tryInsert(handlerKey, "hash", now, "HANDLER"));
+        assertEquals(1, repository.tryInsert(oddKey, "hash", now, "HTTP"));
 
         assertEquals("HTTP", jdbc.queryForObject(
                 "SELECT key_kind FROM idempotency_keys WHERE key_value = ?", String.class, httpKey));
         assertEquals("HANDLER", jdbc.queryForObject(
                 "SELECT key_kind FROM idempotency_keys WHERE key_value = ?", String.class, handlerKey));
+        assertEquals("HTTP", jdbc.queryForObject(
+                "SELECT key_kind FROM idempotency_keys WHERE key_value = ?", String.class, oddKey));
     }
 
     private void insert(String key, String status, LocalDateTime createdAt) {
-        // Same discriminator the production tryInsert computes: prefix match
-        // on the literal, so the near-miss stays HTTP like in production.
+        // The kind is derived from the key prefix here only because this
+        // helper fabricates rows directly; production writes the kind
+        // explicitly (see tryInsert).
         String kind = key.startsWith("outbox_handler_") ? "HANDLER" : "HTTP";
         jdbc.update("INSERT INTO idempotency_keys (key_value, status, created_at, key_kind) VALUES (?, ?, ?, ?)",
                 key, status, createdAt, kind);

@@ -10,6 +10,7 @@ import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
+import com.bank.app.user.application.port.out.MfaAttemptPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import com.bank.app.user.domain.TotpPolicy;
@@ -17,6 +18,7 @@ import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.PasswordPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +44,7 @@ class UserBeanConfigTest {
     @Mock private AuditEventPort auditEventPort;
     @Mock private IdGeneratorPort idGenerator;
     @Mock private MfaSecretPort mfaSecretPort;
+    @Mock private MfaAttemptPort mfaAttemptPort;
 
     @Test
     void shouldCreateRegisterUserUseCaseBean() {
@@ -53,9 +56,12 @@ class UserBeanConfigTest {
     @Test
     void shouldCreateLoginUserUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
+        MfaCodeVerificationService mfaCodeVerification = new MfaCodeVerificationService(
+                mfaSecretPort, AesGcmMfaEncryptor.ephemeral(), new TotpPolicy(30, 6, 1),
+                mfaAttemptPort, clockProvider);
         LoginUserUseCase useCase = config.loginUserUseCase(authenticationPort, jwtPort,
                 loginAttemptPort, refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort,
-                mfaSecretPort, AesGcmMfaEncryptor.ephemeral(), new TotpPolicy(30, 6, 1));
+                mfaCodeVerification);
         assertNotNull(useCase);
     }
 

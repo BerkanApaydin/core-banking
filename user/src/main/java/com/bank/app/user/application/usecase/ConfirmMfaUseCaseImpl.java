@@ -5,22 +5,25 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
-import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.LoadUserPort;
-import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
-import com.bank.app.user.domain.TotpPolicy;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
+import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import java.util.Objects;
 
 /**
  * Completes enrollment: a correct TOTP code proves the user holds the secret
  * in their authenticator, and only then is MFA switched on for logins.
+ *
+ * <p>The code check runs through {@link MfaCodeVerificationService}, which
+ * owns the brute-force bound, the TOTP replay protection and the uniform
+ * failure contract.
  */
 @TransactionalUseCase
 public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
@@ -28,19 +31,17 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
     private final MfaSecretPort mfaSecretPort;
-    private final MfaSecretEncryptorPort encryptor;
-    private final TotpPolicy totpPolicy;
+    private final MfaCodeVerificationService mfaCodeVerification;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public ConfirmMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-            MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort encryptor, TotpPolicy totpPolicy,
+            MfaSecretPort mfaSecretPort, MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
         this.mfaSecretPort = mfaSecretPort;
-        this.encryptor = encryptor;
-        this.totpPolicy = totpPolicy;
+        this.mfaCodeVerification = mfaCodeVerification;
         this.clockProvider = clockProvider;
         this.auditEventPort = auditEventPort;
     }
@@ -53,25 +54,25 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
         if (user.isMfaEnabled()) {
             throw new MfaAlreadyEnabledException();
         }
-        String ciphertext = mfaSecretPort.findSecret(userId)
-                .orElseThrow(MfaNotEnrolledException::new);
-        final byte[] secret;
-        try {
-            secret = encryptor.decrypt(ciphertext);
-        } catch (AuthenticationBackendUnavailableException unavailable) {
-            // Secret-store outage is infrastructure, not a wrong code: must
-            // surface as 503, never collapse into a 400/500. (Decrypt itself
-            // is pure crypto and never throws this, but the guard documents
-            // the contract if the port implementation ever changes.)
-            throw unavailable;
-        } catch (RuntimeException decryptFailed) {
-            // Wrong rotation key or tampered row fails closed like a wrong
-            // code (400 InvalidMfaCode), never a 500 that leaks the cause.
-            throw new InvalidMfaCodeException();
+        if (mfaSecretPort.findSecret(userId).isEmpty()) {
+            throw new MfaNotEnrolledException();
         }
-        if (!totpPolicy.verify(secret, code, clockProvider.clock())) {
-            // 400, not the generic 401: this endpoint runs in an already
-            // authenticated session (see InvalidMfaCodeException).
+        // Brute-force bound first: a locked-out account must not even reach
+        // the code check.
+        if (mfaCodeVerification.isBlocked(userId)) {
+            throw new TooManyFailedMfaAttemptsException(
+                    "Too many failed authenticator code attempts. Please try again in "
+                            + mfaCodeVerification.getWindowMinutes() + " minutes.");
+        }
+        // 400, not the generic 401: this endpoint runs in an already
+        // authenticated session (see InvalidMfaCodeException). The service
+        // collapses "wrong code", "replayed code" and "missing secret" into
+        // one rejection so the response is not an oracle.
+        // The code is verified but NOT consumed: the confirmation does not
+        // mint a session, and consuming the step counter here would reject
+        // the very next legitimate use of the same code (confirm, then log
+        // in, inside one 30-second step).
+        if (!mfaCodeVerification.verify(userId, code)) {
             throw new InvalidMfaCodeException();
         }
         user.enableMfa();

@@ -124,6 +124,16 @@ spec:
             # docs/operations.md "Database connection capacity").
             - name: DB_MAX_POOL_SIZE
               value: "20"
+            # REQUIRED in prod: ApplicationStartupValidator.requireProdCors()
+            # refuses to boot when app.security.cors.allowed-origins resolves to
+            # a loopback host (the base application.yml default is
+            # http://localhost:3000,...). Without this variable every pod
+            # CrashLoopBackOffs before the context starts.
+            # MUST match the ingress host (k8s/ingress.yaml) — a mismatch
+            # breaks credentialed cross-origin calls, and a wildcard is
+            # rejected by CorsConfig (allowCredentials + "*" is invalid).
+            - name: CORS_ALLOWED_ORIGINS
+              value: "https://bank.example.com"
             - name: JAVA_OPTS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"
           volumeMounts:

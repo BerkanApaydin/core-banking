@@ -29,12 +29,21 @@ public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKe
     int deleteExpiredHandlerKeysBatch(@Param("threshold") LocalDateTime threshold,
                                       @Param("batch") int batch);
 
+    /**
+     * Inserts a PENDING reservation.
+     *
+     * <p>{@code key_kind} is an EXPLICIT parameter: V38 replaced the
+     * string-prefix matching ("does the key start with {@code outbox_handler_}?")
+     * with an explicit discriminator, because key_kind drives the retention
+     * split — a misclassified key is deleted by the wrong sweep. Deriving it
+     * from the key text again re-introduced exactly the bug V38 removed.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "INSERT INTO idempotency_keys (key_value, status, created_at, request_hash, key_kind) "
-            + "VALUES (:key, 'PENDING', :now, :requestHash, "
-            + "CASE WHEN left(:key, length('outbox_handler_')) = 'outbox_handler_' THEN 'HANDLER' ELSE 'HTTP' END) "
+            + "VALUES (:key, 'PENDING', :now, :requestHash, :keyKind) "
             + "ON CONFLICT (key_value) DO NOTHING", nativeQuery = true)
-    int tryInsert(@Param("key") String key, @Param("requestHash") String requestHash, @Param("now") LocalDateTime now);
+    int tryInsert(@Param("key") String key, @Param("requestHash") String requestHash,
+                  @Param("now") LocalDateTime now, @Param("keyKind") String keyKind);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE idempotency_keys SET status = 'PENDING', response_body = NULL, response_status = NULL, request_hash = :requestHash, created_at = :now "

@@ -230,7 +230,10 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         adapter.evictAll();
 
-        verify(redisTemplate).delete(List.of("account-snapshot:id-1", "account-snapshot:iban-TR1"));
+        // UNLINK, not DEL: DEL frees the values on the Redis main thread and
+        // would block every other client of the broker for the whole batch.
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("account-snapshot:id-1", "account-snapshot:iban-TR1")));
         verify(redisTemplate, never()).keys(anyString());
         verify(cursor).close();
     }

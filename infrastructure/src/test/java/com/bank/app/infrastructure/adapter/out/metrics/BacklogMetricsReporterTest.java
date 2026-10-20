@@ -108,7 +108,8 @@ class BacklogMetricsReporterTest {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
                 eq("audit_logs_default")))
                 .thenReturn(1);
-        when(jdbc.queryForObject(eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_COUNT_SQL), eq(Long.class)))
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_COUNT_SQL), eq(Long.class),
+                eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_SCAN_LIMIT)))
                 .thenReturn(7L);
 
         reporter.scan();

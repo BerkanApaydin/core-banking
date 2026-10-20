@@ -52,7 +52,27 @@ public class BacklogMetricsReporter {
     static final String TABLE_EXISTS_SQL =
             "SELECT count(*) FROM pg_class WHERE relname = ? "
             + "AND relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p', 'm', 'f')";
-    static final String AUDIT_DEFAULT_PARTITION_COUNT_SQL = "SELECT count(*) FROM audit_logs_default";
+    /**
+     * Partition-drift guard. PERF-5: the scan is CAPPED.
+     *
+     * <p>An unbounded {@code count(*)} on {@code audit_logs_default} is a
+     * full table scan of the largest table in the schema, and this reporter
+     * runs EVERY MINUTE. The metric exists to detect partition drift, and
+     * drift means the default partition keeps GROWING — so the scan cost
+     * grew exactly when the signal mattered most. This is the same class of
+     * problem PERF-1 removed from the ledger path.
+     *
+     * <p>The capped count answers the question the alert actually asks
+     * ("are there ANY rows in the default partition?") with a bounded
+     * amount of work: the scan stops after the cap. The gauge therefore
+     * saturates at the cap — non-zero still means drift, and the exact
+     * number is read from the table when the drift is investigated.
+     */
+    static final String AUDIT_DEFAULT_PARTITION_COUNT_SQL =
+            "SELECT count(*) FROM (SELECT 1 FROM audit_logs_default LIMIT ?) t";
+
+    /** Rows scanned before the partition-drift count saturates. */
+    static final int AUDIT_DEFAULT_PARTITION_SCAN_LIMIT = 1000;
 
     private final JdbcTemplate jdbc;
     private final AdvisorySchedulerLock schedulerLock;
@@ -100,7 +120,7 @@ public class BacklogMetricsReporter {
             // PERF-1: ledger invariant intentionally NOT scanned here (see
             // LEDGER_NONZERO_SQL javadoc). LedgerReconciliationJob owns it.
             long defaultPartitionRows = tableExists("audit_logs_default")
-                    ? readCount(AUDIT_DEFAULT_PARTITION_COUNT_SQL)
+                    ? readCount(AUDIT_DEFAULT_PARTITION_COUNT_SQL, AUDIT_DEFAULT_PARTITION_SCAN_LIMIT)
                     : 0;
             Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
             LocalDateTime now = LocalDateTime.now(clock);
@@ -139,6 +159,18 @@ public class BacklogMetricsReporter {
         Long result = jdbc.queryForObject(sql, Long.class);
         if (result == null) {
             throw new IllegalStateException("Ledger reconcile query returned no row");
+        }
+        return result;
+    }
+
+    /**
+     * Bounded count: the scan stops after {@code limit} rows, so the cost
+     * of the partition-drift probe never grows with the drift it detects.
+     */
+    private long readCount(String sql, int limit) {
+        Long result = jdbc.queryForObject(sql, Long.class, limit);
+        if (result == null) {
+            throw new IllegalStateException("Bounded count query returned no row");
         }
         return result;
     }

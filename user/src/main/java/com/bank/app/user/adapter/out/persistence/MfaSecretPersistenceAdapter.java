@@ -5,6 +5,7 @@ import org.springframework.dao.DataAccessException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import org.springframework.stereotype.Component;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * AES-GCM ciphertext store for TOTP secrets (column
@@ -45,6 +46,35 @@ public class MfaSecretPersistenceAdapter implements MfaSecretPort {
     public void deleteSecret(Long userId) {
         try {
             repository.clearMfaSecret(userId);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
+    }
+
+    @Override
+    public boolean recordAcceptedTotpCounter(Long userId, long counter) {
+        if (userId == null) {
+            return false;
+        }
+        try {
+            // Conditional write: only a strictly newer counter is accepted.
+            // Zero updated rows means the code was a replay.
+            return repository.updateMfaLastTotpCounterIfNewer(userId, counter) > 0;
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
+    }
+
+    @Override
+    public OptionalLong findLastAcceptedTotpCounter(Long userId) {
+        if (userId == null) {
+            return OptionalLong.empty();
+        }
+        try {
+            return repository.findMfaLastTotpCounter(userId)
+                    .filter(java.util.Objects::nonNull)
+                    .map(OptionalLong::of)
+                    .orElse(OptionalLong.empty());
         } catch (DataAccessException e) {
             throw new AuthenticationBackendUnavailableException(e);
         }

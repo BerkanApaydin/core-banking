@@ -33,6 +33,13 @@ public record SecurityProperties(
         // Password-reset endpoints are unauthenticated by necessity (audit);
         // abuse-contained by the auth-tier rate budget + generic responses.
         PublicApiPaths.PASSWORD_RESET_REQUEST, PublicApiPaths.PASSWORD_RESET_CONFIRM,
+        // Logout authenticates with the credentials it presents (the access
+        // token and/or the refresh token) and revokes exactly those. It must
+        // not require a still-valid session: an expired access token would
+        // otherwise make logging out impossible, leaving the browser session
+        // and the server-side refresh session alive. Terminating a session
+        // is not an authorization decision, and nothing is granted by it.
+        PublicApiPaths.LOGOUT, PublicApiPaths.BROWSER_LOGOUT,
         "/v3/api-docs/**", "/swagger-ui/**",
         "/swagger-ui.html", "/actuator/health/**", "/", "/index.html",
         // Static UI assets as patterns (not an enumerated file list): a new

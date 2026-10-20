@@ -7,12 +7,20 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Framework-free in-memory fallback for the account snapshot cache.
+ * Framework-free in-memory snapshot cache: a TEST DOUBLE, not a runtime
+ * backend.
  *
- * <p>Used by transfer unit tests and as {@code @ConditionalOnMissingBean}
- * fallback at runtime; production wires the infrastructure Caffeine-backed
- * adapter (primary) instead. Invalidation semantics live in
- * {@link AbstractAccountSnapshotCache}; this class is storage only.
+ * <p>It lives in the test sources on purpose. The runtime backend is
+ * always supplied by the {@code infrastructure} module — the Caffeine-backed
+ * adapter for dev/test, the Redis-backed one for production — so there is
+ * no {@code @ConditionalOnMissingBean} fallback bean that could activate a
+ * per-JVM map in a multi-replica deployment. Removing that fallback made
+ * the "production must never serve stale snapshots from one pod's heap"
+ * invariant structural instead of conditional: the per-JVM implementation
+ * simply is not on the production classpath.
+ *
+ * <p>Invalidation semantics live in {@link AbstractAccountSnapshotCache};
+ * this class is storage only.
  */
 public class InMemoryAccountInfoCacheAdapter extends AbstractAccountSnapshotCache {
 

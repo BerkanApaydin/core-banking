@@ -10,11 +10,22 @@ import java.util.Set;
  *
  * <p>Canonical prefix: {@code app.cache.account-info.*}. The historical
  * {@code app.cache.caffeine.account-info.*} prefix (see {@link CacheProperties})
- * stays bound as a deprecated fallback. Merging is per field: a canonical
- * field set to a non-default value wins, otherwise the legacy field applies.
- * A canonical field left exactly at its default is indistinguishable from
- * unset, so the legacy value applies there — set a field under ONE prefix per
- * deployment and prefer the canonical one for new configuration.
+ * stays bound as a deprecated fallback. Merging is per field and decided by
+ * PRESENCE: when the canonical key is set — even to its default value — the
+ * canonical value wins; otherwise the legacy value applies. Set a field under
+ * ONE prefix per deployment and prefer the canonical one for new
+ * configuration.
+ *
+ * <p><b>Why the shipped {@code application.yml} defines only the legacy
+ * prefix:</b> presence semantics only work if "unset" is reachable. The base
+ * file therefore keeps the {@code CACHE_ACCOUNT_INFO_*} placeholders under
+ * the alias and leaves the canonical keys unset, so an explicitly set
+ * canonical key (the literal {@code redis} in {@code application-prod.yml},
+ * or any operator override) always wins, while a legacy-only deployment
+ * still resolves its value — and an unknown legacy value stays visible to
+ * {@code ApplicationStartupValidator} instead of being shadowed. Defining
+ * the canonical keys in the base file as well would make every deployment
+ * "canonical" and silently kill the fallback.
  *
  * <p>Single source of truth for backend selection: the Spring
  * {@code @Conditional}s, the resolved settings bean
@@ -41,19 +52,42 @@ public final class CacheBackendResolution {
      * Resolves the effective snapshot-cache settings with per-field
      * canonical-wins semantics. Never returns null; unset keys fall back to
      * {@link CacheProperties.AccountInfoCache} defaults.
+     *
+     * <p>"Canonical wins" is decided by PRESENCE, not by value: a canonical
+     * field that is explicitly set to the default value (for example
+     * {@code maximum-size: 1000}) still wins over the legacy prefix. A
+     * value comparison would make "set to the default" indistinguishable
+     * from "unset" and hand the field to the legacy prefix — the exact
+     * inversion the canonical/legacy split is meant to prevent.
      */
     public static CacheProperties.AccountInfoCache resolve(Environment environment) {
         CacheProperties.AccountInfoCache canonical = read(environment, CANONICAL_PREFIX);
         CacheProperties.AccountInfoCache legacy = read(environment, LEGACY_PREFIX);
-        CacheProperties.AccountInfoCache defaults = CacheProperties.AccountInfoCache.defaults();
         return new CacheProperties.AccountInfoCache(
-                !canonical.backend().equals(defaults.backend()) ? canonical.backend() : legacy.backend(),
-                canonical.maximumSize() != defaults.maximumSize()
-                        ? canonical.maximumSize() : legacy.maximumSize(),
-                canonical.expireAfterWrite() != defaults.expireAfterWrite()
-                        ? canonical.expireAfterWrite() : legacy.expireAfterWrite(),
-                canonical.evictionBatchSize() != defaults.evictionBatchSize()
-                        ? canonical.evictionBatchSize() : legacy.evictionBatchSize());
+                pick(environment, "backend", canonical.backend(), legacy.backend()),
+                pick(environment, "maximum-size", canonical.maximumSize(), legacy.maximumSize()),
+                pick(environment, "expire-after-write", canonical.expireAfterWrite(), legacy.expireAfterWrite()),
+                pick(environment, "eviction-batch-size", canonical.evictionBatchSize(), legacy.evictionBatchSize()));
+    }
+
+    /**
+     * Picks the canonical value when the canonical key is PRESENT in the
+     * environment, otherwise the legacy one.
+     *
+     * <p>Presence is what makes the canonical prefix authoritative — the
+     * value may legitimately equal the built-in default. When neither
+     * prefix sets the key, the canonical read already returned the
+     * built-in default, so returning it is correct.
+     */
+    private static <T> T pick(Environment environment, String property,
+                              T canonicalValue, T legacyValue) {
+        if (environment.containsProperty(CANONICAL_PREFIX + "." + property)) {
+            return canonicalValue;
+        }
+        if (environment.containsProperty(LEGACY_PREFIX + "." + property)) {
+            return legacyValue;
+        }
+        return canonicalValue;
     }
 
     public static boolean isRedis(Environment environment) {

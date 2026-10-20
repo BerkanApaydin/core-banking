@@ -46,6 +46,19 @@ class SnapshotCacheConditionTest {
     }
 
     @Test
+    void canonicalKeyWinsOverConflictingLegacyKey() {
+        // Canonical wins by PRESENCE: even set to the Caffeine default it
+        // beats a legacy redis value — and the unused Caffeine CacheManager
+        // must not be created alongside the Redis adapter.
+        runner().withPropertyValues(
+                "app.cache.account-info.backend=caffeine",
+                "app.cache.caffeine.account-info.backend=redis").run(context -> {
+            assertThat(context).hasSingleBean(CaffeineAccountInfoCacheAdapter.class);
+            assertThat(context).doesNotHaveBean(RedisAccountSnapshotCacheAdapter.class);
+        });
+    }
+
+    @Test
     void resolvedSettingsAgreeWithSelectedBackend() {
         runner().withPropertyValues("app.cache.account-info.backend=redis").run(context -> {
             CacheProperties.AccountInfoCache settings =

@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.TimeUnit;
@@ -13,8 +14,16 @@ import java.util.concurrent.TimeUnit;
 // caching is manual through the AccountSnapshotCache port, and the CacheManager
 // below exists only as its Caffeine backend. Enabling the caching advisor
 // would add a proxy to every bean for zero benefit.
+//
+// The CacheManager is created ONLY for the Caffeine backend. With the Redis
+// backend (production) it was still allocated on every pod — an unused
+// cache-sized manager per replica. The condition resolves BOTH prefixes
+// (canonical + legacy alias) through CacheBackendResolution, exactly like the
+// adapter conditions: a legacy-only deployment that selects Redis must not
+// also get this Caffeine manager.
 @Configuration
 @EnableConfigurationProperties(CacheProperties.class)
+@Conditional(SnapshotCacheCaffeineCondition.class)
 public class CacheConfig {
 
     private final CacheProperties.AccountInfoCache accountInfoCache;

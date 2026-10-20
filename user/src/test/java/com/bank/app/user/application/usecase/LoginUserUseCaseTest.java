@@ -12,7 +12,9 @@ import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
+import com.bank.app.user.application.port.out.MfaAttemptPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import com.bank.app.user.domain.Totp;
 import com.bank.app.user.domain.TotpPolicy;
@@ -24,6 +26,7 @@ import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
+import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,8 +60,10 @@ class LoginUserUseCaseTest {
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
     @Mock private MfaSecretPort mfaSecretPort;
+    @Mock private MfaAttemptPort mfaAttemptPort;
     private final AesGcmMfaEncryptor mfaEncryptor = AesGcmMfaEncryptor.ephemeral();
     private final TotpPolicy totpPolicy = new TotpPolicy(30, 6, 1);
+    private MfaCodeVerificationService mfaCodeVerification;
     private LoginUserUseCase loginUserUseCase;
 
     private static final String USERNAME = "testuser";
@@ -68,9 +73,15 @@ class LoginUserUseCaseTest {
 
     @BeforeEach
     void setUp() {
+        // The shared verification service persists the accepted TOTP step
+        // counter; the mock must accept it (a rejected counter reads as a
+        // replayed code).
+        lenient().when(mfaSecretPort.recordAcceptedTotpCounter(any(), anyLong())).thenReturn(true);
+        mfaCodeVerification = new MfaCodeVerificationService(mfaSecretPort, mfaEncryptor, totpPolicy,
+                mfaAttemptPort, clockProvider);
         loginUserUseCase = new LoginUserUseCaseImpl(authenticationPort, jwtPort, loginAttemptPort,
                 refreshTokenPort, passwordEncoderPort, idGenerator, clockProvider, auditEventPort,
-                mfaSecretPort, mfaEncryptor, totpPolicy);
+                mfaCodeVerification);
     }
 
     @Nested
@@ -132,7 +143,7 @@ class LoginUserUseCaseTest {
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
@@ -156,7 +167,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
@@ -167,7 +178,7 @@ class LoginUserUseCaseTest {
             AuthResponse response = loginUserUseCase.execute(request, null);
 
             assertThat(response.token()).isEqualTo("mock-jwt-token");
-            verify(loginAttemptPort).isUsernameBlocked(USERNAME);
+            verify(loginAttemptPort).isUsernameBlocked(eq(USERNAME), any());
             verify(loginAttemptPort).resetByUsername(USERNAME);
             verify(loginAttemptPort, never()).reset(any());
             verify(loginAttemptPort, never()).recordFailure(any(), any());
@@ -182,7 +193,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
@@ -224,7 +235,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(true);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(true);
             when(loginAttemptPort.getWindowMinutes()).thenReturn(15);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
@@ -297,7 +308,7 @@ class LoginUserUseCaseTest {
         void shouldRecordFailureForUnknownUserWithIp() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
             doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
@@ -328,7 +339,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             doThrow(new AuthenticationFailedException("Bad credentials")).when(authenticationPort).authenticate(anyString(), anyString());
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
@@ -355,7 +366,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             AuthenticationBackendUnavailableException failure = new AuthenticationBackendUnavailableException(
                     new RuntimeException("Database connection lost"));
             doThrow(failure).when(authenticationPort).authenticate(anyString(), anyString());
@@ -435,7 +446,7 @@ class LoginUserUseCaseTest {
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
 
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(false);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
             when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
@@ -515,7 +526,7 @@ class LoginUserUseCaseTest {
         @DisplayName("should publish LOGIN_FAILED when username is blocked")
         void shouldPublishLoginFailedWhenUsernameBlocked() {            AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
-            when(loginAttemptPort.isUsernameBlocked(USERNAME)).thenReturn(true);
+            when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(true);
             when(loginAttemptPort.getWindowMinutes()).thenReturn(15);
             when(clockProvider.clock()).thenReturn(Clock.systemUTC());
 
@@ -603,6 +614,48 @@ class LoginUserUseCaseTest {
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should reject a login while the account MFA budget is locked (429)")
+        void shouldRejectWhenMfaAccountIsLockedOut() {
+            stubSuccess();
+            when(mfaAttemptPort.isBlocked(100L)).thenReturn(true);
+            when(mfaAttemptPort.getWindowMinutes()).thenReturn(15);
+            when(clockProvider.clock()).thenReturn(MFA_FIXED);
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "123456");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(TooManyFailedMfaAttemptsException.class)
+                    .hasMessageContaining("15 minutes");
+
+            // A locked-out account must not even reach the code check...
+            verifyNoInteractions(mfaSecretPort);
+            // ...and the blocked request is not counted as another wrong code.
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+        }
+
+        @Test
+        @DisplayName("should surface an attempt-store outage as 503, never as a bad code")
+        void shouldPropagateAttemptStoreOutageInsteadOfRendering401() {
+            byte[] secret = Totp.generateSecret();
+            stubSuccess();
+            when(clockProvider.clock()).thenReturn(MFA_FIXED);
+            when(mfaSecretPort.findSecret(100L))
+                    .thenReturn(Optional.of(mfaEncryptor.encryptToBase64(secret)));
+            doThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")))
+                    .when(mfaAttemptPort).recordFailure(100L);
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "000000");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isInstanceOf(LoginAttemptStoreUnavailableException.class);
+
+            // The shared attempt store is the login guard too: an outage must
+            // not be double-counted as a credential failure (or rendered 401).
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
             verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
         }
 

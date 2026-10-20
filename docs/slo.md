@@ -42,11 +42,23 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
   traffic).
 - Capacity model: 6 pods × 20 pool = 120 PG connections; requires managed PG
   ≥200 or PgBouncer (`k8s/bank-app.yaml:106-111`, `docs/operations.md`).
+  The pool budget is shared: the outbox workers hold one connection each
+  (REQUIRES_NEW) and the poller caps itself at
+  `pool − app.outbox.web-connection-reserve`, so a busy outbox cannot
+  starve the money path. The connection wait
+  (`DB_CONNECTION_TIMEOUT_MS`, 30s) is deliberately NOT shorter than the
+  use-case transaction budget (`app.transaction.timeout-seconds`, 30s): a
+  use-case transaction can hold its connection for the whole budget while
+  it waits on a pessimistic row lock, and a shorter wait turns pool
+  saturation into a burst of 500s instead of a bounded wait. Alert on
+  `hikaricp_connections_pending` (threads waiting for a connection) and
+  `hikaricp_connections_acquire_seconds_max` (slow acquisition).
   Post-parallelization outbox ceiling is ~100-200 ev/s (default 4 workers per
   partition, capped at 12 total so `REQUIRES_NEW` workers can never exhaust
   the 20-connection Hikari pool — raising `partition-count` past 3 no longer
   adds workers, only scan sharding; both bounds are now configurable via
-  `app.outbox.worker-threads-per-partition` / `app.outbox.max-worker-threads`); beyond that, the
+  `app.outbox.worker-threads-per-partition` / `app.outbox.max-worker-threads`);
+  beyond that, the
   `docs/decisions/kafka-readiness.md` trigger applies.
 - Reconciliation: `LedgerReconciliationJob` (03:30 cron) + `ledger.nonzero`
   counter; nonzero pages (critical), drill procedure in

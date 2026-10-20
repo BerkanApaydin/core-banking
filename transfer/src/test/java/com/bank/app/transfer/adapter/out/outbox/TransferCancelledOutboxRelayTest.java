@@ -78,7 +78,7 @@ class TransferCancelledOutboxRelayTest {
     class Handle {
 
         private void mockDedupSuccess(String eventId) {
-            when(idempotencyPort.tryCreate(
+            when(idempotencyPort.tryCreateHandler(
                     eq("outbox_handler_TransferCancelledOutboxHandler_" + eventId),
                     any(LocalDateTime.class)))
                     .thenReturn(true);
@@ -157,7 +157,7 @@ class TransferCancelledOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-5", "Transfer",
                     "42", "TransferCancelledEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCancelledOutboxHandler_evt-5"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_TransferCancelledOutboxHandler_evt-5"), any(LocalDateTime.class)))
                     .thenReturn(false);
 
             handler.handle(event);
@@ -176,7 +176,7 @@ class TransferCancelledOutboxRelayTest {
                     TransferStatus.CANCELLED, LocalDateTime.now()));
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-7", "Transfer",
                     "42", "TransferCancelledEvent", json, 0, false, false, null, 0, LocalDateTime.now());
-            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCancelledOutboxHandler_evt-7"),
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_TransferCancelledOutboxHandler_evt-7"),
                     any(LocalDateTime.class)))
                     .thenReturn(true);
 
@@ -195,7 +195,7 @@ class TransferCancelledOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-6", "Transfer",
                     "42", "TransferCancelledEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_TransferCancelledOutboxHandler_evt-6"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_TransferCancelledOutboxHandler_evt-6"), any(LocalDateTime.class)))
                     .thenReturn(true);
 
             handler.handle(event);

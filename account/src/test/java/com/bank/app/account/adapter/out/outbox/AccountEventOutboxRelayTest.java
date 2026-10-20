@@ -85,7 +85,7 @@ class AccountEventOutboxRelayTest {
     class Handle {
 
         private void mockDedupSuccess(String eventId) {
-            when(idempotencyPort.tryCreate(
+            when(idempotencyPort.tryCreateHandler(
                     eq("outbox_handler_AccountEventOutboxHandler_" + eventId),
                     any(LocalDateTime.class)))
                     .thenReturn(true);
@@ -227,7 +227,7 @@ class AccountEventOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-9", "Account",
                     "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_AccountEventOutboxHandler_evt-9"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_AccountEventOutboxHandler_evt-9"), any(LocalDateTime.class)))
                     .thenReturn(false);
 
             handler.handle(event);
@@ -245,7 +245,7 @@ class AccountEventOutboxRelayTest {
             OutboxPort.EventEntry event = new OutboxPort.EventEntry("evt-10", "Account",
                     "1", "AccountCreatedEvent", json, 0, false, false, null, 0, LocalDateTime.now());
 
-            when(idempotencyPort.tryCreate(eq("outbox_handler_AccountEventOutboxHandler_evt-10"), any(LocalDateTime.class)))
+            when(idempotencyPort.tryCreateHandler(eq("outbox_handler_AccountEventOutboxHandler_evt-10"), any(LocalDateTime.class)))
                     .thenReturn(true);
 
             handler.handle(event);

@@ -58,34 +58,39 @@ class TransferHistoryPageIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldReturnPageRowsWithTotalInOneQuery() {
-        List<Object[]> rows = repo.findHistoryPage(201L, 10, 0);
+    void shouldReturnPageRowsWithSeparateTotalCount() {
+        // The windowed query (COUNT(*) OVER() over the whole union) is gone:
+        // PostgreSQL can only evaluate a window function after materialising
+        // and sorting the entire union, so a small page cost O(n) over the
+        // account's whole transfer history. The rows and the exact total now
+        // come from two cheap statements.
+        List<TransferJpaEntity> rows = repo.findHistoryRows(201L, 10, 0);
 
         assertEquals(3, rows.size());
         // Newest first.
-        assertEquals(30.00, ((TransferJpaEntity) rows.get(0)[0]).getAmount().doubleValue());
-        assertEquals(10.00, ((TransferJpaEntity) rows.get(2)[0]).getAmount().doubleValue());
-        // Same total repeated on every row.
-        rows.forEach(row -> assertEquals(3L, ((Number) row[1]).longValue()));
+        assertEquals(30.00, rows.get(0).getAmount().doubleValue());
+        assertEquals(10.00, rows.get(2).getAmount().doubleValue());
+        assertEquals(3L, repo.countHistory(201L));
     }
 
     @Test
     void shouldRespectLimitAndOffsetWithStableTotal() {
-        List<Object[]> page = repo.findHistoryPage(201L, 2, 0);
+        List<TransferJpaEntity> page = repo.findHistoryRows(201L, 2, 0);
         assertEquals(2, page.size());
-        assertEquals(3L, ((Number) page.get(0)[1]).longValue());
+        assertEquals(3L, repo.countHistory(201L));
 
-        List<Object[]> remainder = repo.findHistoryPage(201L, 2, 2);
+        List<TransferJpaEntity> remainder = repo.findHistoryRows(201L, 2, 2);
         assertEquals(1, remainder.size());
-        assertEquals(10.00, ((TransferJpaEntity) remainder.get(0)[0]).getAmount().doubleValue());
-        assertEquals(3L, ((Number) remainder.get(0)[1]).longValue());
+        assertEquals(10.00, remainder.get(0).getAmount().doubleValue());
+        assertEquals(3L, repo.countHistory(201L));
     }
 
     @Test
     void shouldReturnEmptyPageWithZeroTotalForUnknownAccount() {
-        List<Object[]> rows = repo.findHistoryPage(999L, 10, 0);
+        List<TransferJpaEntity> rows = repo.findHistoryRows(999L, 10, 0);
 
         assertTrue(rows.isEmpty());
+        assertEquals(0L, repo.countHistory(999L));
     }
 
     @Test

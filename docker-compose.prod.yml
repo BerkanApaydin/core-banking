@@ -61,8 +61,21 @@ services:
       CACHE_ACCOUNT_INFO_BACKEND: redis
       TRACING_ENABLED: "false"
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?prod requires CORS_ALLOWED_ORIGINS (no localhost)}
-    depends_on:
+    # The collector is removed from the merged stack below, so the app must
+    # not depend on it either (a dangling depends_on is an invalid project).
+    # `!override` REPLACES the mapping instead of merging it, so the dev
+    # file's otel-collector entry cannot survive. The health-gated
+    # postgres/redis dependencies are restated here.
+    depends_on: !override
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # The dev file defines an otel-collector for local tracing. Prod keeps
+  # TRACING_ENABLED=false until a real collector endpoint is configured
+  # (D22), so the service is removed from the merged stack here — the
+  # overlay previously only mentioned it in a comment, and the merged
+  # `docker compose config --services` still listed it.
+  otel-collector: !reset null
+

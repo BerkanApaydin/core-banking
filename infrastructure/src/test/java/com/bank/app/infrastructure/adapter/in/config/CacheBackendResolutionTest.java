@@ -30,6 +30,32 @@ class CacheBackendResolutionTest {
     }
 
     @Test
+    void shippedBaseConfigLeavesCanonicalUnsetSoLegacyOverridesApply() {
+        // The base application.yml ships the CACHE_ACCOUNT_INFO_* placeholders
+        // under the legacy prefix ONLY. Canonical must stay "unset" there, or
+        // every deployment would resolve canonical defaults and a legacy-only
+        // override would be silently ignored.
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("app.cache.caffeine.account-info.backend", "redis")
+                .withProperty("app.cache.caffeine.account-info.maximum-size", "5000");
+
+        CacheProperties.AccountInfoCache resolved = CacheBackendResolution.resolve(environment);
+
+        assertEquals("redis", resolved.backend());
+        assertEquals(5000, resolved.maximumSize());
+    }
+
+    @Test
+    void unknownLegacyBackendStaysVisibleWhileCanonicalUnset() {
+        // A typo in a legacy-only deployment must reach the startup validator
+        // instead of being shadowed by canonical defaults.
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("app.cache.caffeine.account-info.backend", "rediss");
+
+        assertFalse(CacheBackendResolution.isKnownBackend(environment));
+    }
+
+    @Test
     void canonicalPrefixSelectsRedisBackend() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("app.cache.account-info.backend", "redis");

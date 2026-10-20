@@ -123,6 +123,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // with arbitrary strings (DoS surface).
             JwtPort.VerifiedToken verified = jwtPort.verifyAndDecode(jwt);
             if (verified == null) {
+                // Logout with an EXPIRED (or otherwise unverifiable) access
+                // token must still reach the controller. Rejecting it here
+                // meant the user could not log out at all: the controller
+                // never ran, the session cookies were never cleared, and the
+                // server-side refresh session stayed alive for its full
+                // lifetime. A logout is a termination request, not an
+                // authorization decision — what it revokes are the very
+                // credentials the caller presents.
+                //
+                // The CSRF check is skipped on this path because the binding
+                // subject (the user id) comes from the token that could not
+                // be verified. It is not a gap: the browser session cookie is
+                // SameSite=Strict, so a cross-site request carries no cookie
+                // and the controller has nothing to revoke.
+                if (FilterRequestDecisions.isLogoutRequest(request, path)) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 rejectUnauthorized(response, request.getRequestURI());
                 return;
             }

@@ -61,7 +61,9 @@ class OutboxPersistenceAdapterTest {
     void shouldFindAndLockUnprocessed() {
         OutboxJpaEntity entity = new OutboxJpaEntity("id-1", "transfer", "agg-1", "TransferCompletedEvent",
                 "{}", now, false, 0, false, null, 0);
-        when(repository.findAndLockUnprocessed(0, PageRequest.of(0, 10)))
+        // The selection now also filters on the retry backoff
+        // (next_attempt_at), so the query takes the "now" reference.
+        when(repository.findAndLockUnprocessed(eq(0), any(LocalDateTime.class), eq(PageRequest.of(0, 10))))
                 .thenReturn(List.of(entity));
 
         List<EventEntry> result = adapter.findAndLockUnprocessed(10, 0);
@@ -113,7 +115,17 @@ class OutboxPersistenceAdapterTest {
     void shouldMarkFailed() {
         adapter.markFailed("id-1", "error", 1);
 
-        verify(repository).markFailed("id-1", "error", 1);
+        // The retry backoff is applied by the statement: base * 2^(retry-1)
+        // seconds, capped (V57).
+        verify(repository).markFailed("id-1", "error", 1, 5);
+    }
+
+    @Test
+    void shouldApplyExponentialBackoffOnRepeatedFailures() {
+        adapter.markFailed("id-1", "error", 3);
+
+        // retry 3 -> base(5s) * 2^2 = 20s
+        verify(repository).markFailed("id-1", "error", 3, 20);
     }
 
     @Test

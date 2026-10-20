@@ -7,7 +7,9 @@ import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.MfaAttemptPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.TotpPolicy;
@@ -33,7 +35,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,10 +54,12 @@ class MfaUseCaseTest {
     @Mock private AuthenticationPort authenticationPort;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
+    @Mock private MfaAttemptPort mfaAttemptPort;
 
     private final AesGcmMfaEncryptor encryptor = AesGcmMfaEncryptor.ephemeral();
     private final TotpPolicy totpPolicy = new TotpPolicy(30, 6, 1);
 
+    private MfaCodeVerificationService mfaCodeVerification;
     private EnableMfaUseCaseImpl enable;
     private ConfirmMfaUseCaseImpl confirm;
     private DisableMfaUseCaseImpl disable;
@@ -62,10 +68,15 @@ class MfaUseCaseTest {
     void setUp() {
         enable = new EnableMfaUseCaseImpl(loadUserPort, mfaSecretPort, encryptor, "test-issuer",
                 clockProvider, auditEventPort);
-        confirm = new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaSecretPort, encryptor,
-                totpPolicy, clockProvider, auditEventPort);
+        // The verification service persists the accepted TOTP step counter;
+        // the mock must accept it (a rejected counter reads as a replay).
+        lenient().when(mfaSecretPort.recordAcceptedTotpCounter(any(), anyLong())).thenReturn(true);
+        mfaCodeVerification = new MfaCodeVerificationService(mfaSecretPort, encryptor, totpPolicy,
+                mfaAttemptPort, clockProvider);
+        confirm = new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaSecretPort,
+                mfaCodeVerification, clockProvider, auditEventPort);
         disable = new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort, mfaSecretPort,
-                encryptor, totpPolicy, clockProvider, auditEventPort);
+                mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     private static User persistedUser(Long id, String username) {

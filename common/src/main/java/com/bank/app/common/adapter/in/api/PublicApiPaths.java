@@ -30,6 +30,16 @@ public final class PublicApiPaths {
     public static final String PASSWORD_RESET_REQUEST = "/api/v1/auth/password/reset/request";
     public static final String PASSWORD_RESET_CONFIRM = "/api/v1/auth/password/reset/confirm";
 
+    /**
+     * MFA management endpoints (enrollment, status, removal). They live
+     * under the AUTH prefix on purpose: the MFA code check is a
+     * brute-force target, so these paths must inherit the tight auth-tier
+     * rate-limit budget instead of the looser resource budget. The
+     * per-account attempt counter ({@code MfaAttemptPort}) adds the second
+     * layer that the IP-keyed budget cannot provide.
+     */
+    public static final String MFA = "/api/v1/auth/mfa";
+
     public static final String ACCOUNTS = "/api/v1/accounts";
     public static final String TRANSFERS = "/api/v1/transfers";
 

@@ -55,7 +55,15 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db
+    # options=-c TimeZone=UTC pins the POSTGRESQL session time zone.
+    #
+    # V46 converted every wall-clock column to TIMESTAMPTZ, but the native
+    # SQL binds LocalDateTime as a PG `timestamp` (zone-less): PostgreSQL
+    # converts timestamp -> timestamptz using the SESSION zone. Without this
+    # parameter a non-UTC server (or a server whose zone changes) shifts
+    # every bound range and every keyset cursor comparison by the offset.
+    # hibernate.jdbc.time_zone below pins only the JVM side of the bind.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db?options=-c%20TimeZone%3DUTC
     username: ${DB_USERNAME:bank_user}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -65,9 +73,17 @@ spring:
       # with DB_MAX_POOL_SIZE; measure pool-wait before raising.
       maximum-pool-size: ${DB_MAX_POOL_SIZE:20}
       minimum-idle: 10
-      # Aligned with fail-fast Tomcat queueing above: waiting longer than the
-      # caller's patience only converts a capacity problem into a 500 spike.
-      connection-timeout: 3000
+      # The wait for a connection must NOT be shorter than the transaction
+      # budget it protects: a use-case transaction can hold its connection
+      # for the full app.transaction.timeout-seconds (30s) while it waits on
+      # a pessimistic row lock. With a 3s connection timeout the pool
+      # saturated by 20 slow transactions turned every further request into
+      # a 500 after 3s — a cliff, not a graceful degradation. The SLO target
+      # is a p99 of 2s, so waiting 30s is already outside the SLO; failing
+      # fast there would only produce a burst of 500s instead of a bounded
+      # wait. Raise DB_MAX_POOL_SIZE (and the database budget) instead of
+      # lowering this value.
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
       idle-timeout: 300000
       max-lifetime: 1200000
       keepalive-time: 60000
@@ -145,6 +161,16 @@ app:
       allowed-skew-windows: ${MFA_SKEW_WINDOWS:1}
       # Single-use password-reset token lifetime (minutes).
       reset-token-validity-minutes: ${PASSWORD_RESET_TOKEN_MINUTES:15}
+      # Brute-force budget for the /api/v1/auth/mfa/* code checks. The
+      # counter is ACCOUNT-keyed (not IP-keyed): those endpoints are
+      # session-authenticated, so an IP budget would let one abusive client
+      # lock a legitimate user out of their own second factor. The store
+      # follows app.security.failed-login.backend (redis in production), so
+      # the budget is identical on every replica.
+      max-attempts: ${MFA_MAX_ATTEMPTS:5}
+      window-minutes: ${MFA_WINDOW_MINUTES:15}
+      # Caffeine counter-cache memory guard (time-based eviction is primary).
+      cache-max-size: ${MFA_CACHE_MAX_SIZE:10000}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080}
     browser-session:
@@ -154,6 +180,12 @@ app:
     failed-login:
       backend: ${FAILED_LOGIN_BACKEND:caffeine}
       max-attempts: ${FAILED_LOGIN_MAX_ATTEMPTS:5}
+      # Account-only budget (no IP dimension). Much higher than
+      # max-attempts on purpose: the tight budget is keyed on account+IP,
+      # and this one only stops a distributed attack spread over many IPs.
+      # A low value here would let one abusive IP lock a victim out of
+      # their own account.
+      global-account-max-attempts: ${FAILED_LOGIN_GLOBAL_ACCOUNT_MAX_ATTEMPTS:50}
       window-minutes: ${FAILED_LOGIN_WINDOW_MINUTES:15}
       # Caffeine counter-cache memory guard (time-based eviction is primary).
       cache-max-size: ${FAILED_LOGIN_CACHE_MAX_SIZE:10000}
@@ -178,6 +210,9 @@ app:
         - /api/v1/auth/browser/refresh
         - /api/v1/auth/password/reset/request
         - /api/v1/auth/password/reset/confirm
+        # MFA code verification is a brute-force target: the tight auth-tier
+        # budget applies (the per-account counter is the second layer).
+        - /api/v1/auth/mfa
         - /api/v1/auth/logout
         - /api/v1/auth/browser/logout
         - /api/v1/auth/browser/session
@@ -188,11 +223,15 @@ app:
       backend: ${TOKEN_BLACKLIST_BACKEND:caffeine}
       min-ttl-ms: ${TOKEN_BLACKLIST_MIN_TTL_MS:1000}
       max-ttl-ms: ${TOKEN_BLACKLIST_MAX_TTL_MS:2592000000}
-  request-body:
     # SE-4: global JSON body-size cap enforced by RequestBodySizeLimitFilter
     # (Tomcat's max-swallow-size only constrains form posts). 2MB matches the
     # container settings above; every real request body is a few KB.
-    max-bytes: ${REQUEST_BODY_MAX_BYTES:2097152}
+    #
+    # The bound prefix is `app.security.request-body` (see
+    # RequestBodyLimitProperties). Declaring it under `app:` instead leaves
+    # REQUEST_BODY_MAX_BYTES unread and silently hardcodes the limit to 2MB.
+    request-body:
+      max-bytes: ${REQUEST_BODY_MAX_BYTES:2097152}
   idempotency:
     # Cron single-source: this yml is authoritative. Code @Scheduled defaults
     # (e.g. OrphanIntegrityReporter, AuditRetentionScheduler) must stay in sync
@@ -263,21 +302,30 @@ app:
     # Retention window for processed outbox rows and their handler dedup keys
     # (unprocessed and dead-letter rows are never deleted).
     retention-days: ${OUTBOX_RETENTION_DAYS:30}
+    # Exponential retry backoff (V57): a failed event is not selected again
+    # until base * 2^(retry-1) seconds have passed (capped at max). Without
+    # it a poison event burned all five retries within a couple of poll
+    # cycles and dead-lettered long before a transient condition could clear.
+    retry-backoff-base-seconds: ${OUTBOX_RETRY_BACKOFF_BASE_SECONDS:5}
+    retry-backoff-max-seconds: ${OUTBOX_RETRY_BACKOFF_MAX_SECONDS:300}
+    # Connections reserved for WEB traffic. Outbox workers hold one Hikari
+    # connection each (REQUIRES_NEW) and share the pool with the request
+    # threads; the poller caps its worker count at
+    # (pool size - this reserve) so a busy outbox can never starve the money
+    # path.
+    web-connection-reserve: ${OUTBOX_WEB_CONNECTION_RESERVE:8}
   cache:
-    # Canonical snapshot-cache keys: prefer app.cache.account-info.* for all
-    # four settings. The legacy app.cache.caffeine.account-info.* keys below
-    # remain as a deprecated fallback: they apply only while the canonical
-    # record is entirely at defaults; on conflict the canonical value wins
-    # (see CacheBackendResolution). Set every key under ONE prefix.
-    account-info:
-      backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
-      maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}
-      expire-after-write: ${CACHE_ACCOUNT_INFO_EXPIRE_SEC:60}
-      # SCAN batch for operational evict-all resets (Redis backend).
-      eviction-batch-size: ${CACHE_ACCOUNT_INFO_EVICTION_BATCH_SIZE:500}
+    # Shipped snapshot-cache defaults live under the DEPRECATED alias prefix
+    # on purpose: the canonical app.cache.account-info.* keys are left UNSET
+    # here, so an explicitly set canonical key always wins by presence
+    # (application-prod.yml pins it to the literal `redis`), while a
+    # legacy-only override — and an unknown legacy value, which the startup
+    # validator rejects — is still honored. Defining the canonical keys here
+    # as well would make "canonical is set" true for every deployment and
+    # silently kill the fallback (see CacheBackendResolution and
+    # docs/decisions/cache-prefix-alias.md). Env placeholders stay on the
+    # alias so existing CACHE_ACCOUNT_INFO_* deployments keep working.
     caffeine:
-      # Deprecated alias of the block above (same env placeholders, so both
-      # prefixes agree unless explicitly overridden). Do not diverge them.
       account-info:
         backend: ${CACHE_ACCOUNT_INFO_BACKEND:caffeine}
         maximum-size: ${CACHE_ACCOUNT_INFO_MAX_SIZE:1000}

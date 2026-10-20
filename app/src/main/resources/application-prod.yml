@@ -32,7 +32,15 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db,redisBackends
+          # redisBackends is deliberately NOT part of readiness. A short
+          # Redis blip made every pod drop out of the Service at once —
+          # a total outage for a dependency whose failure the request path
+          # already handles (the rate limiter fails closed with 503 and the
+          # snapshot cache falls back to the database). Readiness must
+          # answer "can this pod serve?", not "is every dependency up?".
+          # The Redis state stays visible in the global health endpoint
+          # and in the Prometheus alerts.
+          include: readinessState,db
   tracing:
     # D22: tracing is OFF by default in prod. With the OTLP exporter on the
     # classpath but no collector deployed, the SDK pointlessly dials localhost
@@ -83,6 +91,11 @@ app:
       - /api/v1/auth/browser/refresh
       - /api/v1/auth/password/reset/request
       - /api/v1/auth/password/reset/confirm
+      # Logout authenticates with the credentials it presents and revokes
+      # exactly those. Requiring a still-valid session would make logging
+      # out impossible once the access token expired.
+      - /api/v1/auth/logout
+      - /api/v1/auth/browser/logout
       - /actuator/health/**
       - /actuator/prometheus
       - /

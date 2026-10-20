@@ -30,9 +30,10 @@ public class TokenBlacklistBackendConfig {
     @ConditionalOnProperty(name = "app.security.token-blacklist.backend", havingValue = "hybrid")
     TokenBlacklistPort hybridTokenBlacklist(JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager, JwtPort jwtPort,
-            StringRedisTemplate redisTemplate, TokenBlacklistAdapter local) {
+            StringRedisTemplate redisTemplate, TokenBlacklistAdapter local,
+            TokenBlacklistProperties properties) {
         return new HybridTokenBlacklistAdapter(
                 new DatabaseTokenBlacklistAdapter(jdbc, transactionManager, jwtPort),
-                new RedisTokenBlacklistAdapter(redisTemplate), local);
+                new RedisTokenBlacklistAdapter(redisTemplate), local, properties);
     }
 }

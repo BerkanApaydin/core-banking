@@ -25,7 +25,23 @@ public record MfaProperties(
         @DefaultValue("30") int periodSeconds,
         @DefaultValue("6") int digits,
         @DefaultValue("1") int allowedSkewWindows,
-        @DefaultValue("15") int resetTokenValidityMinutes
+        @DefaultValue("15") int resetTokenValidityMinutes,
+        /**
+         * Failed MFA code attempts allowed per account before the
+         * {@code /api/v1/auth/mfa/*} endpoints are locked out for the
+         * window. The budget is ACCOUNT-keyed (not IP-keyed): the endpoints
+         * are session-authenticated, so an IP budget would let one abusive
+         * client lock a legitimate user out of their own second factor.
+         *
+         * <p>A negative value is a documented sentinel meaning "guard
+         * disabled" — both adapters short-circuit to not-blocked, exactly
+         * like the failed-login guard.
+         */
+        @DefaultValue("5") int mfaMaxAttempts,
+        /** Lockout window for failed MFA code attempts, in minutes. */
+        @DefaultValue("15") int mfaWindowMinutes,
+        /** Memory guard for the Caffeine MFA counter cache. */
+        @DefaultValue("10000") int mfaCacheMaxSize
 ) {
     public MfaProperties {
         if (issuer == null || issuer.isBlank()) {
@@ -42,6 +58,12 @@ public record MfaProperties(
         }
         if (resetTokenValidityMinutes <= 0 || resetTokenValidityMinutes > 24 * 60) {
             throw new IllegalArgumentException("Reset token validity must be 1-1440 minutes");
+        }
+        if (mfaWindowMinutes <= 0 || mfaWindowMinutes > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("MFA attempt window must be a positive number of minutes");
+        }
+        if (mfaCacheMaxSize <= 0) {
+            throw new IllegalArgumentException("MFA attempt cache size must be positive");
         }
     }
 

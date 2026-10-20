@@ -13,14 +13,13 @@ import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
-import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
-import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
-import com.bank.app.user.domain.TotpPolicy;
+import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
+import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
@@ -47,16 +46,13 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
     private final IdGeneratorPort idGenerator;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
-    private final MfaSecretPort mfaSecretPort;
-    private final MfaSecretEncryptorPort mfaEncryptor;
-    private final TotpPolicy totpPolicy;
+    private final MfaCodeVerificationService mfaCodeVerification;
 
     public LoginUserUseCaseImpl(AuthenticationPort authenticationPort, JwtPort jwtPort,
                                 LoginAttemptPort loginAttemptPort, RefreshTokenPort refreshTokenPort,
                                 PasswordEncoderPort passwordEncoderPort, IdGeneratorPort idGenerator,
                                 ClockProviderPort clockProvider, AuditEventPort auditEventPort,
-                                MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort mfaEncryptor,
-                                TotpPolicy totpPolicy) {
+                                MfaCodeVerificationService mfaCodeVerification) {
         this.authenticationPort = authenticationPort;
         this.jwtPort = jwtPort;
         this.loginAttemptPort = loginAttemptPort;
@@ -65,9 +61,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         this.idGenerator = idGenerator;
         this.clockProvider = clockProvider;
         this.auditEventPort = auditEventPort;
-        this.mfaSecretPort = mfaSecretPort;
-        this.mfaEncryptor = mfaEncryptor;
-        this.totpPolicy = totpPolicy;
+        this.mfaCodeVerification = mfaCodeVerification;
     }
 
     @Override
@@ -96,6 +90,19 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             // so it feeds the same single brute-force record and audit row
             // (no double counting).
             if (user.mfaEnabled()) {
+                // Shared account-keyed MFA budget: the same counter the
+                // enrollment-confirmation and MFA-removal endpoints enforce.
+                // Checked BEFORE any code work so a locked-out account cannot
+                // keep guessing through the login endpoint either. 429 (not
+                // the generic 401) and only after a valid password, so the
+                // response reveals nothing to an unauthenticated caller.
+                if (mfaCodeVerification.isBlocked(user.id().value())) {
+                    auditLogin(AuditEvent.LOGIN_FAILED, username, user.id().value(),
+                            "MFA temporarily locked after too many failed codes (brute-force guard).");
+                    throw new TooManyFailedMfaAttemptsException(
+                            "Too many failed authenticator code attempts. Please try again in "
+                                    + mfaCodeVerification.getWindowMinutes() + " minutes.");
+                }
                 if (!verifySecondFactor(user, request.totpCode())) {
                     throw new AuthenticationFailedException();
                 }
@@ -134,7 +141,10 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
                     + loginAttemptPort.getWindowMinutes() + " minutes.");
         }
 
-        if (username != null && loginAttemptPort.isUsernameBlocked(username)) {
+        // Account + IP budget (tight) and account-only budget (loose): the
+        // pair key keeps one abusive IP from locking a victim out of their
+        // own account, the account key still stops a distributed attack.
+        if (username != null && loginAttemptPort.isUsernameBlocked(username, clientIp)) {
             auditLogin(AuditEvent.LOGIN_FAILED, username, null,
                     "Blocked login attempt for username (brute-force guard).");
             throw new TooManyFailedLoginAttemptsException(
@@ -176,29 +186,29 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     /**
      * Verifies the TOTP second factor. Every rejection path returns false
-     * (never throws): the caller renders the single generic message. A
-     * decrypt failure (wrong rotation key, tampered row) fails closed like a
-     * wrong code — it must never bypass the factor or leak its cause.
+     * (never throws): the caller renders the single generic message. The
+     * shared {@link MfaCodeVerificationService} owns the brute-force bound,
+     * the TOTP replay protection and the secret decryption — a decrypt
+     * failure (wrong rotation key, tampered row) fails closed like a wrong
+     * code and must never bypass the factor or leak its cause.
      */
     private boolean verifySecondFactor(AuthenticationPort.AuthenticatedUser user, String code) {
         if (code == null || code.isBlank()) {
             return false;
         }
         try {
-            byte[] secret = mfaSecretPort.findSecret(user.id().value())
-                    .map(mfaEncryptor::decrypt)
-                    .orElse(null);
-            if (secret == null) {
-                // Enrolled flag without a secret is a corrupt state: fail
-                // closed rather than letting the factor silently pass.
-                log.warn("MFA-enrolled user has no stored secret");
-                return false;
-            }
-            return totpPolicy.verify(secret, code, clockProvider.clock());
+            return mfaCodeVerification.verifyAndConsume(user.id().value(), code);
         } catch (AuthenticationBackendUnavailableException unavailable) {
             // Secret-store outage is infrastructure (503), not a wrong code:
             // propagate so it is NOT counted as a brute-force failure and the
             // caller does not render a misleading 401.
+            throw unavailable;
+        } catch (LoginAttemptStoreUnavailableException unavailable) {
+            // The shared MFA attempt counter runs on the same store as the
+            // login guard (Redis in production). An outage is infrastructure
+            // (503), not a wrong code: converting it to the generic 401 here
+            // would both misreport the cause and feed the failure counters
+            // a state they cannot record. The caller's catch clause rethrows.
             throw unavailable;
         } catch (RuntimeException e) {
             log.warn("MFA verification unavailable: {}", e.getClass().getSimpleName());

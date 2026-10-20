@@ -3,9 +3,33 @@
 Production uses `TOKEN_BLACKLIST_BACKEND=hybrid` by default. Version 26 of the
 Flyway schema adds `token_revocations`. The hybrid backend writes a SHA-256
 digest of each newly revoked JWT to PostgreSQL and Redis, and accepts a token
-only if neither store has an active revocation. PostgreSQL is queried on every
-negative lookup; there is no negative cache or read-replica lookup. A database
+only if neither store has an active revocation. A database
 read/commit failure returns 503 rather than accepting an unverified token.
+
+## Negative cache (2026-10)
+
+The durable lookup runs on every authenticated request and consumes a
+connection from the SAME Hikari pool the money path uses — the revocation
+check was competing with transfers for connections. A short-lived NEGATIVE
+cache now answers "the database confirmed this token is not revoked" for
+`app.security.token-blacklist.negative-cache-ttl-ms` (5s by default,
+bounded by `...-negative-cache-max-size`).
+
+Correctness of the cache:
+
+- Only a NOT-revoked answer is cached. A confirmed revocation is never
+  cached: it is answered from the local overlay (written on every revoke)
+  and from the shared store.
+- The local overlay is checked FIRST, so a revocation performed on this pod
+  is effective immediately.
+- A cross-pod revocation becomes visible after at most the TTL — far inside
+  the 15-minute window already accepted for role changes on non-admin paths
+  (see `docs/decisions/token-version.md`).
+
+The Redis lookup itself is a single Lua script that checks the hashed and
+the legacy key in ONE round trip (two `hasKey` calls meant two network
+round trips on the shared Lettuce connection, on every authenticated
+request).
 
 ## Rollout from the Redis-only backend
 

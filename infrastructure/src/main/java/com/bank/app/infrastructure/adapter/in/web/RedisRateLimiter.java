@@ -24,8 +24,11 @@ public class RedisRateLimiter implements RateLimiter {
         "redis.call('ZREMRANGEBYSCORE', key, '-inf', windowStart)\n" +
         "local count = redis.call('ZCARD', key)\n" +
         "if count < maxReq then\n" +
-        "    redis.call('ZADD', key, now, now .. ':' .. math.random())\n" +
+        // Unique member: INCR on a per-key counter is guaranteed unique
+        "    local member = tostring(now) .. ':' .. redis.call('INCR', key .. ':seq')\n" +
+        "    redis.call('ZADD', key, now, member)\n" +
         "    redis.call('PEXPIRE', key, window)\n" +
+        "    redis.call('PEXPIRE', key .. ':seq', window)\n" +
         "    return 1\n" +
         "else\n" +
         "    return 0\n" +

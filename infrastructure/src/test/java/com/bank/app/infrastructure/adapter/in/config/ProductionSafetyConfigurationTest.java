@@ -40,6 +40,11 @@ class ProductionSafetyConfigurationTest {
                         "app.security.cors.allowed-origins=https://bank.example.com",
                         "app.security.failed-login.backend=redis", "app.security.rate-limit.backend=redis",
                         "app.cache.caffeine.account-info.backend=redis",
+                        // Silent-floor settings must be PRESENT in prod: the
+                        // base yml defines them, so this context (which does
+                        // not load application.yml) pins them explicitly.
+                        "app.security.password-encoder-strength=12",
+                        "app.security.hsts-max-age-seconds=31536000",
                         "app.security.mfa.encryption-key-base64=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=")
                 .withBean("applicationWorker", Object.class, () -> {
                     singletonStarted.set(true);

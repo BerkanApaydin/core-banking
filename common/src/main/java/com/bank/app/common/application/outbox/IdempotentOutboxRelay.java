@@ -21,7 +21,11 @@ import java.util.Objects;
  * log lines.
  *
  * <p>Dedup-key prefixes are part of the persisted contract: they must never
- * change, or already-processed events reprocess after a deploy.
+ * change, or already-processed events reprocess after a deploy. The prefix
+ * is also no longer what classifies the key: the reservation is made
+ * through {@code tryCreateHandler}, which records the {@code HANDLER} kind
+ * explicitly instead of deriving it from the key text (see
+ * {@code IdempotencyPort}).
  */
 public abstract class IdempotentOutboxRelay implements OutboxEventPort {
 
@@ -41,7 +45,7 @@ public abstract class IdempotentOutboxRelay implements OutboxEventPort {
     public final void handle(EventEntry event) {
         Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
         String dedupKey = dedupKeyPrefix + event.id();
-        if (!idempotencyPort.tryCreate(dedupKey, LocalDateTime.now(clock))) {
+        if (!idempotencyPort.tryCreateHandler(dedupKey, LocalDateTime.now(clock))) {
             // The key already exists: a previous attempt claimed it. A FAILED
             // claim is reopened exactly once per retry (tryResetFailed is
             // conditional on FAILED, so racing workers cannot double-deliver);

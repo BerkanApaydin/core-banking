@@ -103,9 +103,11 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         assertTrue(sessionHeader.contains("HttpOnly"));
         assertTrue(sessionHeader.contains("SameSite=Strict"));
         assertFalse(csrfHeader.contains("HttpOnly"));
-        // Long-lived refresh token: HttpOnly and scoped to its endpoint only.
+        // Long-lived refresh token: HttpOnly and scoped to the browser-auth
+        // endpoints (never to API calls). The scope covers the logout
+        // endpoint too, so a logout can revoke the server-side session.
         assertTrue(refreshHeader.contains("HttpOnly"));
-        assertTrue(refreshHeader.contains("Path=/api/v1/auth/browser/refresh"));
+        assertTrue(refreshHeader.contains("Path=/api/v1/auth/browser"));
         Cookie session = fromSetCookie(sessionHeader);
         Cookie csrf = fromSetCookie(csrfHeader);
         Cookie refresh = fromSetCookie(refreshHeader);

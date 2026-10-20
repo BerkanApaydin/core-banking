@@ -115,7 +115,9 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(user.getId()));
         when(securityUtils.getCurrentUsername()).thenReturn(Optional.of("user1"));
-        when(idempotencyPort.tryCreate(any(), any())).thenReturn(true);
+        // The relay reserves its dedup key through tryCreateHandler: the kind
+        // is declared by the caller, not derived from the key text.
+        when(idempotencyPort.tryCreateHandler(any(), any())).thenReturn(true);
     }
 
     @AfterEach
