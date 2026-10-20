@@ -40,7 +40,7 @@ run 'Frontend lint (ESLint)' npm run lint
 run 'Frontend XSS guard' "$python_cmd" scripts/check_frontend_xss.py
 run 'Frontend XSS guard self-test' "$python_cmd" scripts/check_frontend_xss.py --self-test
 
-for script in i18n.js idempotency.js accounts.js transfers.js app.js; do
+for script in i18n.js idempotency.js accounts.js transfers.js http.js reports.js detail.js format.js auth.js app.js; do
     run "JavaScript syntax: $script" node --check "app/src/main/resources/static/$script"
 done
 run 'Browser API contracts and idempotency (node:test)' node --test "app/src/test/js/*.test.js"

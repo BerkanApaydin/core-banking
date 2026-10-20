@@ -5,7 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 
-const source = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/app.js'), 'utf8');
+const authScript = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/auth.js'), 'utf8');
 const helpers = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/idempotency.js'), 'utf8');
 
 function storage() {
@@ -173,7 +173,7 @@ function logoutHarness(responses) {
         showAlert: (message, type) => alerts.push([message, type]),
         __: key => key
     });
-    const authSource = 'function initAuth() {' + source.split('function initAuth() {')[1].split('function logout() {')[0];
+    const authSource = 'function initAuth() {' + authScript.split('function initAuth() {')[1].split('function logout() {')[0];
     vm.runInContext(authSource, context);
     vm.runInContext('initAuth()', context);
     return {

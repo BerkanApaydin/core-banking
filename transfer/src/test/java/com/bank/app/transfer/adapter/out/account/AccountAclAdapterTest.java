@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -372,6 +373,42 @@ class AccountAclAdapterTest {
             // cancellation handling never sees it.
             assertTrue(waiter.isInterrupted(), "the interrupt flag must be restored");
             releaseLoader.countDown();
+        }
+
+        @Test
+        void shouldTimedOutWaiterInsteadOfBlockingForever() throws Exception {
+            // A stuck leader must not pin every waiter thread indefinitely.
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getSnapshotById(1L)).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                return new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+            });
+
+            var counting = new CountingLookupCache();
+            var shared = new AccountAclAdapter(accountApi, counting, Duration.ofMillis(100));
+            var waiterFailure = new AtomicReference<Throwable>();
+
+            Thread leader = daemonThread(() -> shared.getAccountInfo(new AccountId(1L)));
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Thread waiter = daemonThread(() -> {
+                try {
+                    shared.getAccountInfo(new AccountId(1L));
+                } catch (Throwable failure) {
+                    waiterFailure.set(failure);
+                }
+            });
+            waiter.start();
+            assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
+            waiter.join(2_000);
+
+            assertTrue(waiterFailure.get() instanceof IllegalStateException,
+                    "a timed-out waiter must fail instead of hanging, got: " + waiterFailure.get());
+            releaseLoader.countDown();
+            leader.join(5_000);
         }
 
         private static Thread daemonThread(Runnable body) {            Thread thread = new Thread(body);

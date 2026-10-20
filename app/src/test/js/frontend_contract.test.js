@@ -6,12 +6,16 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/app.js'), 'utf8');
 const accountSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/accounts.js'), 'utf8');
+const httpSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/http.js'), 'utf8');
+const reportsSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/reports.js'), 'utf8');
+const formatSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/format.js'), 'utf8');
 
 test('browser loads feature scripts in dependency order', () => {
     const staticDirectory = path.resolve(__dirname, '../../main/resources/static');
     const html = fs.readFileSync(path.join(staticDirectory, 'index.html'), 'utf8');
     const scripts = Array.from(html.matchAll(/<script src="([^"]+)"/g), match => match[1].split('?')[0]);
-    assert.deepEqual(scripts, ['boot.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js']);
+    assert.deepEqual(scripts, ['boot.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js',
+        'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js']);
     for (const script of scripts) {
         assert.equal(fs.existsSync(path.join(staticDirectory, script)), true, `${script} must be served`);
     }
@@ -34,7 +38,7 @@ test('browser loads feature scripts in dependency order', () => {
 
 test('recipient IBAN validation matches backend MOD 97 rule', () => {
     const functions = 'function isValidIban(value) {'
-        + source.split('function isValidIban(value) {')[1].split('function formatIbanDisplay')[0];
+        + formatSource.split('function isValidIban(value) {')[1].split('function formatIbanDisplay')[0];
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -49,7 +53,7 @@ test('report date selection covers both complete calendar days', () => {
     assert.match(html, /type="date"[^>]*id="report-end-date"/);
 
     const functions = 'function formatDateInput(date) {'
-        + source.split('function formatDateInput(date) {')[1].split('// --- Authentication Operations ---')[0];
+        + formatSource.split('function formatDateInput(date) {')[1].split('// --- Report keyset pagination (DB-2) ---')[0];
     const context = vm.createContext({ __: key => key });
     vm.runInContext(functions, context);
 
@@ -134,8 +138,7 @@ test('transfer cancel posts Idempotency-Key (backend rejects without it)', async
         loadAccountHistory() {}
     });
     const functionSource = 'async function cancelTransfer(transferId, accountId) {'
-        + source.split('async function cancelTransfer(transferId, accountId) {')[1]
-            .split('// --- Detail surfaces')[0];
+        + reportsSource.split('async function cancelTransfer(transferId, accountId) {')[1];
     vm.runInContext(functionSource, context);
     await vm.runInContext('cancelTransfer(19, 7)', context);
 
@@ -194,7 +197,7 @@ test('history cancel action uses a click listener accepted by the CSP', async ()
         showAlert: error => errors.push(error)
     });
     const historyFunction = 'async function loadAccountHistory(accountId, loadMore = false) {'
-        + source.split('async function loadAccountHistory(accountId, loadMore = false) {')[1]
+        + reportsSource.split('async function loadAccountHistory(accountId, loadMore = false) {')[1]
             .split('async function cancelTransfer')[0];
     vm.runInContext(historyFunction, context);
     await vm.runInContext('loadAccountHistory(7)', context);
@@ -241,10 +244,9 @@ test('report pagination exposes every page and invalidation prevents printing st
         showAlert: error => { throw new Error(error); }
     });
     const functions = 'function reportCursorForPage(cursors, page) {'
-        + source.split('function reportCursorForPage(cursors, page) {')[1]
-            .split('// --- Authentication Operations ---')[0]
+        + formatSource.split('function reportCursorForPage(cursors, page) {')[1]
         + 'function invalidateGeneratedReport() {'
-        + source.split('function invalidateGeneratedReport() {')[1].split('async function loadAccountHistory')[0];
+        + reportsSource.split('function invalidateGeneratedReport() {')[1].split('async function loadAccountHistory')[0];
     vm.runInContext(functions, context);
 
     await vm.runInContext('loadReportPage(0)', context);
@@ -294,7 +296,7 @@ test('opening-balance field follows the authenticated backend capability', async
 
 test('concurrent 401s share one silent refresh (theft-safe coalescing)', async () => {
     const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
-        + source.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+        + httpSource.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
     let fetchCalls = 0;
     const context = vm.createContext({
         API_BASE: '',
@@ -341,7 +343,7 @@ test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () =>
 
 test('failed silent refresh keeps the session logged out', async () => {
     const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
-        + source.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+        + httpSource.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
     const context = vm.createContext({
         API_BASE: '',
         authenticated: true,
@@ -360,8 +362,7 @@ test('failed silent refresh keeps the session logged out', async () => {
 
 test('report query omits cursor params on page 0 (offset path)', () => {
     const functions = 'function reportCursorForPage(cursors, page) {'
-        + source.split('function reportCursorForPage(cursors, page) {')[1]
-            .split('// --- Authentication Operations ---')[0];
+        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
     const context = vm.createContext({ URLSearchParams });
     vm.runInContext(functions, context);
 
@@ -378,8 +379,7 @@ test('report query omits cursor params on page 0 (offset path)', () => {
 
 test('report query carries the keyset cursor past page 0 (no OFFSET)', () => {
     const functions = 'function reportCursorForPage(cursors, page) {'
-        + source.split('function reportCursorForPage(cursors, page) {')[1]
-            .split('// --- Authentication Operations ---')[0];
+        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
     const context = vm.createContext({ URLSearchParams });
     vm.runInContext(functions, context);
 
@@ -394,8 +394,7 @@ test('report query carries the keyset cursor past page 0 (no OFFSET)', () => {
 
 test('report cursor stack pushes forward and pops back', () => {
     const functions = 'function reportCursorForPage(cursors, page) {'
-        + source.split('function reportCursorForPage(cursors, page) {')[1]
-            .split('// --- Authentication Operations ---')[0];
+        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -417,7 +416,7 @@ test('report cursor stack pushes forward and pops back', () => {
 
 test('etag cache stores validators, evicts oldest-first, clears on demand', () => {
     const functions = 'const etagCache = new Map();'
-        + source.split('const etagCache = new Map();')[1].split('function isOffline()')[0];
+        + httpSource.split('const etagCache = new Map();')[1].split('function isOffline()')[0];
     const context = vm.createContext({ Map });
     vm.runInContext(functions, context);
 

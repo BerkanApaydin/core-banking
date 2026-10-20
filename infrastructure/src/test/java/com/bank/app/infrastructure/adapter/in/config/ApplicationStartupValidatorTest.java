@@ -256,13 +256,13 @@ class ApplicationStartupValidatorTest {
                 org.mockito.Mockito.mock(org.springframework.core.env.Environment.class);
         org.mockito.Mockito.when(environment.getProperty("app.security.cors.allowed-origins", ""))
                 .thenReturn(null);
-        var validator = new ApplicationStartupValidator(environment);
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("requireProdCors");
+        var method = CorsOriginPolicy.class.getDeclaredMethod(
+                "requireProdCors", org.springframework.core.env.Environment.class);
         method.setAccessible(true);
 
         assertThatCode(() -> {
             try {
-                method.invoke(validator);
+                method.invoke(null, environment);
             } catch (InvocationTargetException e) {
                 sneakyThrow(e.getCause());
             }
@@ -277,7 +277,7 @@ class ApplicationStartupValidatorTest {
     @org.junit.jupiter.params.provider.ValueSource(strings = {
             "localhost", "LOCALHOST", "127.0.0.1", "::1", "[::1]", "foo.localhost", ".localhost"})
     void detectsLoopbackHosts(String host) throws Exception {
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        var method = CorsOriginPolicy.class.getDeclaredMethod("isLoopbackHost", String.class);
         method.setAccessible(true);
 
         assertThatCode(() -> {
@@ -292,7 +292,7 @@ class ApplicationStartupValidatorTest {
     @org.junit.jupiter.params.provider.ValueSource(strings = {
             "example.com", "my-localhost-app.com", "localhost.example.com", "127.0.0.2"})
     void rejectsNonLoopbackHosts(String host) throws Exception {
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        var method = CorsOriginPolicy.class.getDeclaredMethod("isLoopbackHost", String.class);
         method.setAccessible(true);
 
         assertThatCode(() -> {
@@ -305,7 +305,7 @@ class ApplicationStartupValidatorTest {
 
     @Test
     void treatsNullHostAsNonLoopback() throws Exception {
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("isLoopbackHost", String.class);
+        var method = CorsOriginPolicy.class.getDeclaredMethod("isLoopbackHost", String.class);
         method.setAccessible(true);
 
         assertThatCode(() -> {
@@ -318,7 +318,7 @@ class ApplicationStartupValidatorTest {
 
     @Test
     void extractsHostLowerCasedFromValidOrigin() throws Exception {
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("originHost", String.class);
+        var method = CorsOriginPolicy.class.getDeclaredMethod("originHost", String.class);
         method.setAccessible(true);
 
         String host = (String) method.invoke(null, "https://Example.COM:8443/some/path");
@@ -327,7 +327,7 @@ class ApplicationStartupValidatorTest {
 
     @Test
     void fallsBackToRawOriginWhenUriHasNoHost() throws Exception {
-        var method = ApplicationStartupValidator.class.getDeclaredMethod("originHost", String.class);
+        var method = CorsOriginPolicy.class.getDeclaredMethod("originHost", String.class);
         method.setAccessible(true);
 
         String raw = (String) method.invoke(null, "notauri with spaces");
@@ -337,14 +337,14 @@ class ApplicationStartupValidatorTest {
     @Test
     void rejectsMissingBcryptStrengthInProduction() throws Exception {
         // A renamed/removed key must fail, not silently fall back to the floor.
-        var method = ApplicationStartupValidator.class.getDeclaredMethod(
+        var method = StartupPropertyRules.class.getDeclaredMethod(
                 "requireAtLeast", String.class, long.class);
         method.setAccessible(true);
-        var validator = new ApplicationStartupValidator(new MockEnvironment());
+        var rules = new StartupPropertyRules(new MockEnvironment());
 
         assertThatThrownBy(() -> {
             try {
-                method.invoke(validator, "app.security.password-encoder-strength", 12L);
+                method.invoke(rules, "app.security.password-encoder-strength", 12L);
             } catch (InvocationTargetException e) {
                 sneakyThrow(e.getCause());
             }

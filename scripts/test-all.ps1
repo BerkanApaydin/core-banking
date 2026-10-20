@@ -46,7 +46,7 @@ try {
     Invoke-Checked 'Frontend XSS guard' $python ($pythonPrefix + @('scripts/check_frontend_xss.py'))
     Invoke-Checked 'Frontend XSS guard self-test' $python ($pythonPrefix + @('scripts/check_frontend_xss.py', '--self-test'))
 
-    foreach ($script in @('i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js')) {
+    foreach ($script in @('i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js')) {
         Invoke-Checked "JavaScript syntax: $script" 'node' @('--check', "app/src/main/resources/static/$script")
     }
     Invoke-Checked 'Browser API contracts and idempotency (node:test)' 'node' @('--test', 'app/src/test/js/*.test.js')

@@ -289,6 +289,11 @@ jobs:
         node --check app/src/main/resources/static/idempotency.js
         node --check app/src/main/resources/static/accounts.js
         node --check app/src/main/resources/static/transfers.js
+        node --check app/src/main/resources/static/http.js
+        node --check app/src/main/resources/static/reports.js
+        node --check app/src/main/resources/static/detail.js
+        node --check app/src/main/resources/static/format.js
+        node --check app/src/main/resources/static/auth.js
         node --check app/src/main/resources/static/app.js
         # node:test runner (TAP + non-zero exit on failure); new *.test.js
         # files under app/src/test/js/ are picked up without editing CI.

@@ -8,12 +8,15 @@ import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /**
@@ -31,8 +34,11 @@ import java.util.function.Supplier;
  */
 public class AccountAclAdapter implements AccountAclPort {
 
+    private static final Duration DEFAULT_AWAIT_TIMEOUT = Duration.ofSeconds(10);
+
     private final AccountApi accountApi;
     private final AccountSnapshotCache cache;
+    private final Duration awaitTimeout;
 
     /**
      * Singleflight guards: one flight per cache key collapses a thundering herd
@@ -50,8 +56,16 @@ public class AccountAclAdapter implements AccountAclPort {
     private final ConcurrentHashMap<String, CompletableFuture<AccountSnapshot>> inflight = new ConcurrentHashMap<>();
 
     public AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache) {
+        this(accountApi, cache, DEFAULT_AWAIT_TIMEOUT);
+    }
+
+    AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache, Duration awaitTimeout) {
         this.accountApi = Objects.requireNonNull(accountApi, "AccountApi must not be null");
         this.cache = Objects.requireNonNull(cache, "AccountSnapshotCache must not be null");
+        this.awaitTimeout = Objects.requireNonNull(awaitTimeout, "awaitTimeout must not be null");
+        if (awaitTimeout.isZero() || awaitTimeout.isNegative()) {
+            throw new IllegalArgumentException("awaitTimeout must be positive");
+        }
     }
 
     /**
@@ -65,7 +79,7 @@ public class AccountAclAdapter implements AccountAclPort {
         CompletableFuture<AccountSnapshot> mine = new CompletableFuture<>();
         CompletableFuture<AccountSnapshot> running = inflight.putIfAbsent(key, mine);
         if (running != null) {
-            return await(running);
+            return await(running, awaitTimeout);
         }
         try {
             AccountSnapshot value = loader.get();
@@ -82,13 +96,18 @@ public class AccountAclAdapter implements AccountAclPort {
         }
     }
 
-    private static AccountSnapshot await(CompletableFuture<AccountSnapshot> flight) {
+    private static AccountSnapshot await(CompletableFuture<AccountSnapshot> flight, Duration timeout) {
         try {
-            return flight.get();
+            return flight.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while waiting for an in-flight account lookup",
                     interrupted);
+        } catch (TimeoutException timedOut) {
+            throw new IllegalStateException(
+                    "Timed out after " + timeout.toMillis()
+                    + " ms waiting for an in-flight account lookup",
+                    timedOut);
         } catch (ExecutionException failed) {
             Throwable cause = failed.getCause();
             if (cause instanceof RuntimeException runtime) {

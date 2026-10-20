@@ -19,7 +19,8 @@ function loadAppContext() {
         window: {},
         navigator: {},
     });
-    for (const script of ['i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'app.js']) {
+    for (const script of ['i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js',
+        'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js']) {
         vm.runInContext(fs.readFileSync(path.join(staticDir, script), 'utf8'), context,
             { filename: script });
     }

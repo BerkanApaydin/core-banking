@@ -6,12 +6,15 @@ import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
 import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 
 /**
- * Shared logging-only notification behavior. Concrete channels only declare their name;
- * delivery (retry policy, transport) is configured on the overriding methods so that
- * Spring AOP proxies keep working.
+ * Shared logging-only notification behavior. Concrete channels only declare
+ * their name; the class-level retry policy is inherited by every channel and
+ * applied by Spring Retry's proxy to all delivery methods.
  */
+@Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
 public abstract class AbstractLoggingNotificationAdapter implements SendNotificationPort {
 
     protected final Logger log = LoggerFactory.getLogger(getClass());

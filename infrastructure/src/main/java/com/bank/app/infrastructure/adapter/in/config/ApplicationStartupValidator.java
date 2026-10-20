@@ -5,12 +5,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Base64;
-import java.util.Locale;
-import java.util.Set;
 
+/**
+ * Startup safety gate. Delegates to focused validators so each rule group
+ * (backend selection, production requirements, CORS) has one reason to change.
+ */
 public class ApplicationStartupValidator {
 
     private static final Logger log = LoggerFactory.getLogger(ApplicationStartupValidator.class);
@@ -18,33 +17,21 @@ public class ApplicationStartupValidator {
     // Single-sourced from JwtTokenProvider: one literal, no silent divergence.
     private static final String DEFAULT_JWT_SECRET = JwtTokenProvider.DEFAULT_JWT_SECRET;
 
-    /**
-     * The token-blacklist backends this build knows how to wire. Anything
-     * else is a configuration mistake and must fail at startup — a typo used
-     * to select the single-JVM Caffeine backend silently, which makes a
-     * logout invisible to every other replica.
-     */
-    private static final Set<String> KNOWN_BLACKLIST_BACKENDS =
-            Set.of("caffeine", "redis", "database", "hybrid");
-
     private final Environment environment;
+    private final BackendSelectionValidator backendSelectionValidator;
+    private final ProductionConfigValidator productionConfigValidator;
 
     public ApplicationStartupValidator(Environment environment) {
         this.environment = environment;
+        this.backendSelectionValidator = new BackendSelectionValidator(environment);
+        this.productionConfigValidator = new ProductionConfigValidator(environment);
     }
 
     public void validateProductionConfig() {
         String jwtSecret = environment.getProperty("jwt.secret", DEFAULT_JWT_SECRET);
-        String dbPassword = environment.getProperty("spring.datasource.password", "");
 
-        // Backend selection is validated in EVERY profile, not just prod: an
-        // unknown value (a typo such as "rediss") used to select the
-        // single-JVM Caffeine backend silently, and a per-JVM cache in a
-        // multi-replica deployment serves stale account snapshots to every
-        // replica that did not perform the invalidation — with nothing in
-        // the logs to say so.
-        validateSnapshotCacheBackend();
-        validateTokenBlacklistBackend();
+        // Backend selection is validated in EVERY profile, not just prod.
+        backendSelectionValidator.validateAll();
 
         if (!isProdProfile()) {
             if (DEFAULT_JWT_SECRET.equals(jwtSecret)) {
@@ -54,267 +41,7 @@ public class ApplicationStartupValidator {
             return;
         }
 
-        if (environment.acceptsProfiles(Profiles.of("dev", "demo", "test", "testcontainers"))) {
-            throw new IllegalStateException("Production profile must not be combined with development or test profiles");
-        }
-
-        if (jwtSecret == null || jwtSecret.isBlank() || DEFAULT_JWT_SECRET.equals(jwtSecret)) {
-            throw new IllegalStateException(
-                    "Production profile requires a non-default JWT secret. Set JWT_SECRET environment variable.");
-        }
-        if (dbPassword == null || dbPassword.isBlank()) {
-            throw new IllegalStateException(
-                    "Production profile requires a database password via environment variable.");
-        }
-        if ("bank_password".equals(dbPassword)) {
-            throw new IllegalStateException(
-                    "Production profile must not use the default database password. "
-                    + "Set DB_PASSWORD environment variable to a secure password.");
-        }
-        String blacklistBackend = environment.getProperty("app.security.token-blacklist.backend", "");
-        if (!"hybrid".equals(blacklistBackend) && !"database".equals(blacklistBackend)) {
-            throw new IllegalStateException(
-                    "Production token revocations require the hybrid or database backend");
-        }
-        // BCrypt cost and HSTS max-age are env-overridable, so a typo (or a
-        // copy-pasted dev value) could silently weaken the password hash or
-        // turn off downgrade protection. Existing hashes keep verifying after
-        // a cost change (the cost is embedded in the hash), so the floor is
-        // about the cost of NEW hashes.
-        requireAtLeast("app.security.password-encoder-strength", 12);
-        requireAtLeast("app.security.hsts-max-age-seconds", 31536000L);
-        requirePositive("app.security.failed-login.global-account-max-attempts", 50L);
-        requirePositive("app.security.mfa.max-attempts", 5L);
-        requirePositive("app.security.mfa.window-minutes", 15L);
-        if (!environment.getProperty("app.security.browser-session.secure", Boolean.class, false)) {
-            throw new IllegalStateException("Production browser sessions require Secure cookies");
-        }
-        requireRedisBackend("app.security.failed-login.backend");
-        requireRedisBackend("app.security.rate-limit.backend");
-        // Snapshot cache: Caffeine/InMemory is per-JVM. With HPA running
-        // multiple pods an eviction on one replica never reaches the others,
-        // so account status/currency reads go stale cluster-wide up to the
-        // TTL. Prod pins backend=redis (literal, see application-prod.yml);
-        // fail fast here as well so no env/flag override can silently
-        // reinstate the local backend in production. Resolved with
-        // canonical-wins semantics: either prefix may carry the value.
-        CacheProperties.AccountInfoCache snapshotCache = CacheBackendResolution.resolve(environment);
-        if (!"redis".equalsIgnoreCase(snapshotCache.backend())) {
-            throw new IllegalStateException(
-                    "Production requires a shared Redis backend: app.cache.account-info.backend "
-                    + "(canonical; legacy app.cache.caffeine.account-info.backend still honored as fallback)");
-        }
-        // maximum-size is a Caffeine-only setting: the Redis backend has no
-        // entry-count cap, so the region is bounded by the TTL instead
-        // (memory ~= write rate x TTL). Saying so once at startup beats an
-        // operator discovering it from a full broker.
-        log.info("Account snapshot cache: shared Redis backend. 'maximum-size' ({}) applies to the "
-                        + "Caffeine backend only — the Redis region is bounded by its TTL ({}s). Size the "
-                        + "broker with maxmemory, not with this key.",
-                snapshotCache.maximumSize(), snapshotCache.expireAfterWrite());
-        requireProdCors();
-        requirePositive("app.security.failed-login.max-attempts", 5L);
-        requirePositive("app.security.failed-login.window-minutes", 15L);
-        requirePositive("app.security.rate-limit.max-requests", 10L);
-        requirePositive("app.security.rate-limit.time-window-ms", 10_000L);
-        requirePositive("app.security.rate-limit.resource-max-requests", 120L);
-        requirePositive("app.security.rate-limit.resource-time-window-ms", 60_000L);
-        // Snapshot-cache SCAN batch: zero would make evict-all a no-op loop.
-        // Resolved with canonical-wins semantics (see above).
-        if (snapshotCache.evictionBatchSize() <= 0) {
-            throw new IllegalStateException(
-                    "Production requires a positive value: app.cache.account-info.eviction-batch-size");
-        }
-        // Outbox poller misconfiguration silently stops money-movement
-        // callbacks: a zero batch/negative retry count must fail fast at
-        // startup, not as a stalled outbox in production.
-        requirePositive("app.outbox.max-retries", 5L);
-        requirePositive("app.outbox.batch-size", 50L);
-        requirePositive("app.outbox.poll-delay-ms", 2000L);
-        requirePositive("app.outbox.retention-days", 30L);
-        requirePositive("app.audit.retention-days", 365L);
-        // partition-count 0 is the legal unpartitioned mode (single thread);
-        // only negatives (typos) are rejected.
-        requireNonNegative("app.outbox.partition-count", 2L);
-        // Audit (MFA): TOTP secrets are AES-GCM-encrypted at rest. An ephemeral
-        // fallback key (blank MFA_ENCRYPTION_KEY) makes enrolled secrets
-        // unreadable after restart — acceptable for dev, never for prod.
-        requireMfaEncryptionKey();
-        requirePositive("app.security.mfa.period-seconds", 30L);
-        requirePositive("app.security.mfa.reset-token-validity-minutes", 15L);
-    }
-
-    private void requireMfaEncryptionKey() {
-        String mfaKey = environment.getProperty("app.security.mfa.encryption-key-base64", "");
-        if (mfaKey == null || mfaKey.isBlank()) {
-            throw new IllegalStateException(
-                    "Production requires an MFA secret-encryption key: "
-                    + "set MFA_ENCRYPTION_KEY (Base64, 32 bytes).");
-        }
-        final byte[] decoded;
-        try {
-            decoded = Base64.getDecoder().decode(mfaKey.strip());
-        } catch (IllegalArgumentException badBase64) {
-            throw new IllegalStateException(
-                    "Production MFA secret-encryption key is not valid Base64: "
-                    + "set MFA_ENCRYPTION_KEY to 'openssl rand -base64 32' output.");
-        }
-        if (decoded.length != 32) {
-            throw new IllegalStateException(
-                    "Production MFA secret-encryption key must decode to 32 bytes (AES-256), got "
-                    + decoded.length + ". Regenerate with: openssl rand -base64 32");
-        }
-    }
-
-    private void requireRedisBackend(String property) {
-        if (!"redis".equals(environment.getProperty(property))) {
-            throw new IllegalStateException("Production requires a shared Redis backend: " + property);
-        }
-    }
-
-    /**
-     * Rejects an unknown snapshot-cache backend in every profile and warns
-     * when a shared deployment would run on the per-JVM backend.
-     */
-    private void validateSnapshotCacheBackend() {
-        CacheProperties.AccountInfoCache snapshotCache = CacheBackendResolution.resolve(environment);
-        String backend = snapshotCache.backend();
-        if (!CacheBackendResolution.KNOWN_BACKENDS.contains(backend.toLowerCase(Locale.ROOT))) {
-            throw new IllegalStateException(
-                    "Unknown account snapshot cache backend '" + backend + "'. Supported values: "
-                    + CacheBackendResolution.KNOWN_BACKENDS + ". Set "
-                    + CacheBackendResolution.CANONICAL_PREFIX + ".backend.");
-        }
-        if (!"redis".equalsIgnoreCase(backend) && !isLocalOnlyProfile()) {
-            log.warn("Account snapshot cache backend '{}' is per-JVM: an eviction on one replica never "
-                    + "reaches another, so account status/currency reads go stale cluster-wide for up to "
-                    + "the TTL. Use {}.backend=redis for any deployment with more than one replica.",
-                    backend, CacheBackendResolution.CANONICAL_PREFIX);
-        }
-    }
-
-    /**
-     * Rejects an unknown token-blacklist backend in EVERY profile.
-     *
-     * <p>Only the {@code database} and {@code hybrid} backends are declared
-     * in {@code TokenBlacklistBackendConfig}; the local Caffeine adapter is
-     * an unconditional component. An unknown value (a typo such as
-     * {@code rediss}) therefore resolved to the per-JVM adapter SILENTLY —
-     * and in a multi-replica deployment a logout on one pod is invisible to
-     * the others until the token expires. The value is now checked before
-     * any bean is created, exactly like the snapshot-cache backend.
-     */
-    private void validateTokenBlacklistBackend() {
-        String backend = environment.getProperty("app.security.token-blacklist.backend", "caffeine");
-        if (backend == null || backend.isBlank()) {
-            backend = "caffeine";
-        }
-        if (!KNOWN_BLACKLIST_BACKENDS.contains(backend.toLowerCase(Locale.ROOT))) {
-            throw new IllegalStateException(
-                    "Unknown token blacklist backend '" + backend + "'. Supported values: "
-                    + KNOWN_BLACKLIST_BACKENDS + ". Set app.security.token-blacklist.backend.");
-        }
-        if (!"redis".equalsIgnoreCase(backend) && !"database".equalsIgnoreCase(backend)
-                && !"hybrid".equalsIgnoreCase(backend) && !isLocalOnlyProfile()) {
-            log.warn("Token blacklist backend '{}' is per-JVM: a logout on one replica is invisible "
-                    + "to the others until the token expires. Use redis/hybrid/database for any "
-                    + "deployment with more than one replica.", backend);
-        }
-    }
-
-    /**
-     * Profiles that are single-JVM by definition (local development, tests).
-     * Any other profile may run on more than one replica, so it must use the
-     * shared Redis backend.
-     */
-    private boolean isLocalOnlyProfile() {
-        return environment.acceptsProfiles(Profiles.of("dev", "demo", "test", "testcontainers"));
-    }
-
-    private void requireProdCors() {
-        // Base application.yml ships localhost origins for local development and
-        // application-prod.yml inherits them. A prod deployment that forgets
-        // CORS_ALLOWED_ORIGINS would otherwise accept cross-origin credentialed
-        // calls from any localhost page (e.g. a malicious site opened in the
-        // same browser as the banking UI). Fail fast instead of serving them.
-        // L-1: parse per-origin hosts instead of substring-scanning the whole
-        // list — a substring rejects innocent hosts like my-localhost-app.com
-        // and cannot distinguish hosts from paths.
-        String origins = environment.getProperty("app.security.cors.allowed-origins", "");
-        if (origins == null || origins.isBlank()) {
-            return;
-        }
-        for (String raw : origins.split(",")) {
-            String origin = raw.trim();
-            if (origin.isEmpty()) {
-                continue;
-            }
-            String host = originHost(origin);
-            if (isLoopbackHost(host)) {
-                throw new IllegalStateException(
-                        "Production must not allow localhost CORS origins (found: " + origin + "). "
-                        + "Set CORS_ALLOWED_ORIGINS to explicit deployment origins.");
-            }
-        }
-    }
-
-    private static String originHost(String origin) {
-        try {
-            URI uri = new URI(origin);
-            String host = uri.getHost();
-            if (host != null) {
-                return host.toLowerCase(Locale.ROOT);
-            }
-        } catch (URISyntaxException ignored) {
-            // Fall through to the raw check below.
-        }
-        return origin.toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean isLoopbackHost(String host) {
-        if (host == null) {
-            return false;
-        }
-        String h = host.toLowerCase(Locale.ROOT);
-        if (h.equals("localhost") || h.equals("127.0.0.1") || h.equals("[::1]") || h.equals("::1")) {
-            return true;
-        }
-        // Subdomains of localhost (foo.localhost) resolve loopback as well.
-        return h.equals(".localhost") || h.endsWith(".localhost");
-    }
-
-    private void requirePositive(String property, long defaultValue) {
-        if (environment.getProperty(property, Long.class, defaultValue) <= 0) {
-            throw new IllegalStateException("Production requires a positive value: " + property);
-        }
-    }
-
-    /**
-     * Requires a value of at least {@code minimum}. Used for settings whose
-     * weakening is silent (BCrypt cost, HSTS max-age): a lower value does
-     * not fail anywhere, it just makes the deployment weaker.
-     *
-     * <p>An ABSENT key fails as well: the base configuration defines both
-     * keys, so a missing value means the property was renamed or dropped —
-     * treating that as "the floor" would quietly accept a deployment that
-     * no longer pins the setting at all.
-     */
-    private void requireAtLeast(String property, long minimum) {
-        Long value = environment.getProperty(property, Long.class);
-        if (value == null) {
-            throw new IllegalStateException(
-                    "Production requires " + property + " >= " + minimum + " (not set)");
-        }
-        if (value < minimum) {
-            throw new IllegalStateException(
-                    "Production requires " + property + " >= " + minimum + " (found: " + value + ")");
-        }
-    }
-
-    private void requireNonNegative(String property, long defaultValue) {
-        if (environment.getProperty(property, Long.class, defaultValue) < 0) {
-            throw new IllegalStateException("Production requires a non-negative value: " + property);
-        }
+        productionConfigValidator.validate();
     }
 
     private boolean isProdProfile() {
