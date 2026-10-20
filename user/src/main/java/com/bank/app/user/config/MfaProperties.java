@@ -59,7 +59,7 @@ public record MfaProperties(
         if (resetTokenValidityMinutes <= 0 || resetTokenValidityMinutes > 24 * 60) {
             throw new IllegalArgumentException("Reset token validity must be 1-1440 minutes");
         }
-        if (mfaWindowMinutes <= 0 || mfaWindowMinutes > Integer.MAX_VALUE) {
+        if (mfaWindowMinutes <= 0) {
             throw new IllegalArgumentException("MFA attempt window must be a positive number of minutes");
         }
         if (mfaCacheMaxSize <= 0) {

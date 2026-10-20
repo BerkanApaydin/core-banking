@@ -155,14 +155,6 @@ public class BacklogMetricsReporter {
         return result;
     }
 
-    private long readCount(String sql) {
-        Long result = jdbc.queryForObject(sql, Long.class);
-        if (result == null) {
-            throw new IllegalStateException("Ledger reconcile query returned no row");
-        }
-        return result;
-    }
-
     /**
      * Bounded count: the scan stops after {@code limit} rows, so the cost
      * of the partition-drift probe never grows with the drift it detects.

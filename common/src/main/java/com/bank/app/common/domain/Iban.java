@@ -1,6 +1,7 @@
 package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.exception.InvalidIbanException;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -25,7 +26,7 @@ public record Iban(String value) {
 
     public static String normalize(String iban) {
         if (iban == null) return null;
-        return iban.replaceAll("\\s", "").toUpperCase();
+        return iban.replaceAll("\\s", "").toUpperCase(Locale.ROOT);
     }
 
     /** Builds a checksum-valid Turkish IBAN from its 22-digit domestic part. */

@@ -5,7 +5,6 @@ import com.bank.app.common.application.port.in.ReadOnlyUseCase;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
-import com.bank.app.transfer.application.port.out.AccountAclPort.AccountInfo;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.service.TransferAuthorizationService;
 import com.bank.app.transfer.application.service.TransferViewEnricher;
@@ -51,7 +50,7 @@ public class GetTransferHistoryQueryImpl implements GetTransferHistoryQuery {
                             + "with cursorCreatedAt+cursorId");
         }
 
-        AccountInfo account = transferAuthorizationService.authorizeAccountAccess(new AccountId(accountId),
+        transferAuthorizationService.authorizeAccountAccess(new AccountId(accountId),
                 "You are not authorized to view this account's transaction history.");
 
         // Single range scan serves both the page and its exact total (the

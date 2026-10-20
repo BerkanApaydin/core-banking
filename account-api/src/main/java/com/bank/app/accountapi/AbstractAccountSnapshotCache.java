@@ -192,14 +192,19 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
         // Global barrier: every stripe is held (fixed order) so no per-account
         // operation can interleave with the region clear. No other path holds
         // more than one stripe, so the acquisition cannot deadlock.
-        for (ReentrantLock lock : accountLocks) {
-            lock.lock();
-        }
+        int acquired = 0;
         try {
+            for (ReentrantLock lock : accountLocks) {
+                lock.lock();
+                acquired++;
+            }
             clearStorage();
             ibanKeysByAccount.clear();
         } finally {
-            for (int i = accountLocks.length - 1; i >= 0; i--) {
+            // Release only the stripes this thread actually acquired: if an
+            // acquisition fails mid-loop, the ones already taken must not
+            // stay locked forever.
+            for (int i = acquired - 1; i >= 0; i--) {
                 accountLocks[i].unlock();
             }
         }

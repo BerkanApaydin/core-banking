@@ -2,6 +2,8 @@ package com.bank.app.common.domain;
 
 import com.bank.app.common.domain.exception.CurrencyMismatchException;
 
+import java.util.Locale;
+
 public enum Currency {
     TRY, USD, EUR;
 
@@ -16,7 +18,7 @@ public enum Currency {
             throw new CurrencyMismatchException("Currency must not be empty");
         }
         try {
-            return Currency.valueOf(code.trim().toUpperCase());
+            return Currency.valueOf(code.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException unknown) {
             throw new CurrencyMismatchException("Unsupported currency: " + code);
         }

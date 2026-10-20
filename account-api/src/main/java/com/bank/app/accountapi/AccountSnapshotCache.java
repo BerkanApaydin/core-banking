@@ -1,6 +1,7 @@
 package com.bank.app.accountapi;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,6 +71,6 @@ public interface AccountSnapshotCache {
 
     static String ibanKey(String ibanValue) {
         Objects.requireNonNull(ibanValue, "ibanValue must not be null");
-        return ibanValue.replaceAll("\\s", "").toUpperCase();
+        return ibanValue.replaceAll("\\s", "").toUpperCase(Locale.ROOT);
     }
 }
