@@ -6,8 +6,11 @@ import com.bank.app.common.domain.UserId;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public class User extends BaseAggregateRoot {
+
+    private static final Pattern NEW_USERNAME_PATTERN = Pattern.compile(FieldLimits.USERNAME_REGEX);
 
     private final UserId id;
     private final String username;
@@ -96,7 +99,8 @@ public class User extends BaseAggregateRoot {
                               PhoneNumber phone, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         Objects.requireNonNull(encodedPassword, "Encoded password must not be null");
-        return new User(null, username, encodedPassword.value(), Role.ROLE_USER, email, phone);
+        String validatedUsername = validateNewUsername(username);
+        return new User(null, validatedUsername, encodedPassword.value(), Role.ROLE_USER, email, phone);
     }
 
     public void recordRegistration(Clock clock) {
@@ -116,6 +120,21 @@ public class User extends BaseAggregateRoot {
             throw new IllegalArgumentException("Username can be at most " + FieldLimits.MAX_TEXT + " characters");
         }
         return username.trim();
+    }
+
+    /**
+     * New accounts only: legacy rows are rehydrated through the regular
+     * constructor so an existing username that predates this rule still loads.
+     * The Redis failed-login keys additionally escape glob metacharacters, so
+     * legacy names remain safe even though they are no longer issued.
+     */
+    private static String validateNewUsername(String username) {
+        String normalized = validateUsername(username);
+        if (!NEW_USERNAME_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(
+                    "Username may contain only letters, digits, '.', '_' and '-'");
+        }
+        return normalized;
     }
 
     /**
@@ -174,23 +193,37 @@ public class User extends BaseAggregateRoot {
 
     /**
      * Marks MFA enrollment complete (called after the TOTP code confirms the
-     * user actually enrolled the secret). This setter is a plain state flip;
-     * the use-case layer guards re-confirmation with
+     * user actually enrolled the secret). This is an authentication-policy
+     * change like a password change, so it bumps {@code tokenVersion} and
+     * retires every outstanding session at its next refresh.
+     *
+     * <p>The use-case layer guards re-confirmation with
      * {@code MfaAlreadyEnabledException} (409), so callers must check
      * {@link #isMfaEnabled()} first instead of relying on idempotence here.
      */
     public void enableMfa() {
         this.mfaEnabled = true;
+        this.tokenVersion++;
     }
 
     /**
      * Removes the second factor (the encrypted secret is deleted through
-     * {@code MfaSecretPort} by the same flow). Disabling is effective on the
-     * next login — outstanding sessions keep working until refresh, same as
-     * the G-2 trade-off for role changes.
+     * {@code MfaSecretPort} by the same flow). Bumps {@code tokenVersion} for
+     * the same reason as {@link #enableMfa()}: an authentication-policy change
+     * must retire outstanding sessions at their next refresh.
      */
     public void disableMfa() {
         this.mfaEnabled = false;
+        this.tokenVersion++;
+    }
+
+    /**
+     * Rehydrates the persisted MFA flag without treating it as a policy
+     * change. Persistence mappers must use this instead of
+     * {@link #enableMfa()}, otherwise every load would bump the token version.
+     */
+    public void restoreMfaEnabled(boolean enabled) {
+        this.mfaEnabled = enabled;
     }
 
     public boolean isMfaEnabled() {

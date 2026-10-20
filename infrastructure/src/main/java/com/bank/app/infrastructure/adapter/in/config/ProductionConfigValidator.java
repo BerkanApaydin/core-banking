@@ -170,6 +170,39 @@ final class ProductionConfigValidator {
                     "Production MFA secret-encryption key must decode to 32 bytes (AES-256), got "
                     + decoded.length + ". Regenerate with: openssl rand -base64 32");
         }
+        requirePreviousMfaEncryptionKeys();
+    }
+
+    /**
+     * Rotation keys are decryption-only, but a malformed entry would make
+     * existing enrollments fail only when their owner tries to log in — long
+     * after the deploy. Validate the whole ring at startup instead.
+     */
+    private void requirePreviousMfaEncryptionKeys() {
+        String previousKeys = environment.getProperty(
+                "app.security.mfa.previous-encryption-keys-base64", "");
+        if (previousKeys == null || previousKeys.isBlank()) {
+            return;
+        }
+        String[] keys = previousKeys.split(",");
+        for (String key : keys) {
+            if (key.isBlank()) {
+                continue;
+            }
+            final byte[] decoded;
+            try {
+                decoded = Base64.getDecoder().decode(key.strip());
+            } catch (IllegalArgumentException badBase64) {
+                throw new IllegalStateException(
+                        "Production MFA previous encryption key is not valid Base64: "
+                        + "check MFA_ENCRYPTION_PREVIOUS_KEYS.");
+            }
+            if (decoded.length != 32) {
+                throw new IllegalStateException(
+                        "Production MFA previous encryption key must decode to 32 bytes (AES-256), got "
+                        + decoded.length + ". Check MFA_ENCRYPTION_PREVIOUS_KEYS.");
+            }
+        }
     }
 
     private void requireRedisBackend(String property) {

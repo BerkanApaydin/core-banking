@@ -75,6 +75,7 @@ class MfaCodeVerificationServiceTest {
     @DisplayName("should consume the step counter and reset the failure budget on success")
     void shouldConsumeTheCounterOnSuccess() {
         stubVerifiableCode();
+        when(encryptor.isCurrentKey(CIPHERTEXT)).thenReturn(true);
         when(mfaSecretPort.recordAcceptedTotpCounter(USER_ID, 42L)).thenReturn(true);
 
         assertThat(service.verifyAndConsume(USER_ID, CODE)).isTrue();
@@ -102,10 +103,37 @@ class MfaCodeVerificationServiceTest {
     @DisplayName("should not consume the counter on the management endpoints")
     void shouldNotConsumeOnManagementPaths() {
         stubVerifiableCode();
+        when(encryptor.isCurrentKey(CIPHERTEXT)).thenReturn(true);
 
         assertThat(service.verify(USER_ID, CODE)).isTrue();
 
         verify(mfaSecretPort, never()).recordAcceptedTotpCounter(any(), anyLong());
+        verify(mfaAttemptPort).reset(USER_ID);
+    }
+
+    @Test
+    @DisplayName("should lazily re-encrypt a secret written with a previous key after a valid check")
+    void shouldReencryptStaleSecretAfterSuccessfulVerification() {
+        stubVerifiableCode();
+        when(encryptor.isCurrentKey(CIPHERTEXT)).thenReturn(false);
+        when(encryptor.encrypt(any())).thenReturn("reencrypted-secret");
+
+        assertThat(service.verify(USER_ID, CODE)).isTrue();
+
+        verify(mfaSecretPort).reencryptSecret(USER_ID, "reencrypted-secret");
+    }
+
+    @Test
+    @DisplayName("should not fail a valid check when lazy re-encryption fails")
+    void shouldSwallowReencryptionFailure() {
+        stubVerifiableCode();
+        when(encryptor.isCurrentKey(CIPHERTEXT)).thenReturn(false);
+        when(encryptor.encrypt(any())).thenReturn("reencrypted-secret");
+        doThrow(new IllegalStateException("secret store down"))
+                .when(mfaSecretPort).reencryptSecret(USER_ID, "reencrypted-secret");
+
+        assertThat(service.verify(USER_ID, CODE)).isTrue();
+
         verify(mfaAttemptPort).reset(USER_ID);
     }
 

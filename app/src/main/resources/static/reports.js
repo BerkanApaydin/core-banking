@@ -24,10 +24,11 @@ function initReportSection() {
     const tabContents = document.querySelectorAll('.report-tab-content');
     const reportFilterForm = document.getElementById('report-filter-form');
 
-    // Last 30 calendar days, including today.
+    // Last 30 UTC calendar days, including today (the report API compares UTC
+    // LocalDateTime bounds, so the picker must not follow the browser zone).
     const now = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(now.getDate() - 29);
+    const thirtyDaysAgo = new Date(now.getTime());
+    thirtyDaysAgo.setUTCDate(now.getUTCDate() - 29);
 
     document.getElementById('report-start-date').value = formatDateInput(thirtyDaysAgo);
     document.getElementById('report-end-date').value = formatDateInput(now);

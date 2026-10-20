@@ -88,8 +88,12 @@ public class BrowserAuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie(cookies.sessionCookieName(),
                 authenticated.token(), true, sessionLifetime));
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(authenticated.refreshToken()));
+        // CSRF must outlive the access token: the refresh endpoint is exactly
+        // where a 15-minute access token gets rotated, and it rejects requests
+        // without a CSRF pair. Tie the cookie to the refresh lifetime and
+        // reissue it on every rotation below.
         response.addHeader(HttpHeaders.SET_COOKIE, cookie(cookies.csrfCookieName(),
-                csrf, false, sessionLifetime));
+                csrf, false, refreshLifetime));
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         return ResponseEntity.ok(new BrowserUser(authenticated.userId(), authenticated.username()));
     }
@@ -139,9 +143,12 @@ public class BrowserAuthController {
             return ProblemResponses.unauthorized(
                     "Browser session has expired. Please log in again.", request.getRequestURI());
         }
+        String rotatedCsrf = csrfBinding.issueCsrfToken(String.valueOf(rotated.userId()));
         response.addHeader(HttpHeaders.SET_COOKIE, cookie(cookies.sessionCookieName(),
                 rotated.token(), true, sessionLifetime));
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(rotated.refreshToken()));
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie(cookies.csrfCookieName(),
+                rotatedCsrf, false, refreshLifetime));
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         return ResponseEntity.ok(new BrowserUser(rotated.userId(), rotated.username()));
     }

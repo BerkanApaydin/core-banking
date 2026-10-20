@@ -86,7 +86,7 @@ const topLevel = {
     format: [
         "transferStatusMeta", "escapeHtml", "formatMoney", "sanitizeIban",
         "isValidIban", "hasValidIbanChecksum", "formatIbanDisplay",
-        "formatDate", "formatDateInput", "buildReportDateRange",
+        "formatDate", "formatDateInput", "parseApiTimestamp", "buildReportDateRange",
         "plusMonths12", "reportCursorForPage", "storeReportCursor",
         "buildReportQuery",
     ],

@@ -19,7 +19,8 @@ import jakarta.validation.constraints.Size;
  */
 public record RegisterWebRequest(
     @NotBlank(message = "{validation.username.required}")
-    @Size(max = FieldLimits.MAX_TEXT_LENGTH, message = "{validation.username.tooLong}") String username,
+    @Size(max = FieldLimits.MAX_TEXT_LENGTH, message = "{validation.username.tooLong}")
+    @Pattern(regexp = FieldLimits.USERNAME_REGEX, message = "{validation.username.invalid}") String username,
     @NotBlank(message = "{validation.password.required}")
     @ValidPassword
     @Size(max = 72, message = "{validation.password.tooLong}") String password,

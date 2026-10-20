@@ -26,6 +26,9 @@ public interface RefreshTokenPort {
     /** Revokes every session of a family (theft response, logout-all). */
     void revokeFamily(String familyId);
 
+    /** Revokes every session belonging to a user (MFA policy change). */
+    void revokeAllForUser(Long userId);
+
     /** Hygiene: drops expired rows; returns the deleted count. */
     int deleteExpiredBefore(LocalDateTime cutoff);
 }

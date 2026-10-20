@@ -178,6 +178,7 @@ class BrowserAuthControllerTest {
         when(jwtPort.verifyAndDecode("rt"))
                 .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
         when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
+        when(csrfBinding.issueCsrfToken("7")).thenReturn("csrf-1");
         when(refreshSessionUseCase.execute("rt"))
                 .thenReturn(new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
 
@@ -186,7 +187,8 @@ class BrowserAuthControllerTest {
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody())
                 .isEqualTo(new BrowserAuthController.BrowserUser(7L, "alice"));
-        assertThat(response.getHeaderValues("Set-Cookie")).hasSize(2);
+        assertThat(response.getHeaderValues("Set-Cookie")).hasSize(3);
+        verify(csrfBinding).issueCsrfToken("7");
         assertThat(response.getHeader("Cache-Control")).contains("no-store");
     }
 

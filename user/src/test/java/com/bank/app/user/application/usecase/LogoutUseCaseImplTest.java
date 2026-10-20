@@ -5,6 +5,7 @@ import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
+import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
 
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
@@ -121,12 +122,30 @@ class LogoutUseCaseImplTest {
     void shouldRevokeRefreshTokenWhenSupplied() {
         stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("valid-refresh-token"), 7L, "family-1",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
 
         logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
 
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
-        verify(refreshTokenPort).revoke(
-                TokenDigest.sha256Hex("valid-refresh-token"));
+        verify(refreshTokenPort).revokeFamily("family-1");
+        verify(refreshTokenPort, never()).revoke(anyString());
+    }
+
+    @Test
+    @DisplayName("should revoke only the presented token when it is unknown")
+    void shouldFallBackToSingleRevokeForUnknownRefreshToken() {
+        stubClock();
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("unknown")))
+                .thenReturn(java.util.Optional.empty());
+
+        logoutUseCase.execute("Bearer valid-jwt-token", "unknown");
+
+        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("unknown"));
+        verify(refreshTokenPort, never()).revokeFamily(anyString());
     }
 
     @Test
@@ -183,10 +202,14 @@ class LogoutUseCaseImplTest {
         // audit to the refresh identity AND revoke it. A mutant that skips
         // the branch leaves "system" instead of "alice".
         when(jwtPort.extractUsername("refresh-9")).thenReturn("alice");
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("refresh-9")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("refresh-9"), 7L, "family-9",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
 
         logoutUseCase.execute("Basic token123", "refresh-9");
 
-        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("refresh-9"));
+        verify(refreshTokenPort).revokeFamily("family-9");
         verifyNoInteractions(tokenBlacklistPort);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditEventPort).publish(auditCaptor.capture());

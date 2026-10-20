@@ -71,7 +71,11 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
         account.suspend(clockProvider.clock());
         Account saved = saveAccountPort.save(account);
-        domainEventPublisherService.publishEvents(saved);
+        // Publish from the aggregate that recorded the event: the adapter
+        // returns a rehydrated copy (no domain events) after the versioned
+        // UPDATE, so publishing from `saved` silently dropped
+        // AccountSuspendedEvent (R-A01).
+        domainEventPublisherService.publishEvents(account);
         auditEventPort.publish(new AuditEvent(AuditEvent.ACCOUNT_SUSPENDED,
                 "Suspended account ID " + saved.getId() + " (owner user ID "
                         + saved.getUserId().value() + ")",

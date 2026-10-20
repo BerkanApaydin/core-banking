@@ -49,9 +49,7 @@ public class UserJpaMapper {
                 entity.getVersion(),
                 entity.getTokenVersion()
         );
-        if (entity.isMfaEnabled()) {
-            user.enableMfa();
-        }
+        user.restoreMfaEnabled(entity.isMfaEnabled());
         return user;
     }
 

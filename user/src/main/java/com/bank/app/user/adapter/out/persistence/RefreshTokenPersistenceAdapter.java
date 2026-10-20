@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.out.persistence;
 
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -9,10 +10,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
 
-    private final RefreshTokenJpaRepository repository;
+    private static final int BULK_TX_TIMEOUT_SECONDS = 30;
 
-    public RefreshTokenPersistenceAdapter(RefreshTokenJpaRepository repository) {
+    private final RefreshTokenJpaRepository repository;
+    private final TransactionBoundaryPort transactionBoundary;
+
+    public RefreshTokenPersistenceAdapter(RefreshTokenJpaRepository repository,
+            TransactionBoundaryPort transactionBoundary) {
         this.repository = repository;
+        this.transactionBoundary = transactionBoundary;
     }
 
     @Override
@@ -72,8 +78,18 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     @Override
     public void revokeFamily(String familyId) {
         Objects.requireNonNull(familyId, "Family ID must not be null");
-        // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips.
-        repository.revokeFamilyBulk(familyId);
+        // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips. A
+        // dedicated transaction keeps the logout path (intentionally not
+        // transactional: blacklist/audit are not DB work) working.
+        transactionBoundary.executeRequiresNew(
+                () -> repository.revokeFamilyBulk(familyId), BULK_TX_TIMEOUT_SECONDS);
+    }
+
+    @Override
+    public void revokeAllForUser(Long userId) {
+        Objects.requireNonNull(userId, "User ID must not be null");
+        transactionBoundary.executeRequiresNew(
+                () -> repository.revokeAllForUserBulk(userId), BULK_TX_TIMEOUT_SECONDS);
     }
 
     @Override

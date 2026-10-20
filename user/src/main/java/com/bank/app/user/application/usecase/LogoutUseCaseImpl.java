@@ -7,6 +7,7 @@ import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
+import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import org.slf4j.Logger;
@@ -56,8 +57,9 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
             }
             if (isAlreadyRevoked(token)) {
                 // Access already gone but a refresh session was also presented:
-                // revoke it idempotently, then return without re-auditing.
-                refreshTokenPort.revoke(TokenDigest.sha256Hex(refreshToken));
+                // revoke its whole family idempotently, then return without
+                // re-auditing.
+                revokeRefreshFamily(refreshToken);
                 return;
             }
             username = bestEffortUsername(token, refreshToken);
@@ -68,12 +70,29 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         } else if (refreshToken != null && !refreshToken.isBlank()) {
             username = bestEffortUsername(refreshToken, null);
         }
-        // Single-session revoke: unknown/blank refresh values are ignored so
-        // clients without one keep the previous logout behavior.
+        // Revoke the token's whole family: rotating issues a new token in the
+        // same family, so a single-row revoke would leave the replacement
+        // usable after logout. Unknown/blank values are ignored so clients
+        // without a refresh token keep the previous logout behavior.
         if (refreshToken != null && !refreshToken.isBlank()) {
-            refreshTokenPort.revoke(TokenDigest.sha256Hex(refreshToken));
+            revokeRefreshFamily(refreshToken);
         }
         auditLogout(username);
+    }
+
+    /**
+     * Logout ends the browser session, not just the one token presented:
+     * revoking the family also retires the rotated successor. Unknown hashes
+     * keep the idempotent single-row no-op path.
+     */
+    private void revokeRefreshFamily(String refreshToken) {
+        String hash = TokenDigest.sha256Hex(refreshToken);
+        StoredRefresh stored = refreshTokenPort.findByTokenHash(hash).orElse(null);
+        if (stored != null) {
+            refreshTokenPort.revokeFamily(stored.familyId());
+            return;
+        }
+        refreshTokenPort.revoke(hash);
     }
 
     private boolean isAlreadyRevoked(String token) {

@@ -17,5 +17,13 @@ public final class FieldLimits {
     /** String form for messages/DTO documentation. */
     public static final String MAX_TEXT = "255";
 
+    /**
+     * Login-attempt keys embed the username in a Redis SCAN glob. Keeping the
+     * accepted charset to characters with no glob meaning ({@code * ? [ ] \})
+     * or whitespace keeps the key namespace unambiguous. Length is bounded by
+     * {@link #MAX_TEXT_LENGTH} so the domain rule and {@code @Pattern} agree.
+     */
+    public static final String USERNAME_REGEX = "^[A-Za-z0-9._-]{1," + MAX_TEXT_LENGTH + "}$";
+
     private FieldLimits() {}
 }

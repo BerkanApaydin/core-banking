@@ -57,7 +57,7 @@ test('report date selection covers both complete calendar days', () => {
     const context = vm.createContext({ __: key => key });
     vm.runInContext(functions, context);
 
-    assert.equal(vm.runInContext('formatDateInput(new Date(2026, 8, 24, 23, 59))', context), '2026-09-24');
+    assert.equal(vm.runInContext('formatDateInput(new Date(Date.UTC(2026, 8, 24, 23, 59)))', context), '2026-09-24');
     const range = vm.runInContext("buildReportDateRange('2026-09-24', '2026-09-24')", context);
     assert.equal(range.startDate, '2026-09-24T00:00:00');
     assert.equal(range.endDate, '2026-09-24T23:59:59.999999');
@@ -70,6 +70,22 @@ test('report date selection covers both complete calendar days', () => {
         /report.range_too_long/);
     assert.throws(() => vm.runInContext("buildReportDateRange('2025-01-01', '2026-06-01')", context),
         /report.range_too_long/);
+});
+
+test('API timestamps without an offset are parsed as UTC', () => {
+    const functions = 'function parseApiTimestamp(value) {'
+        + formatSource.split('function parseApiTimestamp(value) {')[1].split('function formatDate')[0];
+    const context = vm.createContext({});
+    vm.runInContext(functions, context);
+
+    assert.equal(vm.runInContext("parseApiTimestamp('2026-09-24T12:34:56').toISOString()", context),
+        '2026-09-24T12:34:56.000Z');
+    assert.equal(vm.runInContext("parseApiTimestamp('2026-09-24T12:34:56Z').toISOString()", context),
+        '2026-09-24T12:34:56.000Z');
+    assert.equal(vm.runInContext("parseApiTimestamp('2026-09-24T15:34:56+03:00').toISOString()", context),
+        '2026-09-24T12:34:56.000Z');
+    assert.equal(vm.runInContext("parseApiTimestamp('not-a-date')", context), null);
+    assert.equal(vm.runInContext('parseApiTimestamp(null)', context), null);
 });
 
 test('account creation sends no IBAN and displays the server-generated value', async () => {

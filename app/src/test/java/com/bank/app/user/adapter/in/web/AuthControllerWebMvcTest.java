@@ -213,6 +213,20 @@ class AuthControllerWebMvcTest {
         }
 
         @Test
+        @DisplayName("should return 400 when registration username contains glob characters")
+        void shouldReturn400WhenUsernameContainsGlobCharacters() throws Exception {
+            String body = "{\"username\": \"bad*name\", \"password\": \"ValidPassword123\"}";
+
+            mockMvc.perform(post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors").exists());
+
+            verifyNoInteractions(registerUserPort);
+        }
+
+        @Test
         @DisplayName("should return 400 when email is invalid")
         void shouldReturn400WhenEmailInvalid() throws Exception {
             AuthRequest request = new AuthRequest("validuser", "ValidPass1", "not-an-email", "5551234567");
@@ -411,15 +425,17 @@ class AuthControllerWebMvcTest {
         @DisplayName("should return enrollment on enable for an authenticated user")
         void shouldReturnEnrollmentOnEnable() throws Exception {
             when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
-            when(enableMfaUseCase.execute(7L)).thenReturn(
+            when(enableMfaUseCase.execute(7L, "Secret123")).thenReturn(
                     new MfaEnrollment(
                             "otpauth://totp/x", "JBSWY3DPEHPK3PXP"));
 
-            mockMvc.perform(post("/api/v1/auth/mfa/enable"))
+            mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\": \"Secret123\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.base32Secret").value("JBSWY3DPEHPK3PXP"));
 
-            verify(enableMfaUseCase).execute(7L);
+            verify(enableMfaUseCase).execute(7L, "Secret123");
         }
 
         @Test
@@ -427,7 +443,9 @@ class AuthControllerWebMvcTest {
         void shouldReturn401OnEnableWithoutAuth() throws Exception {
             when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
 
-            mockMvc.perform(post("/api/v1/auth/mfa/enable"))
+            mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\": \"Secret123\"}"))
                     .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(enableMfaUseCase);
@@ -437,14 +455,14 @@ class AuthControllerWebMvcTest {
         @DisplayName("should return 204 on confirm")
         void shouldReturn204OnConfirm() throws Exception {
             when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
-            doNothing().when(confirmMfaUseCase).execute(eq(7L), eq("123456"));
+            doNothing().when(confirmMfaUseCase).execute(eq(7L), eq("Secret123"), eq("123456"));
 
             mockMvc.perform(post("/api/v1/auth/mfa/confirm")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"code\": \"123456\"}"))
+                            .content("{\"password\": \"Secret123\", \"code\": \"123456\"}"))
                     .andExpect(status().isNoContent());
 
-            verify(confirmMfaUseCase).execute(7L, "123456");
+            verify(confirmMfaUseCase).execute(7L, "Secret123", "123456");
         }
 
         @Test
@@ -454,7 +472,7 @@ class AuthControllerWebMvcTest {
 
             mockMvc.perform(post("/api/v1/auth/mfa/confirm")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"code\": \"abc\"}"))
+                            .content("{\"password\": \"Secret123\", \"code\": \"abc\"}"))
                     .andExpect(status().isBadRequest());
 
             verifyNoInteractions(confirmMfaUseCase);

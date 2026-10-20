@@ -5,11 +5,14 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
+import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.User;
+import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
@@ -30,16 +33,21 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
 
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
+    private final AuthenticationPort authenticationPort;
+    private final RefreshTokenPort refreshTokenPort;
     private final MfaSecretPort mfaSecretPort;
     private final MfaCodeVerificationService mfaCodeVerification;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public ConfirmMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
+            AuthenticationPort authenticationPort, RefreshTokenPort refreshTokenPort,
             MfaSecretPort mfaSecretPort, MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
+        this.authenticationPort = authenticationPort;
+        this.refreshTokenPort = refreshTokenPort;
         this.mfaSecretPort = mfaSecretPort;
         this.mfaCodeVerification = mfaCodeVerification;
         this.clockProvider = clockProvider;
@@ -47,12 +55,19 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
     }
 
     @Override
-    public void execute(Long userId, String code) {
+    public void execute(Long userId, String password, String code) {
         Objects.requireNonNull(userId, "User ID must not be null");
         User user = loadUserPort.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
         if (user.isMfaEnabled()) {
             throw new MfaAlreadyEnabledException();
+        }
+        // Step-up before enabling a login factor: a stolen session alone must
+        // not be able to turn on an attacker-controlled second factor.
+        try {
+            authenticationPort.authenticate(user.getUsername(), password);
+        } catch (AuthenticationFailedException wrongPassword) {
+            throw new InvalidMfaCodeException();
         }
         if (mfaSecretPort.findSecret(userId).isEmpty()) {
             throw new MfaNotEnrolledException();
@@ -77,6 +92,9 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
         }
         user.enableMfa();
         saveUserPort.save(user);
+        // enableMfa() bumped tokenVersion; retire the refresh sessions too so
+        // an old session cannot outlive the authentication-policy change.
+        refreshTokenPort.revokeAllForUser(userId);
         EnableMfaUseCaseImpl.audit(auditEventPort, AuditEvent.MFA_ENABLED, user,
                 "MFA enrollment confirmed and enabled.", clockProvider);
     }

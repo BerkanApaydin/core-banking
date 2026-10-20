@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -151,6 +152,7 @@ class BrowserAuthControllerWebMvcTest {
                     new JwtPort.VerifiedToken(
                             "alice", 7L, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
             when(csrfBinding.verifyCsrfToken(CSRF, CSRF, "7")).thenReturn(true);
+            when(csrfBinding.issueCsrfToken("7")).thenReturn("new-csrf");
             when(refreshSessionUseCase.execute("old-refresh")).thenReturn(
                     new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
 
@@ -160,8 +162,10 @@ class BrowserAuthControllerWebMvcTest {
                             .header("X-CSRF-Token", CSRF))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.username").value("alice"))
-                    .andExpect(header().stringValues("Set-Cookie",
-                            hasItem(startsWith("BANK_SESSION="))));
+                    .andExpect(header().stringValues("Set-Cookie", allOf(
+                            hasItem(startsWith("BANK_SESSION=")),
+                            hasItem(startsWith("BANK_REFRESH=")),
+                            hasItem(startsWith("BANK_CSRF=new-csrf")))));
 
             verify(refreshSessionUseCase).execute("old-refresh");
         }

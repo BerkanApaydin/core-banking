@@ -7,6 +7,8 @@ import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.domain.TotpPolicy;
 import java.util.OptionalLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Single place where a TOTP code is verified and CONSUMED.
@@ -39,6 +41,8 @@ import java.util.OptionalLong;
  * is NOT counted as a failed attempt.
  */
 public class MfaCodeVerificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(MfaCodeVerificationService.class);
 
     private final MfaSecretPort mfaSecretPort;
     private final MfaSecretEncryptorPort encryptor;
@@ -148,6 +152,24 @@ public class MfaCodeVerificationService {
             return false;
         }
         mfaAttemptPort.reset(userId);
+        reencryptIfStale(userId, ciphertext, secret);
         return true;
+    }
+
+    /**
+     * Completes key rotation lazily: a secret written with a previous key is
+     * re-encrypted with the current primary key after a successful code
+     * check. Maintenance must never turn a valid login into a failure, so a
+     * re-encryption error is logged and swallowed.
+     */
+    private void reencryptIfStale(Long userId, String ciphertext, byte[] secret) {
+        if (encryptor.isCurrentKey(ciphertext)) {
+            return;
+        }
+        try {
+            mfaSecretPort.reencryptSecret(userId, encryptor.encrypt(secret));
+        } catch (RuntimeException reencryptFailed) {
+            log.warn("Could not re-encrypt an MFA secret with the current key: {}", reencryptFailed.toString());
+        }
     }
 }

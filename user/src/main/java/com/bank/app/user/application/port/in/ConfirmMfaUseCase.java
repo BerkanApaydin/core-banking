@@ -5,8 +5,9 @@ public interface ConfirmMfaUseCase {
      * Completes enrollment by verifying a TOTP code against the pending secret,
      * then enables MFA for subsequent logins.
      *
+     * @param password current password, re-checked before enabling the factor
      * @throws com.bank.app.user.domain.exception.MfaNotEnrolledException when no pending secret exists
-     * @throws com.bank.app.user.domain.exception.InvalidMfaCodeException when the code is wrong
+     * @throws com.bank.app.user.domain.exception.InvalidMfaCodeException when the password or code is wrong
      */
-    void execute(Long userId, String code);
+    void execute(Long userId, String password, String code);
 }

@@ -28,9 +28,21 @@ them.
   Plaintext secrets never touch the DB, the domain, or logs. Blank key =
   ephemeral in-memory key (dev/test only) and a **fail-fast prod startup
   error**.
-- **Enrollment is two-step** (enable → confirm): MFA switches on only after a
-  code proves possession, so an abandoned enrollment can never lock a user out.
-  Disabling requires password re-authentication + a current code.
+- **Encryption-key rotation (2026-10)**: ciphertexts are
+  `v1:<keyId>:<Base64(iv || ct)>`, where `keyId` is derived from the key
+  (SHA-256 prefix) and never contains secret material. Old rows written
+  before key ids (plain `Base64(iv || ct)`) still decrypt. During rotation,
+  set the new key in `MFA_ENCRYPTION_KEY` and keep the old one(s) in
+  `MFA_ENCRYPTION_PREVIOUS_KEYS` (comma-separated, 32-byte Base64): decryption
+  tries the primary key then the previous keys, and the first successful
+  login/confirm re-encrypts the row with the primary key. Remove a previous
+  key only after no rows remain under it. The startup validator rejects
+  malformed/short keys in the ring, and a duplicate key id fails the bean.
+- **Enrollment is two-step and step-up protected** (enable → confirm): both
+  steps require the account password, and MFA switches on only after a code
+  proves possession, so an abandoned enrollment can never lock a user out.
+  Disabling requires password re-authentication + a current code; confirm and
+  disable also revoke every refresh-token family.
 - **Login failures are uniform**: missing/malformed/mismatched codes produce
   the exact same 401, brute-force record and audit row as a bad password (no
   oracle on enrollment, secret validity, or failure kind). The second factor

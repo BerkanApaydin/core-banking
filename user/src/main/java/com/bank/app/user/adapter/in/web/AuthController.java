@@ -7,8 +7,9 @@ import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
-import com.bank.app.user.adapter.in.web.dto.MfaCodeWebRequest;
+import com.bank.app.user.adapter.in.web.dto.MfaConfirmWebRequest;
 import com.bank.app.user.adapter.in.web.dto.MfaDisableWebRequest;
+import com.bank.app.user.adapter.in.web.dto.MfaEnableWebRequest;
 import com.bank.app.user.adapter.in.web.dto.MfaStatusResponse;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetConfirmWebRequest;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetRequestWebRequest;
@@ -157,13 +158,14 @@ public class AuthController {
 
     @PostMapping("/mfa/enable")
     @Operation(summary = "Starts MFA enrollment", description = "Generates a TOTP secret and returns authenticator enrollment material. Requires authentication; MFA stays off until confirmed.")
-    public ResponseEntity<?> enableMfa(HttpServletRequest httpRequest) {
+    public ResponseEntity<?> enableMfa(@Valid @RequestBody MfaEnableWebRequest webRequest,
+            HttpServletRequest httpRequest) {
         Long userId = currentUserId();
         if (userId == null) {
             return ProblemResponses.unauthorized("You must be logged in to perform this action.",
                     httpRequest.getRequestURI());
         }
-        MfaEnrollment enrollment = enableMfaUseCase.execute(userId);
+        MfaEnrollment enrollment = enableMfaUseCase.execute(userId, webRequest.password());
         // Enrollment material contains the TOTP secret (password-equivalent):
         // never allow heuristic caching by browsers or proxies.
         return ResponseEntity.ok()
@@ -173,14 +175,14 @@ public class AuthController {
 
     @PostMapping("/mfa/confirm")
     @Operation(summary = "Confirms MFA enrollment", description = "Verifies a TOTP code against the pending secret and enables MFA for subsequent logins.")
-    public ResponseEntity<?> confirmMfa(@Valid @RequestBody MfaCodeWebRequest webRequest,
+    public ResponseEntity<?> confirmMfa(@Valid @RequestBody MfaConfirmWebRequest webRequest,
             HttpServletRequest httpRequest) {
         Long userId = currentUserId();
         if (userId == null) {
             return ProblemResponses.unauthorized("You must be logged in to perform this action.",
                     httpRequest.getRequestURI());
         }
-        confirmMfaUseCase.execute(userId, webRequest.code());
+        confirmMfaUseCase.execute(userId, webRequest.password(), webRequest.code());
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();

@@ -10,6 +10,7 @@ import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
 import com.bank.app.user.domain.User;
@@ -34,18 +35,20 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
     private final AuthenticationPort authenticationPort;
+    private final RefreshTokenPort refreshTokenPort;
     private final MfaSecretPort mfaSecretPort;
     private final MfaCodeVerificationService mfaCodeVerification;
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
     public DisableMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-            AuthenticationPort authenticationPort, MfaSecretPort mfaSecretPort,
-            MfaCodeVerificationService mfaCodeVerification,
+            AuthenticationPort authenticationPort, RefreshTokenPort refreshTokenPort,
+            MfaSecretPort mfaSecretPort, MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
         this.authenticationPort = authenticationPort;
+        this.refreshTokenPort = refreshTokenPort;
         this.mfaSecretPort = mfaSecretPort;
         this.mfaCodeVerification = mfaCodeVerification;
         this.clockProvider = clockProvider;
@@ -88,6 +91,8 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
         user.disableMfa();
         saveUserPort.save(user);
         mfaSecretPort.deleteSecret(userId);
+        // disableMfa() bumped tokenVersion; retire refresh sessions as well.
+        refreshTokenPort.revokeAllForUser(userId);
         EnableMfaUseCaseImpl.audit(auditEventPort, AuditEvent.MFA_DISABLED, user,
                 "MFA disabled and secret deleted.", clockProvider);
     }

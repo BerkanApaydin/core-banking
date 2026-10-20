@@ -156,6 +156,9 @@ app:
       # in-memory key (dev/test only — secrets die with the JVM). Production
       # refuses to boot without it (see ApplicationStartupValidator).
       encryption-key-base64: ${MFA_ENCRYPTION_KEY:}
+      # Previous keys still accepted for decryption during rotation
+      # (comma-separated Base64, 32 bytes each). New secrets use the primary.
+      previous-encryption-keys-base64: ${MFA_ENCRYPTION_PREVIOUS_KEYS:}
       period-seconds: ${MFA_PERIOD_SECONDS:30}
       digits: ${MFA_DIGITS:6}
       allowed-skew-windows: ${MFA_SKEW_WINDOWS:1}

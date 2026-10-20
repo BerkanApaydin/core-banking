@@ -11,6 +11,7 @@ import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.Totp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import jakarta.persistence.EntityManager;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -40,7 +43,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * production path verifies (shared host clock, ±1 skew absorbs ms drift).
  */
 @AutoConfigureMockMvc
-@Transactional
 @SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 @DisplayName("MFA + password reset integration")
@@ -52,12 +54,15 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
     private final ObjectMapper objectMapper;
     private final CaffeineLoginAttemptAdapter loginAttemptAdapter;
     private final PasswordResetTokenPort resetTokenPort;
+    private final EntityManager entityManager;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired
     MfaFlowIntegrationTest(MockMvc mockMvc, UserJpaRepository userRepository,
             PasswordEncoder passwordEncoder, ObjectMapper objectMapper,
             CaffeineLoginAttemptAdapter loginAttemptAdapter,
-            PasswordResetTokenPort resetTokenPort,
+            PasswordResetTokenPort resetTokenPort, EntityManager entityManager,
+            PlatformTransactionManager transactionManager,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.mockMvc = mockMvc;
@@ -66,12 +71,33 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         this.objectMapper = objectMapper;
         this.loginAttemptAdapter = loginAttemptAdapter;
         this.resetTokenPort = resetTokenPort;
+        this.entityManager = entityManager;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @BeforeEach
     void setUp() {
         loginAttemptAdapter.reset("127.0.0.1");
         loginAttemptAdapter.reset("10.0.0.99");
+    }
+
+    /**
+     * This class must NOT be {@code @Transactional}: login is deliberately
+     * non-transactional, and a test-managed transaction would mask the
+     * REQUIRES_NEW boundary that persists the TOTP replay counter (R-U01).
+     * Committed fixtures are therefore removed explicitly.
+     */
+    @AfterEach
+    void tearDown() {
+        transactionTemplate.executeWithoutResult(status -> {
+            entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
+                            + "(SELECT id FROM users WHERE username IN "
+                            + "('mfa_alice', 'reset_bob', 'mfa_carol'))")
+                    .executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM users WHERE username IN "
+                            + "('mfa_alice', 'reset_bob', 'mfa_carol')")
+                    .executeUpdate();
+        });
     }
 
     private void register(String username, String password) throws Exception {
@@ -107,7 +133,9 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         String token = login("mfa_alice", "My_passw0rd12", null);
 
         MvcResult enrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
-                        .header("Authorization", "Bearer " + token))
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode body = objectMapper.readTree(enrollment.getResponse().getContentAsString());
@@ -122,7 +150,18 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/mfa/confirm")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\": \"000000\"}"))
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \"000000\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MFA_CODE_INVALID"));
+        assertThat(userRepository.findByUsername("mfa_alice").orElseThrow().isMfaEnabled()).isFalse();
+
+        // Password step-up is required: a right code with a wrong password
+        // must not enable the factor.
+        mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"Wrong_passw0rd99\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MFA_CODE_INVALID"));
         assertThat(userRepository.findByUsername("mfa_alice").orElseThrow().isMfaEnabled()).isFalse();
@@ -130,7 +169,8 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/mfa/confirm")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\": \"" + currentCode(base32) + "\"}"))
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
                 .andExpect(status().isNoContent());
 
         assertThat(userRepository.findByUsername("mfa_alice")).isPresent();
@@ -212,7 +252,9 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         String token = login("mfa_carol", "My_passw0rd12", null);
 
         MvcResult enrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
-                        .header("Authorization", "Bearer " + token))
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         String base32 = objectMapper.readTree(enrollment.getResponse().getContentAsString())
@@ -220,7 +262,8 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/mfa/confirm")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"code\": \"" + currentCode(base32) + "\"}"))
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
                 .andExpect(status().isNoContent());
 
         // Wrong password fails even with a right code — as 400, not 401: the

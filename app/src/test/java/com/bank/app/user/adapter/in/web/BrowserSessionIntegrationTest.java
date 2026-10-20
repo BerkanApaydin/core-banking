@@ -10,7 +10,9 @@ import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,8 +23,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,23 +39,61 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(classes = BankApplication.class)
 @AutoConfigureMockMvc
-@Transactional
 @SuppressWarnings("null")
 class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
     private final MockMvc mockMvc;
     private final UserJpaRepository users;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final EntityManager entityManager;
+    private final TransactionTemplate transactionTemplate;
+    private final List<String> createdUsernames = new ArrayList<>();
 
     @Autowired
     BrowserSessionIntegrationTest(MockMvc mockMvc, UserJpaRepository users,
             PasswordEncoder passwordEncoder, ObjectMapper objectMapper,
+            EntityManager entityManager, PlatformTransactionManager transactionManager,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.mockMvc = mockMvc;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
+        this.entityManager = entityManager;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * This class must NOT be {@code @Transactional}: refresh revocation runs
+     * through REQUIRES_NEW, so a test-managed transaction would hide the
+     * committed refresh-token rows from the family-revoke transaction.
+     */
+    @AfterEach
+    void tearDown() {
+        if (createdUsernames.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            for (String username : createdUsernames) {
+                entityManager.createNativeQuery("DELETE FROM ledger_entries WHERE account_id IN "
+                                + "(SELECT id FROM accounts WHERE user_id IN "
+                                + "(SELECT id FROM users WHERE username = :username))")
+                        .setParameter("username", username)
+                        .executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM accounts WHERE user_id IN "
+                                + "(SELECT id FROM users WHERE username = :username)")
+                        .setParameter("username", username)
+                        .executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
+                                + "(SELECT id FROM users WHERE username = :username)")
+                        .setParameter("username", username)
+                        .executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM users WHERE username = :username")
+                        .setParameter("username", username)
+                        .executeUpdate();
+            }
+        });
+        createdUsernames.clear();
     }
 
     @Test
@@ -78,6 +120,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(get("/boot.js")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/accounts/capabilities")).andExpect(status().isUnauthorized());
         String username = "browser_" + UUID.randomUUID().toString().replace("-", "");
+        createdUsernames.add(username);
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode("BrowserPass12"));
@@ -147,6 +190,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
     @Test
     void cookieRefreshRotatesSessionAndDetectsReuse() throws Exception {
         String username = "refresh_" + UUID.randomUUID().toString().replace("-", "");
+        createdUsernames.add(username);
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode("BrowserPass12"));

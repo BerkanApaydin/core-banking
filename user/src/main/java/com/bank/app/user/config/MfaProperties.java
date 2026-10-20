@@ -22,6 +22,13 @@ public record MfaProperties(
          * validator rejects a blank key outright.
          */
         @DefaultValue("") String encryptionKeyBase64,
+        /**
+         * Comma-separated Base64 AES-256 keys that may still decrypt existing
+         * TOTP secrets during rotation ({@code MFA_ENCRYPTION_PREVIOUS_KEYS}).
+         * New writes always use {@code encryptionKeyBase64}; old rows are
+         * re-encrypted lazily after the next successful code check.
+         */
+        @DefaultValue("") String previousEncryptionKeysBase64,
         @DefaultValue("30") int periodSeconds,
         @DefaultValue("6") int digits,
         @DefaultValue("1") int allowedSkewWindows,

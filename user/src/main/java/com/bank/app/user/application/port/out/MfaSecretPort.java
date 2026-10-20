@@ -19,6 +19,16 @@ import java.util.OptionalLong;
 public interface MfaSecretPort {
     void saveSecret(Long userId, String encryptedBase64);
 
+    /**
+     * Replaces a secret that was written with a previous encryption key.
+     * Unlike {@link #saveSecret}, this maintenance write must commit even
+     * when the caller (the deliberately non-transactional login use case)
+     * has no transaction; implementations may open one.
+     */
+    default void reencryptSecret(Long userId, String encryptedBase64) {
+        saveSecret(userId, encryptedBase64);
+    }
+
     Optional<String> findSecret(Long userId);
 
     void deleteSecret(Long userId);

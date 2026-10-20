@@ -118,7 +118,8 @@ public class UserBeanConfig {
                     + "set MFA_ENCRYPTION_KEY (Base64, 32 bytes) for any durable environment.");
             return AesGcmMfaEncryptor.ephemeral();
         }
-        return AesGcmMfaEncryptor.fromBase64OrEphemeral(properties.encryptionKeyBase64());
+        return AesGcmMfaEncryptor.fromBase64OrEphemeral(
+                properties.encryptionKeyBase64(), properties.previousEncryptionKeysBase64());
     }
 
     @Bean
@@ -142,32 +143,38 @@ public class UserBeanConfig {
     }
 
     @Bean
-    public EnableMfaUseCase enableMfaUseCase(LoadUserPort loadUserPort, MfaSecretPort mfaSecretPort,
+    public EnableMfaUseCase enableMfaUseCase(LoadUserPort loadUserPort,
+                                            AuthenticationPort authenticationPort,
+                                            MfaSecretPort mfaSecretPort,
                                             MfaSecretEncryptorPort mfaEncryptor, MfaProperties mfaProperties,
                                             TotpPolicy totpPolicy,
                                             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         // URI digits/period stay in sync with the verification policy.
-        return EnableMfaUseCaseImpl.withPolicy(loadUserPort, mfaSecretPort, mfaEncryptor,
-                mfaProperties.issuer(), totpPolicy, clockProvider, auditEventPort);
+        return EnableMfaUseCaseImpl.withPolicy(loadUserPort, authenticationPort, mfaSecretPort,
+                mfaEncryptor, mfaProperties.issuer(), totpPolicy, clockProvider, auditEventPort);
     }
 
     @Bean
     public ConfirmMfaUseCase confirmMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
+                                              AuthenticationPort authenticationPort,
+                                              RefreshTokenPort refreshTokenPort,
                                               MfaSecretPort mfaSecretPort,
                                               MfaCodeVerificationService mfaCodeVerification,
                                               ClockProviderPort clockProvider,
                                               AuditEventPort auditEventPort) {
-        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaSecretPort,
-                mfaCodeVerification, clockProvider, auditEventPort);
+        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+                refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     @Bean
     public DisableMfaUseCase disableMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-                                               AuthenticationPort authenticationPort, MfaSecretPort mfaSecretPort,
+                                               AuthenticationPort authenticationPort,
+                                               RefreshTokenPort refreshTokenPort,
+                                               MfaSecretPort mfaSecretPort,
                                                MfaCodeVerificationService mfaCodeVerification,
                                                ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
-        return new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort, mfaSecretPort,
-                mfaCodeVerification, clockProvider, auditEventPort);
+        return new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+                refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     @Bean

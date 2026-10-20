@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.out.persistence;
 
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,6 +27,9 @@ class RefreshTokenPersistenceAdapterTest {
 
     @Mock
     private RefreshTokenJpaRepository repository;
+
+    @Mock
+    private TransactionBoundaryPort transactionBoundary;
 
     @InjectMocks
     private RefreshTokenPersistenceAdapter adapter;
@@ -86,12 +91,25 @@ class RefreshTokenPersistenceAdapterTest {
     @Test
     void shouldRevokeFamily() {
         // P-2: single bulk UPDATE instead of SELECT + N UPDATE.
+        when(transactionBoundary.executeRequiresNew(any(), anyInt()))
+                .thenAnswer(invocation -> invocation.<java.util.function.Supplier<Integer>>getArgument(0).get());
         when(repository.revokeFamilyBulk("family-1")).thenReturn(2);
 
         adapter.revokeFamily("family-1");
 
         verify(repository).revokeFamilyBulk("family-1");
         verify(repository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldRevokeAllSessionsForUser() {
+        when(transactionBoundary.executeRequiresNew(any(), anyInt()))
+                .thenAnswer(invocation -> invocation.<java.util.function.Supplier<Integer>>getArgument(0).get());
+        when(repository.revokeAllForUserBulk(7L)).thenReturn(3);
+
+        adapter.revokeAllForUser(7L);
+
+        verify(repository).revokeAllForUserBulk(7L);
     }
 
     @Test

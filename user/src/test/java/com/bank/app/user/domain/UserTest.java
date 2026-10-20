@@ -133,6 +133,30 @@ class UserTest {
             User user = new User(new UserId(1L), "  spaceduser  ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
             assertThat(user.getUsername()).isEqualTo("spaceduser");
         }
+
+        @Test
+        @DisplayName("should reject glob metacharacters in a new username")
+        void shouldRejectGlobMetacharactersInNewUsername() {
+            EncodedPassword encoded = EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001");
+
+            assertThatThrownBy(() -> User.create("bad*name", encoded, null, null, Clock.systemUTC()))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Username may contain only letters, digits, '.', '_' and '-'");
+            assertThatThrownBy(() -> User.create("bad?name", encoded, null, null, Clock.systemUTC()))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> User.create("bad[name]", encoded, null, null, Clock.systemUTC()))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should accept safe characters in a new username")
+        void shouldAcceptSafeCharactersInNewUsername() {
+            EncodedPassword encoded = EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001");
+
+            User user = User.create("  user.name_1-2  ", encoded, null, null, Clock.systemUTC());
+
+            assertThat(user.getUsername()).isEqualTo("user.name_1-2");
+        }
     }
 
     @Nested
@@ -221,6 +245,32 @@ class UserTest {
             user.assignRole(Role.ROLE_ADMIN);
             assertThat(user.getRole()).isEqualTo(Role.ROLE_ADMIN);
             assertThat(user.getTokenVersion()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("should bump token version when MFA is enabled or disabled")
+        void shouldBumpTokenVersionOnMfaPolicyChange() {
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+            assertThat(user.getTokenVersion()).isZero();
+
+            user.enableMfa();
+            assertThat(user.isMfaEnabled()).isTrue();
+            assertThat(user.getTokenVersion()).isEqualTo(1L);
+
+            user.disableMfa();
+            assertThat(user.isMfaEnabled()).isFalse();
+            assertThat(user.getTokenVersion()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("should restore MFA without treating a load as a policy change")
+        void shouldRestoreMfaWithoutBumpingTokenVersion() {
+            User user = UserTestFactory.newUser("testuser", "$2a$12$testpasswordhash00000000000000000000001");
+
+            user.restoreMfaEnabled(true);
+
+            assertThat(user.isMfaEnabled()).isTrue();
+            assertThat(user.getTokenVersion()).isZero();
         }
 
         @Test

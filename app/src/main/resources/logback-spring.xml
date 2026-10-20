@@ -4,27 +4,20 @@
 
     <springProfile name="prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-                <providers>
-                    <timestamp>
-                        <timeZone>UTC</timeZone>
-                    </timestamp>
-                    <pattern>
-                        <pattern>
-                            {
-                            "timestamp": "%date{yyyy-MM-dd'T'HH:mm:ss.SSSX, UTC}",
-                            "level": "%level",
-                            "logger": "%logger",
-                            "message": "%message",
-                            "correlationId": "%mdc{correlationId}",
-                            "traceId": "%mdc{traceId}",
-                            "spanId": "%mdc{spanId}",
-                            "userId": "%mdc{userId}",
-                            "exception": "%exception"
-                            }
-                        </pattern>
-                    </pattern>
-                </providers>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timeZone>UTC</timeZone>
+                <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSX</timestampPattern>
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <includeMdcKeyName>spanId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <message>message</message>
+                    <logger>logger</logger>
+                    <level>level</level>
+                    <stackTrace>exception</stackTrace>
+                </fieldNames>
             </encoder>
         </appender>
     </springProfile>

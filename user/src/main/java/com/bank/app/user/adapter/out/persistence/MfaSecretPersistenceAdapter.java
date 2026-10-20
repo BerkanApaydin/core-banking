@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.out.persistence;
 
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import org.springframework.dao.DataAccessException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
@@ -15,16 +16,40 @@ import java.util.OptionalLong;
 @Component
 public class MfaSecretPersistenceAdapter implements MfaSecretPort {
 
-    private final UserJpaRepository repository;
+    /**
+     * Replay-counter and lazy re-encryption writes are row-scoped and must
+     * commit independently of any caller transaction: the login use case is
+     * intentionally not transactional (Redis login guards stay outside a
+     * database transaction), while the JPA {@code @Modifying} statements
+     * require one.
+     */
+    private static final int WRITE_TX_TIMEOUT_SECONDS = 30;
 
-    public MfaSecretPersistenceAdapter(UserJpaRepository repository) {
+    private final UserJpaRepository repository;
+    private final TransactionBoundaryPort transactionBoundary;
+
+    public MfaSecretPersistenceAdapter(UserJpaRepository repository,
+            TransactionBoundaryPort transactionBoundary) {
         this.repository = repository;
+        this.transactionBoundary = transactionBoundary;
     }
 
     @Override
     public void saveSecret(Long userId, String encryptedBase64) {
         try {
             repository.updateMfaSecret(userId, encryptedBase64);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
+    }
+
+    @Override
+    public void reencryptSecret(Long userId, String encryptedBase64) {
+        try {
+            transactionBoundary.executeRequiresNew(() -> {
+                repository.updateMfaSecret(userId, encryptedBase64);
+                return null;
+            }, WRITE_TX_TIMEOUT_SECONDS);
         } catch (DataAccessException e) {
             throw new AuthenticationBackendUnavailableException(e);
         }
@@ -58,8 +83,13 @@ public class MfaSecretPersistenceAdapter implements MfaSecretPort {
         }
         try {
             // Conditional write: only a strictly newer counter is accepted.
-            // Zero updated rows means the code was a replay.
-            return repository.updateMfaLastTotpCounterIfNewer(userId, counter) > 0;
+            // Zero updated rows means the code was a replay. REQUIRES_NEW
+            // supplies the transaction the JPA update requires when the
+            // (deliberately non-transactional) login use case is the caller.
+            Boolean updated = transactionBoundary.executeRequiresNew(
+                    () -> repository.updateMfaLastTotpCounterIfNewer(userId, counter) > 0,
+                    WRITE_TX_TIMEOUT_SECONDS);
+            return Boolean.TRUE.equals(updated);
         } catch (DataAccessException e) {
             throw new AuthenticationBackendUnavailableException(e);
         }

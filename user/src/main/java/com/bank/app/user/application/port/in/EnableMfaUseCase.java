@@ -8,7 +8,9 @@ public interface EnableMfaUseCase {
      * (MFA stays DISABLED until {@code ConfirmMfaUseCase} proves the user
      * enrolled it) and returns the authenticator enrollment material.
      *
+     * @param password current password, re-checked before a secret is minted
      * @throws com.bank.app.user.domain.exception.MfaAlreadyEnabledException when MFA is already on
+     * @throws com.bank.app.user.domain.exception.InvalidMfaCodeException when the password is wrong
      */
-    MfaEnrollment execute(Long userId);
+    MfaEnrollment execute(Long userId, String password);
 }

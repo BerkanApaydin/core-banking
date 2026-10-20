@@ -5,6 +5,7 @@ import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.Cursor;
@@ -202,6 +203,21 @@ class RedisLoginAttemptAdapterTest {
 
         verify(redisTemplate).delete("login_attempt:user:" + TEST_USERNAME);
         verify(redisTemplate).scan(any(ScanOptions.class));
+    }
+
+    @Test
+    void shouldEscapeGlobMetacharactersWhenResettingByUsername() {
+        // A legacy username containing glob syntax must be matched literally;
+        // otherwise its reset could delete every account's pair bucket.
+        Cursor<String> cursor = emptyCursor();
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+
+        adapter.resetByUsername("a*b?c[d]e\\f");
+
+        ArgumentCaptor<ScanOptions> options = ArgumentCaptor.forClass(ScanOptions.class);
+        verify(redisTemplate).scan(options.capture());
+        assertThat(options.getValue().getPattern())
+                .isEqualTo("login_attempt:account_ip:a\\*b\\?c\\[d\\]e\\\\f|*");
     }
 
     @SuppressWarnings("unchecked")

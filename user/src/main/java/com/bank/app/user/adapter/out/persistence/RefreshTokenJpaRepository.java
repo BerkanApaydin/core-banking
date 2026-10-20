@@ -32,6 +32,11 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
             + "WHERE e.familyId = :familyId AND e.revoked = false")
     int revokeFamilyBulk(@Param("familyId") String familyId);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RefreshTokenJpaEntity e SET e.revoked = true "
+            + "WHERE e.userId = :userId AND e.revoked = false")
+    int revokeAllForUserBulk(@Param("userId") Long userId);
+
     // Audit (P2): sibling bulk statements declare clearAutomatically +
     // flushAutomatically so the persistence context never serves stale
     // entities after the bulk write; this delete was the only exception.

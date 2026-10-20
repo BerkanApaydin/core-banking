@@ -7,7 +7,7 @@ bytes.
 
 ## Flow
 
-1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then builds with the pinned `BASE_BUILDER_IMAGE`/`BASE_RUNTIME_IMAGE` args and pins both the app manifest and the Flyway Job manifest to `@sha256` digests.
+1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then verifies that `inputs.tag` is SemVer-shaped and points at the checked-out commit. Base-image inputs may be tags for convenience, but the workflow resolves each to a `@sha256` digest and builds with those digests. The push includes BuildKit provenance and SBOM attestations, then pins both the app manifest and the Flyway Job manifest to `@sha256` digests.
    `.github/workflows/release.yml` builds the `Dockerfile`, pushes to
    GHCR (`ghcr.io/<owner>/bank-app:<tag>`), pins `k8s/bank-app.yaml`
    to the resolved digest (`bank-app@sha256:…`, verified with `grep`
@@ -57,5 +57,7 @@ contains `ALTER TABLE ... TYPE`, `ADD CONSTRAINT ... VALIDATE`, or
    blocks the release — rewrite as `NOT VALID + VALIDATE`, `pg_repack`, or
    batched backfill per `docs/decisions/enum-types.md`.
 4. Attach the soak log to the release tag alongside the health-smoke JSON.
-   CI `migration-soak` job enforces the script's presence (full soak runs on
-   `workflow_dispatch` + release branches with a staging dump).
+   The CI `migration-soak` job runs the script against a fresh database:
+   migrate to the second-latest version, seed 100k `transfers`, then apply the
+   newest migration. The full 1M-row run still uses a staging dump via
+   `workflow_dispatch` / release branches.

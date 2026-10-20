@@ -18,8 +18,14 @@ public record BrowserSessionCookies(boolean secure) {
         return secure ? "__Host-BANK_SESSION" : "BANK_SESSION";
     }
 
+    /**
+     * The refresh cookie is path-scoped to {@code /api/v1/auth/browser}, so it
+     * cannot use the {@code __Host-} prefix (which mandates {@code Path=/}).
+     * {@code __Secure-} still requires the Secure attribute and is the correct
+     * prefix for a path-scoped secure cookie.
+     */
     public String refreshCookieName() {
-        return secure ? "__Host-BANK_REFRESH" : "BANK_REFRESH";
+        return secure ? "__Secure-BANK_REFRESH" : "BANK_REFRESH";
     }
 
     public String csrfCookieName() {

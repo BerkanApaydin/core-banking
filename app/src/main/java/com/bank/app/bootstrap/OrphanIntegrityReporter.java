@@ -7,7 +7,6 @@ import io.micrometer.core.instrument.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.lang.Nullable;
@@ -26,7 +25,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * an actual clean scan from the initial zero-valued orphan gauges.
  */
 @Service
-@ConditionalOnBean(JdbcTemplate.class)
 @ConditionalOnProperty(prefix = "app.integrity", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OrphanIntegrityReporter {
 

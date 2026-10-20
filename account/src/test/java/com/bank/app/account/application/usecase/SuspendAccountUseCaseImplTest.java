@@ -72,8 +72,16 @@ class SuspendAccountUseCaseImplTest {
 
     private void stubClockAndSave() {
         when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+        // Mirror the real adapter: a versioned save returns a REHYDRATED copy
+        // without the caller's domain events. Publishing from this copy would
+        // drop AccountSuspendedEvent (R-A01).
         when(saveAccountPort.save(any(Account.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation -> {
+                    Account saved = invocation.getArgument(0);
+                    return Account.rehydrate(saved.getId(), saved.getUserId(), saved.getIban(),
+                            saved.getOwnerName(), saved.getBalance(), saved.getStatus(),
+                            saved.getVersion() == null ? 1L : saved.getVersion() + 1);
+                });
     }
 
     private void asAdmin() {

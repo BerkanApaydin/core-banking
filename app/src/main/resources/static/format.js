@@ -1,4 +1,4 @@
-/* exported buildReportDateRange, buildReportQuery, escapeHtml, formatDate, formatDateInput, formatIbanDisplay, formatMoney, hasValidIbanChecksum, reportCursorForPage, sanitizeIban, storeReportCursor, transferStatusMeta */
+/* exported buildReportDateRange, buildReportQuery, escapeHtml, formatDate, formatDateInput, formatIbanDisplay, formatMoney, hasValidIbanChecksum, parseApiTimestamp, reportCursorForPage, sanitizeIban, storeReportCursor, transferStatusMeta */
 // --- Utility Formatters ---
 // Localized badge metadata for backend TransferStatus values.
 // Unknown values render truthfully (escaped raw status, neutral style):
@@ -60,8 +60,21 @@ function formatIbanDisplay(iban) {
     return iban.replace(/(.{4})/g, '$1 ').trim();
 }
 
+function parseApiTimestamp(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const text = String(value);
+    // The API serializes LocalDateTime in UTC without an offset. ECMAScript
+    // treats an offset-less date-time as LOCAL time, shifting every rendered
+    // instant by the browser's zone. Append Z unless the payload already
+    // carries an explicit zone.
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text);
+    const d = new Date(hasZone ? text : `${text}Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(dateString) {
-    const d = new Date(dateString);
+    const d = parseApiTimestamp(dateString);
+    if (!d) return '—';
     return d.toLocaleString(locale(), {
         day: '2-digit',
         month: '2-digit',
@@ -72,8 +85,10 @@ function formatDate(dateString) {
 }
 
 function formatDateInput(date) {
+    // Report bounds are UTC calendar days: the backend stores and compares
+    // UTC LocalDateTime values, with no browser-zone conversion.
     const pad = (n) => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
 function buildReportDateRange(startDay, endDay) {

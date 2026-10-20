@@ -177,6 +177,7 @@ function buildLoginBody(username, password, totp) {
 async function refreshMfaStatus() {
     const pill = document.getElementById('mfa-status-pill');
     const enableBtn = document.getElementById('btn-mfa-enable');
+    const enablePasswordGroup = document.getElementById('mfa-enable-password-group');
     const enrollBox = document.getElementById('mfa-enroll-box');
     const disableForm = document.getElementById('mfa-disable-form');
     if (!pill) return;
@@ -187,6 +188,7 @@ async function refreshMfaStatus() {
         pill.classList.toggle('on', on);
         pill.classList.toggle('off', !on);
         if (enableBtn) enableBtn.classList.toggle('d-none', on);
+        if (enablePasswordGroup) enablePasswordGroup.classList.toggle('d-none', on);
         if (enrollBox && on) enrollBox.classList.add('d-none');
         if (disableForm) disableForm.classList.toggle('d-none', !on);
     } catch (err) {
@@ -267,6 +269,8 @@ function initSecurity() {
 
     // --- MFA enrollment (authenticated) ---
     const enableBtn = document.getElementById('btn-mfa-enable');
+    const enablePasswordGroup = document.getElementById('mfa-enable-password-group');
+    const enablePassword = document.getElementById('mfa-enable-password');
     const enrollBox = document.getElementById('mfa-enroll-box');
     const secretText = document.getElementById('mfa-secret-text');
     const copyBtn = document.getElementById('btn-mfa-copy');
@@ -274,8 +278,19 @@ function initSecurity() {
     const disableForm = document.getElementById('mfa-disable-form');
     if (enableBtn && enrollBox) {
         enableBtn.addEventListener('click', async () => {
+            const password = enablePassword ? enablePassword.value : '';
+            if (!password) {
+                showAlert(__('auth.password.required'), 'danger');
+                if (enablePassword) enablePassword.focus();
+                return;
+            }
             try {
-                const enrollment = await fetchApi('/auth/mfa/enable', { method: 'POST' });
+                const enrollment = await fetchApi('/auth/mfa/enable', {
+                    method: 'POST',
+                    body: JSON.stringify({ password })
+                });
+                if (enablePassword) enablePassword.value = '';
+                if (enablePasswordGroup) enablePasswordGroup.classList.add('d-none');
                 if (secretText) secretText.textContent = enrollment.base32Secret || '';
                 enrollBox.classList.remove('d-none');
                 enableBtn.classList.add('d-none');
@@ -297,15 +312,21 @@ function initSecurity() {
     if (confirmMfaForm) {
         confirmMfaForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const password = document.getElementById('mfa-confirm-password').value;
             const code = document.getElementById('mfa-confirm-code').value.trim();
+            if (!password) {
+                showAlert(__('auth.password.required'), 'danger');
+                return;
+            }
             if (!isTotpLike(code)) return;
             const spinner = document.getElementById('mfa-confirm-spinner');
             if (spinner) spinner.classList.remove('d-none');
             try {
                 await fetchApi('/auth/mfa/confirm', {
                     method: 'POST',
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify({ password, code })
                 });
+                confirmMfaForm.reset();
                 showAlert(__('mfa.confirm_success'));
                 enrollBox.classList.add('d-none');
                 await refreshMfaStatus();
@@ -409,9 +430,9 @@ function drawReportChart(transfers) {
     ctx.clearRect(0, 0, w, h);
     const buckets = {};
     (transfers || []).forEach(t => {
-        const d = new Date(t.createdAt);
-        if (isNaN(d)) return;
-        const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        const d = parseApiTimestamp(t.createdAt);
+        if (!d) return;
+        const k = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
         buckets[k] = (buckets[k] || 0) + Number(t.amount || 0);
     });
     const keys = Object.keys(buckets).sort().slice(-14);
@@ -624,8 +645,8 @@ function initUxEnhancements() {
         ch.addEventListener('click', () => {
             const days = parseInt(ch.getAttribute('data-range'), 10) || 30;
             const end = new Date();
-            const start = new Date();
-            start.setDate(end.getDate() - (days - 1));
+            const start = new Date(end.getTime());
+            start.setUTCDate(end.getUTCDate() - (days - 1));
             const s = document.getElementById('report-start-date');
             const e = document.getElementById('report-end-date');
             if (s) s.value = formatDateInput(start);

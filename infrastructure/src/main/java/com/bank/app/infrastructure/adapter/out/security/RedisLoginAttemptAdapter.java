@@ -109,9 +109,11 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
         withRedis(() -> {
             redisTemplate.delete(ACCOUNT_PREFIX + normalized);
             // Pair buckets carry the account in the key prefix, so they are
-            // cleared by pattern. SCAN, never KEYS: KEYS blocks the Redis
-            // main thread for the whole keyspace.
-            deleteByPattern(ACCOUNT_IP_PREFIX + normalized + "|*");
+            // cleared by pattern. The username is escaped: it is user input and
+            // Redis glob characters (* ? [ ] \) would otherwise widen the match
+            // and clear other accounts' counters. SCAN, never KEYS: KEYS blocks
+            // the Redis main thread for the whole keyspace.
+            deleteByPattern(ACCOUNT_IP_PREFIX + escapeGlob(normalized) + "|*");
             return Boolean.TRUE;
         });
     }
@@ -156,6 +158,23 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
      */
     static String normalizeUsername(String username) {
         return username == null ? null : username.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Escapes Redis glob metacharacters so a username is matched literally
+     * inside a SCAN pattern. Backslash is escaped first: it is the escape
+     * character itself.
+     */
+    static String escapeGlob(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '*' || c == '?' || c == '[' || c == ']' || c == '\\') {
+                escaped.append('\\');
+            }
+            escaped.append(c);
+        }
+        return escaped.toString();
     }
 
     private static String accountIpKey(String normalizedUsername, String ip) {

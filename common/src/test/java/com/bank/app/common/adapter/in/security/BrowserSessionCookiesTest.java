@@ -153,7 +153,7 @@ class BrowserSessionCookiesTest {
         void shouldUseHostPrefixWhenSecure() {
             BrowserSessionCookies cookies = new BrowserSessionCookies(true);
             assertThat(cookies.sessionCookieName()).isEqualTo("__Host-BANK_SESSION");
-            assertThat(cookies.refreshCookieName()).isEqualTo("__Host-BANK_REFRESH");
+            assertThat(cookies.refreshCookieName()).isEqualTo("__Secure-BANK_REFRESH");
             assertThat(cookies.csrfCookieName()).isEqualTo("__Host-BANK_CSRF");
         }
 

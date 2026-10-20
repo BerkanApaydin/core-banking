@@ -6,6 +6,8 @@ import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +16,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,7 +33,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // Full refresh lifecycle through HTTP: pair issuance, rotation, reuse
 // detection (family kill) and logout revocation.
 @AutoConfigureMockMvc
-@Transactional
 @SpringBootTest(classes = BankApplication.class)
 @SuppressWarnings("null")
 class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
@@ -37,18 +41,53 @@ class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
 
     private final ObjectMapper objectMapper;
 
+    private final EntityManager entityManager;
+
+    private final TransactionTemplate transactionTemplate;
+
+    private final List<String> createdUsernames = new ArrayList<>();
+
     @Autowired
-    RefreshTokenFlowIT(MockMvc mockMvc, ObjectMapper objectMapper,
+    RefreshTokenFlowIT(MockMvc mockMvc, ObjectMapper objectMapper, EntityManager entityManager,
+            PlatformTransactionManager transactionManager,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
+        this.entityManager = entityManager;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     private static final String PASSWORD = "RefreshFlow123";
 
+    /**
+     * This class must NOT be {@code @Transactional}: revocation runs through
+     * REQUIRES_NEW, so a test-managed transaction would hide the committed
+     * refresh-token rows from the family-revoke transaction.
+     */
+    @AfterEach
+    void tearDown() {
+        if (createdUsernames.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(status -> {
+            for (String username : createdUsernames) {
+                entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
+                                + "(SELECT id FROM users WHERE username = :username)")
+                        .setParameter("username", username)
+                        .executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM users WHERE username = :username")
+                        .setParameter("username", username)
+                        .executeUpdate();
+            }
+        });
+        createdUsernames.clear();
+    }
+
     private String username() {
-        return "refresh_" + UUID.randomUUID().toString().replace("-", "");
+        String username = "refresh_" + UUID.randomUUID().toString().replace("-", "");
+        createdUsernames.add(username);
+        return username;
     }
 
     private JsonNode login(String username) throws Exception {
