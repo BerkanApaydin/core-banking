@@ -102,6 +102,12 @@ class MfaTransactionBoundaryIntegrationTest extends AbstractSpringBootIntegratio
         String base32 = enable(token);
         confirm(token, base32);
 
+        // R-U01: a wrong code fails closed with 401 before the real login.
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody(wrongCode(base32))))
+                .andExpect(status().isUnauthorized());
+
         String code = currentCode(base32);
         login(code);
 
@@ -163,5 +169,11 @@ class MfaTransactionBoundaryIntegrationTest extends AbstractSpringBootIntegratio
         byte[] secret = Totp.base32Decode(base32Secret);
         long step = Instant.now().getEpochSecond() / 30L;
         return Totp.generateCode(secret, step, 6);
+    }
+
+    private String wrongCode(String base32Secret) {
+        String code = currentCode(base32Secret);
+        char replacement = code.charAt(0) == '0' ? '1' : '0';
+        return replacement + code.substring(1);
     }
 }

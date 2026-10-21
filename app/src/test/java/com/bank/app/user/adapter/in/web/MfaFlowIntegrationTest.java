@@ -108,6 +108,10 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     private String login(String username, String password, String totpCode) throws Exception {
+        return loginPayload(username, password, totpCode).get("token").asText();
+    }
+
+    private JsonNode loginPayload(String username, String password, String totpCode) throws Exception {
         String body = totpCode == null
                 ? "{\"username\": \"" + username + "\", \"password\": \"" + password + "\"}"
                 : "{\"username\": \"" + username + "\", \"password\": \"" + password
@@ -117,7 +121,7 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
                         .content(body))
                 .andReturn();
         assertThat(result.getResponse().getStatus()).isEqualTo(200);
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
     private String currentCode(String base32Secret) {
@@ -130,7 +134,19 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
     @DisplayName("enrollment stays off until confirmed, then login requires the code")
     void enrollmentGatesLoginOnConfirmation() throws Exception {
         register("mfa_alice", "My_passw0rd12");
-        String token = login("mfa_alice", "My_passw0rd12", null);
+        JsonNode firstLogin = loginPayload("mfa_alice", "My_passw0rd12", null);
+        String token = firstLogin.get("token").asText();
+        String preConfirmRefresh = firstLogin.get("refreshToken").asText();
+        long tokenVersionBefore = userRepository.findByUsername("mfa_alice")
+                .orElseThrow().getTokenVersion();
+
+        // R-U04: enrollment is a security-policy change, so it must not start
+        // without a password step-up.
+        mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
 
         MvcResult enrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
                         .header("Authorization", "Bearer " + token)
@@ -142,6 +158,15 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         String base32 = body.get("base32Secret").asText();
         assertThat(base32).hasSize(32);
         assertThat(body.get("otpauthUri").asText()).startsWith("otpauth://totp/");
+
+        // R-U04: confirmation also requires the password step-up; a code
+        // alone must never enable the factor.
+        mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\": \"" + currentCode(base32) + "\"}"))
+                .andExpect(status().isBadRequest());
+        assertThat(userRepository.findByUsername("mfa_alice").orElseThrow().isMfaEnabled()).isFalse();
 
         // Still off: login without a code keeps working before confirmation.
         login("mfa_alice", "My_passw0rd12", null);
@@ -175,6 +200,16 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         assertThat(userRepository.findByUsername("mfa_alice")).isPresent();
         assertThat(userRepository.findByUsername("mfa_alice").orElseThrow().isMfaEnabled()).isTrue();
+
+        // R-U05: enabling MFA is an authentication-policy change. It bumps
+        // the token generation and revokes every refresh family minted before
+        // the change, so an old session cannot outlive it.
+        assertThat(userRepository.findByUsername("mfa_alice").orElseThrow().getTokenVersion())
+                .isEqualTo(tokenVersionBefore + 1);
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\": \"" + preConfirmRefresh + "\"}"))
+                .andExpect(status().isUnauthorized());
 
         // Now on: login without a code fails with the generic message...
         mockMvc.perform(post("/api/v1/auth/login")

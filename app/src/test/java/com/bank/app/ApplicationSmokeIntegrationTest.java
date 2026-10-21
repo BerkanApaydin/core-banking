@@ -1,6 +1,7 @@
 package com.bank.app;
 
 import com.bank.app.account.application.dto.AccountResponse;
+import com.bank.app.bootstrap.OrphanIntegrityReporter;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.infrastructure.adapter.out.metrics.BacklogMetricsReporter;
@@ -35,19 +36,24 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     private final TestRestTemplate restTemplate;
 
     private final BacklogMetricsReporter backlogMetricsReporter;
+    private final OrphanIntegrityReporter orphanIntegrityReporter;
 
     @Autowired
     ApplicationSmokeIntegrationTest(TestRestTemplate restTemplate,
-            BacklogMetricsReporter backlogMetricsReporter, ObjectProvider<CacheManager> cacheManagers) {
+            BacklogMetricsReporter backlogMetricsReporter,
+            OrphanIntegrityReporter orphanIntegrityReporter,
+            ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.restTemplate = restTemplate;
         this.backlogMetricsReporter = backlogMetricsReporter;
+        this.orphanIntegrityReporter = orphanIntegrityReporter;
     }
 
     @Test
     void contextLoads() {
         assertThat(restTemplate).isNotNull();
         assertThat(backlogMetricsReporter).isNotNull();
+        assertThat(orphanIntegrityReporter).isNotNull();
     }
 
     @Test

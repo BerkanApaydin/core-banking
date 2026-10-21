@@ -11,6 +11,10 @@ PSQL_URL="${PSQL_URL:-postgresql://bank_user:bank_password@localhost:5432/bank_d
 FLYWAY_URL="${FLYWAY_URL:-jdbc:postgresql://localhost:5432/bank_db?options=-c%20statement_timeout%3D10min%20-c%20idle_in_transaction_session_timeout%3D0}"
 SEED_ROWS="${SEED_ROWS:-1000000}"
 BASELINE_TARGET="${BASELINE_TARGET:-}"
+# Lock waits are a release risk, not a metric: any ungranted/blocked lock or
+# logged wait above this budget fails the soak. Staging dumps may raise it
+# explicitly; CI keeps the fail-closed default.
+MAX_LOCK_WAITS="${MAX_LOCK_WAITS:-0}"
 
 if command -v flyway >/dev/null 2>&1; then
   FLYWAY_BIN="${FLYWAY_BIN:-flyway}"
@@ -100,7 +104,16 @@ END=$(date +%s)
 echo "[migration-soak] migrate_wall_seconds=$((END - START))"
 
 echo "[migration-soak] current lock waits (point-in-time; log_lock_waits also records events):"
-run_psql -Atc "SELECT 'ungranted_locks=' || count(*) FROM pg_locks WHERE NOT granted;"
-run_psql -Atc "SELECT 'blocked_sessions=' || count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock';"
-echo "[migration-soak] logged lock waits: $(grep -c 'still waiting for' migration-soak.log || true)"
+UNGRANTED_LOCKS=$(run_psql -Atc "SELECT count(*) FROM pg_locks WHERE NOT granted;")
+BLOCKED_SESSIONS=$(run_psql -Atc "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock';")
+LOGGED_LOCK_WAITS=$(grep -c 'still waiting for' migration-soak.log || true)
+echo "[migration-soak] ungranted_locks=$UNGRANTED_LOCKS"
+echo "[migration-soak] blocked_sessions=$BLOCKED_SESSIONS"
+echo "[migration-soak] logged lock waits: $LOGGED_LOCK_WAITS (budget $MAX_LOCK_WAITS)"
+
+if [ "$UNGRANTED_LOCKS" -ne 0 ] || [ "$BLOCKED_SESSIONS" -ne 0 ] \
+    || [ "$LOGGED_LOCK_WAITS" -gt "$MAX_LOCK_WAITS" ]; then
+  echo "::error::migration soak exceeded the lock-wait budget" >&2
+  exit 1
+fi
 echo "[migration-soak] done. Attach migration-soak.log to the release tag."

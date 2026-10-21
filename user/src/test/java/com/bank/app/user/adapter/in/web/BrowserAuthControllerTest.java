@@ -322,6 +322,33 @@ class BrowserAuthControllerTest {
     }
 
     @Test
+    void secureLogoutClearsHostAndSecurePrefixedCookies() {
+        // R-U02: the production cookie contract must also cover logout. A
+        // deletion header with the wrong name or path leaves the credential
+        // in the browser even though the server-side session is gone.
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("__Host-BANK_SESSION", "sess"),
+                new Cookie("__Secure-BANK_REFRESH", "rt"),
+                new Cookie("__Host-BANK_CSRF", "csrf"));
+        MockHttpServletResponse secureResponse = new MockHttpServletResponse();
+
+        ResponseEntity<?> result = secureController().logout(request, secureResponse);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(logoutUseCase).execute("Bearer sess", "rt");
+        List<String> headers = secureResponse.getHeaders("Set-Cookie");
+        assertThat(headers).hasSize(3);
+        assertThat(cookieHeader(headers, "__Host-BANK_SESSION="))
+                .contains("Max-Age=0", "Secure", "HttpOnly", "SameSite=Strict", "Path=/");
+        assertThat(cookieHeader(headers, "__Secure-BANK_REFRESH="))
+                .contains("Max-Age=0", "Secure", "HttpOnly", "SameSite=Strict",
+                        "Path=/api/v1/auth/browser");
+        assertThat(cookieHeader(headers, "__Host-BANK_CSRF="))
+                .contains("Max-Age=0", "Secure", "SameSite=Strict", "Path=/")
+                .doesNotContain("HttpOnly");
+    }
+
+    @Test
     void logoutPassesNullTokensWhenCookiesAbsent() {
         // Kills both EmptyObjectReturn mutants on cookieValue (null -> ""):
         // absent cookies must stay null, not empty strings. The bare request

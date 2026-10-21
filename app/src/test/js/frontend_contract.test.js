@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -597,4 +598,40 @@ test('etag cache stores validators, evicts oldest-first, clears on demand', () =
     assert.equal(vm.runInContext("etagCacheLookup('GET /k34').body", context), 34);
     vm.runInContext('etagCacheInvalidate()', context);
     assert.equal(vm.runInContext('etagCache.size', context), 0);
+});
+
+test('date parsing and report day bounds are identical under UTC and Europe/Istanbul', () => {
+    // R-F01: the browser must treat API timestamps and report bounds as UTC
+    // regardless of the host zone. Spawn a fresh Node process per zone so the
+    // runtime's local zone (not a mutable in-process stub) is what changes.
+    const probe = `
+        const fs = require('node:fs');
+        const vm = require('node:vm');
+        const source = fs.readFileSync(process.argv[1], 'utf8');
+        const context = vm.createContext({});
+        vm.runInContext(source, context);
+        process.stdout.write(JSON.stringify({
+            parsed: vm.runInContext("parseApiTimestamp('2026-03-29T22:30:00').toISOString()", context),
+            day: vm.runInContext("formatDateInput(new Date('2026-03-29T22:30:00Z'))", context),
+            range: vm.runInContext("buildReportDateRange('2026-03-01', '2026-03-31')", context)
+        }));
+    `;
+    const outputFor = (timeZone) => {
+        const result = spawnSync(process.execPath,
+            ['-e', probe, path.resolve(__dirname, '../../main/resources/static/format.js')],
+            { env: { ...process.env, TZ: timeZone }, encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stderr);
+        return JSON.parse(result.stdout);
+    };
+
+    const utc = outputFor('UTC');
+    const istanbul = outputFor('Europe/Istanbul');
+
+    assert.deepEqual(istanbul, utc);
+    assert.equal(utc.parsed, '2026-03-29T22:30:00.000Z');
+    assert.equal(utc.day, '2026-03-29');
+    assert.deepEqual(utc.range, {
+        startDate: '2026-03-01T00:00:00',
+        endDate: '2026-03-31T23:59:59.999999'
+    });
 });

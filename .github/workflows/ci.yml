@@ -161,9 +161,12 @@ jobs:
         test -f scripts/migration_soak.sh
         grep -q '^  migration-soak:' .github/workflows/ci.yml
         grep -q 'BASELINE_TARGET' scripts/migration_soak.sh
+        # O-1: the soak must fail closed on lock contention, not just print it.
+        grep -q 'MAX_LOCK_WAITS' scripts/migration_soak.sh
+        grep -q 'migration soak exceeded the lock-wait budget' scripts/migration_soak.sh
         test -f migrations/src/main/resources/db/migration/V43__transfer_history_keyset_covering_indexes.sql
         test -f k8s/grafana-dashboard.json
-        echo "migration-soak job + keyset index + dashboard present"
+        echo "migration-soak job + lock budget + keyset index + dashboard present"
 
     - name: Migration content contracts (O-8 — presence is not proof)
       # A presence check only fails when a file is deleted; these pin the
@@ -198,6 +201,8 @@ jobs:
         grep -q "aquasecurity/trivy-action" .github/workflows/ci.yml
         grep -q "BASE_BUILDER_IMAGE" .github/workflows/release.yml
         grep -q "Validate release tag points at this commit" .github/workflows/release.yml
+        grep -q 'TAG_SHA != "$SHA"' .github/workflows/release.yml
+        grep -q 'refs/tags/${TAG}' .github/workflows/release.yml
         grep -q "Resolve base images to immutable digests" .github/workflows/release.yml
         grep -q "provenance: true" .github/workflows/release.yml
         echo "supply-chain self-contracts present"
