@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.web;
 
 import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.infrastructure.adapter.in.handler.RequestBodyTooLargeException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -72,6 +73,14 @@ public class RequestBodySizeLimitFilter implements Filter {
         try {
             chain.doFilter(new BoundedRequestWrapper(httpRequest, maxBytes), response);
         } catch (RequestBodyTooLargeException tooLarge) {
+            // Direct propagation (e.g. a filter/controller reading the stream
+            // outside an MVC message converter). Converters instead wrap this
+            // exception in HttpMessageNotReadableException; RequestProblemHandler
+            // inspects the cause chain and also answers 413.
+            if (httpResponse.isCommitted()) {
+                log.warn("Oversized request body detected after the response was committed: path={}", path);
+                return;
+            }
             reject(httpResponse, path, maxBytes);
         }
     }
@@ -87,13 +96,6 @@ public class RequestBodySizeLimitFilter implements Filter {
                 "Request body is too large.", LocaleContextHolder.getLocale());
         ProblemDetailFactory.writeProblem(httpResponse, objectMapper, HttpStatus.PAYLOAD_TOO_LARGE,
                 "REQUEST_BODY_TOO_LARGE", message, path);
-    }
-
-    /** Marker: the bounded stream below counted past the cap. */
-    static final class RequestBodyTooLargeException extends IOException {
-        RequestBodyTooLargeException(String message) {
-            super(message);
-        }
     }
 
     /**

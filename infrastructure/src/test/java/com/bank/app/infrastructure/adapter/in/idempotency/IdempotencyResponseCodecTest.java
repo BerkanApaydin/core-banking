@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -158,6 +159,25 @@ class IdempotencyResponseCodecTest {
             // Assert
             assertThat(entity.getStatusCode().value()).isEqualTo(200);
             assertThat(entity.getBody()).isEqualTo("{\"a\":1}");
+        }
+
+        @Test
+        @DisplayName("should return an explicit problem when the stored body is not replayable")
+        void shouldReturnExplicitProblemWhenNotReplayable() {
+            // R-I06: replaying a truncated body would return corrupt JSON with
+            // the original 2xx status. Fail clearly instead.
+            var result = IdempotencyResult.completed(null, 200, false);
+
+            // Act
+            ResponseEntity<?> entity = (ResponseEntity<?>) codec.replay(result);
+
+            // Assert
+            assertThat(entity.getStatusCode().value()).isEqualTo(500);
+            assertThat(entity.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+            assertThat(entity.getBody()).isInstanceOf(ProblemDetail.class);
+            ProblemDetail problem = (ProblemDetail) entity.getBody();
+            assertThat(problem.getProperties())
+                    .containsEntry("code", "IDEMPOTENCY_REPLAY_UNAVAILABLE");
         }
     }
 }

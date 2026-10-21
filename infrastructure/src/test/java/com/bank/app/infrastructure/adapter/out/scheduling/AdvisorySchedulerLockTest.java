@@ -77,6 +77,10 @@ class AdvisorySchedulerLockTest {
 
         assertThat(result).isTrue();
         assertThat(ran).isTrue();
+        // The poisoned lock transaction must be rolled back before the work
+        // runs; otherwise every statement in work sees PostgreSQL's
+        // "current transaction is aborted" state.
+        verify(status).setRollbackOnly();
     }
 
     @Test

@@ -40,14 +40,24 @@ public class IdempotencyKeyJpaEntity implements Persistable<String> {
      * Replay body for a COMPLETED key. Unbounded TEXT since V53 (was
      * VARCHAR(10000)): completion joins the business transaction, so a
      * length cap here used to roll the business mutation back on oversized
-     * responses. The application cap lives in
-     * {@code IdempotencyPersistenceAdapter} (truncate + warn, replay-only).
+     * responses. R-I06: bodies above the replay cap are not truncated (that
+     * produced corrupt JSON); they are stored as NULL with
+     * {@code responseReplayable = false}.
      */
     @Column(name = "response_body", columnDefinition = "TEXT")
     private String responseBody;
 
     @Column(name = "response_status")
     private Integer responseStatus;
+
+    /**
+     * R-I06: a body larger than the replay cap is stored as NULL with this
+     * flag false. Replaying a character-truncated JSON fragment would return
+     * corrupt JSON to the retried caller; the replay path returns an explicit
+     * problem response instead.
+     */
+    @Column(name = "response_replayable", nullable = false)
+    private boolean responseReplayable = true;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -115,6 +125,14 @@ public class IdempotencyKeyJpaEntity implements Persistable<String> {
 
     public void setResponseStatus(Integer responseStatus) {
         this.responseStatus = responseStatus;
+    }
+
+    public boolean isResponseReplayable() {
+        return responseReplayable;
+    }
+
+    public void setResponseReplayable(boolean responseReplayable) {
+        this.responseReplayable = responseReplayable;
     }
 
     public LocalDateTime getCreatedAt() {

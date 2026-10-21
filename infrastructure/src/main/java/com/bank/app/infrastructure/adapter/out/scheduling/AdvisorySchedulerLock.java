@@ -29,9 +29,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * rollback-only, which would poison an outer transaction).
  *
  * <p>Failure policy: explicit contention (false) → skip (fail closed, no
- * duplicate work). Lock-query <em>error</em> → run anyway (fail open): cleanup
- * and scan work is idempotent, while skipping forever on a transient error
- * would wedge retention and staleness gauges.
+ * duplicate work). Lock-query <em>error</em> → abort the lock transaction
+ * (PostgreSQL marks it aborted anyway) and run the work unguarded afterwards
+ * (fail open): cleanup and scan work is idempotent, while skipping forever on
+ * a transient error would wedge retention and staleness gauges. Running the
+ * work inside the aborted transaction would fail every statement with
+ * "current transaction is aborted", which is why the fail-open path never
+ * shares the lock transaction.
  */
 @Component
 public class AdvisorySchedulerLock {
@@ -105,25 +109,53 @@ public class AdvisorySchedulerLock {
      * @return true if the work ran, false if another replica holds the lock.
      */
     public boolean runIfLeader(String lockName, Runnable work) {
-        Boolean ran = tx.execute(status -> {
-            if (!tryAcquire(lockName)) {
+        LockOutcome outcome = tx.execute(status -> {
+            boolean acquired;
+            try {
+                acquired = tryAcquire(lockName);
+            } catch (LockAcquisitionFailedException e) {
+                // PostgreSQL aborts the whole transaction when the lock query
+                // fails. Running the work inside it would make every statement
+                // fail with "current transaction is aborted", so roll back the
+                // lock transaction and run unguarded afterwards (fail open).
+                status.setRollbackOnly();
+                return LockOutcome.LOCK_FAILED;
+            }
+            if (!acquired) {
                 log.debug("Scheduler lock '{}' held by another replica; skipping.", lockName);
                 status.setRollbackOnly();
-                return false;
+                return LockOutcome.CONTENDED;
             }
             work.run();
-            return true;
+            return LockOutcome.RAN;
         });
-        return Boolean.TRUE.equals(ran);
+        if (outcome == LockOutcome.LOCK_FAILED) {
+            log.warn("Scheduler lock failed; running work unguarded outside the aborted transaction.");
+            work.run();
+            return true;
+        }
+        return outcome == LockOutcome.RAN;
     }
 
     protected boolean tryAcquire(String lockName) {
         try {
             return Boolean.TRUE.equals(jdbc.queryForObject(LOCK_SQL, Boolean.class, lockName));
         } catch (RuntimeException e) {
-            log.warn("Scheduler lock query failed; running unguarded: failureType={}",
-                    e.getClass().getSimpleName());
-            return true;
+            throw new LockAcquisitionFailedException(e);
+        }
+    }
+
+    private enum LockOutcome {
+        RAN,
+        CONTENDED,
+        LOCK_FAILED
+    }
+
+    private static final class LockAcquisitionFailedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private LockAcquisitionFailedException(RuntimeException cause) {
+            super(cause);
         }
     }
 }

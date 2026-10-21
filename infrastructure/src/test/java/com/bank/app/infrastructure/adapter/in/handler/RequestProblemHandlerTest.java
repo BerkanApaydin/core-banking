@@ -262,6 +262,25 @@ class RequestProblemHandlerTest {
         assertEquals("Invalid format", response.getBody().getProperties().get("message"));
     }
 
+    @Test
+    void shouldReturn413WhenMessageConverterWrapsBodyTooLarge() {
+        // A chunked body crosses the cap while Jackson reads it. Spring wraps
+        // the stream's IOException in HttpMessageNotReadableException, so the
+        // cause chain — not the direct cause — identifies the 413 outcome.
+        HttpInputMessage httpInputMessage = mock(HttpInputMessage.class);
+        RequestBodyTooLargeException overflow =
+                new RequestBodyTooLargeException("Request body exceeded 1024 bytes");
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException("I/O error while reading input message", overflow, httpInputMessage);
+
+        ResponseEntity<ProblemDetail> response = handler.handleHttpMessageNotReadableException(ex, null);
+
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("REQUEST_BODY_TOO_LARGE", response.getBody().getProperties().get("code"));
+        assertEquals("Request body is too large.", response.getBody().getProperties().get("message"));
+    }
+
     enum DummyEnum { VALUE1, VALUE2 }
 
     @Test

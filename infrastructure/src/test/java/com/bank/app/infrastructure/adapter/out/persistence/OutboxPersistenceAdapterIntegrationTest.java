@@ -38,15 +38,19 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
         }
     }
 
+    private final OutboxPersistenceAdapter adapter;
+
     private final OutboxJpaRepository outboxJpaRepository;
 
     private final PlatformTransactionManager transactionManager;
 
     @Autowired
-    OutboxPersistenceAdapterIntegrationTest(OutboxJpaRepository outboxJpaRepository,
+    OutboxPersistenceAdapterIntegrationTest(OutboxPersistenceAdapter adapter,
+            OutboxJpaRepository outboxJpaRepository,
             PlatformTransactionManager transactionManager,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
+        this.adapter = adapter;
         this.outboxJpaRepository = outboxJpaRepository;
         this.transactionManager = transactionManager;
     }
@@ -180,6 +184,26 @@ class OutboxPersistenceAdapterIntegrationTest extends AbstractSpringBootIntegrat
                 PageRequest.of(0, 3));
 
         assertEquals(3, result.size());
+    }
+
+    @Test
+    void shouldCommitRetentionBatchEvenWhenTheOuterTransactionRollsBack() {
+        // R-I05: the batch delete owns a REQUIRES_NEW transaction, so a
+        // scheduler-lock transaction that later rolls back must not undo rows
+        // that were already deleted (and committed) by this batch.
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        LocalDateTime old = LocalDateTime.now().minusDays(2);
+        tx.executeWithoutResult(status -> outboxJpaRepository.save(
+                new OutboxJpaEntity("evt-retention", "Transfer", "1", "TransferCompletedEvent",
+                        "{}", old, true, old, 0, false, null, 0)));
+
+        tx.executeWithoutResult(status -> {
+            adapter.deleteProcessedBefore(LocalDateTime.now().minusDays(1));
+            status.setRollbackOnly();
+        });
+
+        assertEquals(0, outboxJpaRepository.count(),
+                "the REQUIRES_NEW batch delete must survive the outer rollback");
     }
 
     @Test

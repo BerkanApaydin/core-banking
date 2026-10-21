@@ -41,6 +41,7 @@ class IdempotencyPersistenceAdapterTest {
         assertThat(result.get().status()).isEqualTo("COMPLETED");
         assertThat(result.get().responseBody()).isEqualTo("response");
         assertThat(result.get().responseStatus()).isEqualTo(200);
+        assertThat(result.get().replayable()).isTrue();
     }
 
     @Test
@@ -74,6 +75,20 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
+    void shouldMapNonReplayableEntry() {
+        var now = LocalDateTime.now();
+        var entity = new IdempotencyKeyJpaEntity("key1", "COMPLETED", null, 200, now);
+        entity.setResponseReplayable(false);
+        when(repository.findById("key1")).thenReturn(Optional.of(entity));
+
+        Optional<Entry> result = adapter.findById("key1");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().responseBody()).isNull();
+        assertThat(result.get().replayable()).isFalse();
+    }
+
+    @Test
     void shouldOnlyClaimFailedKeyWhenConditionalUpdateWins() {
         var now = LocalDateTime.now();
         when(repository.resetFailed("key1", null, now)).thenReturn(1);
@@ -84,33 +99,33 @@ class IdempotencyPersistenceAdapterTest {
 
     @Test
     void shouldMarkCompleted() {
-        when(repository.completeIfPending("key1", "response", 200)).thenReturn(1);
+        when(repository.completeIfPending("key1", "response", 200, true)).thenReturn(1);
 
         adapter.markCompleted("key1", "response", 200);
 
-        verify(repository).completeIfPending("key1", "response", 200);
+        verify(repository).completeIfPending("key1", "response", 200, true);
     }
 
     @Test
     void shouldTreatReplayAsIdempotentWhenAlreadyCompleted() {
         var entity = new IdempotencyKeyJpaEntity("key1", "COMPLETED", "old", 200, LocalDateTime.now());
-        when(repository.completeIfPending("key1", "response", 200)).thenReturn(0);
+        when(repository.completeIfPending("key1", "response", 200, true)).thenReturn(0);
         when(repository.findById("key1")).thenReturn(Optional.of(entity));
 
         adapter.markCompleted("key1", "response", 200);
 
-        verify(repository).completeIfPending("key1", "response", 200);
+        verify(repository).completeIfPending("key1", "response", 200, true);
     }
 
     @Test
     void shouldRejectCompletionWhenReservationIsMissing() {
-        when(repository.completeIfPending("missing", "response", 200)).thenReturn(0);
+        when(repository.completeIfPending("missing", "response", 200, true)).thenReturn(0);
         when(repository.findById("missing")).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class,
                 () -> adapter.markCompleted("missing", "response", 200));
 
-        verify(repository).completeIfPending("missing", "response", 200);
+        verify(repository).completeIfPending("missing", "response", 200, true);
     }
 
     @Test
@@ -166,18 +181,53 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
-    void shouldTruncateOversizedReplayBodyInsteadOfFailingBusinessWrite() {
-        // L6: completion joins the business tx; an oversized replay body must
-        // truncate (replay-only) rather than fail the write and roll money back.
+    void shouldStopAtTheSymmetricBatchBudgetForRequestKeys() {
+        var threshold = LocalDateTime.now();
+        when(repository.deleteExpiredTerminalRequestsBatch(threshold, 1000)).thenReturn(1000);
+
+        int deleted = adapter.deleteExpired(threshold);
+
+        assertThat(deleted)
+                .isEqualTo(1000 * IdempotencyPersistenceAdapter.MAX_BATCHES_PER_RUN);
+        verify(repository, times(IdempotencyPersistenceAdapter.MAX_BATCHES_PER_RUN))
+                .deleteExpiredTerminalRequestsBatch(threshold, 1000);
+    }
+
+    @Test
+    void shouldStopAtTheSymmetricBatchBudgetForHandlerKeys() {
+        var threshold = LocalDateTime.now();
+        when(repository.deleteExpiredHandlerKeysBatch(threshold, 1000)).thenReturn(1000);
+
+        int deleted = adapter.deleteExpiredHandlerKeys(threshold);
+
+        assertThat(deleted)
+                .isEqualTo(1000 * IdempotencyPersistenceAdapter.MAX_BATCHES_PER_RUN);
+        verify(repository, times(IdempotencyPersistenceAdapter.MAX_BATCHES_PER_RUN))
+                .deleteExpiredHandlerKeysBatch(threshold, 1000);
+    }
+
+    @Test
+    void shouldMarkOversizedReplayBodyNotReplayableInsteadOfStoringCorruptJson() {
+        // R-I06: completion joins the business tx, so an oversized replay body
+        // must still not fail the write. It is no longer truncated (a cut JSON
+        // fragment is corrupt on replay); it is stored as NULL and flagged
+        // non-replayable so the codec can return an explicit problem instead.
         String oversized = "x".repeat(IdempotencyPersistenceAdapter.MAX_RESPONSE_BODY_CHARS + 1);
-        when(repository.completeIfPending(eq("key1"), anyString(), eq(200))).thenReturn(1);
+        when(repository.completeIfPending("key1", null, 200, false)).thenReturn(1);
 
         adapter.markCompleted("key1", oversized, 200);
 
-        verify(repository).completeIfPending(eq("key1"),
-                argThat(body -> body != null
-                        && body.length() == IdempotencyPersistenceAdapter.MAX_RESPONSE_BODY_CHARS),
-                eq(200));
+        verify(repository).completeIfPending("key1", null, 200, false);
+    }
+
+    @Test
+    void shouldKeepBodyAtExactReplayCapReplayable() {
+        String atCap = "x".repeat(IdempotencyPersistenceAdapter.MAX_RESPONSE_BODY_CHARS);
+        when(repository.completeIfPending("key1", atCap, 200, true)).thenReturn(1);
+
+        adapter.markCompleted("key1", atCap, 200);
+
+        verify(repository).completeIfPending("key1", atCap, 200, true);
     }
 
     @Test

@@ -105,6 +105,19 @@ class IdempotencyGuardTest {
         }
 
         @Test
+        @DisplayName("should preserve non-replayable flag for an oversized stored response")
+        void shouldPreserveNonReplayableFlag() {
+            Entry existing = new Entry("key-1", "COMPLETED", null, 201,
+                    LocalDateTime.now(), null, false);
+            when(idempotencyPort.findById("key-1")).thenReturn(Optional.of(existing));
+
+            IdempotencyResult result = guard.startRequest("key-1");
+
+            assertEquals(IdempotencyResult.Status.COMPLETED, result.status());
+            assertFalse(result.replayable());
+        }
+
+        @Test
         @DisplayName("should return PENDING on race condition when tryCreate fails and key appears as PENDING")
         void shouldReturnPendingOnRaceCondition() {
             when(idempotencyPort.findById("key-1"))

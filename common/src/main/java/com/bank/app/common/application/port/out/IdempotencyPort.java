@@ -49,10 +49,15 @@ public interface IdempotencyPort {
     int deleteExpiredHandlerKeys(LocalDateTime threshold);
 
     record Entry(String key, String status, String responseBody, Integer responseStatus,
-                 LocalDateTime createdAt, String requestHash) {
+                 LocalDateTime createdAt, String requestHash, boolean replayable) {
         public Entry(String key, String status, String responseBody, Integer responseStatus,
                      LocalDateTime createdAt) {
-            this(key, status, responseBody, responseStatus, createdAt, null);
+            this(key, status, responseBody, responseStatus, createdAt, null, true);
+        }
+
+        public Entry(String key, String status, String responseBody, Integer responseStatus,
+                     LocalDateTime createdAt, String requestHash) {
+            this(key, status, responseBody, responseStatus, createdAt, requestHash, true);
         }
     }
 }

@@ -46,13 +46,17 @@ public interface IdempotencyKeyJpaRepository extends JpaRepository<IdempotencyKe
                   @Param("now") LocalDateTime now, @Param("keyKind") String keyKind);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE idempotency_keys SET status = 'PENDING', response_body = NULL, response_status = NULL, request_hash = :requestHash, created_at = :now "
+    @Query(value = "UPDATE idempotency_keys SET status = 'PENDING', response_body = NULL, response_status = NULL, "
+            + "response_replayable = TRUE, request_hash = :requestHash, created_at = :now "
             + "WHERE key_value = :key AND status = 'FAILED'", nativeQuery = true)
     int resetFailed(@Param("key") String key, @Param("requestHash") String requestHash, @Param("now") LocalDateTime now);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE idempotency_keys SET status='COMPLETED', response_body=:body, response_status=:status WHERE key_value=:key AND status='PENDING'", nativeQuery=true)
-    int completeIfPending(@Param("key") String key, @Param("body") String body, @Param("status") int status);
+    @Query(value = "UPDATE idempotency_keys SET status='COMPLETED', response_body=:body, "
+            + "response_status=:status, response_replayable=:replayable "
+            + "WHERE key_value=:key AND status='PENDING'", nativeQuery=true)
+    int completeIfPending(@Param("key") String key, @Param("body") String body,
+                          @Param("status") int status, @Param("replayable") boolean replayable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE idempotency_keys SET status='FAILED' WHERE key_value=:key AND status='PENDING'", nativeQuery=true)

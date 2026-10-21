@@ -88,11 +88,11 @@ public class OutboxProcessor {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeoutString = "${app.transaction.timeout-seconds:30}")
-    public void recordFailure(EventEntry fallbackEvent, Throwable t, int maxRetries) {
+    public boolean recordFailure(EventEntry fallbackEvent, Throwable t, int maxRetries) {
         EventEntry event = outboxPort.findByIdForUpdateSkipLocked(fallbackEvent.id()).orElse(null);
 
         if (event == null || event.processed() || event.deadLetter()) {
-            return;
+            return false;
         }
 
         int nextRetry = event.retryCount() + 1;
@@ -114,6 +114,7 @@ public class OutboxProcessor {
                         event.id(), nextRetry, maxRetries, error);
             });
         }
+        return true;
     }
 
     private static void afterCommit(Runnable action) {

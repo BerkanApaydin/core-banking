@@ -16,6 +16,9 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -259,21 +262,28 @@ public class OutboxPoller {
 
         ExecutorService w = workers;
         if (w == null || unprocessedEvents.size() == 1) {
+            Set<String> failureClaims = ConcurrentHashMap.newKeySet();
             for (EventEntry event : unprocessedEvents) {
-                processOne(event, maxRetries);
+                processOne(event, maxRetries, failureClaims);
             }
             return;
         }
+        // Exactly one failure write per event per batch: a timed-out worker
+        // and the deadline path can otherwise both call recordFailure, and a
+        // cancelled-before-start task would not call it at all.
+        Set<String> failureClaims = ConcurrentHashMap.newKeySet();
         // Parallel fan-out within the partition; each event owns its row lock
         // (SKIP LOCKED) and its own REQUIRES_NEW processing transaction, so
         // ordering within a batch is intentionally not guaranteed (at-least-once).
         List<Future<?>> futures = new ArrayList<>(unprocessedEvents.size());
         for (EventEntry event : unprocessedEvents) {
-            futures.add(w.submit(() -> processOne(event, maxRetries)));
+            futures.add(w.submit(() -> processOne(event, maxRetries, failureClaims)));
         }
         long deadlineNanos = System.nanoTime()
                 + TimeUnit.SECONDS.toNanos(outboxProperties.workerTimeoutSeconds());
-        for (Future<?> f : futures) {
+        for (int i = 0; i < futures.size(); i++) {
+            Future<?> f = futures.get(i);
+            EventEntry event = unprocessedEvents.get(i);
             // PERF-8: bounded wait — an untimed get() parks the partition
             // thread for the full tx timeout when a handler hangs. Bound
             // lives in OutboxProperties (audit: previously a magic 30s here).
@@ -287,6 +297,7 @@ public class OutboxPoller {
             long remaining = deadlineNanos - System.nanoTime();
             if (remaining <= 0) {
                 f.cancel(true);
+                recordTimeoutFailure(event, maxRetries, failureClaims);
                 log.warn("Outbox batch deadline exceeded after {}s; remaining tasks cancelled",
                         outboxProperties.workerTimeoutSeconds());
                 continue;
@@ -295,8 +306,13 @@ public class OutboxPoller {
                 f.get(remaining, TimeUnit.NANOSECONDS);
             } catch (TimeoutException timeout) {
                 f.cancel(true);
+                recordTimeoutFailure(event, maxRetries, failureClaims);
                 log.warn("Outbox worker timed out after {}s; task cancelled",
                         outboxProperties.workerTimeoutSeconds());
+            } catch (CancellationException cancelled) {
+                // Cancelled by another path (e.g. shutdown) before completing:
+                // advance the retry budget instead of leaving the event stuck.
+                recordTimeoutFailure(event, maxRetries, failureClaims);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -306,7 +322,7 @@ public class OutboxPoller {
         }
     }
 
-    private void processOne(EventEntry event, int maxRetries) {
+    private void processOne(EventEntry event, int maxRetries, Set<String> failureClaims) {
         try {
             outboxProcessor.processEvent(event);
         } catch (Throwable e) {
@@ -316,7 +332,39 @@ public class OutboxPoller {
             // Unwrap one level like before so the stored failureType names
             // the handler's root cause, not the processor wrapper.
             Throwable root = e.getCause() != null ? e.getCause() : e;
-            outboxProcessor.recordFailure(event, root, maxRetries);
+            recordFailureOnce(event, root, maxRetries, failureClaims);
+        }
+    }
+
+    private void recordTimeoutFailure(EventEntry event, int maxRetries, Set<String> failureClaims) {
+        try {
+            recordFailureOnce(event,
+                    new OutboxWorkerTimeoutException("Outbox worker deadline exceeded for event " + event.id()),
+                    maxRetries, failureClaims);
+        } catch (RuntimeException e) {
+            // Failure bookkeeping must not abort the rest of the batch; the
+            // event stays eligible and the next poll retries it.
+            log.warn("Failed to record outbox timeout failure: id={}, failureType={}",
+                    event.id(), e.getClass().getName());
+        }
+    }
+
+    private void recordFailureOnce(EventEntry event, Throwable failure, int maxRetries,
+            Set<String> failureClaims) {
+        if (!failureClaims.add(event.id())) {
+            return;
+        }
+        boolean recorded;
+        try {
+            recorded = outboxProcessor.recordFailure(event, failure, maxRetries);
+        } catch (RuntimeException e) {
+            failureClaims.remove(event.id());
+            throw e;
+        }
+        if (!recorded) {
+            // The row was already processed or locked by a still-running
+            // worker; let that worker own the outcome instead of claiming it.
+            failureClaims.remove(event.id());
         }
     }
 }

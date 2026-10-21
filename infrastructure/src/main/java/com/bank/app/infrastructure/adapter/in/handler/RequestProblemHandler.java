@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -148,6 +149,18 @@ public class RequestProblemHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ProblemDetail> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex, WebRequest request) {
+        // The bounded request stream throws RequestBodyTooLargeException while a
+        // message converter reads a chunked body. Spring wraps that IOException
+        // in HttpMessageNotReadableException, so checking only the direct cause
+        // made oversized chunked requests look like malformed JSON (400). Walk
+        // the chain first: an oversized body is always 413.
+        if (hasCause(ex, RequestBodyTooLargeException.class)) {
+            log.warn("Oversized request body rejected during message conversion");
+            String message = messages.resolveOrDefault(MessageKeys.REQUEST_BODY_TOO_LARGE,
+                    "Request body is too large.");
+            return ProblemDetailFactory.create(HttpStatus.PAYLOAD_TOO_LARGE,
+                    "REQUEST_BODY_TOO_LARGE", message, request);
+        }
         String message = messages.resolveMessage(MessageKeys.INVALID_FORMAT);
         ErrorCode code = ErrorCode.INVALID_FORMAT;
         if (ex.getCause() instanceof InvalidFormatException invalidFormatException) {
@@ -191,5 +204,18 @@ public class RequestProblemHandler {
         String message = messages.resolveOrDefault(MessageKeys.RESOURCE_NOT_FOUND,
                 "The requested resource was not found.");
         return ProblemDetailFactory.create(ErrorCode.RESOURCE_NOT_FOUND, message, request);
+    }
+
+    private static boolean hasCause(Throwable failure, Class<? extends Throwable> type) {
+        Throwable current = failure;
+        // Bound the walk: initCause allows cycles, and a corrupt chain must not
+        // hang request error handling.
+        for (int depth = 0; current != null && depth < 16; depth++) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

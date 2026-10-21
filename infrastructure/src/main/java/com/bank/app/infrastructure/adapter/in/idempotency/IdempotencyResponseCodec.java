@@ -1,7 +1,9 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
+import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,14 @@ final class IdempotencyResponseCodec {
     }
 
     Object replay(IdempotencyGuard.IdempotencyResult result) {
+        if (!result.replayable()) {
+            // R-I06: the first response was too large to store intact. There is
+            // no safe body to replay (a truncated JSON fragment is corruption),
+            // so fail explicitly instead of returning wrong data with a 2xx.
+            return ProblemDetailFactory.create(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "IDEMPOTENCY_REPLAY_UNAVAILABLE",
+                    "The original response is no longer available for replay.", null);
+        }
         HttpStatusCode status = result.responseStatus() != null
                 ? HttpStatusCode.valueOf(result.responseStatus())
                 : HttpStatusCode.valueOf(200);

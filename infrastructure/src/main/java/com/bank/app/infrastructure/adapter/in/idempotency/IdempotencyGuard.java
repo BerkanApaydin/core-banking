@@ -72,7 +72,8 @@ public class IdempotencyGuard {
         }
         return switch (entry.status()) {
             case "PENDING" -> IdempotencyResult.pending();
-            case "COMPLETED" -> IdempotencyResult.completed(entry.responseBody(), entry.responseStatus());
+            case "COMPLETED" -> IdempotencyResult.completed(
+                    entry.responseBody(), entry.responseStatus(), entry.replayable());
             case "FAILED" -> {
                 boolean claimed = requestHash == null
                         ? idempotencyPort.tryResetFailed(key, now())
@@ -84,7 +85,8 @@ public class IdempotencyGuard {
                 // proceed without owning a live reservation.
                 Optional<Entry> winner = idempotencyPort.findById(key);
                 if (winner.isPresent() && "COMPLETED".equals(winner.get().status())) {
-                    yield IdempotencyResult.completed(winner.get().responseBody(), winner.get().responseStatus());
+                    yield IdempotencyResult.completed(
+                            winner.get().responseBody(), winner.get().responseStatus(), winner.get().replayable());
                 }
                 yield IdempotencyResult.pending();
             }
@@ -106,9 +108,14 @@ public class IdempotencyGuard {
         idempotencyPort.markFailed(key);
     }
 
-    public record IdempotencyResult(Status status, String responseBody, Integer responseStatus) {
+    public record IdempotencyResult(Status status, String responseBody, Integer responseStatus,
+                                    boolean replayable) {
         public IdempotencyResult {
             Objects.requireNonNull(status);
+        }
+
+        public IdempotencyResult(Status status, String responseBody, Integer responseStatus) {
+            this(status, responseBody, responseStatus, status == Status.COMPLETED);
         }
 
         public enum Status { NEW, PENDING, COMPLETED }
@@ -118,7 +125,12 @@ public class IdempotencyGuard {
         }
 
         public static IdempotencyResult completed(String responseBody, Integer responseStatus) {
-            return new IdempotencyResult(Status.COMPLETED, responseBody, responseStatus);
+            return new IdempotencyResult(Status.COMPLETED, responseBody, responseStatus, true);
+        }
+
+        public static IdempotencyResult completed(String responseBody, Integer responseStatus,
+                boolean replayable) {
+            return new IdempotencyResult(Status.COMPLETED, responseBody, responseStatus, replayable);
         }
 
         public static IdempotencyResult newRequest() {

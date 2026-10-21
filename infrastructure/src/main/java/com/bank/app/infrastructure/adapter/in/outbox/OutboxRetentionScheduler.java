@@ -30,7 +30,8 @@ public class OutboxRetentionScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxRetentionScheduler.class);
 
-    static final String LOCK_NAME = "outbox-retention";
+    static final String OUTBOX_LOCK_NAME = "outbox-retention";
+    static final String HANDLER_KEY_LOCK_NAME = "outbox-handler-retention";
 
     private final OutboxPort outboxPort;
     private final IdempotencyPort idempotencyPort;
@@ -70,14 +71,29 @@ public class OutboxRetentionScheduler {
     @Scheduled(cron = "${app.outbox.retention-cron:0 0 5 * * 0}")
     public void retainProcessed() {
         // K12/D5: single-flight across replicas. No @Transactional here — the
-        // lock guard owns the transaction (same rule as IdempotencyCleanupScheduler).
-        schedulerLock.runIfLeader(LOCK_NAME, () -> {
-            Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
-            LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(outboxProperties.retentionDays());
+        // lock guard owns the lock transaction, while each delete batch runs in
+        // its own REQUIRES_NEW transaction (R-I05). A slow/failed handler-key
+        // sweep therefore cannot roll back the outbox deletions that already
+        // committed.
+        Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
+        LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(outboxProperties.retentionDays());
+
+        // Order matters: outbox rows first, then their handler dedup keys, so a
+        // key never disappears while its event row still exists. The handler
+        // sweep has its own advisory lock name and only the outbox leader runs
+        // it, preventing a second replica from interleaving the two phases.
+        boolean outboxRetained = schedulerLock.runIfLeader(OUTBOX_LOCK_NAME, () -> {
             int outboxDeleted = outboxPort.deleteProcessedBefore(cutoff);
+            log.info("Outbox retention completed: cutoff={}, processedRowsDeleted={}", cutoff, outboxDeleted);
+        });
+        if (!outboxRetained) {
+            log.debug("Outbox retention skipped: another replica owns '{}'.", OUTBOX_LOCK_NAME);
+            return;
+        }
+        schedulerLock.runIfLeader(HANDLER_KEY_LOCK_NAME, () -> {
             int handlerDeleted = idempotencyPort.deleteExpiredHandlerKeys(cutoff);
-            log.info("Outbox retention completed: cutoff={}, processedRowsDeleted={}, handlerKeysDeleted={}",
-                    cutoff, outboxDeleted, handlerDeleted);
+            log.info("Outbox handler-key retention completed: cutoff={}, handlerKeysDeleted={}",
+                    cutoff, handlerDeleted);
         });
     }
 }

@@ -13,10 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -213,6 +215,49 @@ class OutboxPollerTest {
 
         verify(outboxProcessor).processEvent(ok);
         verify(outboxProcessor).recordFailure(eq(bad), any(Throwable.class), eq(5));
+    }
+
+    @Test
+    void shouldRecordTimeoutFailureForRunningAndQueuedEvents() throws Exception {
+        outboxPoller = new OutboxPoller(outboxPort, outboxProcessor,
+                new OutboxProperties(5, 50, 1, 2000, 30, 4, 12, 1));
+        EventEntry running = event("running");
+        EventEntry queued = event("queued");
+        when(outboxPort.findAndLockUnprocessed(50, 0)).thenReturn(List.of(running, queued));
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            // Ignores interrupts on purpose: this is the tricky case where
+            // Future.cancel(true) cannot stop the handler, yet the queued
+            // event behind it never starts and must still reach a retry.
+            doAnswer(invocation -> {
+                while (release.getCount() > 0) {
+                    try {
+                        release.await(50, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException ignored) {
+                        // keep waiting; the poller owns the deadline
+                    }
+                }
+                return null;
+            }).when(outboxProcessor).processEvent(running);
+            ExecutorService workers = Executors.newFixedThreadPool(1);
+            try {
+                var field = OutboxPoller.class.getDeclaredField("workers");
+                field.setAccessible(true);
+                field.set(outboxPoller, workers);
+
+                outboxPoller.pollAndProcessEvents();
+            } finally {
+                release.countDown();
+                workers.shutdownNow();
+            }
+        } finally {
+            release.countDown();
+        }
+
+        verify(outboxProcessor).recordFailure(eq(running),
+                any(OutboxWorkerTimeoutException.class), eq(5));
+        verify(outboxProcessor).recordFailure(eq(queued),
+                any(OutboxWorkerTimeoutException.class), eq(5));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.bank.app.infrastructure.adapter.in.outbox;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,7 +16,10 @@ import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,8 +31,40 @@ class OutboxRetentionSchedulerTest {
     @Mock
     private IdempotencyPort idempotencyPort;
 
+    @Mock
+    private AdvisorySchedulerLock schedulerLock;
+
     @Captor
     private ArgumentCaptor<LocalDateTime> cutoffCaptor;
+
+    @Test
+    void shouldUseSeparateAdvisoryLocksForTheTwoRetentionPhases() {
+        var scheduler = new OutboxRetentionScheduler(outboxPort, idempotencyPort,
+                new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30), schedulerLock);
+        when(schedulerLock.runIfLeader(eq(OutboxRetentionScheduler.OUTBOX_LOCK_NAME), any(Runnable.class)))
+                .thenReturn(true);
+        when(schedulerLock.runIfLeader(eq(OutboxRetentionScheduler.HANDLER_KEY_LOCK_NAME), any(Runnable.class)))
+                .thenReturn(true);
+
+        scheduler.retainProcessed();
+
+        verify(schedulerLock).runIfLeader(eq(OutboxRetentionScheduler.OUTBOX_LOCK_NAME), any(Runnable.class));
+        verify(schedulerLock).runIfLeader(eq(OutboxRetentionScheduler.HANDLER_KEY_LOCK_NAME), any(Runnable.class));
+    }
+
+    @Test
+    void shouldSkipHandlerSweepWhenAnotherReplicaOwnsTheOutboxPhase() {
+        var scheduler = new OutboxRetentionScheduler(outboxPort, idempotencyPort,
+                new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30), schedulerLock);
+        when(schedulerLock.runIfLeader(eq(OutboxRetentionScheduler.OUTBOX_LOCK_NAME), any(Runnable.class)))
+                .thenReturn(false);
+
+        scheduler.retainProcessed();
+
+        verify(schedulerLock, never())
+                .runIfLeader(eq(OutboxRetentionScheduler.HANDLER_KEY_LOCK_NAME), any(Runnable.class));
+        verifyNoInteractions(outboxPort, idempotencyPort);
+    }
 
     @Test
     void shouldDeleteProcessedRowsBeforeHandlerKeysWithSameCutoff() {
