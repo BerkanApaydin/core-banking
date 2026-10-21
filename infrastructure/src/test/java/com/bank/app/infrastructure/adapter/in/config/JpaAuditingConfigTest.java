@@ -1,11 +1,14 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.auditing.DateTimeProvider;
 import org.springframework.data.domain.AuditorAware;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -13,6 +16,10 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,5 +99,24 @@ class JpaAuditingConfigTest {
         Optional<String> auditor = provider.getCurrentAuditor();
         assertTrue(auditor.isPresent());
         assertEquals("john_doe", auditor.get());
+    }
+
+    @Test
+    void shouldWireUtcDateTimeProviderIntoAuditing() {
+        EnableJpaAuditing auditing = JpaAuditingConfig.class.getAnnotation(EnableJpaAuditing.class);
+
+        assertNotNull(auditing);
+        assertEquals("utcDateTimeProvider", auditing.dateTimeProviderRef());
+    }
+
+    @Test
+    void shouldProduceUtcAuditingTimestampsRegardlessOfClockZone() {
+        Instant instant = Instant.parse("2026-10-21T10:15:30Z");
+        ClockProviderPort clockProvider = () -> Clock.fixed(instant, ZoneId.of("America/New_York"));
+        DateTimeProvider provider = config.utcDateTimeProvider(clockProvider);
+
+        assertEquals(
+                LocalDateTime.of(2026, 10, 21, 10, 15, 30),
+                provider.getNow().orElseThrow());
     }
 }

@@ -2,12 +2,23 @@
 
 ## Current state
 
-All Flyway migrations live in one directory —
-`common/src/main/resources/db/migration/V1__…V55__.sql` — while the JPA
-entities they serve live in their bounded contexts (`account`, `transfer`,
-…). The `persistence` module carries the name but owns almost no schema.
-This is backwards from the module story (BCs own their tables) and makes
-independent schema evolution harder than it should be.
+All Flyway migrations live in one resources-only module
+(`migrations/src/main/resources/db/migration/V1__…V60__.sql`), while the
+JPA entities they serve live in their bounded contexts (`account`,
+`transfer`, …). `common` no longer packages schema resources. The classpath
+location (`classpath:db/migration`) and every file name are unchanged, so
+Flyway history and checksums are unaffected by the move.
+
+The `persistence` module carries the name but owns almost no schema. This is
+still backwards from the module story (BCs own their tables) and makes
+independent schema evolution harder than it should be; the per-BC split below
+remains the long-term goal.
+
+## Migration module (R-C07, done)
+
+`app` consumes the module at compile scope; modules with Testcontainers
+integration tests add it at test scope. The module stays Java-free and keeps
+the resources at `classpath:db/migration`.
 
 ## Convention (effective immediately, V44+)
 

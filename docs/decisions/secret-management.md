@@ -26,6 +26,18 @@ without them:
   secrets; the single allowlisted value is the non-secret dev placeholder
   string (anchored, cannot match inside a real secret).
 
+## Demo seed credentials (R-C06)
+
+`DataSeeder` runs only under `(dev | demo) & !prod`. Its two demo users no
+longer carry passwords in Java: they bind from `app.demo.seed.*`, which maps
+to `DEMO_SEED_AHMET_PASSWORD` / `DEMO_SEED_AYSE_PASSWORD`. The `dev` profile
+keeps the local-only defaults in `application-dev.yml` so a fresh checkout
+still boots without an `.env`; the `demo` profile uses
+`application-demo.yml`, where both placeholders have no default and startup
+fails when they are unset. `DataSeeder` also fails fast on a blank bound value
+instead of creating a user with an empty password. The dev defaults are
+public by design and must never be reused outside a local database.
+
 ## What is still missing
 
 Plain env-vars are not a secret store: they appear in CI logs on

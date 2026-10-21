@@ -36,6 +36,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DataSeederTest {
 
+    private static final DemoSeedProperties SEED_PROPERTIES =
+            new DemoSeedProperties("Ahmet12345678", "Ayse12345678");
+
     @Mock
     private RegisterUserUseCase registerUserUseCase;
     @Mock
@@ -49,7 +52,8 @@ class DataSeederTest {
 
     @BeforeEach
     void setUp() {
-        dataSeeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort, loadAccountPort);
+        dataSeeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort,
+                loadAccountPort, SEED_PROPERTIES);
     }
 
     @Test
@@ -62,8 +66,8 @@ class DataSeederTest {
         CommandLineRunner runner = dataSeeder.seedData();
         runner.run();
 
-        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "Ahmet12345678"));
-        verify(registerUserUseCase).execute(new AuthRequest("ayse", "Ayse12345678"));
+        verify(registerUserUseCase).execute(new AuthRequest("ahmet", SEED_PROPERTIES.ahmetPassword()));
+        verify(registerUserUseCase).execute(new AuthRequest("ayse", SEED_PROPERTIES.aysePassword()));
         verify(createAccountPort, atLeastOnce()).execute(any(CreateAccountRequest.class));
     }
 
@@ -107,7 +111,7 @@ class DataSeederTest {
         assertEquals("User Ahmet not found.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ahmet", "Ahmet12345678"));
+                .execute(new AuthRequest("ahmet", SEED_PROPERTIES.ahmetPassword()));
     }
 
     @Test
@@ -129,7 +133,7 @@ class DataSeederTest {
         assertEquals("User Ayse not found.", ex.getMessage());
 
         verify(registerUserUseCase)
-                .execute(new AuthRequest("ayse", "Ayse12345678"));
+                .execute(new AuthRequest("ayse", SEED_PROPERTIES.aysePassword()));
     }
 
     @Test
@@ -219,5 +223,32 @@ class DataSeederTest {
         dataSeeder.seedData().run();
 
         verify(createAccountPort, times(2)).execute(any(CreateAccountRequest.class));
+    }
+
+    @Test
+    void shouldUseConfiguredSeedPasswords() throws Exception {
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.empty()).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.empty()).thenReturn(Optional.of(ayse));
+        DataSeeder seeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort,
+                loadAccountPort, new DemoSeedProperties("CustomAhmet123!", "CustomAyse123!"));
+
+        seeder.seedData().run();
+
+        verify(registerUserUseCase).execute(new AuthRequest("ahmet", "CustomAhmet123!"));
+        verify(registerUserUseCase).execute(new AuthRequest("ayse", "CustomAyse123!"));
+    }
+
+    @Test
+    void shouldFailFastWhenSeedPasswordIsBlank() {
+        DataSeeder seeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort,
+                loadAccountPort, new DemoSeedProperties(" ", "Ayse12345678"));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> seeder.seedData().run());
+
+        assertThat(failure).hasMessageContaining("app.demo.seed.ahmet-password");
     }
 }

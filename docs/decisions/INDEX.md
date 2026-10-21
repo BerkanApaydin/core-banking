@@ -47,6 +47,7 @@ is the single map: ID → file → one-sentence decision.
 - `keyset-pagination.md` (DB-2: cursor contract)
 - `kafka-readiness.md` (long term: OutboxPort → broker migration)
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
+- `shared-kernel-web-contracts.md` (R-C07: framework-free web contracts stay in `common`; moving them to `infrastructure` would invert the dependency arrow)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 | O-1 | `docs/decisions/secret-management.md` (2026-10 rotation) | Leaked dev-default JWT secret rotated; history still counts as compromised. |
@@ -55,3 +56,8 @@ is the single map: ID → file → one-sentence decision.
 | TX-P | `docs/decisions/transaction-strategy.md` (boundary port) | Adapters observe tx state via `TransactionBoundaryPort`; no programmatic Spring TX in BCs (ArchUnit). |
 | CACHE-1 | `docs/decisions/cache-prefix-alias.md` | Canonical `app.cache.account-info.*` keys win on presence; shipped defaults live on the deprecated legacy prefix (alias) and the resolver falls back to it. |
 | AUD-1 | `docs/decisions/audit-persistence.md` | `AuditLogJpaEntity` intentionally outside the shared auditing base; explicit `@PrePersist` only. |
+| R-C03 | `application-dev.yml`, `DatasourceUtcContractTest` | Dev datasource repeats the base UTC session option; a contract test pins base/dev parity. |
+| R-C04 | `UtcDateTimeProvider`, `JpaAuditingConfig` | JPA auditing uses a UTC `DateTimeProvider`; the clock zone cannot leak into `created_at`/`updated_at`. |
+| R-C05 | `OrphanIntegrityProperties` | Orphan cron and threshold fail fast at binding instead of accepting silently invalid values. |
+| R-C06 | `DemoSeedProperties`, `application-demo.yml` | Demo seed passwords come from config/env; the demo profile requires explicit values and refuses blanks. |
+| R-C07 | `migrations/pom.xml`, `docs/decisions/shared-kernel-web-contracts.md` | Flyway resources live in a dedicated `migrations` module; framework-free web contracts stay in the shared kernel. |

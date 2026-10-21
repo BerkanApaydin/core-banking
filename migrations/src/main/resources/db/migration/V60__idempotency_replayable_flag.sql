@@ -20,6 +20,10 @@
 -- The column is boolean with a server-side default, so the ALTER is metadata
 -- only on PostgreSQL 11+ and does not rewrite the table.
 
+-- The backfill scans every completed idempotency row; lift the role's 30s
+-- statement_timeout for this one transaction (HIGH-4).
+SET LOCAL statement_timeout = '10min';
+
 ALTER TABLE idempotency_keys
     ADD COLUMN response_replayable BOOLEAN NOT NULL DEFAULT TRUE;
 

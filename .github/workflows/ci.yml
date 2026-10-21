@@ -161,7 +161,7 @@ jobs:
         test -f scripts/migration_soak.sh
         grep -q '^  migration-soak:' .github/workflows/ci.yml
         grep -q 'BASELINE_TARGET' scripts/migration_soak.sh
-        test -f common/src/main/resources/db/migration/V43__transfer_history_keyset_covering_indexes.sql
+        test -f migrations/src/main/resources/db/migration/V43__transfer_history_keyset_covering_indexes.sql
         test -f k8s/grafana-dashboard.json
         echo "migration-soak job + keyset index + dashboard present"
 
@@ -170,23 +170,23 @@ jobs:
       # CONTENT that made V51 necessary: V51 must drop the real V27 index
       # name, and must not repeat V41's phantom-name typo.
       run: |
-        grep -q "idx_idempotency_pending_http_created_at" common/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql
-        grep -q "idx_idempotency_pending_http_created_at" common/src/main/resources/db/migration/V27__index_pending_http_idempotency.sql
+        grep -q "idx_idempotency_pending_http_created_at" migrations/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql
+        grep -q "idx_idempotency_pending_http_created_at" migrations/src/main/resources/db/migration/V27__index_pending_http_idempotency.sql
         # Phantom check is DROP-scoped: V51's own comment names the V41 typo
         # for context, so a bare filename grep would false-positive on it.
-        if grep -q "DROP INDEX.*idx_pending_http_idempotency" common/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql; then
+        if grep -q "DROP INDEX.*idx_pending_http_idempotency" migrations/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql; then
           echo "::error::V51 repeats the V41 phantom index name"
           exit 1
         fi
         # L2/V52: the eight subsumed/dead indexes must stay in the drop list.
         for idx in idx_outbox_events_unprocessed idx_transfers_created_at idx_audit_logs_timestamp idx_ledger_account_business idx_accounts_user_id_status idx_audit_logs_username idx_audit_logs_username_action idx_idempotency_keys_created_at; do
-          grep -q "DROP INDEX IF EXISTS $idx" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql || { echo "::error::V52 missing drop for $idx"; exit 1; }
+          grep -q "DROP INDEX IF EXISTS $idx" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql || { echo "::error::V52 missing drop for $idx"; exit 1; }
         done
         # L3/V52: retention expression index over COALESCE(processed_at, created_at).
-        grep -q "idx_outbox_retention_processed_created" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
-        grep -q "COALESCE(processed_at, created_at)" common/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
+        grep -q "idx_outbox_retention_processed_created" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
+        grep -q "COALESCE(processed_at, created_at)" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
         # L6/V53: replay body widened to TEXT, never a business-tx failure mode.
-        grep -q "ALTER TABLE idempotency_keys ALTER COLUMN response_body TYPE TEXT" common/src/main/resources/db/migration/V53__widen_idempotency_response_body.sql
+        grep -q "ALTER TABLE idempotency_keys ALTER COLUMN response_body TYPE TEXT" migrations/src/main/resources/db/migration/V53__widen_idempotency_response_body.sql
         echo "migration content contracts present"
 
     - name: Supply-chain self-contracts (O-1/O-2)
@@ -471,7 +471,7 @@ jobs:
       id: baseline
       run: |
         mapfile -t MIGRATIONS < <(
-          find common/src/main/resources/db/migration -maxdepth 1 -name 'V*__*.sql' -printf '%f\n' | sort -V
+          find migrations/src/main/resources/db/migration -maxdepth 1 -name 'V*__*.sql' -printf '%f\n' | sort -V
         )
         if [ "${#MIGRATIONS[@]}" -lt 2 ]; then
           echo "::error::need at least two migrations to soak the latest"

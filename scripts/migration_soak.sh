@@ -36,7 +36,7 @@ run_psql() {
 run_flyway() {
   "$FLYWAY_BIN" "$@" \
     -url="$FLYWAY_URL" \
-    -locations=filesystem:common/src/main/resources/db/migration
+    -locations=filesystem:migrations/src/main/resources/db/migration
 }
 
 echo "[migration-soak] seed_rows=$SEED_ROWS baseline_target=${BASELINE_TARGET:-<current>}"

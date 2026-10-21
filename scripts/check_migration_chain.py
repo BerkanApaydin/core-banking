@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MIGRATION_DIR = ROOT / "common" / "src" / "main" / "resources" / "db" / "migration"
+MIGRATION_DIR = ROOT / "migrations" / "src" / "main" / "resources" / "db" / "migration"
 
 
 def fail(message: str) -> int:

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Seeds sample data through domain use cases — JPA entity bypass removed.
@@ -48,15 +49,18 @@ public class DataSeeder {
     private final CreateAccountUseCase createAccountPort;
     private final LoadUserPort loadUserPort;
     private final LoadAccountPort loadAccountPort;
+    private final DemoSeedProperties seedProperties;
 
     public DataSeeder(RegisterUserUseCase registerUserUseCase,
             CreateAccountUseCase createAccountPort,
             LoadUserPort loadUserPort,
-            LoadAccountPort loadAccountPort) {
+            LoadAccountPort loadAccountPort,
+            DemoSeedProperties seedProperties) {
         this.registerUserUseCase = registerUserUseCase;
         this.createAccountPort = createAccountPort;
         this.loadUserPort = loadUserPort;
         this.loadAccountPort = loadAccountPort;
+        this.seedProperties = seedProperties;
     }
 
     /**
@@ -66,8 +70,8 @@ public class DataSeeder {
      */
     public CommandLineRunner seedData() {
         return args -> {
-            seedUser("ahmet", "Ahmet12345678");
-            seedUser("ayse", "Ayse12345678");
+            seedUser("ahmet", requireSeedPassword("ahmet", seedProperties.ahmetPassword()));
+            seedUser("ayse", requireSeedPassword("ayse", seedProperties.aysePassword()));
 
             var ahmet = loadUserPort.findByUsername("ahmet")
                     .orElseThrow(() -> new IllegalStateException("User Ahmet not found."));
@@ -90,6 +94,16 @@ public class DataSeeder {
 
             log.info("Database seeding completed (use case based).");
         };
+    }
+
+    private static String requireSeedPassword(String username, String password) {
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException(
+                    "Demo seeding is enabled but no password is configured for '" + username
+                            + "'; set app.demo.seed." + username + "-password or DEMO_SEED_"
+                            + username.toUpperCase(Locale.ROOT) + "_PASSWORD.");
+        }
+        return password;
     }
 
     private void seedUser(String username, String password) {

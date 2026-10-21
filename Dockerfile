@@ -11,6 +11,7 @@ WORKDIR /build
 # Copy parent pom and module poms to cache dependencies
 # (platform modules first, then bounded contexts, then bootstrap)
 COPY pom.xml ./
+COPY migrations/pom.xml ./migrations/
 COPY common/pom.xml ./common/
 COPY persistence/pom.xml ./persistence/
 COPY account-api/pom.xml ./account-api/
@@ -25,6 +26,7 @@ COPY app/pom.xml ./app/
 RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B -pl app -am
 
 # Copy source code of all modules
+COPY migrations/src ./migrations/src
 COPY common/src ./common/src
 COPY persistence/src ./persistence/src
 COPY account-api/src ./account-api/src

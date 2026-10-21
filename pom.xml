@@ -19,6 +19,8 @@
     <description>Clean Architecture Transfer System with Spring Boot</description>
 
     <modules>
+        <!-- Schema ownership: resources-only module (classpath:db/migration) -->
+        <module>migrations</module>
         <!-- Shared kernel: stable, low-level, no BC dependencies -->
         <module>common</module>
         <module>persistence</module>

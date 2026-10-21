@@ -6,9 +6,9 @@
 # manifest (and k8s/.flyway-digest) to @sha256. Never hand-edit a digest here.
 #
 # Operator setup (once per release — migrations live in
-# common/src/main/resources/db/migration):
+# migrations/src/main/resources/db/migration):
 #   kubectl create configmap bank-flyway-migrations \
-#     --from-file=common/src/main/resources/db/migration \
+#     --from-file=migrations/src/main/resources/db/migration \
 #     --dry-run=client -o yaml | kubectl apply -f -
 # Then apply this file; wait for the Job to succeed before rolling the app:
 #   kubectl apply -f k8s/flyway-migrate-job.yaml

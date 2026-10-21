@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MIGRATIONS = ROOT / "common" / "src" / "main" / "resources" / "db" / "migration"
+MIGRATIONS = ROOT / "migrations" / "src" / "main" / "resources" / "db" / "migration"
 
 HEAVY = [
     re.compile(r"\bUPDATE\s+\w+\s+SET\b", re.IGNORECASE),

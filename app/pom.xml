@@ -21,6 +21,11 @@
     <dependencies>
         <dependency>
             <groupId>com.bank</groupId>
+            <artifactId>migrations</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
             <artifactId>common</artifactId>
             <version>${project.version}</version>
         </dependency>

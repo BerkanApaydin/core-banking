@@ -1,7 +1,10 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.infrastructure.adapter.out.clock.UtcDateTimeProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.auditing.DateTimeProvider;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -11,8 +14,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Optional;
 
 @Configuration
-@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
+@EnableJpaAuditing(
+        auditorAwareRef = "auditorProvider",
+        dateTimeProviderRef = "utcDateTimeProvider")
 public class JpaAuditingConfig {
+
+    @Bean
+    public DateTimeProvider utcDateTimeProvider(ClockProviderPort clockProviderPort) {
+        return new UtcDateTimeProvider(clockProviderPort);
+    }
 
     @Bean
     public AuditorAware<String> auditorProvider() {

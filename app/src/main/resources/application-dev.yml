@@ -1,10 +1,16 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db?options=-c%20TimeZone%3DUTC
     username: ${DB_USERNAME:bank_user}
     password: ${DB_PASSWORD:bank_password}
     hikari:
       read-only: false
+
+app:
+  demo:
+    seed:
+      ahmet-password: ${DEMO_SEED_AHMET_PASSWORD:Ahmet12345678}
+      ayse-password: ${DEMO_SEED_AYSE_PASSWORD:Ayse12345678}
 
 jwt:
   # Dev-only insecure fallback: never use in prod. Prod has no default and

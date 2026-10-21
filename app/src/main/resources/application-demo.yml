@@ -1,0 +1,5 @@
+app:
+  demo:
+    seed:
+      ahmet-password: ${DEMO_SEED_AHMET_PASSWORD}
+      ayse-password: ${DEMO_SEED_AYSE_PASSWORD}

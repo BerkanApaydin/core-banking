@@ -50,6 +50,7 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 plus one supporting module (`audit`).
 
 - **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled integrity observer.
+- **`migrations`** [Platform]: Versioned Flyway SQL for the single PostgreSQL schema. Resources stay at the unchanged `classpath:db/migration` location, so Flyway history and checksums are untouched; the module owns schema packaging, not JPA entities. No Java. `app` depends on it at compile scope and integration-test modules add it at test scope. Per-BC migration splitting remains a documented roadmap.
 - **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdGeneratorPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
@@ -83,12 +84,14 @@ graph LR
     subgraph platform[Platform]
         direction TB
         api[account-api]:::plat
+        migs[migrations<br/>Flyway SQL]:::plat
         infra[infrastructure<br/>adapters]:::infraC
     end
 
     shared[common + persistence<br/>shared kernel]:::plat
 
     app --> transfer & account & user & audit
+    app -- schema resources --> migs
     app -. wires .-> infra
     transfer -- published language --> api
     account -. implements .-> api
@@ -105,6 +108,7 @@ graph LR
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
 | `infrastructure` → `user`/`audit` compile edge | Deliberate and port-only (no BC adapter/internals); `user-api`/`audit-api` published languages would remove even this edge — tracked follow-up, not a violation |
 | Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
+| Flyway resource ownership                 | Only `migrations` packages `db/migration`; BCs own their JPA entities, not the schema files. |
 
 > The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the above are the only four rules you need to know.
 
