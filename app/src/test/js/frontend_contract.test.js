@@ -14,18 +14,32 @@ test('browser loads feature scripts in dependency order', () => {
     const staticDirectory = path.resolve(__dirname, '../../main/resources/static');
     const html = fs.readFileSync(path.join(staticDirectory, 'index.html'), 'utf8');
     const scripts = Array.from(html.matchAll(/<script src="([^"]+)"/g), match => match[1].split('?')[0]);
-    assert.deepEqual(scripts, ['boot.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js',
-        'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js']);
+    assert.deepEqual(scripts, ['storage.js', 'boot.js', 'i18n.js', 'idempotency.js', 'accounts.js',
+        'transfers.js', 'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js']);
     for (const script of scripts) {
         assert.equal(fs.existsSync(path.join(staticDirectory, script)), true, `${script} must be served`);
     }
 
+    const values = new Map([['lang', 'tr']]);
+    const localStorage = {
+        get length() { return values.size; },
+        key(index) { return Array.from(values.keys())[index] ?? null; },
+        getItem(key) { return values.has(key) ? values.get(key) : null; },
+        setItem(key, value) { values.set(key, String(value)); },
+        removeItem(key) { values.delete(key); },
+        clear() { values.clear(); }
+    };
     const context = vm.createContext({
-        localStorage: { getItem: () => 'tr' },
-        document: { querySelectorAll: () => [], getElementById: () => null, addEventListener() {} },
+        localStorage,
+        document: {
+            querySelectorAll: () => [],
+            getElementById: () => null,
+            addEventListener() {},
+            documentElement: { lang: '' }
+        },
         window: {}
     });
-    for (const script of scripts.slice(1)) {
+    for (const script of scripts) {
         vm.runInContext(fs.readFileSync(path.join(staticDirectory, script), 'utf8'), context,
             { filename: script });
     }
@@ -34,6 +48,17 @@ test('browser loads feature scripts in dependency order', () => {
     assert.equal(vm.runInContext('typeof getIdempotencyKey', context), 'function');
     assert.equal(vm.runInContext('typeof loadAccounts', context), 'function');
     assert.equal(vm.runInContext('typeof populateTransferDropdowns', context), 'function');
+});
+
+test('portfolio summary keys exist in both locale bundles', () => {
+    const i18n = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/i18n.js'), 'utf8');
+    const en = i18n.split('tr:')[0];
+    const tr = i18n.split('tr:')[1] || '';
+    for (const key of ['portfolio.summary_one', 'portfolio.currency_count',
+        'portfolio.currency_count_one', 'portfolio.synced', 'portfolio.synced_one']) {
+        assert.ok(en.includes(`'${key}'`), `English i18n key missing: ${key}`);
+        assert.ok(tr.includes(`'${key}'`), `Turkish i18n key missing: ${key}`);
+    }
 });
 
 test('recipient IBAN validation matches backend MOD 97 rule', () => {
@@ -173,6 +198,7 @@ test('history cancel action uses a click listener accepted by the CSP', async ()
         accounts: [{ id: 7, iban: 'TR400006200000000000000001' }],
         historyPager: { accountId: null, page: 0, last: true, total: 0 },
         historyCache: { accountId: null, items: [] },
+        historyRequestVersion: 0,
         PAGE_SIZE: 100,
         document: {
             getElementById(id) {
@@ -225,6 +251,127 @@ test('history cancel action uses a click listener accepted by the CSP', async ()
     items[0].button.listeners.get('click')({ stopPropagation() { stopped = true; } });
     assert.equal(stopped, true);
     assert.deepEqual(calls, [[19, 7]]);
+});
+
+test('a stale account response cannot overwrite the latest load', async () => {
+    const resolvers = [];
+    const listElement = {
+        _html: '',
+        children: [],
+        get innerHTML() { return this._html; },
+        set innerHTML(value) {
+            this._html = value;
+            if (value === '') this.children = [];
+        },
+        appendChild(child) { this.children.push(child); }
+    };
+    const context = vm.createContext({
+        accounts: [],
+        accountPager: { page: 0, last: true, total: 0 },
+        accountRequestVersion: 0,
+        PAGE_SIZE: 100,
+        document: {
+            getElementById(id) {
+                return id === 'accounts-list' ? listElement : { textContent: '' };
+            },
+            createElement() {
+                return {
+                    className: '',
+                    innerHTML: '',
+                    setAttribute() {},
+                    addEventListener() {}
+                };
+            }
+        },
+        window: {},
+        fetchApi: () => new Promise(resolve => resolvers.push(resolve)),
+        renderAccountSkeletons() {},
+        renderPortfolioSummary() {},
+        __: key => key,
+        escapeHtml: value => value,
+        formatIbanDisplay: value => value,
+        formatMoney: value => value,
+        openAccountDetail() {}
+    });
+    const accountFunction = 'async function loadAccounts(loadMore = false) {'
+        + accountSource.split('async function loadAccounts(loadMore = false) {')[1]
+            .split('// --- Account Creation Modal ---')[0];
+    vm.runInContext(accountFunction, context);
+
+    const first = vm.runInContext('loadAccounts()', context);
+    const second = vm.runInContext('loadAccounts()', context);
+    resolvers[1]({ content: [{ id: 2, ownerName: 'Second', balance: 222, currency: 'TRY',
+        iban: 'TR400006200000000000000002', active: true }], last: true, totalElements: 1 });
+    await second;
+    resolvers[0]({ content: [{ id: 1, ownerName: 'First', balance: 111, currency: 'TRY',
+        iban: 'TR400006200000000000000001', active: true }], last: true, totalElements: 1 });
+    await first;
+
+    assert.equal(vm.runInContext('accounts[0].ownerName', context), 'Second');
+    assert.equal(listElement.children.length, 1);
+    assert.equal(listElement.children[0].innerHTML.includes('Second'), true);
+    assert.equal(listElement.children[0].innerHTML.includes('First'), false);
+});
+
+test('a stale history response cannot overwrite a newer account', async () => {
+    const items = [];
+    const resolvers = [];
+    const historyList = { innerHTML: '', appendChild(item) { items.push(item); } };
+    const context = vm.createContext({
+        accounts: [
+            { id: 7, iban: 'TR400006200000000000000007' },
+            { id: 8, iban: 'TR400006200000000000000008' }
+        ],
+        historyPager: { accountId: null, page: 0, last: true, total: 0 },
+        historyCache: { accountId: null, items: [] },
+        historyRequestVersion: 0,
+        PAGE_SIZE: 100,
+        document: {
+            getElementById(id) {
+                return id === 'transaction-history-list' ? historyList : { textContent: '' };
+            },
+            createElement() {
+                return {
+                    innerHTML: '',
+                    className: '',
+                    addEventListener() {},
+                    querySelector() { return null; }
+                };
+            }
+        },
+        fetchApi: () => new Promise(resolve => resolvers.push(resolve)),
+        transferStatusMeta: () => ({ cls: 'badge-pending', label: 'Pending' }),
+        __: key => key,
+        escapeHtml: value => value,
+        formatIbanDisplay: value => value,
+        formatDate: value => value,
+        formatMoney: value => value,
+        cancelTransfer() {},
+        openTransferDetail() {},
+        showAlert() {}
+    });
+    const historyFunction = 'async function loadAccountHistory(accountId, loadMore = false) {'
+        + reportsSource.split('async function loadAccountHistory(accountId, loadMore = false) {')[1]
+            .split('async function cancelTransfer')[0];
+    vm.runInContext(historyFunction, context);
+
+    const first = vm.runInContext('loadAccountHistory(7)', context);
+    const second = vm.runInContext('loadAccountHistory(8)', context);
+    resolvers[1]({ content: [{ id: 8, senderIban: 'TR400006200000000000000008',
+        receiverIban: 'TR830006200000000000000003', status: 'PENDING',
+        createdAt: '2026-09-20T12:00:00', amount: 222, currency: 'TRY' }],
+    last: true, totalElements: 1 });
+    await second;
+    resolvers[0]({ content: [{ id: 7, senderIban: 'TR400006200000000000000007',
+        receiverIban: 'TR830006200000000000000003', status: 'PENDING',
+        createdAt: '2026-09-20T11:00:00', amount: 111, currency: 'TRY' }],
+    last: true, totalElements: 1 });
+    await first;
+
+    assert.equal(vm.runInContext('historyCache.accountId', context), 8);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].innerHTML.includes('222'), true);
+    assert.equal(items[0].innerHTML.includes('111'), false);
 });
 
 test('report pagination exposes every page and invalidation prevents printing stale data', async () => {

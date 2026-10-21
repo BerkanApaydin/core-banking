@@ -13,8 +13,9 @@
     <meta http-equiv="Expires" content="0">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070F24'/%3E%3Cpath d='M20 18 L44 46 M44 18 L20 46' stroke='%23C6A15B' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
     <title>X Bank — Corporate Digital Banking</title>
-    <!-- External boot script runs before CSS and complies with script-src 'self'. -->
-    <script src="boot.js?v=15"></script>
+    <!-- External storage guard and boot script run before CSS and comply with script-src 'self'. -->
+    <script src="storage.js?v=1"></script>
+    <script src="boot.js?v=16"></script>
     <!-- No external fonts/CDN: backend CSP is default-src 'self' (script/style),
          so remote assets would be blocked. System font stacks in style.css. -->
     <link rel="stylesheet" href="style.css?v=16">
@@ -827,16 +828,16 @@
         </div>
     </div>
 
-    <script src="i18n.js?v=23"></script>
-    <script src="idempotency.js?v=23"></script>
-    <script src="accounts.js?v=23"></script>
+    <script src="i18n.js?v=24"></script>
+    <script src="idempotency.js?v=24"></script>
+    <script src="accounts.js?v=24"></script>
     <script src="transfers.js?v=23"></script>
     <script src="http.js?v=24"></script>
-    <script src="reports.js?v=24"></script>
+    <script src="reports.js?v=25"></script>
     <script src="detail.js?v=24"></script>
     <script src="format.js?v=24"></script>
     <script src="auth.js?v=24"></script>
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=25"></script>
 </body>
 
 </html>

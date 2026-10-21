@@ -44,11 +44,17 @@ one transaction, so `SET LOCAL` applies). `CREATE INDEX CONCURRENTLY` is
 illegal inside Flyway's transaction — large indexes belong in
 `scripts/create_index_concurrently.sql` as an operator step instead.
 `scripts/check_migration_timeouts.py` (CI + `test-all.sh`) fails any heavy
-migration without the lift. Table rewrites additionally need
+migration without the lift, and now classifies statements after stripping
+comments/literals so a commented-out `UPDATE` cannot mask a real one. It also
+covers `ADD COLUMN ... DEFAULT`, `GENERATED ... STORED`, `SET NOT NULL`,
+`ADD CONSTRAINT`, `SET TABLESPACE`, `VACUUM FULL`, `CLUSTER` and `REINDEX`.
+Both `SET LOCAL` statements must appear before the first heavy/rewrite
+statement, not merely somewhere in the file. Table rewrites additionally need
 `SET LOCAL lock_timeout = '30s';` (fail fast on lock contention instead of
-wedging the deploy); migrations applied before that rule (V8, V10, V14, V30,
-V32, V46, V53) are grandfathered in the script — applied checksums are
-frozen and must not be edited.
+wedging the deploy); migrations applied before those rules (V3, V6, V7, V8,
+V9, V10, V12, V14, V24, V28, V30, V32, V36, V38, V39, V46, V53, V54, V56,
+V60) are grandfathered in the script — applied checksums are frozen and must
+not be edited.
 
 ## Long-term split plan (not yet executed — deliberate)
 

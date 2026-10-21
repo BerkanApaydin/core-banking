@@ -114,6 +114,7 @@ const topLevel = {
         "invalidateGeneratedReport", "updateReportPagination",
         "loadReportPage", "loadAccountHistory", "cancelTransfer",
     ],
+    storage: ["safeStorage"],
     transfers: [
         "populateTransferDropdowns", "updateSenderBalance", "initTransferForm",
     ],
@@ -162,6 +163,7 @@ export default [
     staticBlock("i18n"),
     staticBlock("idempotency"),
     staticBlock("reports"),
+    staticBlock("storage"),
     staticBlock("transfers"),
     {
         files: ["app/src/test/js/*.test.js"],

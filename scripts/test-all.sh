@@ -30,6 +30,9 @@ run 'Restore-drill contract' "$python_cmd" scripts/check_restore_drill.py
 run 'Compose JWT default pinned' "$python_cmd" scripts/check_compose_jwt_default.py
 run 'Error message keys in bundle' "$python_cmd" scripts/check_error_keys.py
 run 'Migration statement timeouts' "$python_cmd" scripts/check_migration_timeouts.py
+run 'Migration timeout guard self-test' "$python_cmd" scripts/check_migration_timeouts.py --self-test
+run 'Code health (long methods, config literals)' "$python_cmd" scripts/check_code_health.py
+run 'Code-health guard self-test' "$python_cmd" scripts/check_code_health.py --self-test
 if [ -f target/bom.json ]; then
     run 'Dependency review (OSV gate)' "$python_cmd" scripts/dependency_review.py
 else
@@ -40,7 +43,7 @@ run 'Frontend lint (ESLint)' npm run lint
 run 'Frontend XSS guard' "$python_cmd" scripts/check_frontend_xss.py
 run 'Frontend XSS guard self-test' "$python_cmd" scripts/check_frontend_xss.py --self-test
 
-for script in i18n.js idempotency.js accounts.js transfers.js http.js reports.js detail.js format.js auth.js app.js; do
+for script in storage.js i18n.js idempotency.js accounts.js transfers.js http.js reports.js detail.js format.js auth.js app.js; do
     run "JavaScript syntax: $script" node --check "app/src/main/resources/static/$script"
 done
 run 'Browser API contracts and idempotency (node:test)' node --test "app/src/test/js/*.test.js"

@@ -36,6 +36,9 @@ try {
     Invoke-Checked 'Compose JWT default pinned' $python ($pythonPrefix + @('scripts/check_compose_jwt_default.py'))
     Invoke-Checked 'Error message keys in bundle' $python ($pythonPrefix + @('scripts/check_error_keys.py'))
     Invoke-Checked 'Migration statement timeouts' $python ($pythonPrefix + @('scripts/check_migration_timeouts.py'))
+    Invoke-Checked 'Migration timeout guard self-test' $python ($pythonPrefix + @('scripts/check_migration_timeouts.py', '--self-test'))
+    Invoke-Checked 'Code health (long methods, config literals)' $python ($pythonPrefix + @('scripts/check_code_health.py'))
+    Invoke-Checked 'Code-health guard self-test' $python ($pythonPrefix + @('scripts/check_code_health.py', '--self-test'))
     if (Test-Path -LiteralPath (Join-Path $repoRoot 'target/bom.json')) {
         Invoke-Checked 'Dependency review (OSV gate)' $python ($pythonPrefix + @('scripts/dependency_review.py'))
     } else {
@@ -46,7 +49,7 @@ try {
     Invoke-Checked 'Frontend XSS guard' $python ($pythonPrefix + @('scripts/check_frontend_xss.py'))
     Invoke-Checked 'Frontend XSS guard self-test' $python ($pythonPrefix + @('scripts/check_frontend_xss.py', '--self-test'))
 
-    foreach ($script in @('i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js')) {
+    foreach ($script in @('storage.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js', 'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js')) {
         Invoke-Checked "JavaScript syntax: $script" 'node' @('--check', "app/src/main/resources/static/$script")
     }
     Invoke-Checked 'Browser API contracts and idempotency (node:test)' 'node' @('--test', 'app/src/test/js/*.test.js')

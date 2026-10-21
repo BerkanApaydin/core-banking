@@ -23,14 +23,28 @@ function renderPortfolioSummary() {
         const balance = Number(acc.balance) || 0;
         totals[acc.currency] = (totals[acc.currency] || 0) + balance;
     });
-    const parts = Object.entries(totals)
+    const currencyEntries = Object.entries(totals);
+    const parts = currencyEntries
         .map(([currency, total]) => `${formatMoney(total)} ${escapeHtml(currency)}`);
+    const plainParts = currencyEntries
+        .map(([currency, total]) => `${formatMoney(total)} ${currency}`);
+    const accountCount = accounts.length;
+    const currencyCount = currencyEntries.length;
+    const summaryLabel = accountCount === 1
+        ? __('portfolio.summary_one', accountCount)
+        : __('portfolio.summary', accountCount);
+    const currencyLabel = currencyCount === 1
+        ? __('portfolio.currency_count_one', currencyCount)
+        : __('portfolio.currency_count', currencyCount);
+    const syncedLabel = accountCount === 1
+        ? __('portfolio.synced_one', accountCount)
+        : __('portfolio.synced', accountCount);
     summaryEl.innerHTML = `<span class="portfolio-total">${parts.join(' · ')}</span>` +
-        `<span class="portfolio-meta">${__('portfolio.summary', accounts.length)}</span>`;
+        `<span class="portfolio-meta">${accounts.length === 1 ? __('portfolio.summary_one', accounts.length) : __('portfolio.summary', accounts.length)}</span>`;
     summaryEl.classList.remove('d-none');
-    if (heroTotal) heroTotal.textContent = parts.join(' · ');
-    if (heroCount) heroCount.textContent = `${__('portfolio.summary', accounts.length)} · ${Object.keys(totals).length} currency`;
-    if (heroUpdated) heroUpdated.textContent = `${new Date().toLocaleString(locale())} · ${accounts.length} accounts synced`;
+    if (heroTotal) heroTotal.textContent = plainParts.join(' · ');
+    if (heroCount) heroCount.textContent = `${summaryLabel} · ${currencyLabel}`;
+    if (heroUpdated) heroUpdated.textContent = `${new Date().toLocaleString(locale())} · ${syncedLabel}`;
 }
 
 function renderAccountSkeletons(listElement, count) {
@@ -43,8 +57,13 @@ function renderAccountSkeletons(listElement, count) {
     }
 }
 
+// Monotonic generation token: a slow response from an older load (language
+// switch, create/refresh, load-more) must never overwrite the latest page.
+let accountRequestVersion = 0;
+
 async function loadAccounts(loadMore = false) {
     const listElement = document.getElementById('accounts-list');
+    const requestVersion = ++accountRequestVersion;
 
     try {
         if (!loadMore) {
@@ -57,6 +76,7 @@ async function loadAccounts(loadMore = false) {
         }
         const page = loadMore ? accountPager.page + 1 : 0;
         const response = await fetchApi(`/accounts?page=${page}&size=${PAGE_SIZE}`);
+        if (requestVersion !== accountRequestVersion) return;
         const content = response.content || response;
         const pageItems = Array.isArray(content) ? content : [];
         accounts = loadMore ? accounts.concat(pageItems) : pageItems;
@@ -161,6 +181,7 @@ async function loadAccounts(loadMore = false) {
                 .addEventListener('click', () => loadAccounts(true));
         }
     } catch (err) {
+        if (requestVersion !== accountRequestVersion) return;
         showAlert(err.message, 'danger');
         const summaryEl = document.getElementById('portfolio-summary');
         if (summaryEl) {

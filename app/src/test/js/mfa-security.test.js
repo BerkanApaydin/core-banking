@@ -9,17 +9,27 @@ const html = fs.readFileSync(path.join(staticDir, 'index.html'), 'utf8');
 const appSource = fs.readFileSync(path.join(staticDir, 'app.js'), 'utf8');
 
 function loadAppContext() {
+    const values = new Map([['lang', 'en']]);
+    const localStorage = {
+        get length() { return values.size; },
+        key(index) { return Array.from(values.keys())[index] ?? null; },
+        getItem(key) { return values.has(key) ? values.get(key) : null; },
+        setItem(key, value) { values.set(key, String(value)); },
+        removeItem(key) { values.delete(key); },
+        clear() { values.clear(); }
+    };
     const context = vm.createContext({
-        localStorage: { getItem: () => 'en' },
+        localStorage,
         document: {
             querySelectorAll: () => [],
             getElementById: () => null,
             addEventListener() {},
+            documentElement: { lang: '' },
         },
         window: {},
         navigator: {},
     });
-    for (const script of ['i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js',
+    for (const script of ['storage.js', 'i18n.js', 'idempotency.js', 'accounts.js', 'transfers.js',
         'http.js', 'reports.js', 'detail.js', 'format.js', 'auth.js', 'app.js']) {
         vm.runInContext(fs.readFileSync(path.join(staticDir, script), 'utf8'), context,
             { filename: script });
@@ -41,6 +51,14 @@ test('login body carries the TOTP code only when well-formed', () => {
     for (const bad of [null, '', '  ', '12345', '123456789', '12ab56', 123456]) {
         assert.equal(body('alice', 'pw', bad), '{"username":"alice","password":"pw"}');
     }
+});
+
+test('dictionaryHtml renders only bundled dictionary keys', () => {
+    const context = loadAppContext();
+    assert.equal(vm.runInContext(
+        'dictionaryHtml("transfer.info_instant").includes("<strong>")', context), true);
+    assert.equal(vm.runInContext('dictionaryHtml("<img src=x onerror=alert(1)>")', context), '');
+    assert.equal(vm.runInContext('dictionaryHtml(null)', context), '');
 });
 
 test('security section, reset panel and status wiring exist', () => {

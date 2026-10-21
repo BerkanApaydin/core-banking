@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """Frontend XSS guard (H-2).
 
-Fails if any ``innerHTML`` assignment in ``app/src/main/resources/static/*.js``
-interpolates a value that is not provably safe.
+Fails if any HTML sink in ``app/src/main/resources/static/*.js`` interpolates a
+value that is not provably safe. Checked sinks:
 
-Only the template literal of the ``innerHTML = ...`` statement itself is
-checked (multi-line templates included). Safe interpolations:
+  - ``innerHTML = ...`` / ``innerHTML += ...``
+  - ``outerHTML = ...`` / ``outerHTML += ...``
+  - ``element.insertAdjacentHTML(position, html)``
+  - ``document.write(...)`` / ``document.writeln(...)``
+
+Only literal template/string arguments are considered provable. Safe
+interpolations:
   - ``escapeHtml(...)``, ``formatMoney(...)``, ``formatDate(...)``,
-  - pure ``__(...)`` i18n lookups,
   - ``resolveAccountRef(...)`` (escapes internally),
-  - numeric expressions (``Number(...)``, ``.length``, ``page``, ``*Id``),
+  - ``dictionaryHtml(...)`` (renders only bundled, developer-controlled keys),
+  - numeric expressions (``Number(...)``, ``.length``, ``.total``, ``page``),
   - ``encodeURIComponent(...)`` for URL/attribute contexts,
   - boolean-to-constant class toggles from an allow-list.
 
+``__(key, ...args)`` is only safe when the key is a static string literal and
+every interpolated argument is itself provably safe. A dynamic key or a raw
+argument is rejected: ``__('x', userControlled)`` renders attacker text.
+
 Run: ``python scripts/check_frontend_xss.py``
+Self-test: ``python scripts/check_frontend_xss.py --self-test``
 """
 from __future__ import annotations
 
@@ -24,15 +34,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "app" / "src" / "main" / "resources" / "static"
 
-INTERPOLATION = re.compile(r"\$\{([^}]+)\}")
-SAFE_SUBSTRINGS = (
-    "escapeHtml(",
-    "formatMoney(",
-    "formatDate(",
-    "resolveAccountRef(",
-    "encodeURIComponent(",
-    "formatIbanDisplay(",
-    "parts.join(",
+ASSIGN_SINK = re.compile(r"\b(innerHTML|outerHTML)\s*\+?=")
+ADJACENT_SINK = re.compile(r"\.insertAdjacentHTML\s*\(")
+DOC_WRITE = re.compile(r"\bdocument\.(?:write|writeln)\s*\(")
+
+# Function calls whose result is safe by contract. Whole-word matching keeps
+# `unescapeHtml(` from passing as `escapeHtml(`.
+SAFE_CALLS = re.compile(
+    r"(?:\b(?:escapeHtml|formatMoney|formatDate|resolveAccountRef|"
+    r"encodeURIComponent|formatIbanDisplay|dictionaryHtml)\s*\(|\bparts\.join\s*\()"
+)
+# Known constant/class-name variables assembled from static branches.
+SAFE_EXACT = {
     "badgeClass",
     "badgeIcon",
     "amountClass",
@@ -42,21 +55,19 @@ SAFE_SUBSTRINGS = (
     "meta.cls",
     "meta.label",
     "prefix",
-    "btn-cancel-transfer",
     "showStatusPill",
     "isEligibleForCancel",
-)
+    "btn-cancel-transfer",
+}
 NUMERIC_HINT = re.compile(
-    r"^\s*(Number\(|String\(Number|.*\.length|page|size|total|userId|accountId|transferId|#\$|[0-9][0-9_ .()]*)\s*$"
+    r"^\s*(?:Number\(|String\(Number|.*\.(?:length|total|page|size|count)|"
+    r"page|size|count|total|userId|accountId|transferId|#\$|"
+    r"[0-9][0-9_ .()+\-*/%]*)\s*$"
 )
 
 
 def _split_top_level(expr: str, sep: str = "+") -> list[str]:
-    """Split on `sep` ignoring nesting (parens/brackets/braces) and quotes.
-
-    `escapeHtml(a) + b` must not pass on the strength of its first operand:
-    callers split concatenations and vet every piece.
-    """
+    """Split on `sep` ignoring nesting (parens/brackets/braces) and quotes."""
     parts: list[str] = []
     depth = 0
     quote: str | None = None
@@ -99,77 +110,16 @@ def _is_quoted_literal(text: str) -> bool:
     return len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'`"
 
 
-def is_safe(expr: str) -> bool:
-    e = expr.strip()
-    if not e:
-        return True
-    if "+" in e:
-        operands = _split_top_level(e)
-        if len(operands) > 1:
-            # Every concatenated piece must be safe (or a quoted literal) on
-            # its own; a bare identifier next to escapeHtml(...) fails.
-            return all(_is_quoted_literal(o) or is_safe(o) for o in operands)
-    if e.startswith("__(") and e.endswith(")"):
-        return True
-    if any(s in e for s in SAFE_SUBSTRINGS):
-        # formatIbanDisplay output is [A-Z0-9 ] shaped, but callers in this
-        # repo always wrap it in escapeHtml; require that pairing.
-        if "formatIbanDisplay(" in e and "escapeHtml(" not in e:
-            return False
-        return True
-    if NUMERIC_HINT.match(e):
-        return True
-    # Ternary of two safe branches:  cond ? `...safe...` : `...safe...`
-    # or cond ? 'const' : 'const' — allow when both sides are quoted/allow-listed.
-    if "?" in e and ":" in e:
-        parts = e.split("?", 1)[1].split(":")
-        if all(
-            p.strip().startswith(("'", '"', "`"))
-            or any(s in p for s in SAFE_SUBSTRINGS)
-            or p.strip() in {"true", "false", "''", '""'}
-            for p in parts
-        ):
-            return True
-        # boolean -> constant class names
-        if all(re.match(r"^[\w .?'\"`()-]+$", p.strip()) for p in parts):
-            text = " ".join(parts)
-            if "escapeHtml" in text or "formatMoney" in text or "__(" in text:
-                return True
-            if re.search(r"badge-|amount-|card-", text):
-                return True
-    return False
-
-
-def extract_template(lines: list[str], start: int) -> str:
-    """Return the template literal text of the innerHTML assignment at start (0-based).
-
-    The scan is brace-aware (`${...}` nesting, quotes inside interpolations)
-    and runs up to 500 lines ahead: long page templates (60-120 lines) are
-    checked in full, not just their first 20 lines.
-    """
-    text = "\n".join(lines[start : start + 500])
-    eq = text.find("innerHTML")
-    eq = text.find("=", eq)
-    if eq == -1:
-        return ""
-    rest = text[eq + 1 :]
-    bt1 = rest.find("`")
-    q1 = rest.find("'")
-    # Empty-string / single-quoted assignment: no interpolations possible.
-    if q1 != -1 and (bt1 == -1 or q1 < bt1):
-        return ""
-    if bt1 == -1:
-        return ""
-    # Walk from the opening backtick: it closes only at ${}-depth 0, so
-    # nested template literals inside interpolations don't end the scan
-    # early. Quotes are tracked only inside interpolations (HTML text at the
-    # top level may contain apostrophes, which must not swallow the scan).
-    i, n = bt1 + 1, len(rest)
+def _template_content(text: str) -> str | None:
+    """Return the body of a complete template literal, or None if malformed."""
+    if not text.startswith("`"):
+        return None
+    i, n = 1, len(text)
     depth = 0
     quote: str | None = None
     escaped = False
     while i < n:
-        ch = rest[i]
+        ch = text[i]
         if escaped:
             escaped = False
             i += 1
@@ -189,10 +139,10 @@ def extract_template(lines: list[str], start: int) -> str:
             continue
         if ch == "`":
             if depth == 0:
-                return rest[bt1 + 1 : i]
+                return text[1:i] if not text[i + 1 :].strip() else None
             i += 1
             continue
-        if ch == "$" and i + 1 < n and rest[i + 1] == "{":
+        if ch == "$" and i + 1 < n and text[i + 1] == "{":
             depth += 1
             i += 2
             continue
@@ -201,27 +151,224 @@ def extract_template(lines: list[str], start: int) -> str:
             i += 1
             continue
         i += 1
-    return rest[bt1 + 1 :]
+    return None
+
+
+def _interpolations(template_body: str) -> list[str]:
+    """Return `${...}` expressions, handling nested braces and sub-templates."""
+    found: list[str] = []
+    i, n = 0, len(template_body)
+    while i < n:
+        if not template_body.startswith("${", i):
+            i += 1
+            continue
+        start = i + 2
+        j = start
+        depth = 1
+        quote: str | None = None
+        escaped = False
+        while j < n:
+            ch = template_body[j]
+            if quote is not None:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == quote:
+                    quote = None
+            elif ch in "\"'`":
+                quote = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    found.append(template_body[start:j])
+                    i = j + 1
+                    break
+            j += 1
+        else:
+            break
+        if j >= n:
+            break
+    return found
+
+
+def _split_ternary(expr: str) -> tuple[str, str, str] | None:
+    question = _split_top_level(expr, "?")
+    if len(question) != 2:
+        return None
+    tail = question[1]
+    if tail.lstrip().startswith((".", "?")):
+        return None
+    branches = _split_top_level(tail, ":")
+    if len(branches) < 2:
+        return None
+    return question[0], branches[0], ":".join(branches[1:])
+
+
+def _is_i18n_lookup(expr: str) -> bool:
+    """`__(staticKey, safeArg...)` is safe; dynamic keys/raw args are not."""
+    if not (expr.startswith("__(") and expr.endswith(")")):
+        return False
+    args = _split_top_level(expr[3:-1], ",")
+    if not args or not _is_quoted_literal(args[0]):
+        return False
+    return all(is_safe(arg) for arg in args[1:])
+
+
+def is_safe(expr: str) -> bool:
+    e = expr.strip()
+    if not e:
+        return True
+    ternary = _split_ternary(e)
+    if ternary is not None:
+        return is_safe(ternary[1]) and is_safe(ternary[2])
+    if e.startswith("`"):
+        content = _template_content(e)
+        if content is None:
+            return False
+        return all(is_safe(value) for value in _interpolations(content))
+    if "+" in e:
+        operands = _split_top_level(e)
+        if len(operands) > 1:
+            # Every concatenated piece must be safe (or a quoted literal) on
+            # its own; a bare identifier next to escapeHtml(...) fails.
+            return all(_is_quoted_literal(o) or is_safe(o) for o in operands)
+    if _is_i18n_lookup(e):
+        return True
+    if SAFE_CALLS.search(e) or e in SAFE_EXACT:
+        # formatIbanDisplay output is [A-Z0-9 ] shaped, but callers in this
+        # repo always wrap it in escapeHtml; require that pairing.
+        if re.search(r"\bformatIbanDisplay\s*\(", e) and not re.search(
+                r"\bescapeHtml\s*\(", e):
+            return False
+        return True
+    if NUMERIC_HINT.match(e):
+        return True
+    if _is_quoted_literal(e):
+        return True
+    return False
+
+
+def _extract_statement(text: str, start: int) -> str:
+    """Return the expression after a sink assignment/argument start."""
+    i, n = start, len(text)
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    while i < n:
+        ch = text[i]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "\"'`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            if depth > 0:
+                depth -= 1
+        elif ch == ";" and depth == 0:
+            break
+        i += 1
+    return text[start:i]
+
+
+def _extract_call_args(text: str, open_paren: int) -> list[str]:
+    """Split a call's arguments, respecting nested brackets and quotes."""
+    args: list[str] = []
+    current: list[str] = []
+    i, n = open_paren + 1, len(text)
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    while i < n:
+        ch = text[i]
+        if quote is not None:
+            current.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "\"'`":
+            quote = ch
+            current.append(ch)
+        elif ch in "([{":
+            depth += 1
+            current.append(ch)
+        elif ch in ")]}":
+            if ch == ")" and depth == 0:
+                args.append("".join(current))
+                return args
+            if depth > 0:
+                depth -= 1
+            current.append(ch)
+        elif ch == "," and depth == 0:
+            args.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+        i += 1
+    return args
+
+
+def check_expression(expr: str) -> list[str]:
+    """Return the unsafe sub-expressions in an HTML argument."""
+    e = expr.strip()
+    if not e:
+        return []
+    ternary = _split_ternary(e)
+    if ternary is not None:
+        return check_expression(ternary[1]) + check_expression(ternary[2])
+    if "+" in e:
+        operands = _split_top_level(e)
+        if len(operands) > 1:
+            return [o.strip() for o in operands if not is_safe(o)]
+    return [] if is_safe(e) else [e]
+
+
+def check_source(name: str, text: str) -> list[str]:
+    violations: list[str] = []
+
+    for match in ASSIGN_SINK.finditer(text):
+        line = text.count("\n", 0, match.start()) + 1
+        expr = _extract_statement(text, match.end())
+        for bad in check_expression(expr):
+            violations.append(f"{name}:{line}: unsafe {match.group(1)} `${{{bad[:110]}}}`")
+
+    for match in ADJACENT_SINK.finditer(text):
+        line = text.count("\n", 0, match.start()) + 1
+        args = _extract_call_args(text, match.end() - 1)
+        if len(args) < 2 or not args[1].strip():
+            violations.append(
+                f"{name}:{line}: insertAdjacentHTML without a provable HTML argument")
+            continue
+        for bad in check_expression(args[1]):
+            violations.append(f"{name}:{line}: unsafe insertAdjacentHTML `${{{bad[:110]}}}`")
+
+    for match in DOC_WRITE.finditer(text):
+        line = text.count("\n", 0, match.start()) + 1
+        args = _extract_call_args(text, match.end() - 1)
+        for arg in args:
+            for bad in check_expression(arg):
+                violations.append(f"{name}:{line}: unsafe document.write `${{{bad[:110]}}}`")
+
+    return violations
 
 
 def check_file(path: Path) -> list[str]:
-    violations: list[str] = []
-    lines = path.read_text(encoding="utf-8").splitlines()
-    for i, line in enumerate(lines):
-        if "innerHTML" not in line or "escapeHtml" in line and "${" not in line:
-            # Still need full check below; this is just a fast path guard.
-            pass
-        if "innerHTML" not in line:
-            continue
-        template = extract_template(lines, i)
-        if not template:
-            continue
-        for m in INTERPOLATION.finditer(template):
-            expr = m.group(1)
-            if not is_safe(expr):
-                violations.append(f"{path.name}:{i + 1}: unsafe `${{{expr.strip()[:110]}}}`")
-                break
-    return violations
+    return check_source(path.name, path.read_text(encoding="utf-8"))
 
 
 def self_test() -> int:
@@ -235,27 +382,56 @@ def self_test() -> int:
         ("escapeHtml(t.currency)", True),
         ("t.senderIban", False),
         ("__('transfer.cancel_btn')", True),
+        ("__('transfer.cancel_btn', escapeHtml(x))", True),
+        ("__('transfer.cancel_btn', userControlled)", False),
+        ("__(key)", False),
+        ("__('general.showing_of', accounts.length, accountPager.total)", True),
         ("isEligibleForCancel ? 'x' : ''", True),
         ("formatIbanDisplay(t.iban)", False),  # must pair with escapeHtml
         ("escapeHtml(formatIbanDisplay(t.iban))", True),
+        ("`<p>${escapeHtml(x)}</p>`", True),
+        ("`<p>${userControlled}</p>`", False),
+        ("cond ? escapeHtml(a) : escapeHtml(b)", True),
+        ("cond ? a : escapeHtml(b)", False),
     ]
     failures = [
         f"is_safe({expr!r}) = {is_safe(expr)}, want {want}"
         for expr, want in cases
         if is_safe(expr) is not want
     ]
+
+    sink_cases = [
+        ("el.innerHTML = `<p>${userControlled}</p>`;", False),
+        ("el.innerHTML = `<p>${escapeHtml(userControlled)}</p>`;", True),
+        ("el.outerHTML = `<p>${userControlled}</p>`;", False),
+        ("el.outerHTML = `<p>${escapeHtml(userControlled)}</p>`;", True),
+        ("el.insertAdjacentHTML('beforeend', `<p>${userControlled}</p>`);", False),
+        ("el.insertAdjacentHTML('beforeend', `<p>${escapeHtml(userControlled)}</p>`);", True),
+        ("el.insertAdjacentHTML('beforeend', payload);", False),
+        ("el.innerHTML = __(key);", False),
+        ("el.innerHTML = __('x', userControlled);", False),
+        ("el.innerHTML = __('x', escapeHtml(userControlled));", True),
+        ("el.innerHTML = '<p>' + escapeHtml(x) + '</p>';", True),
+        ("el.innerHTML = '<p>' + x + '</p>';", False),
+        ("el.innerHTML = dictionaryHtml(key);", True),
+    ]
+    for code, want_safe in sink_cases:
+        got_safe = not check_source("vector.js", code)
+        if got_safe is not want_safe:
+            failures.append(f"check_source({code!r}) safe={got_safe}, want {want_safe}")
+
     # A 30-line template with the payload past the old 20-line window.
-    long_lines = ["el.innerHTML = `"] + ["  <p>pad</p>"] * 24 + ["  ${userControlled}", "`;"]
-    if not extract_template(long_lines, 0).strip().endswith("${userControlled}"):
-        failures.append("long template was truncated before line 25")
-    if is_safe("userControlled") is not False:
-        failures.append("raw identifier must be unsafe")
+    long_code = "\n".join(["el.innerHTML = `"] + ["  <p>pad</p>"] * 24
+                          + ["  ${userControlled}", "`;"])
+    if not check_source("vector.js", long_code):
+        failures.append("long template was not scanned to its closing backtick")
+
     if failures:
         print("XSS guard self-test FAILED:")
-        for f in failures:
-            print(f"  - {f}")
+        for failure in failures:
+            print(f"  - {failure}")
         return 1
-    print(f"XSS guard self-test OK — {len(cases) + 2} vectors.")
+    print(f"XSS guard self-test OK — {len(cases) + len(sink_cases) + 1} vectors.")
     return 0
 
 
@@ -269,12 +445,12 @@ def main() -> int:
     for js in sorted(STATIC.glob("*.js")):
         violations.extend(check_file(js))
     if violations:
-        print("XSS guard FAILED — unsafe innerHTML interpolations:")
+        print("XSS guard FAILED — unsafe HTML sink interpolations:")
         for v in violations:
             print(f"  - {v}")
-        print("\nFix: wrap user-controlled values in escapeHtml(...).")
+        print("\nFix: wrap user-controlled values in escapeHtml(...) or use a safe sink.")
         return 1
-    print(f"XSS guard OK — {len(list(STATIC.glob('*.js')))} JS files, no unsafe innerHTML.")
+    print(f"XSS guard OK — {len(list(STATIC.glob('*.js')))} JS files, no unsafe HTML sinks.")
     return 0
 
 

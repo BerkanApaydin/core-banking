@@ -73,6 +73,11 @@ const translations = {
         'account.load_error': 'Account information could not be loaded. Please refresh the page.',
         'account.created': 'Your account has been created. IBAN: {0}',
         'portfolio.summary': '{0} accounts',
+        'portfolio.summary_one': '{0} account',
+        'portfolio.currency_count': '{0} currencies',
+        'portfolio.currency_count_one': '{0} currency',
+        'portfolio.synced': '{0} accounts synced',
+        'portfolio.synced_one': '{0} account synced',
         'account.iban_hint': 'TR is filled in for you — just type the 24 digits.',
         'account.invalid_balance': 'Please enter a valid initial balance (0 or more, max 2 decimals).',
         'account.funding_checking': 'Checking simulation funding mode…',
@@ -319,6 +324,11 @@ const translations = {
         'account.load_error': 'Hesap bilgileri yüklenemedi. Lütfen sayfayı yenileyin.',
         'account.created': 'Hesabınız oluşturuldu. IBAN: {0}',
         'portfolio.summary': '{0} hesap',
+        'portfolio.summary_one': '{0} hesap',
+        'portfolio.currency_count': '{0} para birimi',
+        'portfolio.currency_count_one': '{0} para birimi',
+        'portfolio.synced': '{0} hesap senkronize edildi',
+        'portfolio.synced_one': '{0} hesap senkronize edildi',
         'account.iban_hint': 'TR otomatik yazılır — yalnızca 24 rakamı girmeniz yeterli.',
         'account.invalid_balance': 'Lütfen geçerli bir başlangıç bakiyesi girin (0 veya üzeri, en fazla 2 ondalık).',
         'account.funding_checking': 'Simülasyon fonlama modu kontrol ediliyor…',
@@ -495,7 +505,7 @@ const translations = {
     }
 };
 
-let currentLang = localStorage.getItem('lang') || 'en';
+let currentLang = safeStorage.getItem('lang') || 'en';
 if (currentLang !== 'tr' && currentLang !== 'en') currentLang = 'en';
 
 function locale() {
@@ -514,9 +524,19 @@ function __(key, ...args) {
     return text;
 }
 
+// Bundled dictionary strings are developer-controlled and some intentionally
+// contain markup. Rendering only a key that exists in the bundle keeps a
+// dynamic data-i18n attribute from becoming an HTML injection sink.
+function dictionaryHtml(key) {
+    if (typeof key !== 'string' || !Object.prototype.hasOwnProperty.call(translations.en, key)) {
+        return '';
+    }
+    return __(key);
+}
+
 function setLanguage(lang) {
     currentLang = (lang === 'tr') ? 'tr' : 'en';
-    localStorage.setItem('lang', currentLang);
+    safeStorage.setItem('lang', currentLang);
     document.documentElement.lang = currentLang;
     translateStaticPage();
     document.dispatchEvent(new CustomEvent('languagechange', { detail: { lang: currentLang } }));
@@ -529,9 +549,10 @@ function translateStaticPage() {
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
             el.placeholder = __(key);
         } else {
-            // innerHTML: dictionary strings are developer-controlled and some
-            // contain markup (<strong>); textContent would strip it.
-            el.innerHTML = __(key);
+            // Dictionary strings are developer-controlled and some contain
+            // markup (<strong>); textContent would strip it. dictionaryHtml()
+            // only returns known bundled keys.
+            el.innerHTML = dictionaryHtml(key);
         }
     });
     document.querySelectorAll('[data-i18n-title]').forEach(el => {

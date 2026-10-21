@@ -1,17 +1,23 @@
+#!/usr/bin/env python3
 """Dependency-free static-analysis gate (audit follow-up).
 
 The build has no Checkstyle/SpotBugs/PMD plugin (and the offline build cache
 cannot resolve new Maven plugins), so structural hotspots are pinned here
-instead — same CI step as the other check_*.py gates:
+instead - same CI step as the other check_*.py gates:
 
 1. Long methods: no main-source method body longer than MAX_METHOD_LINES.
    (Motivation: JwtAuthenticationFilter.doFilterInternal grew to ~133 lines
    with five interleaved decisions before it was split into named predicates;
    LoginUserUseCaseImpl/RefreshSessionUseCaseImpl got the same treatment.)
+   The scanner masks comments, strings, chars and text blocks before brace
+   counting, and detects signatures whose ``{`` is on a later line.
 2. Config-knob literals: BCrypt cost, HSTS max-age and cache bounds must come
    from @ConfigurationProperties records, never inline literals in the
    adapters that consume them.
 3. No System.out/err or printStackTrace in main sources (logging only).
+
+Run: ``python scripts/check_code_health.py``
+Self-test: ``python scripts/check_code_health.py --self-test``
 """
 
 import re
@@ -27,7 +33,7 @@ MODULES = ["account", "user", "transfer", "audit", "common", "infrastructure",
 # the refresh-rotation helpers (~50) and the outbox wiring (~56).
 MAX_METHOD_LINES = 90
 
-# (file suffix, forbidden regex, why) — literals that must live in
+# (file suffix, forbidden regex, why) - literals that must live in
 # @ConfigurationProperties records instead.
 LITERAL_RULES = [
     ("SecurityConfig.java", r"new\s+BCryptPasswordEncoder\s*\(\s*\d+",
@@ -41,6 +47,11 @@ LITERAL_RULES = [
 ]
 
 PRINT_RE = re.compile(r"System\.(out|err)\.print|\.printStackTrace\s*\(")
+TYPE_RE = re.compile(r"\b(?:class|interface|enum|record)\s+[A-Za-z_$]")
+CONTROL_RE = re.compile(
+    r"^(?:if|for|while|switch|catch|synchronized|try|do|return|throw|new|"
+    r"else|case|assert|yield)\b")
+METHOD_ANNOTATION_RE = re.compile(r"^\s*@[\w.]+(?:\s*\([^)]*\))?")
 
 
 def main_files():
@@ -52,31 +63,318 @@ def main_files():
             yield java
 
 
+def mask_java(text):
+    """Blank comments/strings/chars/text blocks, preserving length + newlines."""
+    out = list(text)
+    i, n = 0, len(text)
+
+    def blank(start, end):
+        for j in range(start, end):
+            if out[j] != "\n":
+                out[j] = " "
+
+    while i < n:
+        if text.startswith("//", i):
+            end = text.find("\n", i)
+            end = n if end < 0 else end
+            blank(i, end)
+            i = end
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end < 0 else end + 2
+            blank(i, end)
+            i = end
+        elif text.startswith('"""', i):
+            j = i + 3
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text.startswith('"""', j):
+                    j += 3
+                    break
+                j += 1
+            blank(i, min(j, n))
+            i = min(j, n)
+        elif text[i] in ('"', "'"):
+            quote = text[i]
+            j = i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == quote or text[j] == "\n":
+                    j += 1
+                    break
+                j += 1
+            blank(i, min(j, n))
+            i = min(j, n)
+        else:
+            i += 1
+    return "".join(out)
+
+
+def _looks_like_method(signature):
+    sig = " ".join(signature.split())
+    if not sig or "(" not in sig or ")" not in sig:
+        return False
+    if "->" in sig or "=>" in sig or ";" in sig:
+        return False
+    if TYPE_RE.search(sig) or CONTROL_RE.match(sig):
+        return False
+    # Assignment (but not ==, !=, <=, >=) rules out field initializers.
+    if re.search(r"(^|[^=!<>])=(?!=)", sig):
+        return False
+    return True
+
+
+def _strip_annotations(line):
+    """Return the declaration remainder for a line that may start with @Ann."""
+    rest = line
+    while True:
+        match = METHOD_ANNOTATION_RE.match(rest)
+        if not match or not rest.lstrip().startswith("@"):
+            return rest
+        rest = rest[match.end():]
+        if not rest.strip():
+            return ""
+
+
+def _type_body_brace(line, paren_depth):
+    """Find the type-body `{` while ignoring braces inside annotation args."""
+    for ch in line:
+        if ch == "(":
+            paren_depth += 1
+        elif ch == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif ch == "{" and paren_depth == 0:
+            return True, paren_depth
+    return False, paren_depth
+
+
 def method_lengths(text):
-    """Yield (signature, body_lines) using brace-depth tracking."""
-    lines = text.splitlines()
+    """Yield (signature, body_lines), masking comments/strings and multi-line sigs."""
+    masked = mask_java(text)
+    lines = masked.splitlines()
+    raw_lines = text.splitlines()
     depth = 0
-    start = -1
-    sig = ""
+    type_depths = set()
+    type_pending = None
+    type_paren = 0
+    annotation_depth = 0
+    method_start = None
+    method_base = None
+    method_sig = ""
+    pending = []
+
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if depth == 1 and start == -1 and "(" in line and line.rstrip().endswith("{") \
-                and not re.match(r"^(if|for|while|switch|catch|synchronized|try|do)\b", stripped) \
-                and not stripped.startswith("new ") and "=>" not in line \
-                and "class " not in stripped and "interface " not in stripped \
-                and "enum " not in stripped and "@" not in stripped:
-            start = i
-            sig = stripped[:100]
+
+        if method_start is not None:
+            depth += line.count("{") - line.count("}")
+            if depth <= method_base:
+                yield method_sig, i - method_start + 1
+                method_start = None
+                method_base = None
+                method_sig = ""
+            continue
+
+        if type_pending is not None:
+            body_brace, type_paren = _type_body_brace(line, type_paren)
+            if body_brace:
+                type_depths.add(type_pending + 1)
+                type_pending = None
+            elif ";" in line:
+                type_pending = None
+            depth += line.count("{") - line.count("}")
+            continue
+
+        if annotation_depth > 0:
+            annotation_depth += line.count("(") - line.count(")")
+            if annotation_depth < 0:
+                annotation_depth = 0
+            continue
+
+        if stripped.startswith("@"):
+            pending = []
+            remainder = _strip_annotations(line).strip()
+            if not remainder:
+                continue
+            if remainder.startswith("@"):
+                annotation_depth = max(0, line.count("(") - line.count(")"))
+                continue
+            if remainder.startswith("("):
+                annotation_depth = max(1, line.count("(") - line.count(")"))
+                continue
+            stripped = remainder
+            line = remainder
+
+        if not stripped:
+            pending = []
+            continue
+
+        if TYPE_RE.search(line):
+            pending = []
+            body_brace, type_paren = _type_body_brace(line, 0)
+            if body_brace:
+                type_depths.add(depth + 1)
+                type_pending = None
+            else:
+                type_pending = depth
+            depth += line.count("{") - line.count("}")
+            continue
+
+        if depth in type_depths:
+            pending.append((i, stripped))
+            signature = " ".join(part for _, part in pending)
+            opens = line.count("{")
+            if ";" in line and not opens:
+                pending = []
+            elif opens:
+                if _looks_like_method(signature):
+                    method_start = pending[0][0]
+                    method_base = depth
+                    method_sig = " ".join(raw_lines[k].strip()
+                                          for k, _ in pending)[:120]
+                elif re.search(r"\bnew\b", signature) and not line.count("}"):
+                    type_depths.add(depth + 1)
+                pending = []
+
         depth += line.count("{") - line.count("}")
-        if start != -1 and depth <= 1 and "}" in line:
-            yield sig, i - start + 1
-            start = -1
-        if depth < 1:
+        if depth < 0:
             depth = 0
-            start = -1
+        if method_start is not None and depth <= method_base:
+            yield method_sig, i - method_start + 1
+            method_start = None
+            method_base = None
+            method_sig = ""
+        type_depths = {d for d in type_depths if d <= depth}
+
+    if method_start is not None:
+        yield method_sig, len(lines) - method_start
+
+
+def self_test():
+    """Regression vectors for the parser itself (run: --self-test in CI)."""
+    failures = []
+
+    def methods(source):
+        return list(method_lengths(source))
+
+    sample = """class A {
+    void one() {
+        if (true) {
+            run();
+        }
+    }
+    public void multi(
+        String a,
+        String b) {
+        run();
+    }
+}
+"""
+    found = methods(sample)
+    if len(found) != 2:
+        failures.append(f"simple/multi-line scan found {len(found)} methods, want 2: {found}")
+    if found and any("multi" in sig for sig, _ in found):
+        length = dict((sig, n) for sig, n in found)
+        sig = next((s for s in length if "multi" in s), "")
+        if length.get(sig) != 5:
+            failures.append(f"multi-line method length {length.get(sig)}, want 5")
+
+    braces = """class B {
+    void tricky() {
+        String s = "}";
+        String t = \"\"\"
+            }
+            \"\"\";
+        // }
+        /* } */
+        run();
+    }
+}
+"""
+    found = methods(braces)
+    if len(found) != 1 or found[0][1] != 9:
+        failures.append(f"masked braces scan {found}, want one 9-line method")
+
+    lambda_field = """class C {
+    private final Runnable r = () -> {
+        run();
+    };
+    void real() {
+        run();
+    }
+}
+"""
+    found = methods(lambda_field)
+    if len(found) != 1 or "real" not in found[0][0]:
+        failures.append(f"lambda field counted as method: {found}")
+
+    annotated = """class D {
+    @Override
+    @SuppressWarnings({"x", "y"})
+    public void annotated() {
+        run();
+    }
+}
+"""
+    found = methods(annotated)
+    if len(found) != 1 or found[0][1] != 3:
+        failures.append(f"annotation scan {found}, want one 3-line method")
+
+    interface_default = """interface I {
+    default int x() {
+        return 1;
+    }
+}
+"""
+    found = methods(interface_default)
+    if len(found) != 1 or found[0][1] != 3:
+        failures.append(f"interface default scan {found}, want one 3-line method")
+
+    inline_annotation = """class G {
+    @Deprecated public void annotated(
+        String value) {
+        run();
+    }
+}
+"""
+    found = methods(inline_annotation)
+    if len(found) != 1 or found[0][1] != 4:
+        failures.append(f"inline annotation scan {found}, want one 4-line method")
+
+    record_header = """record R(
+    @Ann
+    @SuppressWarnings({"x", "y"}) String x
+) {
+    public R(String x) {
+        this.x = x;
+    }
+}
+"""
+    found = methods(record_header)
+    if len(found) != 1 or found[0][1] != 3:
+        failures.append(f"record-header scan {found}, want one 3-line constructor")
+
+    long_body = "class E {\n    void huge() {\n" + "        run();\n" * 95 + "    }\n}\n"
+    found = methods(long_body)
+    if len(found) != 1 or found[0][1] <= MAX_METHOD_LINES:
+        failures.append(f"long method not detected: {found}")
+
+    if failures:
+        print("code-health self-test FAILED:")
+        for failure in failures:
+            print(f"  - {failure}")
+        return 1
+    print("code-health self-test OK - 8 vectors.")
+    return 0
 
 
 def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     failures = []
     for java in main_files():
         rel = str(java.relative_to(ROOT)).replace("\\", "/")

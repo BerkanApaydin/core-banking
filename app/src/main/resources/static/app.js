@@ -4,7 +4,7 @@ const API_BASE = '/api/v1';
 
 // --- Theme (dark default, preference persisted) ---
 function getPreferredTheme() {
-    const saved = localStorage.getItem('theme');
+    const saved = safeStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
         return saved;
     }
@@ -27,7 +27,7 @@ function setTheme(theme) {
     } else {
         document.documentElement.removeAttribute('data-theme');
     }
-    localStorage.setItem('theme', theme);
+    safeStorage.setItem('theme', theme);
     const meta = document.getElementById('meta-theme-color');
     if (meta) {
         meta.setAttribute('content', theme === 'light' ? '#EDF0F6' : '#060F22');
@@ -69,7 +69,7 @@ const alertContainer = document.getElementById('alert-container');
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
-    const savedLang = localStorage.getItem('lang');
+    const savedLang = safeStorage.getItem('lang');
     if (savedLang === 'tr' || savedLang === 'en') {
         currentLang = savedLang;
     }

@@ -64,11 +64,11 @@ function loadIdempotencyDrafts(keyName, persistent) {
     const drafts = new Map();
     const prefix = `${IDEMPOTENCY_STORAGE_PREFIX}draft:${keyName}:`;
     const expired = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const name = localStorage.key(i);
+    for (let i = 0; i < safeStorage.length; i++) {
+        const name = safeStorage.key(i);
         if (!name || !name.startsWith(prefix)) continue;
         try {
-            const state = JSON.parse(localStorage.getItem(name));
+            const state = JSON.parse(safeStorage.getItem(name));
             if (state && state.version === 2 && typeof state.key === 'string'
                 && typeof state.fingerprint === 'string') {
                 if (!state.uncertain && Date.now() - state.createdAt >= IDEMPOTENCY_KEY_MAX_AGE_MS) {
@@ -79,7 +79,7 @@ function loadIdempotencyDrafts(keyName, persistent) {
             }
         } catch (e) { /* malformed old browser state is ignored */ }
     }
-    expired.forEach(name => localStorage.removeItem(name));
+    expired.forEach(name => safeStorage.removeItem(name));
     idempotencyMemory.set(keyName, drafts);
     return drafts;
 }
@@ -88,16 +88,16 @@ function saveIdempotencyState(keyName, state) {
     const drafts = idempotencyMemory.get(keyName);
     drafts.set(state.fingerprint, state);
     if (state.persistent) {
-        localStorage.setItem(draftStorageKey(keyName, state.fingerprint), JSON.stringify(state));
+        safeStorage.setItem(draftStorageKey(keyName, state.fingerprint), JSON.stringify(state));
     }
 }
 
 function syncIdempotencyWarning(keyName) {
     const drafts = idempotencyMemory.get(keyName);
     if (drafts && Array.from(drafts.values()).some(state => state.uncertain)) {
-        localStorage.setItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName, '1');
+        safeStorage.setItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName, '1');
     } else {
-        localStorage.removeItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName);
+        safeStorage.removeItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName);
     }
 }
 
@@ -106,7 +106,7 @@ function syncIdempotencyWarning(keyName) {
 // On insecure HTTP origins without SubtleCrypto, all drafts are memory-only;
 // an uncertainty marker survives reload and forces an explicit new intent.
 async function getIdempotencyKey(keyName, payload, persist = true) {
-    localStorage.removeItem(keyName); // Discard unbound keys from older frontend versions.
+    safeStorage.removeItem(keyName); // Discard unbound keys from older frontend versions.
     const signature = await requestSignature(payload);
     const persistent = Boolean(signature && persist);
     const fingerprint = signature || JSON.stringify(payload);
@@ -118,7 +118,7 @@ async function getIdempotencyKey(keyName, payload, persist = true) {
         if (!await confirmDialog(__('general.uncertain_retry'))) return null;
     } else if (anyUncertain) {
         if (!await confirmDialog(__('general.uncertain_changed'))) return null;
-    } else if (localStorage.getItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName)) {
+    } else if (safeStorage.getItem(IDEMPOTENCY_STORAGE_PREFIX + 'uncertain:' + keyName)) {
         if (!await confirmDialog(__('general.uncertain_new'))) return null;
     }
 
@@ -128,7 +128,7 @@ async function getIdempotencyKey(keyName, payload, persist = true) {
     }
     if (previous) {
         drafts.delete(fingerprint);
-        if (previous.persistent) localStorage.removeItem(draftStorageKey(keyName, fingerprint));
+        if (previous.persistent) safeStorage.removeItem(draftStorageKey(keyName, fingerprint));
     }
     const state = { version: 2, key: newUuid(), fingerprint, createdAt: Date.now(), uncertain: false, persistent };
     saveIdempotencyState(keyName, state);
@@ -169,7 +169,7 @@ function clearIdempotencyKey(keyName) {
     const fingerprint = idempotencyActive.get(keyName);
     const drafts = idempotencyMemory.get(keyName);
     const state = drafts?.get(fingerprint);
-    if (state?.persistent) localStorage.removeItem(draftStorageKey(keyName, fingerprint));
+    if (state?.persistent) safeStorage.removeItem(draftStorageKey(keyName, fingerprint));
     if (drafts) drafts.delete(fingerprint);
     idempotencyActive.delete(keyName);
     syncIdempotencyWarning(keyName);
@@ -178,12 +178,12 @@ function clearIdempotencyKey(keyName) {
 function clearAllIdempotencyKeys() {
     idempotencyMemory.clear();
     idempotencyActive.clear();
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-        const name = localStorage.key(i);
+    for (let i = safeStorage.length - 1; i >= 0; i--) {
+        const name = safeStorage.key(i);
         if (name && (name.startsWith(IDEMPOTENCY_STORAGE_PREFIX)
             || name === 'accountKey' || name === 'transferKey' || name === 'registerKey'
             || name.startsWith('cancelKey_'))) {
-            localStorage.removeItem(name);
+            safeStorage.removeItem(name);
         }
     }
 }

@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 
 const authScript = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/auth.js'), 'utf8');
+const storageSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/storage.js'), 'utf8');
 const helpers = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/idempotency.js'), 'utf8');
 
 function storage() {
@@ -36,6 +37,7 @@ function browser(localStorage, crypto = webcrypto) {
         },
         __: key => key
     });
+    vm.runInContext(storageSource, context);
     vm.runInContext(helpers, context);
     return {
         context,

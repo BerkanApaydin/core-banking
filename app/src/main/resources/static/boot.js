@@ -1,11 +1,13 @@
 // Only appearance preferences persist in browser storage. A prior release's
 // bearer token is discarded before application code or third-party scripts run.
+// safeStorage (storage.js, loaded first) cannot throw when the browser blocks
+// or exhausts localStorage.
 (function () {
     try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('username');
-        var theme = localStorage.getItem('theme');
+        safeStorage.removeItem('token');
+        safeStorage.removeItem('userId');
+        safeStorage.removeItem('username');
+        var theme = safeStorage.getItem('theme');
         if (theme !== 'light' && theme !== 'dark' && window.matchMedia
                 && window.matchMedia('(prefers-color-scheme: light)').matches) {
             theme = 'light';
@@ -15,7 +17,7 @@
             var meta = document.getElementById('meta-theme-color');
             if (meta) meta.setAttribute('content', '#EDF0F6');
         }
-        var lang = localStorage.getItem('lang');
+        var lang = safeStorage.getItem('lang');
         if (lang === 'tr' || lang === 'en') document.documentElement.lang = lang;
     } catch (e) { /* storage may be unavailable; defaults remain usable */ }
 })();

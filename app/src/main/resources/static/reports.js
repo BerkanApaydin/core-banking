@@ -151,10 +151,16 @@ async function loadReportPage(page) {
     }
 }
 
+// Monotonic generation token: switching accounts (or a cancelled transfer
+// refresh) can leave an older history response in flight. Only the newest
+// request may render.
+let historyRequestVersion = 0;
+
 async function loadAccountHistory(accountId, loadMore = false) {
     const historyList = document.getElementById('transaction-history-list');
     const selectedAcc = accounts.find(a => a.id == accountId);
     if (!selectedAcc) return;
+    const requestVersion = ++historyRequestVersion;
 
     const sameAccount = historyPager.accountId !== null && String(historyPager.accountId) === String(accountId);
     if (!loadMore || !sameAccount) {
@@ -166,6 +172,7 @@ async function loadAccountHistory(accountId, loadMore = false) {
 
     try {
         const response = await fetchApi(`/transfers/history/${accountId}?page=${page}&size=${PAGE_SIZE}`);
+        if (requestVersion !== historyRequestVersion) return;
         const content = response.content || [];
         const pageItems = Array.isArray(content) ? content : [];
         historyCache = {
@@ -280,6 +287,7 @@ async function loadAccountHistory(accountId, loadMore = false) {
                 .addEventListener('click', () => loadAccountHistory(accountId, true));
         }
     } catch (err) {
+        if (requestVersion !== historyRequestVersion) return;
         showAlert(err.message, 'danger');
         historyList.innerHTML = `
             <div class="empty-state" style="color: var(--danger);">
