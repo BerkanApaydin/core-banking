@@ -77,7 +77,7 @@ class PasswordResetUseCaseTest {
         @DisplayName("should issue exactly one live token and notify for a known user")
         void shouldIssueAndNotifyForKnownUser() {
             User user = persistedUser(7L, "alice");
-            when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(user));
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(user));
 
             request.execute("alice");
 
@@ -97,7 +97,7 @@ class PasswordResetUseCaseTest {
         @Test
         @DisplayName("should stay silent (but audit) for an unknown user")
         void shouldStaySilentForUnknownUser() {
-            when(loadUserPort.findByUsername("ghost")).thenReturn(Optional.empty());
+            when(loadUserPort.findByUsernameForUpdate("ghost")).thenReturn(Optional.empty());
 
             request.execute("ghost");
 

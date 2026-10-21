@@ -119,6 +119,43 @@ class RedisLoginAttemptIntegrationTest {
     }
 
     @Test
+    void shouldDecayIpCounterByOneAndPreserveTtl() {
+        String ip = "10.0.0.10";
+        String key = "login_attempt:ip:" + ip;
+        redisTemplate.delete(key);
+        adapter.recordFailure(ip, "decay_user");
+        adapter.recordFailure(ip, "decay_user");
+        assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("2");
+
+        // Shrink the window to prove DECR preserves the existing TTL instead
+        // of restarting it (a restart would grant a fresh 15-minute window).
+        redisTemplate.expire(key, 120, TimeUnit.SECONDS);
+        adapter.recordIpSuccess(ip);
+
+        assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("1");
+        Long ttlMs = redisTemplate.getExpire(key, TimeUnit.MILLISECONDS);
+        assertThat(ttlMs).isNotNull().isBetween(1L, TimeUnit.SECONDS.toMillis(120));
+    }
+
+    @Test
+    void shouldNotDecayIpCounterBelowZero() {
+        String ip = "10.0.0.11";
+        String key = "login_attempt:ip:" + ip;
+        redisTemplate.delete(key);
+
+        // Absent counter: no key is created by a successful login.
+        adapter.recordIpSuccess(ip);
+        assertThat(redisTemplate.hasKey(key)).isFalse();
+
+        adapter.recordFailure(ip, "decay_zero_user");
+        adapter.recordIpSuccess(ip);
+        adapter.recordIpSuccess(ip);
+
+        assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("0");
+        assertThat(adapter.isIpBlocked(ip)).isFalse();
+    }
+
+    @Test
     void shouldNotPartiallyUpdateIpCounterWhenUsernameCounterIsCorrupt() {
         String ipKey = "login_attempt:ip:10.0.0.9";
         String userKey = "login_attempt:user:corrupt_user";

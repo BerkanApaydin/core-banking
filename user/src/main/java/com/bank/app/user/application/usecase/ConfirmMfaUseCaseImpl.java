@@ -5,14 +5,13 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
-import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
+import com.bank.app.user.application.service.MfaReauthenticationService;
 import com.bank.app.user.domain.User;
-import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
@@ -33,7 +32,7 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
 
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
-    private final AuthenticationPort authenticationPort;
+    private final MfaReauthenticationService mfaReauthentication;
     private final RefreshTokenPort refreshTokenPort;
     private final MfaSecretPort mfaSecretPort;
     private final MfaCodeVerificationService mfaCodeVerification;
@@ -41,12 +40,12 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
     private final AuditEventPort auditEventPort;
 
     public ConfirmMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-            AuthenticationPort authenticationPort, RefreshTokenPort refreshTokenPort,
+            MfaReauthenticationService mfaReauthentication, RefreshTokenPort refreshTokenPort,
             MfaSecretPort mfaSecretPort, MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
-        this.authenticationPort = authenticationPort;
+        this.mfaReauthentication = mfaReauthentication;
         this.refreshTokenPort = refreshTokenPort;
         this.mfaSecretPort = mfaSecretPort;
         this.mfaCodeVerification = mfaCodeVerification;
@@ -64,11 +63,12 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
         }
         // Step-up before enabling a login factor: a stolen session alone must
         // not be able to turn on an attacker-controlled second factor.
-        try {
-            authenticationPort.authenticate(user.getUsername(), password);
-        } catch (AuthenticationFailedException wrongPassword) {
-            throw new InvalidMfaCodeException();
-        }
+        // R-U08: a wrong password is charged to the shared account budget.
+        // No reset on password success: the code check below owns the reset,
+        // otherwise a correct password would erase failed-code history on
+        // every attempt.
+        mfaReauthentication.reauthenticate(userId, user.getUsername(), password,
+                "MFA confirmation");
         if (mfaSecretPort.findSecret(userId).isEmpty()) {
             throw new MfaNotEnrolledException();
         }
@@ -76,7 +76,7 @@ public class ConfirmMfaUseCaseImpl implements ConfirmMfaUseCase {
         // the code check.
         if (mfaCodeVerification.isBlocked(userId)) {
             throw new TooManyFailedMfaAttemptsException(
-                    "Too many failed authenticator code attempts. Please try again in "
+                    "Please try again in "
                             + mfaCodeVerification.getWindowMinutes() + " minutes.");
         }
         // 400, not the generic 401: this endpoint runs in an already

@@ -14,11 +14,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -132,6 +134,38 @@ class LogoutUseCaseImplTest {
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
         verify(refreshTokenPort).revokeFamily("family-1");
         verify(refreshTokenPort, never()).revoke(anyString());
+    }
+
+    @Test
+    @DisplayName("R-U11: revoke the refresh family before blacklisting the access token")
+    void shouldRevokeRefreshFamilyBeforeBlacklistingAccessToken() {
+        stubClock();
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("valid-refresh-token"), 7L, "family-1",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
+
+        logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
+
+        InOrder order = inOrder(refreshTokenPort, tokenBlacklistPort);
+        order.verify(refreshTokenPort).revokeFamily("family-1");
+        order.verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
+    }
+
+    @Test
+    @DisplayName("R-U11: a failed refresh revocation must not burn the access token")
+    void shouldNotBlacklistAccessTokenWhenRefreshRevocationFails() {
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
+                .thenThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> logoutUseCase.execute(
+                "Bearer valid-jwt-token", "valid-refresh-token"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db down");
+
+        verify(jwtPort, never()).getRemainingMs(anyString());
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
     }
 
     @Test

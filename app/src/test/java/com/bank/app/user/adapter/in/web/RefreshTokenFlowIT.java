@@ -3,7 +3,10 @@ package com.bank.app.user.adapter.in.web;
 import com.bank.app.BankApplication;
 
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
+import com.bank.app.common.domain.TokenDigest;
+import com.bank.app.user.adapter.out.persistence.RefreshTokenJpaEntity;
 import com.bank.app.user.application.dto.AuthRequest;
+import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -24,8 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,17 +50,20 @@ class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
 
     private final TransactionTemplate transactionTemplate;
 
+    private final RefreshTokenPort refreshTokenPort;
+
     private final List<String> createdUsernames = new ArrayList<>();
 
     @Autowired
     RefreshTokenFlowIT(MockMvc mockMvc, ObjectMapper objectMapper, EntityManager entityManager,
-            PlatformTransactionManager transactionManager,
+            PlatformTransactionManager transactionManager, RefreshTokenPort refreshTokenPort,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
         this.entityManager = entityManager;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.refreshTokenPort = refreshTokenPort;
     }
 
     private static final String PASSWORD = "RefreshFlow123";
@@ -142,6 +150,26 @@ class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
                         .content(objectMapper.writeValueAsString(
                                 Map.of("refreshToken", secondRefresh))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldPreserveRotationLinkWhenRevokingAnAlreadyRotatedToken() throws Exception {
+        JsonNode pair = login(username());
+        String oldHash = TokenDigest.sha256Hex(pair.get("refreshToken").asText());
+        String replacementHash = TokenDigest.sha256Hex("concurrent-replacement");
+
+        // R-U09: rotation and revocation race in the same transaction. The
+        // revocation must not overwrite the replacedByHash link written by
+        // rotation; otherwise reuse detection loses the token chain.
+        transactionTemplate.executeWithoutResult(status -> {
+            refreshTokenPort.markRotated(oldHash, replacementHash);
+            refreshTokenPort.revoke(oldHash);
+        });
+
+        RefreshTokenJpaEntity stored = entityManager.find(RefreshTokenJpaEntity.class, oldHash);
+        assertNotNull(stored);
+        assertTrue(stored.isRevoked());
+        assertEquals(replacementHash, stored.getReplacedByHash());
     }
 
     @Test

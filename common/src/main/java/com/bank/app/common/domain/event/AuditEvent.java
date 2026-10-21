@@ -24,6 +24,7 @@ public record AuditEvent(String action, String details, LocalDateTime occurredAt
     public static final String TOKEN_REVOKED = "TOKEN_REVOKED";
     public static final String MFA_ENABLED = "MFA_ENABLED";
     public static final String MFA_DISABLED = "MFA_DISABLED";
+    public static final String MFA_REAUTH_FAILED = "MFA_REAUTH_FAILED";
     public static final String PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED";
     public static final String PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED";
 

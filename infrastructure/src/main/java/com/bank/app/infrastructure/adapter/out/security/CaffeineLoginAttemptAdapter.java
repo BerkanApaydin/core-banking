@@ -91,6 +91,15 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
+    public void recordIpSuccess(String ip) {
+        if (ip == null) return;
+        ipCache.asMap().computeIfPresent(ip, (key, count) -> {
+            int remaining = count.decrementAndGet();
+            return remaining <= 0 ? null : count;
+        });
+    }
+
+    @Override
     public void reset(String ip) {
         if (ip == null) return;
         ipCache.invalidate(ip);

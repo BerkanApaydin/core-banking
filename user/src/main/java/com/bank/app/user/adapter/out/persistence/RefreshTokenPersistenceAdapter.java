@@ -1,10 +1,12 @@
 package com.bank.app.user.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,7 +35,11 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         entity.setFamilyId(familyId);
         entity.setExpiresAt(expiresAt);
         entity.setRevoked(false);
-        repository.save(entity);
+        try {
+            repository.save(entity);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override
@@ -41,13 +47,17 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         if (tokenHash == null) {
             return Optional.empty();
         }
-        return repository.findById(tokenHash).map(entity -> new StoredRefresh(
-                entity.getTokenHash(),
-                entity.getUserId(),
-                entity.getFamilyId(),
-                entity.getExpiresAt(),
-                entity.isRevoked(),
-                entity.getReplacedByHash()));
+        try {
+            return repository.findById(tokenHash).map(entity -> new StoredRefresh(
+                    entity.getTokenHash(),
+                    entity.getUserId(),
+                    entity.getFamilyId(),
+                    entity.getExpiresAt(),
+                    entity.isRevoked(),
+                    entity.getReplacedByHash()));
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override
@@ -58,7 +68,12 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         // concurrent refresh already rotated this token, or it is unknown.
         // Same fail-fast contract as before — the use case re-reads to tell
         // reuse (family revoke) apart from a stale/unknown token.
-        int rotated = repository.rotateIfActive(oldHash, newHash);
+        int rotated;
+        try {
+            rotated = repository.rotateIfActive(oldHash, newHash);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
         if (rotated == 0) {
             throw new IllegalArgumentException("Unknown refresh token");
         }
@@ -69,10 +84,14 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         if (tokenHash == null) {
             return;
         }
-        repository.findById(tokenHash).ifPresent(entity -> {
-            entity.setRevoked(true);
-            repository.save(entity);
-        });
+        // R-U09: conditional UPDATE instead of read-modify-write. The old
+        // findById + save overwrote replacedByHash when a concurrent refresh
+        // had already rotated the token, defeating reuse detection.
+        try {
+            repository.revokeIfActive(tokenHash);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override
@@ -81,15 +100,23 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips. A
         // dedicated transaction keeps the logout path (intentionally not
         // transactional: blacklist/audit are not DB work) working.
-        transactionBoundary.executeRequiresNew(
-                () -> repository.revokeFamilyBulk(familyId), BULK_TX_TIMEOUT_SECONDS);
+        try {
+            transactionBoundary.executeRequiresNew(
+                    () -> repository.revokeFamilyBulk(familyId), BULK_TX_TIMEOUT_SECONDS);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override
     public void revokeAllForUser(Long userId) {
         Objects.requireNonNull(userId, "User ID must not be null");
-        transactionBoundary.executeRequiresNew(
-                () -> repository.revokeAllForUserBulk(userId), BULK_TX_TIMEOUT_SECONDS);
+        try {
+            transactionBoundary.executeRequiresNew(
+                    () -> repository.revokeAllForUserBulk(userId), BULK_TX_TIMEOUT_SECONDS);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
     }
 
     @Override

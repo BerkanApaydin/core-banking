@@ -1,6 +1,8 @@
 package com.bank.app.user.adapter.out.persistence;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +11,15 @@ import java.util.Optional;
 public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
 
     Optional<UserJpaEntity> findByUsername(String username);
+
+    /**
+     * R-U12: row lock for the password-reset request path. The lock is held
+     * until the enclosing use-case transaction commits, serializing the
+     * "retire old token + insert new token" pair for the same account.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM UserJpaEntity e WHERE e.username = :username")
+    Optional<UserJpaEntity> findByUsernameForUpdate(@Param("username") String username);
 
     /**
      * MFA secret writes bypass the aggregate mapper on purpose (see

@@ -7,6 +7,21 @@ public interface LoadUserPort {
     Optional<User> findByUsername(String username);
 
     /**
+     * R-U12: username lookup that takes a pessimistic row lock for the
+     * duration of the current use-case transaction. Password-reset requests
+     * use it to serialize "delete the previous live token + insert the new
+     * one", which a plain SELECT cannot do (two concurrent requests could
+     * both see no token and insert one each).
+     *
+     * <p>Defaults to the unlocked lookup so test doubles and adapters without
+     * row-lock support keep working; the JPA adapter overrides it with
+     * {@code SELECT ... FOR UPDATE}.
+     */
+    default Optional<User> findByUsernameForUpdate(String username) {
+        return findByUsername(username);
+    }
+
+    /**
      * Primary-key lookup for security re-validation (SEC-01: the access-token
      * filter re-checks the token generation on admin paths). Defaults to
      * empty so external/test doubles that only support username lookup keep

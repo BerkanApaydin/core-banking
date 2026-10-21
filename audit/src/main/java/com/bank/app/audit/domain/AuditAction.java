@@ -26,6 +26,9 @@ public enum AuditAction {
     // added in V55.
     MFA_ENABLED,
     MFA_DISABLED,
+    // R-U08: a session-authenticated MFA management endpoint received a
+    // wrong password step-up. DB value added in V58.
+    MFA_REAUTH_FAILED,
     PASSWORD_RESET_REQUESTED,
     PASSWORD_RESET_COMPLETED;
 

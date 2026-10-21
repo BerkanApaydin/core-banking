@@ -70,6 +70,53 @@ class CaffeineLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldDecayIpCounterByOnePerSuccessfulLogin() {
+        // R-U13: a success shaves one failure off the IP budget instead of
+        // wiping it, so an attacker cannot launder a burned budget with a
+        // single login to an account they control.
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        assertTrue(adapter.isIpBlocked(IP_A));
+
+        adapter.recordIpSuccess(IP_A);
+        assertFalse(adapter.isIpBlocked(IP_A));
+
+        adapter.recordIpSuccess(IP_A);
+        adapter.recordIpSuccess(IP_A);
+        // At zero: still not blocked, and further successes must not go
+        // negative (which would grant a budget larger than the window).
+        adapter.recordIpSuccess(IP_A);
+        assertFalse(adapter.isIpBlocked(IP_A));
+    }
+
+    @Test
+    void shouldTreatSuccessfulLoginWithoutIpFailuresAsNoOp() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+
+        assertDoesNotThrow(() -> adapter.recordIpSuccess(IP_A));
+        assertDoesNotThrow(() -> adapter.recordIpSuccess(null));
+        assertFalse(adapter.isIpBlocked(IP_A));
+    }
+
+    @Test
+    void shouldNotDecayAccountCountersOnSuccessfulLogin() {
+        // Only the IP budget decays on a success. The account budgets belong
+        // to the account whose credentials were just proven; they are cleared
+        // explicitly by resetByUsername, not by the IP decay.
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        assertTrue(adapter.isUsernameBlocked("user", IP_A));
+
+        adapter.recordIpSuccess(IP_A);
+
+        assertTrue(adapter.isUsernameBlocked("user", IP_A));
+    }
+
+    @Test
     void shouldResetIpAfterBlocking() {
         CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(2, 15, 10000));
         adapter.recordFailure(IP_A, "user");

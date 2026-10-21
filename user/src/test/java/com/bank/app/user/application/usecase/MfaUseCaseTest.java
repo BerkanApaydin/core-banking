@@ -3,6 +3,7 @@ package com.bank.app.user.application.usecase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.user.application.port.out.AuthenticationPort;
@@ -11,6 +12,7 @@ import com.bank.app.user.application.port.out.MfaAttemptPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
+import com.bank.app.user.application.service.MfaReauthenticationService;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.TotpPolicy;
@@ -21,6 +23,7 @@ import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
+import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -62,22 +66,25 @@ class MfaUseCaseTest {
     private final TotpPolicy totpPolicy = new TotpPolicy(30, 6, 1);
 
     private MfaCodeVerificationService mfaCodeVerification;
+    private MfaReauthenticationService mfaReauthentication;
     private EnableMfaUseCaseImpl enable;
     private ConfirmMfaUseCaseImpl confirm;
     private DisableMfaUseCaseImpl disable;
 
     @BeforeEach
     void setUp() {
-        enable = new EnableMfaUseCaseImpl(loadUserPort, authenticationPort, mfaSecretPort,
-                encryptor, "test-issuer", clockProvider, auditEventPort);
         // The verification service persists the accepted TOTP step counter;
         // the mock must accept it (a rejected counter reads as a replay).
         lenient().when(mfaSecretPort.recordAcceptedTotpCounter(any(), anyLong())).thenReturn(true);
         mfaCodeVerification = new MfaCodeVerificationService(mfaSecretPort, encryptor, totpPolicy,
                 mfaAttemptPort, clockProvider);
-        confirm = new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+        mfaReauthentication = new MfaReauthenticationService(authenticationPort, mfaAttemptPort,
+                auditEventPort, clockProvider);
+        enable = new EnableMfaUseCaseImpl(loadUserPort, mfaReauthentication, mfaSecretPort,
+                encryptor, "test-issuer", clockProvider, auditEventPort);
+        confirm = new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaReauthentication,
                 refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
-        disable = new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+        disable = new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, mfaReauthentication,
                 refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
     }
 
@@ -113,6 +120,9 @@ class MfaUseCaseTest {
             assertThat(user.isMfaEnabled()).isFalse();
             verify(mfaSecretPort).saveSecret(eq(7L), any(String.class));
             verify(saveUserPort, never()).save(any());
+            // R-U08: enrolment has no second factor, so a successful password
+            // step-up clears the shared verification budget.
+            verify(mfaAttemptPort).reset(7L);
         }
 
         @Test
@@ -132,11 +142,35 @@ class MfaUseCaseTest {
         void shouldRejectWrongPassword() {
             User user = persistedUser(7L, "alice");
             when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
             when(authenticationPort.authenticate("alice", "nope"))
                     .thenThrow(new AuthenticationFailedException());
 
             assertThatThrownBy(() -> enable.execute(7L, "nope"))
                     .isInstanceOf(InvalidMfaCodeException.class);
+            verify(mfaSecretPort, never()).saveSecret(any(), any());
+            // R-U08: the wrong password is charged to the account budget and
+            // audited, not silently discarded.
+            verify(mfaAttemptPort).recordFailure(7L);
+            verify(mfaAttemptPort, never()).reset(anyLong());
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_REAUTH_FAILED.equals(event.action())
+                            && "alice".equals(event.username())
+                            && Long.valueOf(7L).equals(event.actorUserId())));
+        }
+
+        @Test
+        @DisplayName("R-U08: an exhausted shared budget blocks before password work")
+        void shouldRejectWhenSharedBudgetExhausted() {
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(mfaAttemptPort.isBlocked(7L)).thenReturn(true);
+            when(mfaAttemptPort.getWindowMinutes()).thenReturn(15);
+
+            assertThatThrownBy(() -> enable.execute(7L, "Secret123"))
+                    .isInstanceOf(TooManyFailedMfaAttemptsException.class)
+                    .hasMessageContaining("15");
+            verify(authenticationPort, never()).authenticate(any(), any());
             verify(mfaSecretPort, never()).saveSecret(any(), any());
         }
     }
@@ -192,12 +226,18 @@ class MfaUseCaseTest {
         void shouldRejectWrongPassword() {
             User user = persistedUser(7L, "alice");
             when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
             when(authenticationPort.authenticate("alice", "nope"))
                     .thenThrow(new AuthenticationFailedException());
 
             assertThatThrownBy(() -> confirm.execute(7L, "nope", "123456"))
                     .isInstanceOf(InvalidMfaCodeException.class);
             verify(mfaSecretPort, never()).findSecret(any());
+            verify(mfaAttemptPort).recordFailure(7L);
+            // A correct code path owns the reset; a failed password never does.
+            verify(mfaAttemptPort, never()).reset(anyLong());
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_REAUTH_FAILED.equals(event.action())));
         }
 
         @Test
@@ -282,6 +322,7 @@ class MfaUseCaseTest {
             User user = persistedUser(7L, "alice");
             user.enableMfa();
             when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
             when(authenticationPort.authenticate(eq("alice"), eq("nope")))
                     .thenThrow(new AuthenticationFailedException());
 
@@ -289,6 +330,10 @@ class MfaUseCaseTest {
                     .isInstanceOf(InvalidMfaCodeException.class);
             assertThat(user.isMfaEnabled()).isTrue();
             verify(saveUserPort, never()).save(any());
+            verify(mfaAttemptPort).recordFailure(7L);
+            verify(mfaAttemptPort, never()).reset(anyLong());
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_REAUTH_FAILED.equals(event.action())));
         }
     }
 

@@ -65,6 +65,20 @@ class ProblemResponsesTest {
     }
 
     @Test
+    void serviceUnavailableRendersProblemShape() {
+        var response = ProblemResponses.serviceUnavailable(
+                "Security service temporarily unavailable.", "/api/v1/auth/browser/logout");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody().getTitle()).isEqualTo("Service Unavailable");
+        assertThat(response.getBody().getInstance().toString())
+                .isEqualTo("/api/v1/auth/browser/logout");
+        assertThat(response.getBody().getProperties())
+                .containsEntry("code", "SECURITY_BACKEND_UNAVAILABLE")
+                .containsEntry("message", "Security service temporarily unavailable.");
+    }
+
+    @Test
     void correlationIdPropagatesFromMdcWhenPresent() {
         // Kills the Negate mutant on (correlationId != null && !isBlank) and
         // the setProperty(correlationId) VoidMethodCall mutant.

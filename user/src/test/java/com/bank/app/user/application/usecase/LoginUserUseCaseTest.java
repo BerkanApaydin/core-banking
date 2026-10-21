@@ -137,7 +137,7 @@ class LoginUserUseCaseTest {
         }
 
         @Test
-        @DisplayName("should login successfully with client IP and reset login attempts")
+        @DisplayName("should login successfully with client IP and decay IP login attempts")
         void shouldLoginWithClientIpAndResetAttempts() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
@@ -156,7 +156,8 @@ class LoginUserUseCaseTest {
 
             assertThat(response.token()).isEqualTo("mock-jwt-token");
             assertThat(response.refreshToken()).isEqualTo("mock-refresh-token");
-            verify(loginAttemptPort).reset(CLIENT_IP);
+            verify(loginAttemptPort).recordIpSuccess(CLIENT_IP);
+            verify(loginAttemptPort, never()).reset(CLIENT_IP);
             verify(loginAttemptPort).resetByUsername(USERNAME);
             verify(refreshTokenPort).save(anyString(), eq(100L), anyString(), any());
         }
@@ -181,6 +182,7 @@ class LoginUserUseCaseTest {
             verify(loginAttemptPort).isUsernameBlocked(eq(USERNAME), any());
             verify(loginAttemptPort).resetByUsername(USERNAME);
             verify(loginAttemptPort, never()).reset(any());
+            verify(loginAttemptPort, never()).recordIpSuccess(any());
             verify(loginAttemptPort, never()).recordFailure(any(), any());
         }
 
@@ -261,16 +263,16 @@ class LoginUserUseCaseTest {
         }
 
         @Test
-        void shouldNotReturnTokenWhenAttemptStoreFailsDuringReset() {
+        void shouldNotReturnTokenWhenAttemptStoreFailsDuringDecay() {
             AuthenticatedUser user = new AuthenticatedUser(new UserId(100L), USERNAME, Role.ROLE_USER);
             when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
             doThrow(new LoginAttemptStoreUnavailableException(new RuntimeException("Redis down")))
-                    .when(loginAttemptPort).reset(CLIENT_IP);
+                    .when(loginAttemptPort).recordIpSuccess(CLIENT_IP);
 
-            // Guard reset happens before any token is minted: nothing to revoke.
+            // Guard update happens before any token is minted: nothing to revoke.
             assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD), CLIENT_IP))
                     .isInstanceOf(LoginAttemptStoreUnavailableException.class);
-            verify(loginAttemptPort).reset(CLIENT_IP);
+            verify(loginAttemptPort).recordIpSuccess(CLIENT_IP);
             verify(loginAttemptPort, never()).resetByUsername(USERNAME);
             verify(loginAttemptPort, never()).recordFailure(any(), any());
             verify(jwtPort, never()).generateToken(any(), any(), any(), anyLong());

@@ -43,8 +43,9 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     @Override
     public void execute(String authHeader, String refreshToken) {
         String username = "system";
+        String accessToken = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+            accessToken = authHeader.substring(7);
             // M-4: already-revoked access tokens short-circuit to a pure no-op
             // (still 204 at the controller). Without this, a revoked token can
             // re-trigger server-side logout until its natural expiry — audit
@@ -52,32 +53,39 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
             // 401 tells whether the token was revoked). The revocation check
             // is best-effort: if the store is unreadable, fall through and
             // attempt the normal revocation path instead of dropping logout.
-            if (isAlreadyRevoked(token) && (refreshToken == null || refreshToken.isBlank())) {
-                return;
-            }
-            if (isAlreadyRevoked(token)) {
+            if (isAlreadyRevoked(accessToken)) {
                 // Access already gone but a refresh session was also presented:
                 // revoke its whole family idempotently, then return without
                 // re-auditing.
-                revokeRefreshFamily(refreshToken);
+                if (hasRefreshToken(refreshToken)) {
+                    revokeRefreshFamily(refreshToken);
+                }
                 return;
             }
-            username = bestEffortUsername(token, refreshToken);
-            long remainingMs = jwtPort.getRemainingMs(token);
-            if (remainingMs > 0) {
-                tokenBlacklistPort.blacklist(token, remainingMs);
-            }
-        } else if (refreshToken != null && !refreshToken.isBlank()) {
+            username = bestEffortUsername(accessToken, refreshToken);
+        } else if (hasRefreshToken(refreshToken)) {
             username = bestEffortUsername(refreshToken, null);
         }
-        // Revoke the token's whole family: rotating issues a new token in the
-        // same family, so a single-row revoke would leave the replacement
-        // usable after logout. Unknown/blank values are ignored so clients
-        // without a refresh token keep the previous logout behavior.
-        if (refreshToken != null && !refreshToken.isBlank()) {
+        // R-U11: revoke the long-lived refresh family BEFORE blacklisting the
+        // short-lived access token. If the database is unavailable, logout
+        // fails here and the caller can retry; reversing the order would leave
+        // a usable refresh token behind after the access token was already
+        // burned. Rotating issues a new token in the same family, so a
+        // single-row revoke would leave the replacement usable too.
+        if (hasRefreshToken(refreshToken)) {
             revokeRefreshFamily(refreshToken);
         }
+        if (accessToken != null) {
+            long remainingMs = jwtPort.getRemainingMs(accessToken);
+            if (remainingMs > 0) {
+                tokenBlacklistPort.blacklist(accessToken, remainingMs);
+            }
+        }
         auditLogout(username);
+    }
+
+    private static boolean hasRefreshToken(String refreshToken) {
+        return refreshToken != null && !refreshToken.isBlank();
     }
 
     /**

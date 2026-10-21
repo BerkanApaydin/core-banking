@@ -10,9 +10,11 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
+import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
 import jakarta.servlet.http.Cookie;
@@ -136,6 +138,16 @@ public class BrowserAuthController {
         final AuthResponse rotated;
         try {
             rotated = refreshSessionUseCase.execute(refreshToken);
+        } catch (AuthenticationBackendUnavailableException | RevocationStoreUnavailableException backendUnavailable) {
+            // R-U10: the token was never proven invalid — a database or
+            // revocation-store outage must not destroy the browser session.
+            // Return 503 so the client retries with its cookies intact.
+            log.warn("Browser session rotation backend unavailable: {}",
+                    backendUnavailable.getClass().getSimpleName());
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            return ProblemResponses.serviceUnavailable(
+                    "Security service temporarily unavailable. Please try again later.",
+                    request.getRequestURI());
         } catch (RuntimeException rotationFailed) {
             log.warn("Browser session rotation failed: {}",
                     rotationFailed.getClass().getSimpleName());
@@ -169,16 +181,27 @@ public class BrowserAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
         String token = cookieValue(request, cookies.sessionCookieName());
         String refreshToken = cookieValue(request, cookies.refreshCookieName());
         try {
             logoutUseCase.execute(token != null ? "Bearer " + token : null, refreshToken);
-            return ResponseEntity.noContent().build();
-        } finally {
-            clearSessionCookies(response);
+        } catch (AuthenticationBackendUnavailableException | RevocationStoreUnavailableException backendUnavailable) {
+            // R-U11: server-side revocation did not complete. Keep the cookies
+            // so the client can retry; clearing them here would strand a live
+            // refresh token on the server.
+            log.warn("Browser logout backend unavailable: {}",
+                    backendUnavailable.getClass().getSimpleName());
             response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            return ProblemResponses.serviceUnavailable(
+                    "Security service temporarily unavailable. Please try again later.",
+                    request.getRequestURI());
         }
+        // Only a completed logout clears cookies. Unexpected failures propagate
+        // to the global 500 handler with the session cookies untouched.
+        clearSessionCookies(response);
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return ResponseEntity.noContent().build();
     }
 
     private void clearSessionCookies(HttpServletResponse response) {

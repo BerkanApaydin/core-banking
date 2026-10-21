@@ -35,11 +35,26 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
             end
             return 1
             """;
+    private static final String DECAY_IP_SCRIPT = """
+            local count = redis.call('GET', KEYS[1])
+            if not count then
+                return 0
+            end
+            if not string.match(count, '^%d+$') then
+                return redis.error_reply('invalid login attempt counter')
+            end
+            if tonumber(count) <= 0 then
+                return 0
+            end
+            redis.call('DECR', KEYS[1])
+            return 1
+            """;
 
     private final StringRedisTemplate redisTemplate;    private final int maxAttempts;
     private final int globalAccountMaxAttempts;
     private final long windowMinutes;
     private final DefaultRedisScript<Long> recordFailureScript;
+    private final DefaultRedisScript<Long> decayIpScript;
 
     public RedisLoginAttemptAdapter(
             StringRedisTemplate redisTemplate,
@@ -49,6 +64,7 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
         this.globalAccountMaxAttempts = properties.globalAccountMaxAttempts();
         this.windowMinutes = properties.windowMinutes();
         this.recordFailureScript = new DefaultRedisScript<>(RECORD_FAILURE_SCRIPT, Long.class);
+        this.decayIpScript = new DefaultRedisScript<>(DECAY_IP_SCRIPT, Long.class);
     }
 
     @Override
@@ -94,6 +110,16 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
         if (!Long.valueOf(1L).equals(result)) {
             throw new LoginAttemptStoreUnavailableException(
                     new IllegalStateException("Failed-login counter update returned no result"));
+        }
+    }
+
+    @Override
+    public void recordIpSuccess(String ip) {
+        if (ip == null) return;
+        Long result = withRedis(() -> redisTemplate.execute(decayIpScript, List.of(IP_PREFIX + ip)));
+        if (result == null) {
+            throw new LoginAttemptStoreUnavailableException(
+                    new IllegalStateException("Failed-login counter decay returned no result"));
         }
     }
 

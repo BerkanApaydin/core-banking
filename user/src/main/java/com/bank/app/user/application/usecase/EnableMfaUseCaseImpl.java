@@ -6,15 +6,13 @@ import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.user.application.port.in.EnableMfaUseCase;
-import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
+import com.bank.app.user.application.service.MfaReauthenticationService;
 import com.bank.app.user.domain.Totp;
 import com.bank.app.user.domain.TotpPolicy;
 import com.bank.app.user.domain.User;
-import com.bank.app.user.domain.exception.AuthenticationFailedException;
-import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.UserNotFoundException;
 import java.time.LocalDateTime;
@@ -31,7 +29,7 @@ import java.util.Objects;
 public class EnableMfaUseCaseImpl implements EnableMfaUseCase {
 
     private final LoadUserPort loadUserPort;
-    private final AuthenticationPort authenticationPort;
+    private final MfaReauthenticationService mfaReauthentication;
     private final MfaSecretPort mfaSecretPort;
     private final MfaSecretEncryptorPort encryptor;
     private final String issuer;
@@ -40,19 +38,21 @@ public class EnableMfaUseCaseImpl implements EnableMfaUseCase {
     private final ClockProviderPort clockProvider;
     private final AuditEventPort auditEventPort;
 
-    public EnableMfaUseCaseImpl(LoadUserPort loadUserPort, AuthenticationPort authenticationPort,
+    public EnableMfaUseCaseImpl(LoadUserPort loadUserPort,
+            MfaReauthenticationService mfaReauthentication,
             MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort encryptor, String issuer,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
-        this(loadUserPort, authenticationPort, mfaSecretPort, encryptor, issuer,
+        this(loadUserPort, mfaReauthentication, mfaSecretPort, encryptor, issuer,
                 Totp.DEFAULT_DIGITS, Totp.DEFAULT_PERIOD_SECONDS, clockProvider, auditEventPort);
     }
 
-    public EnableMfaUseCaseImpl(LoadUserPort loadUserPort, AuthenticationPort authenticationPort,
+    public EnableMfaUseCaseImpl(LoadUserPort loadUserPort,
+            MfaReauthenticationService mfaReauthentication,
             MfaSecretPort mfaSecretPort, MfaSecretEncryptorPort encryptor, String issuer,
             int digits, int periodSeconds,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
-        this.authenticationPort = authenticationPort;
+        this.mfaReauthentication = mfaReauthentication;
         this.mfaSecretPort = mfaSecretPort;
         this.encryptor = encryptor;
         this.issuer = issuer;
@@ -64,10 +64,10 @@ public class EnableMfaUseCaseImpl implements EnableMfaUseCase {
 
     /** Policy-wired factory: keeps the otpauth URI in sync with verification. */
     public static EnableMfaUseCaseImpl withPolicy(LoadUserPort loadUserPort,
-            AuthenticationPort authenticationPort, MfaSecretPort mfaSecretPort,
+            MfaReauthenticationService mfaReauthentication, MfaSecretPort mfaSecretPort,
             MfaSecretEncryptorPort encryptor, String issuer, TotpPolicy totpPolicy,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
-        return new EnableMfaUseCaseImpl(loadUserPort, authenticationPort, mfaSecretPort,
+        return new EnableMfaUseCaseImpl(loadUserPort, mfaReauthentication, mfaSecretPort,
                 encryptor, issuer, totpPolicy.digits(), totpPolicy.periodSeconds(),
                 clockProvider, auditEventPort);
     }
@@ -82,11 +82,11 @@ public class EnableMfaUseCaseImpl implements EnableMfaUseCase {
         }
         // Step-up before minting password-equivalent material: a stolen
         // session alone must not be able to enroll an attacker's secret.
-        try {
-            authenticationPort.authenticate(user.getUsername(), password);
-        } catch (AuthenticationFailedException wrongPassword) {
-            throw new InvalidMfaCodeException();
-        }
+        // R-U08: wrong passwords are charged to the shared account-keyed
+        // verification budget; no second factor exists yet, so a successful
+        // step-up clears it.
+        mfaReauthentication.reauthenticate(userId, user.getUsername(), password, "MFA enable");
+        mfaReauthentication.resetAttempts(userId);
         byte[] secret = Totp.generateSecret();
         try {
             mfaSecretPort.saveSecret(userId, encryptor.encrypt(secret));

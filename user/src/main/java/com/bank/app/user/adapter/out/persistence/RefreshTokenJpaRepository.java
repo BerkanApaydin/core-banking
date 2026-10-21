@@ -24,6 +24,18 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
     int rotateIfActive(@Param("hash") String hash, @Param("newHash") String newHash);
 
     /**
+     * R-U09: conditional single-token revocation. A read-modify-write here
+     * would overwrite {@code replacedByHash} written by a concurrent
+     * {@link #rotateIfActive(String, String)} and break refresh-token reuse
+     * detection. Returns 1 when this caller revoked the row, 0 when it was
+     * already revoked or unknown (both are idempotent no-ops).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RefreshTokenJpaEntity e SET e.revoked = true "
+            + "WHERE e.tokenHash = :hash AND e.revoked = false")
+    int revokeIfActive(@Param("hash") String hash);
+
+    /**
      * P-2: family revocation as a single bulk UPDATE instead of
      * 1 SELECT + N UPDATE. Theft response stays one round trip.
      */

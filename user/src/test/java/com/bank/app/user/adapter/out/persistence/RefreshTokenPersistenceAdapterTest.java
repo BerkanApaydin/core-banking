@@ -1,8 +1,10 @@
 package com.bank.app.user.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -11,7 +13,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -113,23 +114,36 @@ class RefreshTokenPersistenceAdapterTest {
     }
 
     @Test
-    void shouldRevokeSingleSession() {
-        RefreshTokenJpaEntity entity = new RefreshTokenJpaEntity();
-        when(repository.findById("hash-1")).thenReturn(Optional.of(entity));
+    void shouldRevokeSingleSessionWithConditionalUpdate() {
+        when(repository.revokeIfActive("hash-1")).thenReturn(1);
 
         adapter.revoke("hash-1");
 
-        assertThat(entity.isRevoked()).isTrue();
-        verify(repository).save(entity);
+        verify(repository).revokeIfActive("hash-1");
+        // R-U09: no read-modify-write, so a concurrent rotateIfActive's
+        // replacedByHash link cannot be overwritten.
+        verify(repository, never()).findById(any());
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void shouldIgnoreRevokeOfUnknownHash() {
-        when(repository.findById("nope")).thenReturn(Optional.empty());
+    void shouldTreatAlreadyRevokedOrUnknownHashAsIdempotentNoOp() {
+        when(repository.revokeIfActive("nope")).thenReturn(0);
 
         adapter.revoke("nope");
 
+        verify(repository).revokeIfActive("nope");
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void shouldWrapRevokeDataAccessFailure() {
+        when(repository.revokeIfActive("hash-1"))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.revoke("hash-1"))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
     }
 
     @Test

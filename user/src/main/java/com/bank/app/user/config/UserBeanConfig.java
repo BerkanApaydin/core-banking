@@ -26,6 +26,7 @@ import com.bank.app.user.application.usecase.EnableMfaUseCaseImpl;
 import com.bank.app.user.application.usecase.MfaStatusUseCaseImpl;
 import com.bank.app.user.application.usecase.RequestPasswordResetUseCaseImpl;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
+import com.bank.app.user.application.service.MfaReauthenticationService;
 import com.bank.app.user.adapter.out.security.AesGcmMfaEncryptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,38 +143,51 @@ public class UserBeanConfig {
                 mfaAttemptPort, clockProvider);
     }
 
+    /**
+     * R-U08: shared password step-up for the MFA management endpoints. Wrong
+     * passwords are charged to the same account-keyed budget as wrong TOTP
+     * codes, so neither factor can be brute-forced through another endpoint.
+     */
+    @Bean
+    public MfaReauthenticationService mfaReauthenticationService(
+            AuthenticationPort authenticationPort, MfaAttemptPort mfaAttemptPort,
+            AuditEventPort auditEventPort, ClockProviderPort clockProvider) {
+        return new MfaReauthenticationService(authenticationPort, mfaAttemptPort,
+                auditEventPort, clockProvider);
+    }
+
     @Bean
     public EnableMfaUseCase enableMfaUseCase(LoadUserPort loadUserPort,
-                                            AuthenticationPort authenticationPort,
+                                            MfaReauthenticationService mfaReauthentication,
                                             MfaSecretPort mfaSecretPort,
                                             MfaSecretEncryptorPort mfaEncryptor, MfaProperties mfaProperties,
                                             TotpPolicy totpPolicy,
                                             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         // URI digits/period stay in sync with the verification policy.
-        return EnableMfaUseCaseImpl.withPolicy(loadUserPort, authenticationPort, mfaSecretPort,
+        return EnableMfaUseCaseImpl.withPolicy(loadUserPort, mfaReauthentication, mfaSecretPort,
                 mfaEncryptor, mfaProperties.issuer(), totpPolicy, clockProvider, auditEventPort);
     }
 
     @Bean
     public ConfirmMfaUseCase confirmMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-                                              AuthenticationPort authenticationPort,
+                                              MfaReauthenticationService mfaReauthentication,
                                               RefreshTokenPort refreshTokenPort,
                                               MfaSecretPort mfaSecretPort,
                                               MfaCodeVerificationService mfaCodeVerification,
                                               ClockProviderPort clockProvider,
                                               AuditEventPort auditEventPort) {
-        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+        return new ConfirmMfaUseCaseImpl(loadUserPort, saveUserPort, mfaReauthentication,
                 refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
     }
 
     @Bean
     public DisableMfaUseCase disableMfaUseCase(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-                                               AuthenticationPort authenticationPort,
+                                               MfaReauthenticationService mfaReauthentication,
                                                RefreshTokenPort refreshTokenPort,
                                                MfaSecretPort mfaSecretPort,
                                                MfaCodeVerificationService mfaCodeVerification,
                                                ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
-        return new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, authenticationPort,
+        return new DisableMfaUseCaseImpl(loadUserPort, saveUserPort, mfaReauthentication,
                 refreshTokenPort, mfaSecretPort, mfaCodeVerification, clockProvider, auditEventPort);
     }
 

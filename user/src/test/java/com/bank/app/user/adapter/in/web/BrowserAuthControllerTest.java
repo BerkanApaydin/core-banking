@@ -7,10 +7,12 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.JwtPort.VerifiedToken;
+import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -156,6 +159,27 @@ class BrowserAuthControllerTest {
     }
 
     @Test
+    void refreshReturns503AndKeepsCookiesWhenBackendUnavailable() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
+        request.addHeader("X-CSRF-Token", "c");
+        when(jwtPort.verifyAndDecode("rt"))
+                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
+        when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
+        when(refreshSessionUseCase.execute("rt"))
+                .thenThrow(new AuthenticationBackendUnavailableException(
+                        new IllegalStateException("db down")));
+
+        ResponseEntity<?> result = controller.refresh(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(((ProblemDetail) result.getBody()).getProperties())
+                .containsEntry("code", "SECURITY_BACKEND_UNAVAILABLE");
+        assertThat(response.getHeader("Set-Cookie")).isNull();
+        assertThat(response.getHeader("Cache-Control")).contains("no-store");
+    }
+
+    @Test
     void refreshClearsCookiesOnReuse() {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
@@ -214,11 +238,11 @@ class BrowserAuthControllerTest {
     }
 
     @Test
-    void logoutDelegatesBearerTokenAndAlwaysClearsCookies() {
+    void logoutDelegatesBearerTokenAndClearsCookiesOnSuccess() {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_SESSION", "sess"), new Cookie("BANK_REFRESH", "rt"));
 
-        ResponseEntity<Void> result = controller.logout(request, response);
+        ResponseEntity<?> result = controller.logout(request, response);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         verify(logoutUseCase).execute("Bearer sess", "rt");
@@ -251,12 +275,43 @@ class BrowserAuthControllerTest {
     }
 
     @Test
-    void logoutClearsCookiesEvenWhenRevocationFails() {
+    void logoutReturns503AndKeepsCookiesWhenBackendUnavailable() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("BANK_SESSION", "sess"), new Cookie("BANK_REFRESH", "rt"));
+        doThrow(new AuthenticationBackendUnavailableException(
+                new IllegalStateException("db down")))
+                .when(logoutUseCase).execute(any(), any());
+
+        ResponseEntity<?> result = controller.logout(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(((ProblemDetail) result.getBody()).getProperties())
+                .containsEntry("code", "SECURITY_BACKEND_UNAVAILABLE");
+        assertThat(response.getHeader("Set-Cookie")).isNull();
+        assertThat(response.getHeader("Cache-Control")).contains("no-store");
+    }
+
+    @Test
+    void logoutKeepsCookiesWhenRevocationStoreUnavailable() {
         MockHttpServletRequest request = requestWithCookies();
-        doThrow(new RuntimeException("store down")).when(logoutUseCase).execute(any(), any());
+        doThrow(new RevocationStoreUnavailableException(
+                new IllegalStateException("redis down")))
+                .when(logoutUseCase).execute(any(), any());
+
+        ResponseEntity<?> result = controller.logout(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getHeader("Set-Cookie")).isNull();
+    }
+
+    @Test
+    void logoutDoesNotClearCookiesOnUnexpectedFailure() {
+        MockHttpServletRequest request = requestWithCookies();
+        doThrow(new RuntimeException("boom")).when(logoutUseCase).execute(any(), any());
 
         assertThatThrownBy(() -> controller.logout(request, response))
-                .isInstanceOf(RuntimeException.class);
-        assertThat(response.getHeaderValues("Set-Cookie")).hasSize(3);
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("boom");
+        assertThat(response.getHeader("Set-Cookie")).isNull();
     }
 }

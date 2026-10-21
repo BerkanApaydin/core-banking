@@ -5,16 +5,14 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.DisableMfaUseCase;
-import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
-import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
+import com.bank.app.user.application.service.MfaReauthenticationService;
 import com.bank.app.user.domain.User;
-import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
 import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
@@ -34,7 +32,7 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
 
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
-    private final AuthenticationPort authenticationPort;
+    private final MfaReauthenticationService mfaReauthentication;
     private final RefreshTokenPort refreshTokenPort;
     private final MfaSecretPort mfaSecretPort;
     private final MfaCodeVerificationService mfaCodeVerification;
@@ -42,12 +40,12 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
     private final AuditEventPort auditEventPort;
 
     public DisableMfaUseCaseImpl(LoadUserPort loadUserPort, SaveUserPort saveUserPort,
-            AuthenticationPort authenticationPort, RefreshTokenPort refreshTokenPort,
+            MfaReauthenticationService mfaReauthentication, RefreshTokenPort refreshTokenPort,
             MfaSecretPort mfaSecretPort, MfaCodeVerificationService mfaCodeVerification,
             ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
         this.loadUserPort = loadUserPort;
         this.saveUserPort = saveUserPort;
-        this.authenticationPort = authenticationPort;
+        this.mfaReauthentication = mfaReauthentication;
         this.refreshTokenPort = refreshTokenPort;
         this.mfaSecretPort = mfaSecretPort;
         this.mfaCodeVerification = mfaCodeVerification;
@@ -68,17 +66,15 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
         // InvalidMfaCodeException): no oracle on which factor failed, and no
         // session-killing 401 inside an authenticated flow. Backend outages
         // (AuthenticationBackendUnavailableException) still propagate as 503.
-        try {
-            authenticationPort.authenticate(user.getUsername(), password);
-        } catch (AuthenticationFailedException wrongPassword) {
-            throw new InvalidMfaCodeException();
-        }
+        // R-U08: wrong passwords are charged to the account-keyed budget; no
+        // reset here because the code check owns the reset.
+        mfaReauthentication.reauthenticate(userId, user.getUsername(), password, "MFA disable");
         if (mfaSecretPort.findSecret(userId).isEmpty()) {
             throw new MfaNotEnrolledException();
         }
         if (mfaCodeVerification.isBlocked(userId)) {
             throw new TooManyFailedMfaAttemptsException(
-                    "Too many failed authenticator code attempts. Please try again in "
+                    "Please try again in "
                             + mfaCodeVerification.getWindowMinutes() + " minutes.");
         }
         // The code is verified but NOT consumed: removing the second factor

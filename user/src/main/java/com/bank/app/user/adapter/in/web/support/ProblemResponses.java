@@ -50,6 +50,15 @@ public final class ProblemResponses {
         return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", message, path);
     }
 
+    /**
+     * R-U10/R-U11: a security backend (database, revocation store) failed.
+     * 503 tells the client to retry; unlike a 401 it must not destroy the
+     * browser session cookies, because the session was never proven invalid.
+     */
+    public static ResponseEntity<ProblemDetail> serviceUnavailable(String message, String path) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "SECURITY_BACKEND_UNAVAILABLE", message, path);
+    }
+
     private static ResponseEntity<ProblemDetail> problem(HttpStatus status, String code,
             String message, String path) {
         ProblemBody body = ProblemBody.of(status.value(), code, message,

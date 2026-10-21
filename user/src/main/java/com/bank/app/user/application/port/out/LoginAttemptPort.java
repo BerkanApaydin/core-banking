@@ -37,6 +37,19 @@ public interface LoginAttemptPort {
 
     void recordFailure(String ip, String username);
 
+    /**
+     * R-U13: a successful login decays the client's IP failure counter by
+     * one instead of wiping it. A full reset let an attacker who already
+     * burned the IP budget launder it with a single known-good login (e.g.
+     * their own account) and keep spraying. The counter never drops below
+     * zero. The window still expires it eventually.
+     */
+    void recordIpSuccess(String ip);
+
+    /**
+     * Hard clear of the IP counter, for administrative and test cleanup.
+     * Successful authentication must use {@link #recordIpSuccess(String)}.
+     */
     void reset(String ip);
 
     void resetByUsername(String username);

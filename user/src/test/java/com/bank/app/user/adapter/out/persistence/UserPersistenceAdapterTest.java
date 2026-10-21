@@ -103,6 +103,31 @@ class UserJpaAdapterTest {
                 () -> adapter.findByUsername("testuser"));
     }
 
+    @Test
+    void shouldFindUserByUsernameForUpdate() {
+        UserJpaEntity entity = new UserJpaEntity();
+        entity.setId(1L);
+        entity.setUsername("testuser");
+        entity.setPassword("$2a$12$testpasswordhash00000000000000000000001");
+        entity.setRole(Role.ROLE_USER);
+        when(userJpaRepository.findByUsernameForUpdate("testuser")).thenReturn(Optional.of(entity));
+
+        Optional<User> result = adapter.findByUsernameForUpdate("testuser");
+
+        assertTrue(result.isPresent());
+        assertEquals("testuser", result.get().getUsername());
+        verify(userJpaRepository).findByUsernameForUpdate("testuser");
+    }
+
+    @Test
+    void shouldClassifyLockedLookupFailureAsBackendUnavailable() {
+        when(userJpaRepository.findByUsernameForUpdate("testuser"))
+                .thenThrow(new DataAccessResourceFailureException("lock timeout"));
+
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> adapter.findByUsernameForUpdate("testuser"));
+    }
+
     @Nested
     @DisplayName("save new user")
     class SaveNewUser {

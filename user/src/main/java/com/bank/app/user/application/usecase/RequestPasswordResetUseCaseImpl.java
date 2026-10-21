@@ -24,7 +24,9 @@ import java.util.Optional;
  * known ones (same audit shape, same empty return, no timing shortcut) —
  * the only observable difference is the out-of-band message, which an
  * attacker cannot observe. A successful request revokes older tokens first
- * so exactly one token is live per user.
+ * so exactly one token is live per user. R-U12: the delete+insert pair runs
+ * under a pessimistic lock on the user row (plus a partial unique index in
+ * V58), so concurrent requests cannot leave two live tokens behind.
  */
 @TransactionalUseCase
 public class RequestPasswordResetUseCaseImpl implements RequestPasswordResetUseCase {
@@ -66,7 +68,7 @@ public class RequestPasswordResetUseCaseImpl implements RequestPasswordResetUseC
         LocalDateTime now = LocalDateTime.now(clockProvider.clock());
         Optional<User> user = identifier.isEmpty()
                 ? Optional.empty()
-                : loadUserPort.findByUsername(identifier);
+                : loadUserPort.findByUsernameForUpdate(identifier);
         if (user.isPresent()) {
             User found = user.get();
             Long userId = found.getId() != null ? found.getId().value() : null;

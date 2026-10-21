@@ -32,6 +32,15 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
     }
 
     @Override
+    public Optional<User> findByUsernameForUpdate(String username) {
+        try {
+            return repository.findByUsernameForUpdate(username).map(mapper::toDomain);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
+    }
+
+    @Override
     public Optional<User> findById(Long userId) {
         if (userId == null) return Optional.empty();
         try {

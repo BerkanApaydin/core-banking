@@ -185,6 +185,52 @@ class RedisLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldDecayIpCounterAfterSuccessfulLogin() {
+        // R-U13: one DECR per success, atomically clamped at zero inside the
+        // script. The TTL is preserved by DECR, so the window does not restart.
+        when(redisTemplate.execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)))).thenReturn(1L);
+
+        adapter.recordIpSuccess(TEST_IP);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)));
+    }
+
+    @Test
+    void shouldTreatAbsentOrZeroIpCounterAsNoOpOnSuccess() {
+        when(redisTemplate.execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)))).thenReturn(0L);
+
+        adapter.recordIpSuccess(TEST_IP);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)));
+    }
+
+    @Test
+    void shouldIgnoreNullIpOnSuccessfulLogin() {
+        adapter.recordIpSuccess(null);
+    }
+
+    @Test
+    void shouldFailClosedWhenIpCounterDecayFails() {
+        when(redisTemplate.execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP))))
+                .thenThrow(new RedisConnectionFailureException("Redis down"));
+
+        assertThatThrownBy(() -> adapter.recordIpSuccess(TEST_IP))
+                .isInstanceOf(LoginAttemptStoreUnavailableException.class);
+    }
+
+    @Test
+    void shouldFailClosedWhenIpCounterDecayReturnsNoResult() {
+        assertThatThrownBy(() -> adapter.recordIpSuccess(TEST_IP))
+                .isInstanceOf(LoginAttemptStoreUnavailableException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void shouldResetByIp() {
         adapter.reset(TEST_IP);
 

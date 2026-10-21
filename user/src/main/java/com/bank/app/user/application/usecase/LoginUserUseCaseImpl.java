@@ -100,7 +100,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
                     auditLogin(AuditEvent.LOGIN_FAILED, username, user.id().value(),
                             "MFA temporarily locked after too many failed codes (brute-force guard).");
                     throw new TooManyFailedMfaAttemptsException(
-                            "Too many failed authenticator code attempts. Please try again in "
+                            "Please try again in "
                                     + mfaCodeVerification.getWindowMinutes() + " minutes.");
                 }
                 if (!verifySecondFactor(user, request.totpCode())) {
@@ -127,7 +127,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
             throw e;
         } catch (LoginAttemptStoreUnavailableException e) {
             // A successful credential check is not enough if the login guard
-            // cannot reset or record its state. Do not return the generated JWT.
+            // cannot update its state. Do not return the generated JWT.
             throw e;
         }
     }
@@ -154,10 +154,13 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
     }
 
     private AuthResponse issueSession(AuthenticationPort.AuthenticatedUser user, String clientIp) {
-        // Guard-state reset first: a failure here must not mint tokens.
+        // Guard-state update first: a failure here must not mint tokens.
         // Null-safe like the isUsernameBlocked check above: the adapters
-        // treat a missing username as a no-op instead of throwing NPE.
-        if (clientIp != null) loginAttemptPort.reset(clientIp);
+        // treat a missing username/IP as a no-op instead of throwing NPE.
+        // R-U13: the IP counter decays by one instead of fully resetting, so
+        // a known-good login cannot launder an already-burned IP budget. The
+        // authenticated account's own counters are cleared in full.
+        if (clientIp != null) loginAttemptPort.recordIpSuccess(clientIp);
         if (user.username() != null) loginAttemptPort.resetByUsername(user.username());
         // The generation rides along with the authenticated identity (no
         // user reload: the credential check already loaded the row, and

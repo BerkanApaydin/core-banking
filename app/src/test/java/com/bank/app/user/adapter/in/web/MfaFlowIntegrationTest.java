@@ -196,6 +196,32 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
     }
 
     @Test
+    @DisplayName("R-U08: wrong MFA management passwords share the account lockout budget")
+    void wrongManagementPasswordIsRateLimited() throws Exception {
+        register("mfa_alice", "My_passw0rd12");
+        String token = login("mfa_alice", "My_passw0rd12", null);
+
+        // Five wrong passwords exhaust app.security.mfa.max-attempts.
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\": \"Wrong_passw0rd99\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("MFA_CODE_INVALID"));
+        }
+
+        // The next request is rejected before password verification, even
+        // with the correct password: the password step-up is budgeted.
+        mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_FAILED_MFA_ATTEMPTS"));
+    }
+
+    @Test
     @DisplayName("password reset is enumeration-safe and single-use")
     void passwordResetIsSingleUse() throws Exception {
         register("reset_bob", "My_passw0rd12");
@@ -220,12 +246,17 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
                 .andExpect(jsonPath("$.code").value("PASSWORD_RESET_TOKEN_INVALID"));
 
         // The simulation channel is the only reader of the raw token; drive
-        // the confirm path through a directly-issued token instead.
+        // the confirm path through a directly-issued token instead. V58 allows
+        // only one live token per user, so retire the request token first,
+        // in the same transaction as the direct issue.
         UserJpaEntity bob = userRepository.findByUsername("reset_bob").orElseThrow();
         String raw = "test-reset-token-value";
-        resetTokenPort.issue(new PasswordResetTokenPort.PasswordResetToken(
-                TokenDigest.sha256Hex(raw), bob.getId(),
-                LocalDateTime.now().plusMinutes(15), null));
+        transactionTemplate.executeWithoutResult(status -> {
+            resetTokenPort.deleteByUserId(bob.getId());
+            resetTokenPort.issue(new PasswordResetTokenPort.PasswordResetToken(
+                    TokenDigest.sha256Hex(raw), bob.getId(),
+                    LocalDateTime.now().plusMinutes(15), null));
+        });
 
         mockMvc.perform(post("/api/v1/auth/password/reset/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
