@@ -1,5 +1,6 @@
 package com.bank.app.architecture;
 
+import com.bank.app.common.domain.BaseAggregateRoot;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -9,6 +10,7 @@ import com.tngtech.archunit.lang.conditions.ArchConditions;
 import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("null")
 class DomainPurityArchitectureTest extends ArchitectureTest {
@@ -87,13 +89,34 @@ class DomainPurityArchitectureTest extends ArchitectureTest {
     }
 
     @Test
-    void domainEventsShouldOnlyBePublishedByDomainEntities() {
-        ArchRule rule = classes()
-                .that().resideInAnyPackage("..domain..")
-                .and().haveSimpleNameEndingWith("Event")
-                .should().resideInAPackage("..domain..");
+    void domainEventsShouldOnlyBeRegisteredByDomainEntities() {
+        DescribedPredicate<JavaClass> callsRegisterEvent = callRegisterEvent();
+        // Non-vacuous scope: production aggregates actually call
+        // BaseAggregateRoot.registerEvent; a rename must fail loudly instead
+        // of turning the rule green.
+        long callers = importedClasses.stream().filter(callsRegisterEvent).count();
+        assertThat(callers)
+                .as("BaseAggregateRoot.registerEvent must have production callers — rule would be vacuous")
+                .isPositive();
 
+        ArchRule rule = classes()
+                .that(callsRegisterEvent)
+                .should().resideInAnyPackage("..domain..")
+                .allowEmptyShould(false)
+                .because("aggregates outside the domain must not register domain events directly");
         rule.check(importedClasses);
+    }
+
+    private static DescribedPredicate<JavaClass> callRegisterEvent() {
+        return new DescribedPredicate<>("call BaseAggregateRoot.registerEvent") {
+            @Override
+            public boolean test(JavaClass javaClass) {
+                return javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner()
+                                        .isAssignableTo(BaseAggregateRoot.class)
+                                && call.getName().equals("registerEvent"));
+            }
+        };
     }
 
     @Test

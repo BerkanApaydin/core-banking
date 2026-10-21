@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,9 +22,9 @@ class ProblemBodyTest {
         ProblemBody body = ProblemBody.of(401, "AUTHENTICATION_FAILED", "No session.",
                 FIXED, null, "/api/v1/auth/browser/session");
 
-        assertThat(body.timestamp()).isEqualTo("2026-06-01T12:00");
-        // Parseable back to a LocalDateTime by any consumer.
-        assertThat(LocalDateTime.parse(body.timestamp())).isEqualTo(LocalDateTime.of(2026, 6, 1, 12, 0));
+        assertThat(body.timestamp()).isEqualTo("2026-06-01T12:00:00Z");
+        // Parseable back to an Instant by any consumer; the Z marks UTC.
+        assertThat(Instant.parse(body.timestamp())).isEqualTo(Instant.parse("2026-06-01T12:00:00Z"));
     }
 
     @Test

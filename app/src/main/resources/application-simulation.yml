@@ -7,6 +7,3 @@ management:
   tracing:
     sampling:
       probability: 1.0
-app:
-  simulation:
-    enabled: true

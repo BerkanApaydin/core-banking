@@ -87,9 +87,10 @@ public class IdempotencyPendingReaper {
         // lock guard owns the transaction (a contended lock marks rollback-only,
         // which must not poison an outer transaction).
         schedulerLock.runIfLeader(LOCK_NAME, () -> {
+            LocalDateTime threshold = null;
             try {
                 Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
-                LocalDateTime threshold = LocalDateTime.now(clock).minus(properties.olderThan());
+                threshold = LocalDateTime.now(clock).minus(properties.olderThan());
                 int reaped = idempotencyPort.failStalePending(threshold);
                 if (reaped > 0) {
                     count(REAPED_COUNTER, reaped);
@@ -99,8 +100,9 @@ public class IdempotencyPendingReaper {
                 }
             } catch (RuntimeException e) {
                 // A missed schedule only delays recovery; the next run retries.
-                // Never let a store failure kill the scheduler thread.
-                log.warn("Idempotency pending reap failed: failureType={}", e.getClass().getName());
+                // Never let a store failure kill the scheduler thread. The
+                // exception is the last argument so its stack trace is logged.
+                log.warn("Idempotency pending reap failed: threshold={}", threshold, e);
             }
         });
     }

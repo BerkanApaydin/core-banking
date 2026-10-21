@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -145,6 +146,12 @@ class RedisLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldNormalizeUsernameWhitespaceAndCase() {
+        assertThat(RedisLoginAttemptAdapter.normalizeUsername("  Alice  ")).isEqualTo("alice");
+        assertThat(RedisLoginAttemptAdapter.normalizeUsername(null)).isNull();
+    }
+
+    @Test
     void shouldReturnFalseWhenUsernameBlockingDisabled() {
         assertThat(new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(-1, 15, 10000)).isUsernameBlocked(TEST_USERNAME, TEST_IP)).isFalse();
     }
@@ -163,6 +170,44 @@ class RedisLoginAttemptAdapterTest {
         var zeroThreshold = new RedisLoginAttemptAdapter(redisTemplate, new LoginAttemptProperties(0, 15, 10000));
 
         assertThat(zeroThreshold.isUsernameBlocked(null, TEST_IP)).isFalse();
+    }
+
+    @Test
+    void shouldNotConsultRedisWhenIpIsNull() {
+        assertThat(adapter.isIpBlocked(null)).isFalse();
+
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void shouldIgnoreNullIpOnReset() {
+        adapter.reset(null);
+
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void shouldRecordNullIpFailureAgainstPairAndAccountBucketsOnly() {
+        // R-I11: no "login_attempt:ip:null" key; the unresolvable client still
+        // burns the account+IP bucket (with "-") and the account bucket.
+        when(redisTemplate.execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:account_ip:" + TEST_USERNAME + "|-",
+                        "login_attempt:user:" + TEST_USERNAME)),
+                eq("900000"))).thenReturn(1L);
+
+        adapter.recordFailure(null, TEST_USERNAME);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:account_ip:" + TEST_USERNAME + "|-",
+                        "login_attempt:user:" + TEST_USERNAME)),
+                eq("900000"));
+    }
+
+    @Test
+    void shouldNoOpWhenBothIpAndUsernameAreNull() {
+        adapter.recordFailure(null, null);
+
+        verifyNoInteractions(redisTemplate);
     }
 
     @Test

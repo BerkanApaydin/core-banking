@@ -28,9 +28,4 @@ class ApplicationModularityTest extends ArchitectureTest {
                     .isPositive();
         }
     }
-
-    @Test
-    void applicationModulesShouldNotBeEmpty() {
-        assertThat(ArchitectureTest.importedClasses).isNotEmpty();
-    }
 }

@@ -10,6 +10,7 @@ import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.api.IfNoneMatch;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -93,7 +94,7 @@ public class AccountController {
             @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
         AccountResponse body = getAccountByIdQuery.execute(id);
         String etag = etagFor(body);
-        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+        if (IfNoneMatch.matches(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
                     .cacheControl(CacheControl.noStore()).build();
         }
@@ -107,7 +108,7 @@ public class AccountController {
             @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
         AccountResponse body = getAccountByIbanQuery.execute(iban);
         String etag = etagFor(body);
-        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+        if (IfNoneMatch.matches(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
                     .cacheControl(CacheControl.noStore()).build();
         }

@@ -70,6 +70,11 @@ class SecurityConfigTest {
     @Test
     void shouldCreateAuthenticationProviderBean() {
         AuthenticationProvider provider = securityConfig.authenticationProvider();
-        assertInstanceOf(DaoAuthenticationProvider.class, provider);
+        DaoAuthenticationProvider daoProvider =
+                assertInstanceOf(DaoAuthenticationProvider.class, provider);
+        // R-U15: the unknown-user signal must reach AuthenticationAdapter,
+        // which translates it to UserNotFoundException and lets the login use
+        // case burn a dummy BCrypt.
+        assertFalse(daoProvider.isHideUserNotFoundExceptions());
     }
 }

@@ -25,22 +25,6 @@ public class AccountJpaMapper {
         );
     }
 
-    /**
-     * Mutates a managed entity in place (7.1): same pattern as
-     * {@code TransferPersistenceAdapter} — no detached merge, hence no
-     * implicit pre-update SELECT. Identity fields (id, userId, iban) and the
-     * managed version are never overwritten; Hibernate owns the version.
-     */
-    public void updateJpaEntity(AccountJpaEntity entity, Account account) {
-        if (entity == null || account == null) {
-            throw new IllegalArgumentException("Entity and account must not be null");
-        }
-        entity.setOwnerName(account.getOwnerName());
-        entity.setBalance(account.getBalance().amount());
-        entity.setCurrency(account.getBalance().currency());
-        entity.setStatus(account.getStatus());
-    }
-
     public Account toDomain(AccountJpaEntity entity) {
         if (entity == null) {
             throw new IllegalArgumentException("entity must not be null");

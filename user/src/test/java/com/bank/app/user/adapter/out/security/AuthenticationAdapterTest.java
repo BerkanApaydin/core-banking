@@ -1,6 +1,7 @@
 package com.bank.app.user.adapter.out.security;
 
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import com.bank.app.user.domain.Role;
 import java.util.List;
 
@@ -111,6 +113,22 @@ class AuthenticationAdapterTest {
         var thrown = assertThrows(AuthenticationFailedException.class,
                 () -> adapter.authenticate("user", "wrong"));
         assertFalse(thrown.getMessage().contains("admin"));
+    }
+
+    @Test
+    void shouldTranslateUnknownUserToDomainExceptionWithoutLeakingUsername() {
+        // R-U15: SecurityConfig disables hideUserNotFoundExceptions so this
+        // reaches the adapter. It must surface the domain exception (the use
+        // case then burns a dummy BCrypt) without forwarding the framework
+        // message, which may contain the username.
+        AuthenticationAdapter adapter = new AuthenticationAdapter(authenticationManager);
+        doThrow(new UsernameNotFoundException("User not found: secret"))
+                .when(authenticationManager).authenticate(any());
+
+        var thrown = assertThrows(UserNotFoundException.class,
+                () -> adapter.authenticate("user", "wrong"));
+        assertFalse(thrown.getMessage().contains("secret"));
+        assertEquals("User not found", thrown.getMessage());
     }
 
     @Test

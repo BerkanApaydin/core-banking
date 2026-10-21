@@ -127,6 +127,18 @@ class TransferControllersTest {
     }
 
     @Test
+    void shouldReturn304WhenDetailEtagAppearsInCommaSeparatedList() throws Exception {
+        when(getTransferDetailQuery.execute(7L)).thenReturn(new TransferDetailResponse(
+                7L, 1L, 2L, new BigDecimal("50.00"), "TRY", TransferStatus.COMPLETED,
+                LocalDateTime.of(2026, 9, 2, 10, 0), 5L));
+
+        mockMvc.perform(get("/transfers/7")
+                        .header("If-None-Match", "W/\"stale\", W/\"transfer-7-5\""))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string("ETag", "W/\"transfer-7-5\""));
+    }
+
+    @Test
     void shouldReturnHistoryPage() throws Exception {
         TransferResponse item = new TransferResponse(10L, TransferStatus.COMPLETED,
                 new BigDecimal("10.00"), "TRY", LocalDateTime.of(2026, 9, 1, 12, 0),

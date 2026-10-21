@@ -11,6 +11,21 @@ public record PageResponse<T>(
         boolean first,
         boolean last) {
 
+    public PageResponse {
+        if (content == null) {
+            throw new IllegalArgumentException("content must not be null");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("page must not be negative");
+        }
+        if (size < 0) {
+            throw new IllegalArgumentException("size must not be negative");
+        }
+        if (totalElements < 0) {
+            throw new IllegalArgumentException("totalElements must not be negative");
+        }
+    }
+
     public static <T> PageResponse<T> of(List<T> content, int page, int size, long totalElements) {
         int totalPages = (size > 0) ? (int) Math.ceil((double) totalElements / size) : 0;
         return new PageResponse<>(

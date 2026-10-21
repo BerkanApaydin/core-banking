@@ -34,7 +34,7 @@ public abstract class AuditableJpaEntity {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    protected void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -42,7 +42,7 @@ public abstract class AuditableJpaEntity {
         return createdBy;
     }
 
-    public void setCreatedBy(String createdBy) {
+    protected void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
 
@@ -50,7 +50,7 @@ public abstract class AuditableJpaEntity {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
+    protected void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
 
@@ -58,7 +58,7 @@ public abstract class AuditableJpaEntity {
         return updatedBy;
     }
 
-    public void setUpdatedBy(String updatedBy) {
+    protected void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
     }
 }

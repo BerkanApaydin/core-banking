@@ -11,6 +11,135 @@ const httpSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources
 const reportsSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/reports.js'), 'utf8');
 const formatSource = fs.readFileSync(path.resolve(__dirname, '../../main/resources/static/format.js'), 'utf8');
 
+const REGEX_START_PUNCTUATION = '([{,;:=!&|?~+-*%^<>';
+const REGEX_START_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new',
+    'delete', 'void', 'case', 'yield', 'await', 'do', 'else']);
+
+function skipQuoted(source, start) {
+    const quote = source[start];
+    let index = start + 1;
+    while (index < source.length) {
+        if (source[index] === '\\') {
+            index += 2;
+        } else if (source[index] === quote) {
+            return index + 1;
+        } else {
+            index++;
+        }
+    }
+    return source.length;
+}
+
+function skipRegexLiteral(source, start) {
+    let index = start + 1;
+    let inClass = false;
+    while (index < source.length) {
+        const char = source[index];
+        if (char === '\\') {
+            index += 2;
+        } else if (char === '[') {
+            inClass = true;
+            index++;
+        } else if (char === ']') {
+            inClass = false;
+            index++;
+        } else if (char === '/' && !inClass) {
+            index++;
+            while (index < source.length && /[a-z]/i.test(source[index])) index++;
+            return index;
+        } else {
+            index++;
+        }
+    }
+    return source.length;
+}
+
+function regexCanStartAfter(token) {
+    if (!token) return true;
+    if (token === 'value' || token === ')' || token === ']' || token === '}') return false;
+    if (token.length > 1) return REGEX_START_KEYWORDS.has(token);
+    return REGEX_START_PUNCTUATION.includes(token);
+}
+
+function extractFunction(source, name) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = new RegExp(`(?:async\\s+)?function\\s+${escaped}\\s*\\(`).exec(source);
+    if (!match) throw new Error(`function not found: ${name}`);
+    const start = match.index;
+    const openBrace = source.indexOf('{', start + match[0].length - 1);
+    if (openBrace === -1) throw new Error(`function body not found: ${name}`);
+    let depth = 0;
+    let index = openBrace;
+    let token = '';
+    while (index < source.length) {
+        const char = source[index];
+        const next = source[index + 1];
+        if (char === '/' && next === '/') {
+            const lineEnd = source.indexOf('\n', index + 2);
+            index = lineEnd === -1 ? source.length : lineEnd + 1;
+            continue;
+        }
+        if (char === '/' && next === '*') {
+            const commentEnd = source.indexOf('*/', index + 2);
+            index = commentEnd === -1 ? source.length : commentEnd + 2;
+            continue;
+        }
+        if (char === '"' || char === "'" || char === '`') {
+            index = skipQuoted(source, index);
+            token = 'value';
+            continue;
+        }
+        if (char === '/' && regexCanStartAfter(token)) {
+            index = skipRegexLiteral(source, index);
+            token = 'value';
+            continue;
+        }
+        if (char === '{') {
+            depth++;
+            token = '{';
+            index++;
+            continue;
+        }
+        if (char === '}') {
+            depth--;
+            if (depth === 0) return source.slice(start, index + 1);
+            token = '}';
+            index++;
+            continue;
+        }
+        if (/\s/.test(char)) {
+            index++;
+            continue;
+        }
+        if (/[A-Za-z_$]/.test(char)) {
+            let end = index + 1;
+            while (end < source.length && /[A-Za-z0-9_$]/.test(source[end])) end++;
+            token = source.slice(index, end);
+            index = end;
+            continue;
+        }
+        if (/[0-9]/.test(char)) {
+            let end = index + 1;
+            while (end < source.length && /[0-9A-Za-z_.]/.test(source[end])) end++;
+            token = 'value';
+            index = end;
+            continue;
+        }
+        if ((char === '+' || char === '-') && next === char) {
+            token = 'value';
+            index += 2;
+            continue;
+        }
+        token = char;
+        index++;
+    }
+    throw new Error(`unterminated function: ${name}`);
+}
+
+function extractFunctions(source, ...names) {
+    return names.map(name => extractFunction(source, name)).join('\n');
+}
+
 test('browser loads feature scripts in dependency order', () => {
     const staticDirectory = path.resolve(__dirname, '../../main/resources/static');
     const html = fs.readFileSync(path.join(staticDirectory, 'index.html'), 'utf8');
@@ -63,8 +192,7 @@ test('portfolio summary keys exist in both locale bundles', () => {
 });
 
 test('recipient IBAN validation matches backend MOD 97 rule', () => {
-    const functions = 'function isValidIban(value) {'
-        + formatSource.split('function isValidIban(value) {')[1].split('function formatIbanDisplay')[0];
+    const functions = extractFunctions(formatSource, 'isValidIban', 'hasValidIbanChecksum');
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -78,8 +206,7 @@ test('report date selection covers both complete calendar days', () => {
     assert.match(html, /type="date"[^>]*id="report-start-date"/);
     assert.match(html, /type="date"[^>]*id="report-end-date"/);
 
-    const functions = 'function formatDateInput(date) {'
-        + formatSource.split('function formatDateInput(date) {')[1].split('// --- Report keyset pagination (DB-2) ---')[0];
+    const functions = extractFunctions(formatSource, 'formatDateInput', 'buildReportDateRange', 'plusMonths12');
     const context = vm.createContext({ __: key => key });
     vm.runInContext(functions, context);
 
@@ -99,8 +226,7 @@ test('report date selection covers both complete calendar days', () => {
 });
 
 test('API timestamps without an offset are parsed as UTC', () => {
-    const functions = 'function parseApiTimestamp(value) {'
-        + formatSource.split('function parseApiTimestamp(value) {')[1].split('function formatDate')[0];
+    const functions = extractFunction(formatSource, 'parseApiTimestamp');
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -146,8 +272,7 @@ test('account creation sends no IBAN and displays the server-generated value', a
         renderFundingMode() {}, showAlert: message => alerts.push(message),
         __: (key, ...args) => `${key}:${args.join(',')}`
     });
-    const functionSource = 'function initModal() {'
-        + accountSource.split('function initModal() {')[1];
+    const functionSource = extractFunction(accountSource, 'initModal');
     vm.runInContext(functionSource, context);
     vm.runInContext('initModal()', context);
     await listeners.get('submit')({ preventDefault() {} });
@@ -179,8 +304,7 @@ test('transfer cancel posts Idempotency-Key (backend rejects without it)', async
         loadAccounts: async () => {},
         loadAccountHistory() {}
     });
-    const functionSource = 'async function cancelTransfer(transferId, accountId) {'
-        + reportsSource.split('async function cancelTransfer(transferId, accountId) {')[1];
+    const functionSource = extractFunction(reportsSource, 'cancelTransfer');
     vm.runInContext(functionSource, context);
     await vm.runInContext('cancelTransfer(19, 7)', context);
 
@@ -239,9 +363,7 @@ test('history cancel action uses a click listener accepted by the CSP', async ()
         openTransferDetail: () => { throw new Error('row click must not run'); },
         showAlert: error => errors.push(error)
     });
-    const historyFunction = 'async function loadAccountHistory(accountId, loadMore = false) {'
-        + reportsSource.split('async function loadAccountHistory(accountId, loadMore = false) {')[1]
-            .split('async function cancelTransfer')[0];
+    const historyFunction = extractFunction(reportsSource, 'loadAccountHistory');
     vm.runInContext(historyFunction, context);
     await vm.runInContext('loadAccountHistory(7)', context);
 
@@ -294,9 +416,7 @@ test('a stale account response cannot overwrite the latest load', async () => {
         formatMoney: value => value,
         openAccountDetail() {}
     });
-    const accountFunction = 'async function loadAccounts(loadMore = false) {'
-        + accountSource.split('async function loadAccounts(loadMore = false) {')[1]
-            .split('// --- Account Creation Modal ---')[0];
+    const accountFunction = extractFunction(accountSource, 'loadAccounts');
     vm.runInContext(accountFunction, context);
 
     const first = vm.runInContext('loadAccounts()', context);
@@ -351,9 +471,7 @@ test('a stale history response cannot overwrite a newer account', async () => {
         openTransferDetail() {},
         showAlert() {}
     });
-    const historyFunction = 'async function loadAccountHistory(accountId, loadMore = false) {'
-        + reportsSource.split('async function loadAccountHistory(accountId, loadMore = false) {')[1]
-            .split('async function cancelTransfer')[0];
+    const historyFunction = extractFunction(reportsSource, 'loadAccountHistory');
     vm.runInContext(historyFunction, context);
 
     const first = vm.runInContext('loadAccountHistory(7)', context);
@@ -407,10 +525,9 @@ test('report pagination exposes every page and invalidation prevents printing st
         renderReportResults: report => rendered.push(report),
         showAlert: error => { throw new Error(error); }
     });
-    const functions = 'function reportCursorForPage(cursors, page) {'
-        + formatSource.split('function reportCursorForPage(cursors, page) {')[1]
-        + 'function invalidateGeneratedReport() {'
-        + reportsSource.split('function invalidateGeneratedReport() {')[1].split('async function loadAccountHistory')[0];
+    const functions = extractFunctions(formatSource, 'reportCursorForPage', 'storeReportCursor', 'buildReportQuery')
+        + '\n' + extractFunctions(reportsSource, 'invalidateGeneratedReport', 'updateReportPagination',
+            'loadReportPage');
     vm.runInContext(functions, context);
 
     await vm.runInContext('loadReportPage(0)', context);
@@ -442,8 +559,7 @@ test('opening-balance field follows the authenticated backend capability', async
             return { initialFundingEnabled: enabled };
         }
     });
-    const functions = 'function renderFundingMode() {'
-        + accountSource.split('function renderFundingMode() {')[1].split('function initModal()')[0];
+    const functions = extractFunctions(accountSource, 'renderFundingMode', 'loadAccountCapabilities');
     vm.runInContext(functions, context);
 
     await vm.runInContext('loadAccountCapabilities()', context);
@@ -459,8 +575,7 @@ test('opening-balance field follows the authenticated backend capability', async
 });
 
 test('concurrent 401s share one silent refresh (theft-safe coalescing)', async () => {
-    const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
-        + httpSource.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+    const functions = 'let refreshInFlight = null;\n' + extractFunction(httpSource, 'trySilentRefresh');
     let fetchCalls = 0;
     const context = vm.createContext({
         API_BASE: '',
@@ -488,8 +603,7 @@ test('concurrent 401s share one silent refresh (theft-safe coalescing)', async (
 });
 
 test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () => {
-    const functions = 'function meetsPasswordPolicy(pw) {'
-        + source.split('function meetsPasswordPolicy(pw) {')[1].split('function initUxEnhancements')[0];
+    const functions = extractFunction(source, 'meetsPasswordPolicy');
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -506,8 +620,7 @@ test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () =>
 });
 
 test('failed silent refresh keeps the session logged out', async () => {
-    const functions = 'let refreshInFlight = null;\nasync function trySilentRefresh() {'
-        + httpSource.split('async function trySilentRefresh() {')[1].split('function logout()')[0];
+    const functions = 'let refreshInFlight = null;\n' + extractFunction(httpSource, 'trySilentRefresh');
     const context = vm.createContext({
         API_BASE: '',
         authenticated: true,
@@ -525,8 +638,7 @@ test('failed silent refresh keeps the session logged out', async () => {
 });
 
 test('report query omits cursor params on page 0 (offset path)', () => {
-    const functions = 'function reportCursorForPage(cursors, page) {'
-        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
+    const functions = extractFunctions(formatSource, 'reportCursorForPage', 'buildReportQuery');
     const context = vm.createContext({ URLSearchParams });
     vm.runInContext(functions, context);
 
@@ -542,8 +654,7 @@ test('report query omits cursor params on page 0 (offset path)', () => {
 });
 
 test('report query carries the keyset cursor past page 0 (no OFFSET)', () => {
-    const functions = 'function reportCursorForPage(cursors, page) {'
-        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
+    const functions = extractFunctions(formatSource, 'reportCursorForPage', 'buildReportQuery');
     const context = vm.createContext({ URLSearchParams });
     vm.runInContext(functions, context);
 
@@ -557,8 +668,7 @@ test('report query carries the keyset cursor past page 0 (no OFFSET)', () => {
 });
 
 test('report cursor stack pushes forward and pops back', () => {
-    const functions = 'function reportCursorForPage(cursors, page) {'
-        + formatSource.split('function reportCursorForPage(cursors, page) {')[1];
+    const functions = extractFunctions(formatSource, 'reportCursorForPage', 'storeReportCursor');
     const context = vm.createContext({});
     vm.runInContext(functions, context);
 
@@ -579,8 +689,7 @@ test('report cursor stack pushes forward and pops back', () => {
 });
 
 test('etag cache stores validators, evicts oldest-first, clears on demand', () => {
-    const functions = 'const etagCache = new Map();'
-        + httpSource.split('const etagCache = new Map();')[1].split('function isOffline()')[0];
+    const functions = httpSource;
     const context = vm.createContext({ Map });
     vm.runInContext(functions, context);
 

@@ -23,20 +23,24 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 abstract class ArchitectureTest {
 
-    protected static JavaClasses importedClasses;
+    protected static volatile JavaClasses importedClasses;
 
     @BeforeAll
     static void importClasses() {
         if (importedClasses == null) {
-            importedClasses = new ClassFileImporter()
-                    .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                    .withImportOption(location -> !location.toString().contains("-tests.jar"))
-                    .importPackages("com.bank.app");
-            // K-1/T-1 guard: a vacuous import (empty classes) would let every
-            // allowEmptyShould rule pass silently. Fail fast instead.
-            assertThat(importedClasses)
-                    .as("ArchUnit import must not be empty — rules would be vacuous")
-                    .isNotEmpty();
+            synchronized (ArchitectureTest.class) {
+                if (importedClasses == null) {
+                    importedClasses = new ClassFileImporter()
+                            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                            .withImportOption(location -> !location.toString().contains("-tests.jar"))
+                            .importPackages("com.bank.app");
+                    // K-1/T-1 guard: a vacuous import (empty classes) would let
+                    // every allowEmptyShould rule pass silently. Fail fast instead.
+                    assertThat(importedClasses)
+                            .as("ArchUnit import must not be empty — rules would be vacuous")
+                            .isNotEmpty();
+                }
+            }
         }
     }
 

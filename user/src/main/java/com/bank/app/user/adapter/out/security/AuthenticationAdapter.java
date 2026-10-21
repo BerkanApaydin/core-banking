@@ -3,12 +3,14 @@ package com.bank.app.user.adapter.out.security;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.domain.Role;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +46,12 @@ public class AuthenticationAdapter implements AuthenticationPort {
             } catch (IllegalArgumentException | NullPointerException invalidIdentity) {
                 throw new AuthenticationServiceException("Authentication provider returned an invalid identity", invalidIdentity);
             }
+        } catch (UsernameNotFoundException e) {
+            // R-U15: SecurityConfig disables Spring's default hiding so the
+            // unknown-user path reaches the application layer, which burns a
+            // dummy BCrypt and returns the same generic 401. The framework
+            // message may embed the username, so never forward it.
+            throw new UserNotFoundException("User not found");
         } catch (AuthenticationServiceException e) {
             throw new AuthenticationBackendUnavailableException(e);
         } catch (AuthenticationException e) {

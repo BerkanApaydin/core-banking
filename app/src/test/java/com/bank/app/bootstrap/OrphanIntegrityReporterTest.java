@@ -99,6 +99,10 @@ class OrphanIntegrityReporterTest {
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
     }
 
+    private static double alarmCount(SimpleMeterRegistry registry, String type) {
+        return registry.get("db.orphan.alarm").tag("type", type).counter().count();
+    }
+
     private static void assertThatCapturedGaugesAre(
             ArgumentCaptor<AtomicLong> gaugeCaptor, long expected) {
         assertEquals(3, gaugeCaptor.getAllValues().size());
@@ -150,8 +154,14 @@ class OrphanIntegrityReporterTest {
         OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 0)).reportOrphans();
 
-        // 2 orphans x 3 checks, all above threshold 0
-        assertEquals(6.0, registry.get("db.orphan.alarm").counter().count());
+        // 2 orphans x 3 checks, all above threshold 0, each tagged by type.
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+        assertEquals(6.0,
+                alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER)
+                        + alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER)
+                        + alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
     }
 
     @Test
@@ -162,7 +172,9 @@ class OrphanIntegrityReporterTest {
         OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
 
-        assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
     }
 
     @Test
@@ -175,7 +187,9 @@ class OrphanIntegrityReporterTest {
         OrphanIntegrityReporter.forTests(jdbc, registry,
                 new OrphanIntegrityProperties(true, "0 0 3 * * *", 5)).reportOrphans();
 
-        assertEquals(0.0, registry.get("db.orphan.alarm").counter().count());
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
     }
 
     @Test

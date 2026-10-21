@@ -43,6 +43,22 @@ public record OutboxProperties(
 ) {
     @ConstructorBinding
     public OutboxProperties {
+        if (maxRetries < 0) {
+            throw new IllegalArgumentException("Outbox max retries must not be negative");
+        }
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("Outbox batch size must be positive");
+        }
+        // 0 is the single-partition mode and stays valid.
+        if (partitionCount < 0) {
+            throw new IllegalArgumentException("Outbox partition count must not be negative");
+        }
+        if (pollDelayMs < 0) {
+            throw new IllegalArgumentException("Outbox poll delay must not be negative");
+        }
+        if (retentionDays <= 0) {
+            throw new IllegalArgumentException("Outbox retention days must be positive");
+        }
         if (workerThreadsPerPartition <= 0) {
             throw new IllegalArgumentException("Outbox workers per partition must be positive");
         }

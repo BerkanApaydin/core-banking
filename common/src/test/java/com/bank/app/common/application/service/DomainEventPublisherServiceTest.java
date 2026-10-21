@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DomainEventPublisherServiceTest {
 
@@ -46,6 +47,21 @@ class DomainEventPublisherServiceTest {
         service.publishEvents(provider);
 
         assertThat(provider.cleared).isTrue();
+    }
+
+    @Test
+    void publishEventsShouldNotClearProviderWhenPublishFails() {
+        StubDomainEventProvider provider = new StubDomainEventProvider(
+                new TestEvent("event1"),
+                new TestEvent("event2")
+        );
+        eventPublisher.failOnPublishNumber = 2;
+
+        assertThatThrownBy(() -> service.publishEvents(provider))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(eventPublisher.published).hasSize(1);
+        assertThat(provider.cleared).isFalse();
     }
 
     @Test
@@ -95,9 +111,14 @@ class DomainEventPublisherServiceTest {
 
     private static class StubEventPublisherPort implements EventPublisherPort {
         final List<DomainEvent> published = new ArrayList<>();
+        int failOnPublishNumber = -1;
+        int publishCalls;
 
         @Override
         public void publish(DomainEvent event) {
+            if (++publishCalls == failOnPublishNumber) {
+                throw new IllegalStateException("publish failed");
+            }
             published.add(event);
         }
     }

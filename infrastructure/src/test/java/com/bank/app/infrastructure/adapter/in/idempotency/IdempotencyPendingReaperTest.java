@@ -4,6 +4,10 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.infrastructure.adapter.in.config.IdempotencyReaperProperties;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -86,6 +91,31 @@ class IdempotencyPendingReaperTest {
             assertThatCode(reaper::reapStalePending).doesNotThrowAnyException();
 
             verify(idempotencyPort).failStalePending(any(LocalDateTime.class));
+        }
+
+        @Test
+        @DisplayName("logs the failure (with stack trace) and the threshold context")
+        void shouldLogFailureWithThrowableAndThreshold() {
+            when(clockProvider.clock()).thenReturn(fixedClock);
+            when(idempotencyPort.failStalePending(any(LocalDateTime.class)))
+                    .thenThrow(new IllegalStateException("db down"));
+            Logger reaperLogger = (Logger) LoggerFactory.getLogger(IdempotencyPendingReaper.class);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            reaperLogger.addAppender(appender);
+            try {
+                assertThatCode(reaper::reapStalePending).doesNotThrowAnyException();
+            } finally {
+                reaperLogger.detachAppender(appender);
+            }
+
+            assertThat(appender.list).anySatisfy(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                assertThat(event.getFormattedMessage()).contains("threshold=");
+                assertThat(event.getThrowableProxy()).isNotNull();
+                assertThat(event.getThrowableProxy().getClassName())
+                        .isEqualTo(IllegalStateException.class.getName());
+            });
         }
 
         @Test

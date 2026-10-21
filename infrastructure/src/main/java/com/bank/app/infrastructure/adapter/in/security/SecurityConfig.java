@@ -96,6 +96,11 @@ public class SecurityConfig {
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
+        // R-U15: let UsernameNotFoundException reach the user module instead
+        // of collapsing it into BadCredentials here. AuthenticationAdapter
+        // translates it to the domain exception, and LoginUserUseCaseImpl
+        // burns a dummy BCrypt before returning the generic 401.
+        authProvider.setHideUserNotFoundExceptions(false);
         return authProvider;
     }
 

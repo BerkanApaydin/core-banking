@@ -12,7 +12,9 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,7 +62,38 @@ class HybridTokenBlacklistAdapterTest {
         assertThatThrownBy(() -> adapter.blacklist("token", 60_000))
                 .isInstanceOf(RevocationStoreUnavailableException.class);
         verify(database).blacklist("token", 60_000);
-        assertThat(local.isBlacklisted("token")).isFalse();
+        // R-I12: the local overlay is written before the shared stores, so this
+        // pod is fail-closed even when Redis cannot be updated.
+        assertThat(local.isBlacklisted("token")).isTrue();
+    }
+
+    @Test
+    void shouldStillAttemptRedisWhenDatabaseWriteFailsAndKeepLocalRevocation() {
+        doThrow(new RevocationStoreUnavailableException(new RuntimeException("db down")))
+                .when(database).blacklist("token", 60_000);
+
+        assertThatThrownBy(() -> adapter.blacklist("token", 60_000))
+                .isInstanceOf(RevocationStoreUnavailableException.class);
+        verify(redis).blacklist("token", 60_000);
+        assertThat(local.isBlacklisted("token")).isTrue();
+    }
+
+    @Test
+    void shouldInvalidateNegativeCacheOnSuccessfulBlacklist() {
+        TokenBlacklistAdapter localMock = mock(TokenBlacklistAdapter.class);
+        HybridTokenBlacklistAdapter hybrid = new HybridTokenBlacklistAdapter(database, redis, localMock);
+        when(redis.isBlacklisted("token")).thenReturn(false);
+        when(database.isBlacklisted("token")).thenReturn(false, true);
+
+        // Populate the negative cache with a durable "not revoked" answer.
+        assertThat(hybrid.isBlacklisted("token")).isFalse();
+
+        hybrid.blacklist("token", 60_000);
+
+        // Without invalidation the stale negative entry would answer false
+        // without touching the database again.
+        assertThat(hybrid.isBlacklisted("token")).isTrue();
+        verify(database, times(2)).isBlacklisted("token");
     }
 
     @Test

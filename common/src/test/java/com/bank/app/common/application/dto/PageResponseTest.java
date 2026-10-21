@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("PageResponse")
 class PageResponseTest {
@@ -54,6 +55,43 @@ class PageResponseTest {
             assertThat(response.first()).isFalse();
             assertThat(response.last()).isTrue();
             assertThat(response.totalPages()).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("validation")
+    class Validation {
+
+        @Test
+        @DisplayName("should reject null content")
+        void shouldRejectNullContent() {
+            assertThatThrownBy(() -> new PageResponse<String>(null, 0, 10, 0, 0, true, true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("content");
+        }
+
+        @Test
+        @DisplayName("should reject negative page")
+        void shouldRejectNegativePage() {
+            assertThatThrownBy(() -> new PageResponse<String>(List.of(), -1, 10, 0, 0, false, true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("page");
+        }
+
+        @Test
+        @DisplayName("should reject negative size")
+        void shouldRejectNegativeSize() {
+            assertThatThrownBy(() -> new PageResponse<String>(List.of(), 0, -1, 0, 0, true, true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("size");
+        }
+
+        @Test
+        @DisplayName("should reject negative totalElements")
+        void shouldRejectNegativeTotalElements() {
+            assertThatThrownBy(() -> new PageResponse<String>(List.of(), 0, 10, -1, 0, true, true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("totalElements");
         }
     }
 

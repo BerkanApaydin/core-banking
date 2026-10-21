@@ -40,9 +40,11 @@ import java.util.concurrent.locks.ReentrantLock;
  * microseconds a compound operation holds it.
  *
  * <p>{@link #evictAll()} takes every stripe in a fixed order, so it acts as
- * a global barrier that no per-account operation can interleave with. The
- * order is fixed and no other path holds more than one stripe, so the
- * acquisition cannot deadlock.
+ * a global barrier that no per-account operation can interleave with.
+ * Compound paths that touch several accounts ({@link #putIbans},
+ * {@link #evictAll}) acquire unique stripes in ascending index order and
+ * release them in reverse, so every multi-lock path uses the same order and
+ * the acquisition cannot deadlock.
  *
  * <p>What the locks deliberately do <em>not</em> cover: the read-through
  * race between a database read and the cache write that follows it. That
@@ -104,7 +106,11 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
      * {@code AccountSnapshot} requires a non-null id.
      */
     private ReentrantLock lockFor(Long accountId) {
-        return accountLocks[Math.floorMod(accountId.hashCode(), accountLocks.length)];
+        return accountLocks[stripeIndex(accountId)];
+    }
+
+    private int stripeIndex(Long accountId) {
+        return Math.floorMod(accountId.hashCode(), accountLocks.length);
     }
 
     @Override
@@ -120,7 +126,15 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
         if (accountId == null || snapshot == null) {
             return;
         }
-        writeSnapshot("id-" + accountId, snapshot);
+        // Same stripe as evictById(accountId) -> a snapshot write and the
+        // eviction of that account are mutually exclusive.
+        ReentrantLock lock = lockFor(accountId);
+        lock.lock();
+        try {
+            writeSnapshot("id-" + accountId, snapshot);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -180,18 +194,41 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
             return;
         }
         // Map keys are authoritative; the collection only guards the null contract.
+        Map<Long, String> writes = new LinkedHashMap<>();
         ibans.forEach((id, iban) -> {
             if (id != null && iban != null && !iban.isEmpty()) {
-                writeIbanMapping(id, iban);
+                writes.put(id, iban);
             }
         });
+        if (writes.isEmpty()) {
+            return;
+        }
+        // Hold every affected stripe so an eviction of any of these accounts
+        // cannot interleave with this batch. Unique stripes are acquired in
+        // ascending order and released in reverse, matching evictAll's fixed
+        // order and preventing deadlock between concurrent batch writes.
+        int[] stripes = writes.keySet().stream()
+                .mapToInt(this::stripeIndex)
+                .distinct()
+                .sorted()
+                .toArray();
+        for (int stripe : stripes) {
+            accountLocks[stripe].lock();
+        }
+        try {
+            writes.forEach(this::writeIbanMapping);
+        } finally {
+            for (int i = stripes.length - 1; i >= 0; i--) {
+                accountLocks[stripes[i]].unlock();
+            }
+        }
     }
 
     @Override
     public void evictAll() {
-        // Global barrier: every stripe is held (fixed order) so no per-account
-        // operation can interleave with the region clear. No other path holds
-        // more than one stripe, so the acquisition cannot deadlock.
+        // Global barrier: every stripe is held (fixed ascending order) so no
+        // per-account or multi-account operation can interleave with the region
+        // clear. Multi-stripe paths share this order, so no deadlock.
         int acquired = 0;
         try {
             for (ReentrantLock lock : accountLocks) {

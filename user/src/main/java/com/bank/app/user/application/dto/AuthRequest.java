@@ -16,6 +16,11 @@ public record AuthRequest(
     public AuthRequest {
         Objects.requireNonNull(username, "Username must not be null");
         Objects.requireNonNull(password, "Password must not be null");
+        // R-U16: canonicalize the username at the application boundary so
+        // trailing/leading whitespace cannot create a distinct login-attempt
+        // key from the stored/authenticated value. The password is never
+        // stripped: whitespace is part of the secret.
+        username = username.strip();
         // Defense in depth behind web-layer @NotBlank: direct callers
         // (seeders, tests, future adapters) must not slip blank credentials
         // past the application boundary. No jakarta import here by design

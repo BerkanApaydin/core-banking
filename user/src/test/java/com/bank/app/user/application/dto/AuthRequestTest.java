@@ -38,6 +38,14 @@ class AuthRequestTest {
     }
 
     @Test
+    void shouldStripUsernameWhitespaceButPreservePassword() {
+        AuthRequest request = new AuthRequest("  testuser  ", " password  ");
+
+        assertEquals("testuser", request.username());
+        assertEquals(" password  ", request.password());
+    }
+
+    @Test
     void shouldRejectBlankUsername() {
         assertThrows(IllegalArgumentException.class, () -> new AuthRequest("", "Password1!"));
         assertThrows(IllegalArgumentException.class, () -> new AuthRequest("   ", "Password1!"));

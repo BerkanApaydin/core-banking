@@ -69,7 +69,10 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     public boolean isIpBlocked(String ip) {
-        if (maxAttempts < 0)
+        // A missing client IP must not become the literal key
+        // "login_attempt:ip:null" (junk key, and every unresolvable client
+        // would share it).
+        if (maxAttempts < 0 || ip == null)
             return false;
         return withRedis(() -> {
             String count = redisTemplate.opsForValue().get(IP_PREFIX + ip);
@@ -97,13 +100,24 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     public void recordFailure(String ip, String username) {
-        // A null username must not create a junk "user:null" counter: only
-        // the IP bucket is incremented, mirroring the Caffeine no-op.
-        List<String> keys = username == null
-                ? List.of(IP_PREFIX + ip)
-                : List.of(IP_PREFIX + ip,
-                        accountIpKey(normalizeUsername(username), ip),
-                        ACCOUNT_PREFIX + normalizeUsername(username));
+        // Null dimensions must not create junk "ip:null"/"user:null" counters.
+        // Mirrors the Caffeine adapter: no IP means only the account+IP pair
+        // (with "-") and account buckets; no username means only the IP bucket;
+        // both null is a no-op.
+        if (ip == null && username == null) {
+            return;
+        }
+        List<String> keys;
+        if (username == null) {
+            keys = List.of(IP_PREFIX + ip);
+        } else {
+            String normalized = normalizeUsername(username);
+            keys = ip == null
+                    ? List.of(accountIpKey(normalized, null), ACCOUNT_PREFIX + normalized)
+                    : List.of(IP_PREFIX + ip,
+                            accountIpKey(normalized, ip),
+                            ACCOUNT_PREFIX + normalized);
+        }
         Long result = withRedis(() -> redisTemplate.execute(
                 recordFailureScript, keys,
                 String.valueOf(TimeUnit.MINUTES.toMillis(windowMinutes))));
@@ -125,6 +139,8 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     public void reset(String ip) {
+        // Never delete "login_attempt:ip:null".
+        if (ip == null) return;
         withRedis(() -> redisTemplate.delete(IP_PREFIX + ip));
     }
 
@@ -178,12 +194,13 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
     }
 
     /**
-     * Case-fold brute-force keys: if authentication folds case and the guard
-     * does not, an attacker rotates username casing to get a fresh budget per
-     * variant. Null-safe: callers pass the raw request value through.
+     * Canonicalize brute-force keys: trim and case-fold, matching the
+     * application boundary's username canonicalization. Without this an
+     * attacker rotates casing/whitespace to get a fresh budget per variant.
+     * Null-safe: callers pass the raw request value through.
      */
     static String normalizeUsername(String username) {
-        return username == null ? null : username.toLowerCase(Locale.ROOT);
+        return username == null ? null : username.strip().toLowerCase(Locale.ROOT);
     }
 
     /**

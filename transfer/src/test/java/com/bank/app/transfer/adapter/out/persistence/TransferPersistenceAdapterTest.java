@@ -2,6 +2,7 @@ package com.bank.app.transfer.adapter.out.persistence;
 
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.persistence.AuditableJpaEntity;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -45,8 +47,18 @@ class TransferPersistenceAdapterTest {
             Currency currency, TransferStatus status, Long version, LocalDateTime createdAt) {
         TransferJpaEntity entity = new TransferJpaEntity(id, senderAccountId, receiverAccountId, amount, currency,
                 status, version);
-        entity.setCreatedAt(createdAt);
+        setAuditCreatedAt(entity, createdAt);
         return entity;
+    }
+
+    private static void setAuditCreatedAt(TransferJpaEntity entity, LocalDateTime value) {
+        try {
+            Field field = AuditableJpaEntity.class.getDeclaredField("createdAt");
+            field.setAccessible(true);
+            field.set(entity, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to set createdAt on test fixture", e);
+        }
     }
 
     @Test

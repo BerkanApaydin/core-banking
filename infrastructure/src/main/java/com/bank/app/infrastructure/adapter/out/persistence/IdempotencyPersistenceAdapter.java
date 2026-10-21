@@ -98,6 +98,12 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
             if (current.isEmpty()) {
                 throw new IllegalStateException("Idempotency reservation is missing");
             }
+            if ("FAILED".equals(current.get().getStatus())) {
+                // The pending reaper won the race between the reservation load
+                // and this write. The caller sees a failure while the original
+                // work may have succeeded; keep the warning free of the body.
+                log.warn("Idempotency completion lost the race with the pending reaper: key={}", key);
+            }
         }
     }
 

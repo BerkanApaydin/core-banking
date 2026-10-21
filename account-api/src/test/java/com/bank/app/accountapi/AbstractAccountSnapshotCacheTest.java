@@ -3,6 +3,7 @@ package com.bank.app.accountapi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -245,6 +246,44 @@ class AbstractAccountSnapshotCacheTest {
     }
 
     /**
+     * A batch mapping write holds the stripe of every account it touches, so
+     * an eviction of one of those accounts cannot slip between two mapping
+     * writes and leave a stale mapping behind.
+     */
+    @Test
+    void shouldNotInterleaveEvictionWithBatchMappingWrite() throws Exception {
+        BlockingTestCache blocking = new BlockingTestCache();
+        blocking.blockNextMappingWrite = true;
+        Map<Long, String> ibans = new LinkedHashMap<>();
+        ibans.put(1L, "TR1");
+        ibans.put(2L, "TR2");
+
+        Thread writer = daemonThread(() -> blocking.putIbans(Set.of(1L, 2L), ibans));
+        writer.start();
+        assertThat(blocking.mappingWriteStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        var evictionDone = new CountDownLatch(1);
+        Thread evictor = daemonThread(() -> {
+            blocking.evictById(1L);
+            evictionDone.countDown();
+        });
+        evictor.start();
+
+        try {
+            assertThat(evictionDone.await(200, TimeUnit.MILLISECONDS))
+                    .as("eviction of an account in the batch must wait for the mapping write")
+                    .isFalse();
+        } finally {
+            blocking.releaseMappingWrite.countDown();
+        }
+        writer.join(5_000);
+        evictor.join(5_000);
+
+        // The batch write completed, so the eviction removed its mapping.
+        assertThat(blocking.getIbans(Set.of(1L))).isEmpty();
+    }
+
+    /**
      * The per-account lock must not become an instance-wide monitor: an
      * eviction of an unrelated account proceeds while another account's write
      * is in flight.
@@ -339,7 +378,10 @@ class AbstractAccountSnapshotCacheTest {
     static class BlockingTestCache extends TestCache {
         final CountDownLatch writeStarted = new CountDownLatch(1);
         final CountDownLatch releaseWrite = new CountDownLatch(1);
+        final CountDownLatch mappingWriteStarted = new CountDownLatch(1);
+        final CountDownLatch releaseMappingWrite = new CountDownLatch(1);
         volatile boolean blockNextIbanWrite;
+        volatile boolean blockNextMappingWrite;
 
         @Override
         protected void writeSnapshot(String key, AccountSnapshot snapshot) {
@@ -348,6 +390,20 @@ class AbstractAccountSnapshotCacheTest {
                 writeStarted.countDown();
                 try {
                     releaseWrite.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        @Override
+        protected void writeIbanMapping(Long accountId, String iban) {
+            super.writeIbanMapping(accountId, iban);
+            if (blockNextMappingWrite) {
+                blockNextMappingWrite = false;
+                mappingWriteStarted.countDown();
+                try {
+                    releaseMappingWrite.await(5, TimeUnit.SECONDS);
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 }

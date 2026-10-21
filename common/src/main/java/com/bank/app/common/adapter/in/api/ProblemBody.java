@@ -1,7 +1,7 @@
 package com.bank.app.common.adapter.in.api;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -41,7 +41,7 @@ public record ProblemBody(
             String correlationId, String instance) {
         Objects.requireNonNull(clock, "clock must not be null");
         return new ProblemBody(status, code, message == null ? "" : message,
-                LocalDateTime.now(clock).toString(),
+                Instant.now(clock).toString(),
                 blankToNull(correlationId), instance);
     }
 

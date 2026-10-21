@@ -70,20 +70,45 @@ public final class HybridTokenBlacklistAdapter implements TokenBlacklistPort {
 
     @Override
     public void blacklist(String token, long expirationMs) {
-        database.blacklist(token, expirationMs);
+        String digest = TokenDigest.sha256Hex(token);
+        // Invalidate FIRST: a cached "not revoked" answer must never outlive
+        // the revocation, not even while the shared writes are in flight.
+        if (notRevoked != null) {
+            notRevoked.invalidate(digest);
+        }
+        // Local overlay immediately: this pod is fail-closed even if both
+        // shared stores are unavailable.
+        local.blacklist(token, expirationMs);
+
+        RuntimeException failure = null;
         try {
-            // Old pods in a rolling deployment still consult Redis. A failed
-            // write cannot be reported as successful until they are gone.
+            database.blacklist(token, expirationMs);
+        } catch (RuntimeException e) {
+            failure = e;
+            log.warn("Hybrid revocation database write failed: {}", e.getClass().getSimpleName());
+        }
+        try {
+            // Old pods in a rolling deployment still consult Redis. The write
+            // is attempted even after a database failure; order must not hide
+            // one store's outage behind the other's.
             redis.blacklist(token, expirationMs);
         } catch (RuntimeException e) {
+            if (failure == null) {
+                failure = e;
+            } else {
+                failure.addSuppressed(e);
+            }
             log.warn("Hybrid revocation Redis write failed: {}", e.getClass().getSimpleName());
-            throw new RevocationStoreUnavailableException(e);
+        } finally {
+            if (notRevoked != null) {
+                notRevoked.invalidate(digest);
+            }
         }
-        local.blacklist(token, expirationMs);
-        // A revocation invalidates any cached "not revoked" answer for the
-        // same token: the token IS revoked now.
-        if (notRevoked != null) {
-            notRevoked.invalidate(TokenDigest.sha256Hex(token));
+        if (failure != null) {
+            // A failed shared write cannot be reported as successful: legacy
+            // pods (and, for the database, a restart) would still accept the
+            // token. The local revocation above stays in effect.
+            throw new RevocationStoreUnavailableException(failure);
         }
     }
 

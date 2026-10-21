@@ -6,6 +6,7 @@ import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -81,6 +82,64 @@ class RequestBodySizeLimitFilterTest {
         doAnswer(invocation -> {
             HttpServletRequest wrapped = invocation.getArgument(0);
             wrapped.getInputStream().readAllBytes();
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(body.toString()).contains("REQUEST_BODY_TOO_LARGE");
+    }
+
+    @Test
+    @DisplayName("should keep the byte count when the wrapped stream is requested twice")
+    void shouldNotResetCounterWhenInputStreamIsRequestedTwice() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getContentLengthLong()).thenReturn(-1L);
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(request.getInputStream()).thenReturn(new FixedServletInputStream(new byte[2048]));
+        StringWriter body = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(body));
+        doAnswer(invocation -> {
+            HttpServletRequest wrapped = invocation.getArgument(0);
+            ServletInputStream first = wrapped.getInputStream();
+            ServletInputStream second = wrapped.getInputStream();
+            assertThat(second).isSameAs(first);
+            byte[] chunk = new byte[600];
+            assertThat(first.read(chunk)).isEqualTo(600);
+            // A fresh wrapper per getInputStream() call would reset the
+            // counter; the same stream accumulates past the 1024-byte cap.
+            second.read(chunk);
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(body.toString()).contains("REQUEST_BODY_TOO_LARGE");
+    }
+
+    @Test
+    @DisplayName("should keep the byte count when the wrapped reader is requested twice")
+    void shouldNotResetCounterWhenReaderIsRequestedTwice() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getContentLengthLong()).thenReturn(-1L);
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(request.getCharacterEncoding()).thenReturn("UTF-8");
+        when(request.getInputStream()).thenReturn(new FixedServletInputStream(new byte[2048]));
+        StringWriter body = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(body));
+        doAnswer(invocation -> {
+            HttpServletRequest wrapped = invocation.getArgument(0);
+            BufferedReader first = wrapped.getReader();
+            BufferedReader second = wrapped.getReader();
+            assertThat(second).isSameAs(first);
+            char[] chars = new char[2048];
+            while (second.read(chars) != -1) {
+                // Drain past the cap.
+            }
             return null;
         }).when(chain).doFilter(any(), any());
 

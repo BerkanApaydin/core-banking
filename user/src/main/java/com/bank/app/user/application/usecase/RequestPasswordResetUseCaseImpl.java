@@ -20,13 +20,17 @@ import java.util.Optional;
 /**
  * Starts a password reset without leaking account existence.
  *
- * <p>Enumeration safety: unknown identifiers follow the exact same path as
- * known ones (same audit shape, same empty return, no timing shortcut) —
- * the only observable difference is the out-of-band message, which an
- * attacker cannot observe. A successful request revokes older tokens first
- * so exactly one token is live per user. R-U12: the delete+insert pair runs
- * under a pessimistic lock on the user row (plus a partial unique index in
- * V58), so concurrent requests cannot leave two live tokens behind.
+ * <p>Enumeration safety: known and unknown identifiers produce the same
+ * external response and audit shape. The unknown path performs best-effort
+ * dummy digest work so it is not free to probe, but timing parity is NOT
+ * claimed: the known path also deletes/inserts a token under a pessimistic
+ * lock and sends a synchronous out-of-band notification, so the two paths
+ * can still differ measurably. The only intended observable difference is
+ * the out-of-band message, which an attacker cannot observe. A successful
+ * request revokes older tokens first so exactly one token is live per user.
+ * R-U12: the delete+insert pair runs under a pessimistic lock on the user
+ * row (plus a partial unique index in V58), so concurrent requests cannot
+ * leave two live tokens behind.
  */
 @TransactionalUseCase
 public class RequestPasswordResetUseCaseImpl implements RequestPasswordResetUseCase {
@@ -80,10 +84,11 @@ public class RequestPasswordResetUseCaseImpl implements RequestPasswordResetUseC
                 notificationPort.sendPasswordResetToken(found.getUsername(), contactOf(found), token);
             }
         } else {
-            // Enumeration-safe dummy work: an unknown identifier must cost
-            // roughly the same as a known one (token mint + digest), otherwise
-            // the response-time gap oracles account existence despite the
-            // identical 202 + audit shape.
+            // Best-effort dummy work: an unknown identifier still mints a
+            // token and burns a digest so it is not free to probe. This does
+            // NOT equalize timing with the known path (which also locks,
+            // persists and notifies); the identical response/audit shape is
+            // the enumeration guarantee, not timing.
             TokenDigest.sha256Hex(newToken());
         }
         audit(identifier, user.map(u -> u.getId() != null ? u.getId().value() : null).orElse(null), now);

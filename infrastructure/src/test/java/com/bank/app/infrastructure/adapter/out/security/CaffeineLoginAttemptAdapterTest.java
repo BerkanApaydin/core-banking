@@ -139,6 +139,12 @@ class CaffeineLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldNormalizeUsernameWhitespaceAndCase() {
+        assertEquals("alice", CaffeineLoginAttemptAdapter.normalizeUsername("  Alice  "));
+        assertNull(CaffeineLoginAttemptAdapter.normalizeUsername(null));
+    }
+
+    @Test
     void shouldReturnWindowMinutes() {
         CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(5, 30, 10000));
         assertEquals(30, adapter.getWindowMinutes());

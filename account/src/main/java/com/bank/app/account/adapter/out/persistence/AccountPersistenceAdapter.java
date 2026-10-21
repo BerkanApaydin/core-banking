@@ -5,13 +5,17 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Iban;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -134,8 +138,19 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         AccountJpaEntity entity;
         if (account.getId() == null) {
             entity = mapper.toJpaEntity(account);
-            AccountJpaEntity saved = repository.save(entity);
-            return mapper.toDomain(saved);
+            try {
+                AccountJpaEntity saved = repository.save(entity);
+                return mapper.toDomain(saved);
+            } catch (DataIntegrityViolationException ex) {
+                // A pre-check ("does this IBAN exist?") cannot close the race
+                // between two concurrent creations; the database unique
+                // constraint is the source of truth. Translate only that
+                // constraint into the domain conflict, rethrow everything else.
+                if (isDuplicateIbanViolation(ex)) {
+                    throw new DuplicateIbanException(account.getIban().value());
+                }
+                throw ex;
+            }
         }
         if (account.getVersion() != null) {
             int updated = repository.updateIfVersionMatch(
@@ -167,5 +182,32 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
             throw new AccountNotFoundException(account.getId());
         }
         throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
+    }
+
+    private static boolean isDuplicateIbanViolation(DataIntegrityViolationException ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof SQLException sqlException
+                    && "23505".equals(sqlException.getSQLState())) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && namesIbanUniqueness(message)) {
+                return true;
+            }
+            Throwable next = current.getCause();
+            if (next == current) {
+                return false;
+            }
+            current = next;
+        }
+        return false;
+    }
+
+    private static boolean namesIbanUniqueness(String message) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("accounts_iban_key")
+                || (lower.contains("iban")
+                && (lower.contains("unique") || lower.contains("duplicate")));
     }
 }

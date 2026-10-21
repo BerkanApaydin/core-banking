@@ -3,6 +3,7 @@ package com.bank.app.transfer.adapter.out.persistence;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.persistence.AuditableJpaEntity;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,18 @@ class TransferJpaMapperTest {
     @BeforeEach
     void setUp() {
         mapper = new TransferJpaMapper();
+    }
+
+    private static void setAuditCreatedAt(TransferJpaEntity entity, LocalDateTime value) {
+        // R-C18: auditing setters are protected; tests outside the
+        // persistence package inject the JPA-managed field via reflection.
+        try {
+            Field field = AuditableJpaEntity.class.getDeclaredField("createdAt");
+            field.setAccessible(true);
+            field.set(entity, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Could not set createdAt for test fixture", e);
+        }
     }
 
     @Nested
@@ -81,7 +94,7 @@ class TransferJpaMapperTest {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
             entity.setBusinessCreatedAt(CREATED_AT);
-            entity.setCreatedAt(CREATED_AT.plusHours(1));
+            setAuditCreatedAt(entity, CREATED_AT.plusHours(1));
 
             Transfer transfer = mapper.toDomain(entity);
 
@@ -100,7 +113,7 @@ class TransferJpaMapperTest {
         void shouldFallBackToAuditingTimestamp() {
             TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
                     AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
-            entity.setCreatedAt(CREATED_AT);
+            setAuditCreatedAt(entity, CREATED_AT);
 
             Transfer transfer = mapper.toDomain(entity);
 
@@ -117,53 +130,13 @@ class TransferJpaMapperTest {
     }
 
     @Nested
-    @DisplayName("updateJpaEntity")
-    class UpdateJpaEntity {
-
-        @Test
-        @DisplayName("should update entity fields from transfer")
-        void shouldUpdateEntity() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
-                    AMOUNT_VALUE, CURRENCY, TransferStatus.COMPLETED, 1L);
-            Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
-                    TransferStatus.CANCELLED, CREATED_AT, 5L);
-
-            mapper.updateJpaEntity(entity, transfer);
-
-            assertThat(entity.getStatus()).isEqualTo(TransferStatus.CANCELLED);
-            assertThat(entity.getVersion()).isEqualTo(1L);
-        }
-
-        @Test
-        @DisplayName("should throw when entity is null")
-        void shouldThrowOnNullEntity() {
-            Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT, STATUS, CREATED_AT, VERSION);
-
-            assertThatThrownBy(() -> mapper.updateJpaEntity(null, transfer))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Entity and Transfer must not be null");
-        }
-
-        @Test
-        @DisplayName("should throw when transfer is null")
-        void shouldThrowOnNullTransfer() {
-            TransferJpaEntity entity = new TransferJpaEntity(ID, SENDER_ACCOUNT_ID.value(), RECEIVER_ACCOUNT_ID.value(),
-                    AMOUNT_VALUE, CURRENCY, STATUS, VERSION);
-
-            assertThatThrownBy(() -> mapper.updateJpaEntity(entity, null))
-                    .isExactlyInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Entity and Transfer must not be null");
-        }
-    }
-
-    @Nested
     @DisplayName("mapping completeness")
     class MappingCompleteness {
 
         // Every persistent column of TransferJpaEntity, explicitly enumerated.
         // A new column breaks the subset assertion below and forces a conscious
-        // decision: map it (toJpaEntity/toDomain) and state whether
-        // updateJpaEntity must sync it on merge.
+        // decision: map it in toJpaEntity/toDomain (or explicitly leave it
+        // unmapped).
         private static final Set<String> KNOWN_COLUMNS = Set.of(
                 "id", "senderAccountId", "receiverAccountId", "amount",
                 "currency", "status", "businessCreatedAt", "version");
@@ -183,26 +156,6 @@ class TransferJpaMapperTest {
             assertThat(reloaded.getStatus()).isEqualTo(transfer.getStatus());
             assertThat(reloaded.getCreatedAt()).isEqualTo(transfer.getCreatedAt());
             assertThat(reloaded.getVersion()).isEqualTo(transfer.getVersion());
-        }
-
-        @Test
-        @DisplayName("updateJpaEntity should sync only the mutable columns by design")
-        void shouldUpdateOnlyMutableColumns() {
-            TransferJpaEntity entity = mapper.toJpaEntity(new Transfer(ID, SENDER_ACCOUNT_ID,
-                    RECEIVER_ACCOUNT_ID, AMOUNT, TransferStatus.PENDING, CREATED_AT, 1L));
-            Transfer completed = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
-                    TransferStatus.COMPLETED, CREATED_AT, 2L);
-
-            mapper.updateJpaEntity(entity, completed);
-
-            assertThat(entity.getStatus()).isEqualTo(TransferStatus.COMPLETED);
-            assertThat(entity.getVersion()).isEqualTo(1L);
-            assertThat(entity.getId()).isEqualTo(ID);
-            assertThat(entity.getSenderAccountId()).isEqualTo(SENDER_ACCOUNT_ID.value());
-            assertThat(entity.getReceiverAccountId()).isEqualTo(RECEIVER_ACCOUNT_ID.value());
-            assertThat(entity.getAmount()).isEqualByComparingTo(AMOUNT_VALUE);
-            assertThat(entity.getCurrency()).isEqualTo(CURRENCY);
-            assertThat(entity.getBusinessCreatedAt()).isEqualTo(CREATED_AT);
         }
 
         @Test

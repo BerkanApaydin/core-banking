@@ -32,7 +32,7 @@ class RedisRateLimiterEdgeCaseTest {
 
     @Test
     void shouldAllowDifferentClientsIndependently() {
-        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(), anyString(), anyString()))
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1L);
 
         assertTrue(rateLimiter.tryAcquire("client-a"));
@@ -47,7 +47,7 @@ class RedisRateLimiterEdgeCaseTest {
 
     @Test
     void shouldHandleHighVolumeForSingleClient() {
-        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(), anyString(), anyString()))
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1L, 1L, 1L, 1L, 1L, 0L);
 
         for (int i = 0; i < 5; i++) {
@@ -58,7 +58,7 @@ class RedisRateLimiterEdgeCaseTest {
 
     @Test
     void shouldHandleRedisUnavailableGracefully() {
-        when(redisTemplate.execute(any(), any(List.class), anyString(), anyString(), anyString()))
+        when(redisTemplate.execute(any(), any(List.class), anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("Redis connection failed"));
 
         RuntimeException ex = assertThrows(RuntimeException.class,

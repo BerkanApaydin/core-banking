@@ -119,7 +119,7 @@ public class CaffeineLoginAttemptAdapter implements LoginAttemptPort {
     }
 
     static String normalizeUsername(String username) {
-        return username == null ? null : username.toLowerCase(Locale.ROOT);
+        return username == null ? null : username.strip().toLowerCase(Locale.ROOT);
     }
 
     /**

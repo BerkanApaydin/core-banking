@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.in.web;
 
 import com.bank.app.common.adapter.in.api.ApiVersion;
+import com.bank.app.common.adapter.in.api.IfNoneMatch;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
@@ -69,7 +70,7 @@ public class TransferQueryController {
             @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
         TransferDetailResponse body = getTransferDetailQuery.execute(id);
         String etag = etagForDetail(body);
-        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+        if (IfNoneMatch.matches(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
                     .cacheControl(CacheControl.noStore()).build();
         }
@@ -121,7 +122,7 @@ public class TransferQueryController {
                 ? generateTransferReportWithTotalsQuery.execute(criteria)
                 : generateTransferReportQuery.execute(criteria);
         String etag = TransferReportEtagService.etagFor(body);
-        if (ifNoneMatch != null && ("*".equals(ifNoneMatch) || ifNoneMatch.equals(etag))) {
+        if (IfNoneMatch.matches(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
                     .cacheControl(CacheControl.noStore()).build();
         }

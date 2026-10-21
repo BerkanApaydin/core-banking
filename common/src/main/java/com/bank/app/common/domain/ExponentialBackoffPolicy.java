@@ -28,11 +28,21 @@ public final class ExponentialBackoffPolicy {
     }
 
     public long nextDelay(long currentDelayMs) {
-        long doubled = Math.min(currentDelayMs * 2, maxDelayMs);
+        // Saturating double: a huge current delay must cap at maxDelayMs, not
+        // overflow to a negative number and disable the wait entirely.
+        long doubled = currentDelayMs > maxDelayMs / 2
+                ? maxDelayMs
+                : Math.min(currentDelayMs * 2, maxDelayMs);
         if (jitterMs == 0) {
             return doubled;
         }
-        return doubled + ThreadLocalRandom.current().nextLong(0, jitterMs + 1);
+        // jitterMs + 1 overflows when jitterMs is Long.MAX_VALUE; nextLong(bound)
+        // with the bound itself still yields a non-negative sample.
+        long jitterBound = jitterMs == Long.MAX_VALUE ? Long.MAX_VALUE : jitterMs + 1;
+        long jitter = ThreadLocalRandom.current().nextLong(jitterBound);
+        // The contract allows jitter to exceed maxDelayMs, but the addition must
+        // not wrap around.
+        return doubled > Long.MAX_VALUE - jitter ? Long.MAX_VALUE : doubled + jitter;
     }
 
     @Override

@@ -99,6 +99,22 @@ class ExponentialBackoffPolicyTest {
     }
 
     @Test
+    void shouldSaturateAtMaxForHugeCurrentDelayWithoutJitter() {
+        var policy = new ExponentialBackoffPolicy(500, 2000, 0);
+        assertThat(policy.nextDelay(Long.MAX_VALUE)).isEqualTo(2000);
+    }
+
+    @Test
+    void shouldNotOverflowWhenAddingJitterToVeryLargeDelay() {
+        long maxDelayMs = Long.MAX_VALUE - 5;
+        var policy = new ExponentialBackoffPolicy(500, maxDelayMs, 10);
+        for (int i = 0; i < 100; i++) {
+            long next = policy.nextDelay(Long.MAX_VALUE);
+            assertThat(next).isBetween(maxDelayMs, Long.MAX_VALUE);
+        }
+    }
+
+    @Test
     void shouldApplyJitterAdditionExactly() {
         // Deterministic kill for both MATH mutants on nextDelay:
         // (doubled + jitterSample) vs (doubled - jitterSample) and

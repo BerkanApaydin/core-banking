@@ -3,6 +3,7 @@ package com.bank.app.account.adapter.out.persistence;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
@@ -136,6 +138,39 @@ class AccountPersistenceAdapterTest {
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> repository.save(domainAccount));
         verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
+    }
+
+    @Test
+    @DisplayName("should translate an IBAN unique violation into DuplicateIbanException")
+    @SuppressWarnings("null")
+    void shouldTranslateDuplicateIbanViolation() {
+        Iban iban = new Iban("TR770006200000000000000111");
+        Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet",
+                Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        DataIntegrityViolationException violation = new DataIntegrityViolationException(
+                "duplicate", new java.sql.SQLException(
+                        "duplicate key value violates unique constraint \"accounts_iban_key\"",
+                        "23505"));
+        when(springDataRepo.save(any(AccountJpaEntity.class))).thenThrow(violation);
+
+        assertThrows(DuplicateIbanException.class, () -> repository.save(domainAccount));
+    }
+
+    @Test
+    @DisplayName("should propagate unrelated integrity violations unchanged")
+    @SuppressWarnings("null")
+    void shouldPropagateUnrelatedIntegrityViolation() {
+        Iban iban = new Iban("TR770006200000000000000111");
+        Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet",
+                Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        DataIntegrityViolationException violation = new DataIntegrityViolationException(
+                "not-null violation", new java.sql.SQLException("null value in column", "23502"));
+        when(springDataRepo.save(any(AccountJpaEntity.class))).thenThrow(violation);
+
+        DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
+                () -> repository.save(domainAccount));
+
+        assertSame(violation, thrown);
     }
 
     @Nested

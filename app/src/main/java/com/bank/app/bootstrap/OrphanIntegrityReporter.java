@@ -14,7 +14,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -48,7 +50,7 @@ public class OrphanIntegrityReporter {
     private final AtomicLong transfersWithoutSender = new AtomicLong();
     private final AtomicLong transfersWithoutReceiver = new AtomicLong();
     private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
-    private final Counter alarmCounter;
+    private final Map<String, Counter> alarmCounters;
 
     // Single canonical constructor for Spring: the scheduler lock and the
     // bound OrphanIntegrityProperties always come from the container, so
@@ -62,7 +64,7 @@ public class OrphanIntegrityReporter {
         this.jdbc = jdbc;
         this.schedulerLock = schedulerLock;
         this.alarmThreshold = properties != null ? properties.orphanAlarmThreshold() : 0;
-        Counter counter = null;
+        Map<String, Counter> counters = new HashMap<>();
         if (meterRegistry != null) {
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", ACCOUNTS_WITHOUT_USER)), accountsWithoutUser);
             meterRegistry.gauge("db.orphan.current", List.of(Tag.of("type", TRANSFERS_WITHOUT_SENDER)), transfersWithoutSender);
@@ -70,11 +72,18 @@ public class OrphanIntegrityReporter {
             meterRegistry.gauge("db.orphan.last_success_epoch_seconds", lastSuccessfulScanEpochSeconds);
             // Alarm hook for Alertmanager/PagerDuty, e.g.:
             //   sum(increase(db_orphan_alarm_total[1h])) by (type) > 0
-            counter = Counter.builder("db.orphan.alarm")
-                    .description("Orphan rows above the alarm threshold (out-of-band deletion suspected)")
-                    .register(meterRegistry);
+            counters.put(ACCOUNTS_WITHOUT_USER, alarmCounter(meterRegistry, ACCOUNTS_WITHOUT_USER));
+            counters.put(TRANSFERS_WITHOUT_SENDER, alarmCounter(meterRegistry, TRANSFERS_WITHOUT_SENDER));
+            counters.put(TRANSFERS_WITHOUT_RECEIVER, alarmCounter(meterRegistry, TRANSFERS_WITHOUT_RECEIVER));
         }
-        this.alarmCounter = counter;
+        this.alarmCounters = counters;
+    }
+
+    private static Counter alarmCounter(MeterRegistry meterRegistry, String type) {
+        return Counter.builder("db.orphan.alarm")
+                .description("Orphan rows above the alarm threshold (out-of-band deletion suspected)")
+                .tag("type", type)
+                .register(meterRegistry);
     }
 
     static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
@@ -109,6 +118,7 @@ public class OrphanIntegrityReporter {
         long orphans = count == null ? 0 : count;
         gauge.set(orphans);
         if (orphans > alarmThreshold) {
+            Counter alarmCounter = alarmCounters.get(type);
             if (alarmCounter != null) {
                 alarmCounter.increment(orphans);
             }

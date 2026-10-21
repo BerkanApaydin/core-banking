@@ -105,6 +105,8 @@ public class RequestBodySizeLimitFilter implements Filter {
      */
     static final class BoundedRequestWrapper extends HttpServletRequestWrapper {
         private final long maxBytes;
+        private ServletInputStream inputStream;
+        private BufferedReader reader;
 
         BoundedRequestWrapper(HttpServletRequest request, long maxBytes) {
             super(request);
@@ -113,12 +115,20 @@ public class RequestBodySizeLimitFilter implements Filter {
 
         @Override
         public ServletInputStream getInputStream() throws IOException {
-            return new BoundedInputStream(super.getInputStream(), maxBytes);
+            // One counting stream per request: recreating it would reset the
+            // byte counter and let a caller read the cap again on each call.
+            if (inputStream == null) {
+                inputStream = new BoundedInputStream(super.getInputStream(), maxBytes);
+            }
+            return inputStream;
         }
 
         @Override
         public BufferedReader getReader() throws IOException {
-            return new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding()));
+            if (reader == null) {
+                reader = new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding()));
+            }
+            return reader;
         }
     }
 

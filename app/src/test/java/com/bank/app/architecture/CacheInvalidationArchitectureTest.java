@@ -16,6 +16,8 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 /**
@@ -31,6 +33,14 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
  */
 @SuppressWarnings("null")
 class CacheInvalidationArchitectureTest extends ArchitectureTest {
+
+    /**
+     * Explicit read allowlist for the published AccountApi. Anything not
+     * listed here is a mutation and must evict. A new read method must be
+     * added deliberately; a new mutation is therefore never silently exempt.
+     */
+    private static final Set<String> ACCOUNT_API_READ_METHODS = Set.of(
+            "getSnapshotById", "getSnapshotByIban", "getIbansForAccounts");
 
     @Test
     void accountStatusMutatorsMustEvictSnapshots() {
@@ -74,7 +84,7 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
                         javaClass.getMethods().stream()
                                 .filter(method -> method.getOwner().equals(javaClass))
                                 .filter(method -> method.getModifiers().contains(JavaModifier.PUBLIC))
-                                .filter(method -> !method.getName().startsWith("get"))
+                                .filter(method -> !ACCOUNT_API_READ_METHODS.contains(method.getName()))
                                 .forEach(method -> {
                                     if (!callsEvict(method)) {
                                         events.add(SimpleConditionEvent.violated(method,

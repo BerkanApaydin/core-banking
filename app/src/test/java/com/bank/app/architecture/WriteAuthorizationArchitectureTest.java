@@ -1,6 +1,8 @@
 package com.bank.app.architecture;
 
+import com.bank.app.common.application.service.UserContextService;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
@@ -65,9 +67,25 @@ class WriteAuthorizationArchitectureTest extends ArchitectureTest {
         JavaClass suspend = importedClasses.stream()
                 .filter(c -> c.getSimpleName().equals("SuspendAccountUseCaseImpl"))
                 .findFirst().orElseThrow();
-        assertThat(suspend.getDirectDependenciesFromSelf())
-                .as("SuspendAccountUseCaseImpl must reference UserContextService/UserContext for the ADMIN check")
-                .anyMatch(d -> d.getTargetClass().getSimpleName().contains("UserContext"));
+
+        // DependOnUserContext alone is not enforcement: pin the actual
+        // hasRole(String) invocation and the ROLE_ADMIN constant it checks.
+        ArchRule rule = classes()
+                .that().haveSimpleName("SuspendAccountUseCaseImpl")
+                .should().callMethod(UserContextService.class, "hasRole", String.class)
+                .because("suspending an account must actually invoke the ADMIN role check, not just import the context type");
+        rule.check(importedClasses);
+
+        JavaField adminRole = suspend.tryGetField("ADMIN_ROLE")
+                .orElseThrow(() -> new AssertionError(
+                        "SuspendAccountUseCaseImpl must declare the ADMIN_ROLE constant it checks"));
+        // ADMIN_ROLE is a compile-time String constant, so javac inlines it at
+        // the hasRole(...) call site and no field-access instruction remains
+        // for ArchUnit to observe. The callMethod rule above still pins the
+        // actual role check; this pins that the constant exists and is a String.
+        assertThat(adminRole.getRawType().getName())
+                .as("ADMIN_ROLE must be the ROLE_ADMIN string constant")
+                .isEqualTo(String.class.getName());
     }
 
     @Test
