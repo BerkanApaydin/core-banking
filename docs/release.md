@@ -7,7 +7,7 @@ bytes.
 
 ## Flow
 
-1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then verifies that `inputs.tag` is SemVer-shaped and points at the checked-out commit. Base-image inputs may be tags for convenience, but the workflow resolves each to a `@sha256` digest and builds with those digests. The push includes BuildKit provenance and SBOM attestations, then pins both the app manifest and the Flyway Job manifest to `@sha256` digests.
+1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then verifies that `inputs.tag` is SemVer-shaped and points at the checked-out commit. Base-image inputs may be tags for convenience, but the workflow resolves each to a `@sha256` digest and builds with those digests. The push includes BuildKit provenance and SBOM attestations, then pins the app manifest to the pushed `@sha256` digest and the Flyway Job manifest to the `<flyway.version>` from `pom.xml` plus its multi-arch index digest (never the rolling `11-alpine` tag).
    `.github/workflows/release.yml` builds the `Dockerfile`, pushes to
    GHCR (`ghcr.io/<owner>/bank-app:<tag>`), pins `k8s/bank-app.yaml`
    to the resolved digest (`bank-app@sha256:…`, verified with `grep`
@@ -20,10 +20,14 @@ bytes.
    `image:` line in `k8s/bank-app.yaml` in place and writes
    `k8s/.image-digest` (`<image>@sha256:<digest>`, UTC timestamp,
    git SHA).
-3. Deploy the pinned manifest (`kubectl apply -f k8s/` after the
-   Flyway Job completes), then run `python ops/health_smoke.py
-   <staging-host> --require-probes --json` and save the JSON output
-   next to the release tag as rollout evidence.
+3. Run the Flyway gate, then deploy the pinned manifest. The Job name is
+   fixed and Job specs are immutable, so delete the previous run first
+   (`kubectl delete job bank-flyway-migrate --ignore-not-found`), apply
+   `k8s/flyway-migrate-job.yaml`, and wait for completion before
+   `kubectl apply -f k8s/`. `ttlSecondsAfterFinished` is intentionally unset
+   so a retained Job remains as audit evidence. Then run
+   `python ops/health_smoke.py <staging-host> --require-probes --json` and
+   save the JSON output next to the release tag as rollout evidence.
 4. Rollback = re-apply the previous pinned manifest (previous digest
    in git history) after rehearsing it against the migrated schema
    (see `docs/operations.md` — rollback is forward repair, never a
@@ -31,10 +35,11 @@ bytes.
 
 ## Rules
 
-- `bank-app:latest` must never appear as an `image:` reference in a
-  production manifest (CI K9/D7 guard enforces this); local compose builds
-  from source instead of pulling tags. Production applies a manifest whose
-  `image:` contains `@sha256:`.
+- The checked-in app image must be the explicit local-only placeholder
+  `bank-app:dev-local` (or a digest-pinned reference); any other tag, including
+  `bank-app:latest` and `bank-app:0.0.1`, fails the manifest contract in CI
+  (K9/D7). Production applies a manifest whose `image:` contains `@sha256:`.
+  Local compose builds from source instead of pulling tags.
 - The digest file (`k8s/.image-digest`) is committed with every
   release, starting with the first cut (absent before any release exists);
   `git log -- k8s/.image-digest` is the release ledger.

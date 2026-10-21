@@ -7,7 +7,10 @@ fail the build — it fails the DEPLOYMENT, at 3am, as a CrashLoopBackOff.
 
 This check compares the shipped manifest against the properties the
 application requires in the ``prod`` profile and against the safety rules the
-manifest itself documents.
+manifest itself documents: pod/container hardening (non-root, pinned
+UID/GID, no service-account token, seccomp, read-only root), the
+digest-or-explicit-dev-placeholder image policy, the Flyway version/digest
+pin, and the DNS TCP+UDP egress needed for truncated answers.
 """
 
 from pathlib import Path
@@ -17,6 +20,29 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "k8s" / "bank-app.yaml"
 INGRESS = ROOT / "k8s" / "ingress.yaml"
+NETWORK_POLICY = ROOT / "k8s" / "networkpolicy.yaml"
+FLYWAY_JOB = ROOT / "k8s" / "flyway-migrate-job.yaml"
+POM = ROOT / "pom.xml"
+DOCKERFILE = ROOT / "Dockerfile"
+
+DEV_APP_IMAGE = "bank-app:dev-local"
+
+POD_HARDENING = (
+    (r"^\s*automountServiceAccountToken:\s*false\s*$",
+     "automountServiceAccountToken: false"),
+    (r"^\s*runAsNonRoot:\s*true\s*$", "runAsNonRoot: true"),
+    (r"^\s*runAsUser:\s*1000\s*$", "runAsUser: 1000"),
+    (r"^\s*runAsGroup:\s*1000\s*$", "runAsGroup: 1000"),
+    (r"^\s*fsGroup:\s*1000\s*$", "fsGroup: 1000"),
+    (r"seccompProfile:\s*\n\s+type:\s*RuntimeDefault\s*$",
+     "seccompProfile: RuntimeDefault"),
+    (r"^\s*allowPrivilegeEscalation:\s*false\s*$",
+     "allowPrivilegeEscalation: false"),
+    (r"^\s*readOnlyRootFilesystem:\s*true\s*$",
+     "readOnlyRootFilesystem: true"),
+    (r"capabilities:\s*\n\s+drop:\s*\n\s+-\s+ALL\s*$",
+     "capabilities.drop: [ALL]"),
+)
 
 # Environment variables the prod profile REQUIRES. The application refuses to
 # boot without them, so a manifest that does not set them deploys a pod that
@@ -103,13 +129,16 @@ def prod_yaml(text: str) -> dict[str, str]:
 
 
 def main() -> int:
-    if not MANIFEST.is_file():
-        return fail(f"{MANIFEST.relative_to(ROOT)} is missing")
-    if not INGRESS.is_file():
-        return fail(f"{INGRESS.relative_to(ROOT)} is missing")
+    for path in (MANIFEST, INGRESS, NETWORK_POLICY, FLYWAY_JOB, POM, DOCKERFILE):
+        if not path.is_file():
+            return fail(f"{path.relative_to(ROOT)} is missing")
 
     manifest = MANIFEST.read_text(encoding="utf-8")
     ingress = INGRESS.read_text(encoding="utf-8")
+    network_policy = NETWORK_POLICY.read_text(encoding="utf-8")
+    flyway_job = FLYWAY_JOB.read_text(encoding="utf-8")
+    pom = POM.read_text(encoding="utf-8")
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
     env = env_entries(manifest)
 
     prod_profile_path = ROOT / "app" / "src" / "main" / "resources" / "application-prod.yml"
@@ -172,9 +201,106 @@ def main() -> int:
                 f"application-prod.yml must pin {name} to redis (found: {value!r})"
             )
 
+    errors = []
+
+    # Pod/container hardening: both workloads keep the same non-root contract;
+    # runAsGroup must match the GID pinned in the Dockerfile.
+    for text, source in (
+        (manifest, "k8s/bank-app.yaml"),
+        (flyway_job, "k8s/flyway-migrate-job.yaml"),
+    ):
+        for pattern, label in POD_HARDENING:
+            if not re.search(pattern, text, re.MULTILINE | re.DOTALL):
+                errors.append(f"{source}: missing {label}")
+
+    if not re.search(r"addgroup\s+-S\s+-g\s+1000\s+bank", dockerfile):
+        errors.append("Dockerfile: pin the image group to GID 1000 "
+                      "(addgroup -S -g 1000 bank)")
+    if not re.search(r"adduser\s+-S\s+-u\s+1000\s+-G\s+bank\s+bank", dockerfile):
+        errors.append("Dockerfile: pin the image user to UID 1000 in group bank")
+
+    # Image policy: the app is either the explicit local-only placeholder or
+    # digest-pinned. Any other tag (bank-app:0.0.1, ghcr.io/...:v1.2.3) fails.
+    app_images = re.findall(r"^\s*image:\s*(\S+)\s*$", manifest, re.MULTILINE)
+    if len(app_images) != 1:
+        errors.append(
+            f"k8s/bank-app.yaml: expected exactly one image, found {len(app_images)}"
+        )
+    else:
+        app_image = app_images[0]
+        if app_image != DEV_APP_IMAGE and "@sha256:" not in app_image:
+            errors.append(
+                "k8s/bank-app.yaml: image must be the explicit local placeholder "
+                f"{DEV_APP_IMAGE!r} or a digest-pinned reference, found {app_image!r}"
+            )
+
+    # Flyway Job: version must track pom.xml and the reference must carry the
+    # multi-arch index digest. TTL is forbidden because a fixed Job name plus
+    # automatic deletion races the next release; the header must document the
+    # delete-before-apply step.
+    flyway_images = re.findall(r"^\s*image:\s*(\S+)\s*$", flyway_job, re.MULTILINE)
+    if len(flyway_images) != 1:
+        errors.append(
+            "k8s/flyway-migrate-job.yaml: expected exactly one image, "
+            f"found {len(flyway_images)}"
+        )
+    else:
+        flyway_image = flyway_images[0]
+        flyway_version = re.search(r"<flyway\.version>([^<]+)</flyway\.version>", pom)
+        if not flyway_version:
+            errors.append("pom.xml: <flyway.version> is missing")
+        else:
+            expected = (
+                rf"^flyway/flyway:{re.escape(flyway_version.group(1))}-alpine"
+                r"@sha256:[0-9a-f]{64}$"
+            )
+            if not re.fullmatch(expected, flyway_image):
+                errors.append(
+                    "k8s/flyway-migrate-job.yaml: image must be "
+                    f"flyway/flyway:{flyway_version.group(1)}-alpine"
+                    "@sha256:<64 hex>, "
+                    f"found {flyway_image!r}"
+                )
+    if re.search(r"^\s*ttlSecondsAfterFinished:", flyway_job, re.MULTILINE):
+        errors.append(
+            "k8s/flyway-migrate-job.yaml: ttlSecondsAfterFinished is forbidden "
+            "(fixed name + immutable spec; delete the previous Job before apply)"
+        )
+    if "kubectl delete job bank-flyway-migrate --ignore-not-found" not in flyway_job:
+        errors.append(
+            "k8s/flyway-migrate-job.yaml: document the delete-before-apply step"
+        )
+    if "lock_timeout" not in flyway_job:
+        errors.append(
+            "k8s/flyway-migrate-job.yaml: set lock_timeout in the JDBC URL "
+            "(protects the grandfathered V28/V32/V46 rewrites)"
+        )
+
+    # DNS over TCP is mandatory for truncated UDP responses; a UDP-only rule
+    # turns large DNS answers into intermittent resolution failures.
+    dns_block = re.search(
+        r"# Cluster DNS\.(.*?)# PostgreSQL\.", network_policy, re.DOTALL
+    )
+    if not dns_block:
+        errors.append(
+            "k8s/networkpolicy.yaml: cannot locate the Cluster DNS egress block"
+        )
+    else:
+        block = dns_block.group(1)
+        for protocol in ("UDP", "TCP"):
+            if not re.search(rf"protocol:\s*{protocol}\s*\n\s*port:\s*53", block):
+                errors.append(
+                    f"k8s/networkpolicy.yaml: DNS egress must allow {protocol} 53"
+                )
+
+    if errors:
+        return fail("hardening/image policy drift:\n  - " + "\n  - ".join(errors))
+
     print(
         "k8s manifest contract OK: "
-        f"{len(env)} env vars, CORS={cors!r}, ingress hosts={sorted(hosts)}"
+        f"{len(env)} env vars, app image={DEV_APP_IMAGE!r} or digest, "
+        f"Flyway pinned to pom.xml, hardening+TCP-DNS present, "
+        f"CORS={cors!r}, ingress hosts={sorted(hosts)}"
     )
     return 0
 

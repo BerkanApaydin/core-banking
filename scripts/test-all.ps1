@@ -15,9 +15,21 @@ function Invoke-Checked {
     )
 
     Write-Host "`n==> $Label"
-    & $Command @CommandArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Label failed with exit code $LASTEXITCODE."
+    # Windows PowerShell 5.1 turns native stderr (JVM/Maven warnings) into
+    # error records; with ErrorActionPreference=Stop that aborts the run even
+    # though the command succeeded. Let native stderr through and judge the
+    # command by its exit code instead.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Command @CommandArgs
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($exitCode -ne 0) {
+        throw "$Label failed with exit code $exitCode."
     }
 }
 
@@ -25,9 +37,15 @@ try {
     Push-Location -LiteralPath $repoRoot
 
     Invoke-Checked 'Python version' $python ($pythonPrefix + @('-c', "import sys; assert sys.version_info >= (3, 10), 'Python 3.10+ required'"))
+    Invoke-Checked 'Static repository contracts (CI parity)' $python ($pythonPrefix + @('scripts/check_ci_contracts.py'))
+    Write-Host "`n==> Image-pin encoding self-test"
+    & (Join-Path $repoRoot 'scripts\pin-image-digest.ps1') -SelfTest
+    if (-not $?) { throw 'Image-pin encoding self-test failed.' }
     Invoke-Checked 'Docker daemon for Testcontainers' 'docker' @('info', '--format', '{{.ServerVersion}}')
-    Invoke-Checked 'Java unit and integration tests with JaCoCo' (Join-Path $repoRoot 'mvnw.cmd') @('-B', '-ntp', 'clean', 'verify')
+    Invoke-Checked 'Java unit and integration tests with JaCoCo' (Join-Path $repoRoot 'mvnw.cmd') @('-B', '-ntp', 'clean', 'install')
     Invoke-Checked 'Aggregate coverage gate' $python ($pythonPrefix + @('scripts/check_aggregate_coverage.py', 'app/target/site/jacoco-aggregate/jacoco.xml'))
+    Invoke-Checked 'Kubernetes manifest contract' $python ($pythonPrefix + @('scripts/check_k8s_manifest_contract.py'))
+    Invoke-Checked 'Migration chain contract' $python ($pythonPrefix + @('scripts/check_migration_chain.py'))
     Invoke-Checked 'No Spring field injection in tests' $python ($pythonPrefix + @('scripts/check_test_injection.py'))
     Invoke-Checked 'Load-test runner unit tests' $python ($pythonPrefix + @('-m', 'unittest', 'load_tests.test_runner', '-v'))
     Invoke-Checked 'Load acceptance thresholds pinned' $python ($pythonPrefix + @('scripts/check_load_acceptance.py'))
@@ -39,11 +57,12 @@ try {
     Invoke-Checked 'Migration timeout guard self-test' $python ($pythonPrefix + @('scripts/check_migration_timeouts.py', '--self-test'))
     Invoke-Checked 'Code health (long methods, config literals)' $python ($pythonPrefix + @('scripts/check_code_health.py'))
     Invoke-Checked 'Code-health guard self-test' $python ($pythonPrefix + @('scripts/check_code_health.py', '--self-test'))
-    if (Test-Path -LiteralPath (Join-Path $repoRoot 'target/bom.json')) {
-        Invoke-Checked 'Dependency review (OSV gate)' $python ($pythonPrefix + @('scripts/dependency_review.py'))
-    } else {
-        Write-Host "`n==> Dependency review (OSV gate) SKIPPED (target/bom.json not built)"
+    Invoke-Checked 'Generate aggregate CycloneDX SBOM' (Join-Path $repoRoot 'mvnw.cmd') @('-B', '-ntp', '-pl', 'app', 'org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom')
+    $bomPath = Join-Path $repoRoot 'app/target/bom.json'
+    if (-not (Test-Path -LiteralPath $bomPath) -or (Get-Item -LiteralPath $bomPath).Length -eq 0) {
+        throw "SBOM was not generated at app/target/bom.json"
     }
+    Invoke-Checked 'Dependency review (OSV gate)' $python ($pythonPrefix + @('scripts/dependency_review.py'))
     Invoke-Checked 'Frontend dependencies' 'npm' @('ci')
     Invoke-Checked 'Frontend lint (ESLint)' 'npm' @('run', 'lint')
     Invoke-Checked 'Frontend XSS guard' $python ($pythonPrefix + @('scripts/check_frontend_xss.py'))

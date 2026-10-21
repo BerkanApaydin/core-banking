@@ -19,9 +19,19 @@ run() {
 }
 
 run 'Python version' "$python_cmd" -c "import sys; assert sys.version_info >= (3, 10), 'Python 3.10+ required'"
+run 'Static repository contracts (CI parity)' "$python_cmd" scripts/check_ci_contracts.py
+if command -v pwsh >/dev/null 2>&1; then
+    run 'Image-pin encoding self-test' pwsh -NoProfile -File scripts/pin-image-digest.ps1 -SelfTest
+elif command -v powershell >/dev/null 2>&1; then
+    run 'Image-pin encoding self-test' powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pin-image-digest.ps1 -SelfTest
+else
+    printf '\n==> Image-pin encoding self-test SKIPPED (PowerShell not installed)\n'
+fi
 run 'Docker daemon for Testcontainers' docker info --format '{{.ServerVersion}}'
-run 'Java unit and integration tests with JaCoCo' ./mvnw -B -ntp clean verify
+run 'Java unit and integration tests with JaCoCo' ./mvnw -B -ntp clean install
 run 'Aggregate coverage gate' "$python_cmd" scripts/check_aggregate_coverage.py app/target/site/jacoco-aggregate/jacoco.xml
+run 'Kubernetes manifest contract' "$python_cmd" scripts/check_k8s_manifest_contract.py
+run 'Migration chain contract' "$python_cmd" scripts/check_migration_chain.py
 run 'No Spring field injection in tests' "$python_cmd" scripts/check_test_injection.py
 run 'Load-test runner unit tests' "$python_cmd" -m unittest load_tests.test_runner -v
 run 'Load acceptance thresholds pinned' "$python_cmd" scripts/check_load_acceptance.py
@@ -33,11 +43,12 @@ run 'Migration statement timeouts' "$python_cmd" scripts/check_migration_timeout
 run 'Migration timeout guard self-test' "$python_cmd" scripts/check_migration_timeouts.py --self-test
 run 'Code health (long methods, config literals)' "$python_cmd" scripts/check_code_health.py
 run 'Code-health guard self-test' "$python_cmd" scripts/check_code_health.py --self-test
-if [ -f target/bom.json ]; then
-    run 'Dependency review (OSV gate)' "$python_cmd" scripts/dependency_review.py
-else
-    printf '\n==> Dependency review (OSV gate) SKIPPED (target/bom.json not built)\n'
+run 'Generate aggregate CycloneDX SBOM' ./mvnw -B -ntp -pl app org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom
+if [ ! -s app/target/bom.json ]; then
+    echo "SBOM was not generated at app/target/bom.json" >&2
+    exit 1
 fi
+run 'Dependency review (OSV gate)' "$python_cmd" scripts/dependency_review.py
 run 'Frontend dependencies' npm ci
 run 'Frontend lint (ESLint)' npm run lint
 run 'Frontend XSS guard' "$python_cmd" scripts/check_frontend_xss.py

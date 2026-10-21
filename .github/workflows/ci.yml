@@ -71,16 +71,19 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Guard against mutable image tags (K9/D7)
-      # The release workflow pins k8s/bank-app.yaml to a digest; the default
-      # must stay a versioned tag so an unpinned apply can never roll :latest.
-      # Match `image:` lines only: the manifest documents the forbidden value
-      # in its own comments, and a bare substring grep false-positives on them.
-      run: |
-        if grep -Eq "^[[:space:]]*image:[[:space:]]+bank-app:latest([[:space:]#]|$)" k8s/bank-app.yaml; then
-          echo "::error::k8s/bank-app.yaml must not reference bank-app:latest (K9/D7)"
-          exit 1
-        fi
+    - name: Image-pin encoding self-test (R-O08)
+      # Windows PowerShell 5.1 reads/writes BOM-less files with the ANSI code
+      # page; the pin script must prove it preserves UTF-8 (em dash/Turkish)
+      # and CRLF. GitHub's Ubuntu runner ships pwsh, so run the regression
+      # vector here rather than only on a developer laptop.
+      shell: pwsh
+      run: ./scripts/pin-image-digest.ps1 -SelfTest
+
+    - name: Static repository contracts (K9/D7, O-1/O-3, O-8, I-08)
+      # Single source of truth shared with scripts/test-all.*: mutable image
+      # tags, migration-soak presence, migration content contract, supply-chain
+      # self-contracts, deployment-manifest presence and tool-only sources.
+      run: python3 scripts/check_ci_contracts.py
 
     - name: Set up JDK 21
       uses: actions/setup-java@v5
@@ -156,57 +159,6 @@ jobs:
     - name: Check restore-drill contract (script, template, ledger gauge)
       run: python3 scripts/check_restore_drill.py
 
-    - name: Migration-soak presence (O-1/DB-1 large-table guard)
-      run: |
-        test -f scripts/migration_soak.sh
-        grep -q '^  migration-soak:' .github/workflows/ci.yml
-        grep -q 'BASELINE_TARGET' scripts/migration_soak.sh
-        # O-1: the soak must fail closed on lock contention, not just print it.
-        grep -q 'MAX_LOCK_WAITS' scripts/migration_soak.sh
-        grep -q 'migration soak exceeded the lock-wait budget' scripts/migration_soak.sh
-        test -f migrations/src/main/resources/db/migration/V43__transfer_history_keyset_covering_indexes.sql
-        test -f k8s/grafana-dashboard.json
-        echo "migration-soak job + lock budget + keyset index + dashboard present"
-
-    - name: Migration content contracts (O-8 — presence is not proof)
-      # A presence check only fails when a file is deleted; these pin the
-      # CONTENT that made V51 necessary: V51 must drop the real V27 index
-      # name, and must not repeat V41's phantom-name typo.
-      run: |
-        grep -q "idx_idempotency_pending_http_created_at" migrations/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql
-        grep -q "idx_idempotency_pending_http_created_at" migrations/src/main/resources/db/migration/V27__index_pending_http_idempotency.sql
-        # Phantom check is DROP-scoped: V51's own comment names the V41 typo
-        # for context, so a bare filename grep would false-positive on it.
-        if grep -q "DROP INDEX.*idx_pending_http_idempotency" migrations/src/main/resources/db/migration/V51__drop_orphaned_v27_partial.sql; then
-          echo "::error::V51 repeats the V41 phantom index name"
-          exit 1
-        fi
-        # L2/V52: the eight subsumed/dead indexes must stay in the drop list.
-        for idx in idx_outbox_events_unprocessed idx_transfers_created_at idx_audit_logs_timestamp idx_ledger_account_business idx_accounts_user_id_status idx_audit_logs_username idx_audit_logs_username_action idx_idempotency_keys_created_at; do
-          grep -q "DROP INDEX IF EXISTS $idx" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql || { echo "::error::V52 missing drop for $idx"; exit 1; }
-        done
-        # L3/V52: retention expression index over COALESCE(processed_at, created_at).
-        grep -q "idx_outbox_retention_processed_created" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
-        grep -q "COALESCE(processed_at, created_at)" migrations/src/main/resources/db/migration/V52__drop_subsumed_indexes_and_retention_expression_index.sql
-        # L6/V53: replay body widened to TEXT, never a business-tx failure mode.
-        grep -q "ALTER TABLE idempotency_keys ALTER COLUMN response_body TYPE TEXT" migrations/src/main/resources/db/migration/V53__widen_idempotency_response_body.sql
-        echo "migration content contracts present"
-
-    - name: Supply-chain self-contracts (O-1/O-2)
-      # The release must stay gated and the image must stay scanned: if a
-      # future edit drops either, CI fails here instead of shipping blind.
-      run: |
-        grep -q "verify-green-ci" .github/workflows/release.yml
-        grep -q "needs: verify-green-ci" .github/workflows/release.yml
-        grep -q "aquasecurity/trivy-action" .github/workflows/ci.yml
-        grep -q "BASE_BUILDER_IMAGE" .github/workflows/release.yml
-        grep -q "Validate release tag points at this commit" .github/workflows/release.yml
-        grep -q 'TAG_SHA != "$SHA"' .github/workflows/release.yml
-        grep -q 'refs/tags/${TAG}' .github/workflows/release.yml
-        grep -q "Resolve base images to immutable digests" .github/workflows/release.yml
-        grep -q "provenance: true" .github/workflows/release.yml
-        echo "supply-chain self-contracts present"
-
     - name: Migration chain contract (T-1/O-3 upgrade-path guard)
       # Static half of the upgrade-path story: a broken Flyway chain (gap,
       # duplicate, empty file) fails closed at deploy time — catch it here.
@@ -214,7 +166,10 @@ jobs:
       # (scripts/migration_soak.sh) because it needs a staging dump.
       run: python3 scripts/check_migration_chain.py
 
-    - name: Contract checks (secret pin, test DI, autoscaling, prod compose, partition scripts)
+    - name: Python contract checks (secret pin, test DI)
+      # Static presence/supply-chain/migration-content guards run in the
+      # "Static repository contracts" step above; this step owns the executable
+      # Python guards and their self-tests.
       run: |
         python3 scripts/check_compose_jwt_default.py
         python3 scripts/check_test_injection.py
@@ -223,29 +178,6 @@ jobs:
         python3 scripts/check_code_health.py
         python3 scripts/check_migration_timeouts.py --self-test
         python3 scripts/check_code_health.py --self-test
-        grep -q "kind: HorizontalPodAutoscaler" k8s/bank-app.yaml
-        grep -q "kind: PodDisruptionBudget" k8s/bank-app.yaml
-        test -f docker-compose.prod.yml
-        test -f scripts/audit_partition_cutover.sql
-        test -f scripts/ensure_audit_partition.sql
-        test -f scripts/audit_partition_finalize.sql
-        echo "contracts present"
-
-    - name: Tool-only sources guard (I-08)
-      # audit-work/ holds investigation probes and evidence JSON — no Maven
-      # module may compile or reference it. It is outside every module's
-      # src/ tree by construction; this fails closed if that ever changes.
-      run: |
-        if grep -rq "audit-work" --include="pom.xml" . 2>/dev/null; then
-          echo "::error::no module pom may reference audit-work/ (tool-only sources)"
-          exit 1
-        fi
-        refs=$(grep -rl "audit\.work\|audit-work" --include="*.java" account user transfer audit common infrastructure persistence app account-api 2>/dev/null | grep -v "/target/" || true)
-        if [ -n "$refs" ]; then
-          echo "::error::main sources must not reference audit-work/ probes: $refs"
-          exit 1
-        fi
-        echo "tool-only sources guard passed"
 
     - name: Live rate-limit smoke (real app + runner)
       # Boots the packaged jar against the CI postgres/redis services and runs

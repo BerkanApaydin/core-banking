@@ -42,10 +42,10 @@ RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -B
 
 # Runner stage
 FROM ${BASE_RUNTIME_IMAGE}
-# D20: pin UID 1000 so the image user matches k8s runAsUser: 1000.
-# (Alpine -S assigns the next free system UID otherwise, and the pod
-# securityContext would override USER bank with an anonymous UID.)
-RUN addgroup -S bank && adduser -S -u 1000 -G bank bank \
+# D20: pin UID/GID 1000 so the image user matches k8s runAsUser/runAsGroup:
+# 1000. (Alpine -S would otherwise assign an arbitrary system GID, and the
+# pod securityContext would override USER bank with anonymous IDs.)
+RUN addgroup -S -g 1000 bank && adduser -S -u 1000 -G bank bank \
     && apk add --no-cache curl
 USER bank
 WORKDIR /app
@@ -55,9 +55,9 @@ COPY --from=builder /build/app/target/*.jar app.jar
 EXPOSE 8080
 
 # Container-aware heap defaults; override with JAVA_OPTS env (e.g. -Xmx1g).
-# user.timezone=UTC + TZ=UTC: all timestamps are TIMESTAMP (without time zone),
-# so the JVM wall clock IS the stored clock. Pinning UTC keeps every replica,
-# the DB and the logs on the same instant regardless of host zone.
+# user.timezone=UTC + TZ=UTC: since V46 wall-clock columns are TIMESTAMPTZ, so
+# the JVM zone supplies the offset used when binding/reading instants. Pinning
+# UTC keeps every replica, the DB session and the logs on the same clock.
 ENV TZ=UTC
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"

@@ -38,21 +38,23 @@ import java.util.function.Function;
 public class JwtTokenProvider implements JwtPort {
 
     /**
-     * Local-development fallback secret. Single owner of this value: startup
-     * validation references this constant instead of duplicating the literal,
-     * so the two can never silently diverge. Never use in production
-     * ({@code jwt.allow-default-secret=false} fails fast; rotate immediately
-     * if this value ever leaks — it lives in git history and images).
+     * Local-development fallback secret. A deliberately non-secret, zero-entropy
+     * Base64 marker that decodes to {@code dev-only-NOT-FOR-PROD-0000000000}
+     * (exactly 32 bytes). It is shared verbatim with
+     * {@code application-dev.yml} and {@code docker-compose.yml};
+     * {@code scripts/check_compose_jwt_default.py} fails CI if the three drift,
+     * and {@code .gitleaks.toml} allowlists this documented placeholder.
+     * Production refuses it twice: {@code jwt.allow-default-secret=false} plus
+     * {@code ApplicationStartupValidator}. Never replace this with a real key.
      *
      * @deprecated Test-only fallback. Production must set {@code JWT_SECRET};
      *             this constant exists so tests and local dev boot without a
-     *             secret manager. Do not log or expose its value. The previous
-     *             value was rotated after appearing in git history — treat any
-     *             leaked value as compromised and rotate again on suspicion.
+     *             secret manager. The previous real-looking value appeared in
+     *             git history and is compromised; this marker is not a secret.
      */
     @Deprecated
     public static final String DEFAULT_JWT_SECRET =
-            "i83oGVJffFn/qzcqrahuJ6oxZyKp6bvxmDukRE/X3+s=";
+            "ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=";
 
     /** Token type claim distinguishing access from refresh tokens. */
     public static final String TOKEN_TYPE_CLAIM = "typ";

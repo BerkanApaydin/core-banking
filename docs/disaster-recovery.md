@@ -23,26 +23,37 @@ the drill procedure and its evidence.
 
 ## Quarterly drill (staging, executable)
 
-Run `ops/restore-drill.sh <staging-base-url> docs/drills/<date>-restore.md`
-(DB credentials via `PGHOST/PGUSER/PGPASSWORD/PGDATABASE`). It captures
-the baseline (row counts + per-currency totals + Flyway version + image
-digest), prints the ledger-reconcile query and runs the probe smoke
-check; the operator appends backup location, restore steps and the
-achieved RPO/RTO. File each completed record under `docs/drills/` using
-`docs/drills/restore-drill-record-template.md` — a drill without a
+Two phases, both fail closed. File each completed record under `docs/drills/`
+using `docs/drills/restore-drill-record-template.md` — a drill without a
 committed record did not happen.
 
-1. Baseline: synthetic users/accounts/transfers + known idempotency keys,
-   pending outbox IDs, `token_revocations` + `refresh_tokens` counts,
-   per-currency totals (script captures all of these).
+1. Immediately before the backup, with staging writes quiesced:
+   `ops/restore-drill.sh <staging-base-url> docs/drills/<date>-restore.md`
+   (DB credentials via `PGHOST/PGUSER/PGPASSWORD/PGDATABASE`). It writes
+   `docs/drills/<date>-restore.baseline.json` with row counts, per-currency
+   totals, Flyway version and image digest, records the ledger net-zero
+   result and runs the staging probe smoke. It refuses to overwrite existing
+   evidence; use a new record file for a new drill.
 2. Back up with the platform method to a separately protected destination;
-   record timestamp, Flyway version (`flyway_schema_history`), image digest.
+   record timestamp, Flyway version (`flyway_schema_history`) and image digest.
 3. Restore into an isolated environment with outbound providers disabled.
    Point a compatible app version at it; verify migrations + constraints.
-4. Reconcile: ledger legs per `transaction_ref` net to zero; aggregate
+4. Verify the restored database and app:
+   `ops/restore-drill.sh --verify <restored-base-url> docs/drills/<date>-restore.md [restored-database-url]`
+   (or set `RESTORED_DATABASE_URL` instead of the third argument). It captures
+   `<record>.restored.json`, compares Flyway, every tracked table count,
+   per-currency totals and the ledger net-zero invariant, runs the probe smoke
+   against the restored app, appends the evidence and exits nonzero on any
+   drift or failed probe. Neither check is wrapped in `|| true`.
+5. Reconcile: ledger legs per `transaction_ref` net to zero; aggregate
    totals match; uncertain operations replayed with ORIGINAL keys only.
-5. Record achieved data-loss interval and time-to-recovery against RPO/RTO;
-   file gaps as issues, not tribal knowledge.
+   The verifier compares exact decimal strings; retain the record-level
+   checks because aggregate totals alone cannot detect every wrong transfer.
+6. Record achieved data-loss interval and time-to-recovery against RPO/RTO;
+   paste the automated verdict, and file gaps as issues, not tribal knowledge.
+
+Static guards (no database needed): `python3 ops/restore_verify.py --self-test`
+and `python3 scripts/check_restore_drill.py`.
 
 Rollback is not a database downgrade: rehearse the previous app version
 against the migrated staging schema and choose forward repair when old

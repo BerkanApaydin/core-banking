@@ -147,19 +147,27 @@ jobs:
           BASE_RUNTIME_IMAGE=${{ steps.bases.outputs.runtime }}
 
     - name: Pin flyway image to digest
-      # O-7: k8s/flyway-migrate-job.yaml floats on flyway/flyway:11-alpine in
-      # git (dev convenience); the DEPLOYED manifest is digest-pinned here, the
-      # same mechanism as the app image below. A failed inspect fails closed.
+      # O-7/R-O05: the source manifest is already pinned to the Flyway version
+      # declared in pom.xml plus a multi-arch index digest. Re-resolve that exact
+      # version (never the rolling :11-alpine tag) and emit the index digest, so
+      # amd64 and arm64 nodes pull the same release. A failed/blank inspect fails
+      # closed instead of producing a floating manifest.
       run: |
-        docker pull flyway/flyway:11-alpine
-        PINNED=$(docker image inspect --format '{{index .RepoDigests 0}}' flyway/flyway:11-alpine)
-        if [ -z "$PINNED" ]; then
-          echo "::error::could not resolve flyway digest"
+        FLYWAY_VERSION=$(sed -n 's:.*<flyway.version>\(.*\)</flyway.version>.*:\1:p' pom.xml | head -1)
+        if [ -z "$FLYWAY_VERSION" ]; then
+          echo "::error::flyway.version missing from pom.xml"
           exit 1
         fi
+        FLYWAY_REF="flyway/flyway:${FLYWAY_VERSION}-alpine"
+        DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$FLYWAY_REF")
+        if ! printf '%s' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+          echo "::error::could not resolve a multi-arch index digest for $FLYWAY_REF (got: '$DIGEST')"
+          exit 1
+        fi
+        PINNED="${FLYWAY_REF}@${DIGEST}"
         echo "Flyway pinned: $PINNED"
-        awk -v img="$PINNED" '{ if ($0 ~ /^[[:space:]]*image:[[:space:]]+flyway\/flyway:/) print "          image: " img; else print }' k8s/flyway-migrate-job.yaml > k8s/flyway-migrate-job.yaml.tmp && mv k8s/flyway-migrate-job.yaml.tmp k8s/flyway-migrate-job.yaml
-        grep -q "@sha256:" k8s/flyway-migrate-job.yaml
+        awk -v img="$PINNED" '{ if ($0 ~ /^[[:space:]]*image:[[:space:]]+flyway\/flyway/) print "          image: " img; else print }' k8s/flyway-migrate-job.yaml > k8s/flyway-migrate-job.yaml.tmp && mv k8s/flyway-migrate-job.yaml.tmp k8s/flyway-migrate-job.yaml
+        grep -q "flyway/flyway:${FLYWAY_VERSION}-alpine@sha256:" k8s/flyway-migrate-job.yaml
         echo "$PINNED" > k8s/.flyway-digest
 
     - name: Pin manifest to digest

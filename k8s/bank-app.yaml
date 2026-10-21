@@ -37,19 +37,25 @@ spec:
           labelSelector:
             matchLabels:
               app: bank-app
+      # The application never talks to the Kubernetes API.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: bank-app
-          # Release pin: replaced with registry@sha256:digest by
-          # scripts/pin-image-digest.sh (or the release workflow).
-          # The default below is the versioned tag — never :latest, so an
-          # unpinned apply cannot silently roll to a mutable tag (K9/D7).
-          # CI fails if `bank-app:latest` reappears (see ci.yml guard).
-          image: bank-app:0.0.1
+          # DEV PLACEHOLDER ONLY. This tag is not published anywhere, so an
+          # unpinned production apply fails closed (ImagePullBackOff) instead
+          # of silently running a mutable tag. The release workflow replaces
+          # this line with registry@sha256:digest via steps.push.outputs.digest
+          # (manual equivalent: scripts/pin-image-digest.sh). The manifest
+          # contract in scripts/check_k8s_manifest_contract.py accepts only
+          # this literal or a digest-pinned reference (K9/D7).
+          image: bank-app:dev-local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

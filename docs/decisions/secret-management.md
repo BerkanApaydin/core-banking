@@ -23,8 +23,12 @@ without them:
   `JwtTokenProvider.DEFAULT_JWT_SECRET`, loopback-bound ports only), which
   production refuses twice at startup;
 - `.gitleaks.toml` + the `secret-scan` CI job reject new hardcoded
-  secrets; the single allowlisted value is the non-secret dev placeholder
-  string (anchored, cannot match inside a real secret).
+  secrets; the allowlisted entries are the documented non-secret dev
+  placeholders (the Base64 marker and its decoded
+  `dev-only-NOT-FOR-PROD…` text), delimited so they cannot match inside a
+  longer real key. `scripts/check_compose_jwt_default.py` fails CI if the
+  marker drifts between the code constant, `application-dev.yml`,
+  `docker-compose.yml` and the allowlist.
 
 ## Demo seed credentials (R-C06)
 
@@ -80,6 +84,6 @@ For any deployment beyond staging:
 
 ## 2026-10 dev-default rotation (O-1)
 
-The former DEFAULT_JWT_SECRET value appeared in git history and therefore counts as compromised. It was replaced with a freshly generated 256-bit Base64 value in JwtTokenProvider.DEFAULT_JWT_SECRET + the docker-compose.yml dev default (kept equal by scripts/check_compose_jwt_default.py, which fails CI on drift). Prod behavior is unchanged: the new value is refused exactly like the old one (llow-default-secret: false + ApplicationStartupValidator).
+The former DEFAULT_JWT_SECRET value appeared in git history and therefore counts as compromised. It was replaced with a deliberately non-secret, zero-entropy marker: the Base64 value `ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=` (decodes to `dev-only-NOT-FOR-PROD-0000000000`, exactly 32 bytes, R-O07). The same literal is used in `JwtTokenProvider.DEFAULT_JWT_SECRET`, `application-dev.yml` and `docker-compose.yml`; `scripts/check_compose_jwt_default.py` fails CI if the three drift or if the value stops being a documented `NOT-FOR-PROD` marker, and `.gitleaks.toml` allowlists both forms. Prod behavior is unchanged: the marker is refused twice (`allow-default-secret: false` + `ApplicationStartupValidator`).
 
 History still contains the old value: treat any pre-rotation token signed with it as compromised (short TTL bounds the exposure) and, for full hygiene, rewrite history with git filter-repo or rotate the repository if the history was ever pushed to an untrusted remote. New hardcoded secrets remain rejected by gitleaks + the secret-scan CI job.

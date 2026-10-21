@@ -56,6 +56,30 @@ V9, V10, V12, V14, V24, V28, V30, V32, V36, V38, V39, V46, V53, V54, V56,
 V60) are grandfathered in the script — applied checksums are frozen and must
 not be edited.
 
+## Immutability vs. audit findings (R-O03/R-O04)
+
+Two audit findings propose editing already-merged migrations: add
+`lock_timeout` to V28, and squash the V46/V48 projection churn. Both
+observations are correct, but the proposed edits are rejected. V28, V32 and
+V46 are in `GRANDFATHERED` because Flyway `validate-on-migrate` freezes their
+checksums; editing them breaks every existing database and provides no runtime
+benefit (fresh databases run the same statements either way). The accepted
+debt is recorded here and covered by the forward-looking controls:
+
+- `SET LOCAL lock_timeout = '30s'` is required before every table rewrite in
+  a non-grandfathered migration (`scripts/check_migration_timeouts.py`);
+- the Flyway Job sets `lock_timeout=30s` as a session default in its JDBC URL,
+  so even a grandfathered rewrite (V28 on a fresh database) fails fast instead
+  of wedging the rollout;
+- large index builds stay in `scripts/create_index_concurrently.sql`;
+- new work follows the net-zero rule below.
+
+**Net-zero rule (R-O04):** within one unreleased batch, never create a
+projection/relation in one migration and drop it in a later migration of the
+same batch. If the change is already merged, leave it immutable and remove
+the dead object in a forward migration (V48 follows this). Squashing is only
+allowed before merge, never after a checksum has been applied.
+
 ## Long-term split plan (not yet executed — deliberate)
 
 1. Group the existing files by owner header (backfill headers in one

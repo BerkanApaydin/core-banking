@@ -47,11 +47,14 @@ spec:
         - protocol: TCP
           port: 8080
   egress:
-    # Cluster DNS.
+    # Cluster DNS. TCP 53 is required for truncated UDP answers (large
+    # responses / DNSSEC) and is also used by some DNS implementations.
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: UDP
+          port: 53
+        - protocol: TCP
           port: 53
     # PostgreSQL.
     - to:

@@ -1,16 +1,22 @@
 # Flyway migration gate: runs BEFORE the application Deployment rolls out, so
 # schema changes never race application startup across replicas.
 #
-# Supply chain (O-7): the image below floats on flyway/flyway:11-alpine in git
-# for dev convenience; the release workflow resolves and pins the DEPLOYED
-# manifest (and k8s/.flyway-digest) to @sha256. Never hand-edit a digest here.
+# Supply chain (O-7/R-O05): the image is pinned to the Flyway version declared
+# in pom.xml (<flyway.version>, kept aligned with the Maven driver) plus the
+# multi-arch index digest. The release workflow re-resolves that exact version
+# and rewrites the digest; never hand-edit the version independently of pom.xml.
 #
 # Operator setup (once per release — migrations live in
 # migrations/src/main/resources/db/migration):
 #   kubectl create configmap bank-flyway-migrations \
 #     --from-file=migrations/src/main/resources/db/migration \
 #     --dry-run=client -o yaml | kubectl apply -f -
-# Then apply this file; wait for the Job to succeed before rolling the app:
+#
+# Job specs are immutable and the name is fixed so the wait below works.
+# ttlSecondsAfterFinished is intentionally NOT set: a retained completed Job is
+# audit evidence, and a silent TTL deletion must never race the next release.
+# Delete the previous run (from the last release) before applying:
+#   kubectl delete job bank-flyway-migrate --ignore-not-found
 #   kubectl apply -f k8s/flyway-migrate-job.yaml
 #   kubectl wait --for=condition=complete job/bank-flyway-migrate --timeout=300s
 #
@@ -28,24 +34,32 @@ metadata:
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 600
-  ttlSecondsAfterFinished: 86400
   template:
     metadata:
       labels:
         app: bank-app
         purpose: db-migration
     spec:
+      # Migrations need PostgreSQL/DNS only, never the Kubernetes API.
+      automountServiceAccountToken: false
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: flyway
-          image: flyway/flyway:11-alpine
+          image: flyway/flyway:11.7.2-alpine@sha256:a493a5ef0700f6d1ef4f7b83320f79601071b20749c2eca1d73dd2e352948656
           args:
-            - -url=jdbc:postgresql://postgres:5432/bank_db
+            # R-O03: V28/V32/V46 predate the lock_timeout rule and cannot be
+            # edited (Flyway checksums are frozen). Set the session default for
+            # the whole run so any table rewrite — including V28 on a fresh
+            # database — fails fast after 30s of lock wait instead of wedging
+            # the rollout. New migrations still add SET LOCAL lock_timeout.
+            - -url=jdbc:postgresql://postgres:5432/bank_db?options=-c%20lock_timeout%3D30s
             - -user=$(FLYWAY_USER)
             - -locations=filesystem:/flyway/sql
             - migrate
@@ -64,6 +78,9 @@ spec:
             - name: migrations
               mountPath: /flyway/sql
               readOnly: true
+            # The JVM/Flyway may need a writable temp dir; the root FS is read-only.
+            - name: tmp-volume
+              mountPath: /tmp
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -74,3 +91,5 @@ spec:
         - name: migrations
           configMap:
             name: bank-flyway-migrations
+        - name: tmp-volume
+          emptyDir: {}

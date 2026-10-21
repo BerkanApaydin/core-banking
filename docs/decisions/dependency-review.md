@@ -1,7 +1,8 @@
 # Dependency Review (OSV Gate + Accepted Risks)
 
-**Gate:** `scripts/dependency_review.py` reads `target/bom.json` (CycloneDX),
-queries OSV for all 158 libraries, and fails on HIGH/CRITICAL — same bar as
+**Gate:** `scripts/dependency_review.py` reads `app/target/bom.json` (the
+aggregate CycloneDX SBOM CI generates; a root `target/bom.json` is kept only
+as a fallback), queries OSV for all 158 libraries, and fails on HIGH/CRITICAL — same bar as
 CI's `dependency-review-action` (fail-on-severity: high). 2026-10 run: 11 of
 13 HIGH/CRITICAL findings closed by patch bumps
 (`jackson-bom 2.21.7`, `tomcat 10.1.59`, `netty-bom 4.1.137.Final`,

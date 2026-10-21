@@ -15,9 +15,10 @@ app:
 jwt:
   # Dev-only insecure fallback: never use in prod. Prod has no default and
   # fails fast when JWT_SECRET is unset (see application.yml / prod yml).
-  # The fallback is a valid 256-bit Base64 value (decodes to the ASCII
-  # 'dev-only-NOT-FOR-PROD-0000000000') so a missing JWT_SECRET fails with a
-  # clear prod-guard message instead of a raw Base64 DecodingException.
-  # If this fallback value ever leaks, rotate it.
+  # This is NOT a secret: it is a zero-entropy Base64 marker that decodes to
+  # 'dev-only-NOT-FOR-PROD-0000000000' (32 bytes). It is kept byte-for-byte
+  # equal to JwtTokenProvider.DEFAULT_JWT_SECRET and docker-compose.yml by
+  # scripts/check_compose_jwt_default.py; .gitleaks.toml allowlists it. Prod
+  # refuses exactly this value twice, so it can never be used as a real key.
   secret: ${JWT_SECRET:ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=}
   allow-default-secret: true
