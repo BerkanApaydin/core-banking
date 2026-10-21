@@ -2,14 +2,19 @@ package com.bank.app.user.domain.exception;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.common.domain.exception.CommitOnFailure;
 import com.bank.app.common.messages.MessageKeys;
 
 /**
  * A rotated (already replaced) refresh token was presented again: probable
  * token theft. The whole token family is revoked as the response; the client
  * must re-authenticate with credentials.
+ *
+ * <p>{@link CommitOnFailure}: the family revoke happens before this exception
+ * is thrown, so the use-case transaction must commit rather than roll back —
+ * otherwise the theft response would be undone.
  */
-public class RefreshTokenReuseException extends BusinessException {
+public class RefreshTokenReuseException extends BusinessException implements CommitOnFailure {
     private static final long serialVersionUID = 1L;
 
     @Override

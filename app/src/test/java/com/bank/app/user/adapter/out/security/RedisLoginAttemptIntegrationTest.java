@@ -156,6 +156,25 @@ class RedisLoginAttemptIntegrationTest {
     }
 
     @Test
+    void shouldResetOnlyTheExactAccountWhenItsNameContainsGlobMetacharacters() {
+        // R-T07: usernames are user input used inside a Redis SCAN pattern.
+        // Without escaping, "*" widens the pattern to every account_ip bucket
+        // and "[a]lpha" would also match "alpha".
+        adapter.recordFailure("10.0.3.1", "alpha");
+        adapter.recordFailure("10.0.3.2", "*");
+        adapter.recordFailure("10.0.3.3", "[a]lpha");
+
+        adapter.resetByUsername("*");
+        adapter.resetByUsername("[a]lpha");
+
+        assertThat(redisTemplate.hasKey("login_attempt:account_ip:*|10.0.3.2")).isFalse();
+        assertThat(redisTemplate.hasKey("login_attempt:account_ip:[a]lpha|10.0.3.3")).isFalse();
+        // The lookalike/literal-expansion keys are untouched.
+        assertThat(redisTemplate.hasKey("login_attempt:account_ip:alpha|10.0.3.1")).isTrue();
+        assertThat(redisTemplate.hasKey("login_attempt:user:alpha")).isTrue();
+    }
+
+    @Test
     void shouldNotPartiallyUpdateIpCounterWhenUsernameCounterIsCorrupt() {
         String ipKey = "login_attempt:ip:10.0.0.9";
         String userKey = "login_attempt:user:corrupt_user";

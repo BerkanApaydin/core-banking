@@ -205,10 +205,17 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
                 .andReturn();
 
         List<String> setCookies = login.getResponse().getHeaders("Set-Cookie");
-        Cookie csrf = fromSetCookie(setCookies.stream()
-                .filter(s -> s.startsWith("BANK_CSRF=")).findFirst().orElseThrow());
+        String loginCsrfHeader = setCookies.stream()
+                .filter(s -> s.startsWith("BANK_CSRF=")).findFirst().orElseThrow();
+        Cookie csrf = fromSetCookie(loginCsrfHeader);
         Cookie firstRefresh = fromSetCookie(setCookies.stream()
                 .filter(s -> s.startsWith("BANK_REFRESH=")).findFirst().orElseThrow());
+        // R-T03: the CSRF cookie must outlive the 15-minute access token
+        // (refresh is the only endpoint that can rotate an expired session)
+        // and the session cookie stays short-lived.
+        assertTrue(loginCsrfHeader.contains("Max-Age=604800"));
+        assertTrue(setCookies.stream().filter(s -> s.startsWith("BANK_SESSION="))
+                .findFirst().orElseThrow().contains("Max-Age=900"));
 
         // Rotate with CSRF header: fresh session + fresh refresh cookie.
         MvcResult rotated = mockMvc.perform(post("/api/v1/auth/browser/refresh")
@@ -220,18 +227,38 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         List<String> rotatedCookies = rotated.getResponse().getHeaders("Set-Cookie");
         Cookie secondRefresh = fromSetCookie(rotatedCookies.stream()
                 .filter(s -> s.startsWith("BANK_REFRESH=")).findFirst().orElseThrow());
+        Cookie rotatedCsrf = fromSetCookie(rotatedCookies.stream()
+                .filter(s -> s.startsWith("BANK_CSRF=")).findFirst().orElseThrow());
         assertNotEquals(firstRefresh.getValue(), secondRefresh.getValue());
+        // R-T03: every rotation reissues the CSRF credential, so a client that
+        // rotated after access expiry always holds a fresh pair.
+        assertNotEquals(csrf.getValue(), rotatedCsrf.getValue());
+
+        // A second rotation with the newly issued pair proves the refreshed
+        // CSRF works beyond the access-token lifetime (15 minutes in prod).
+        MvcResult rotatedAgain = mockMvc.perform(post("/api/v1/auth/browser/refresh")
+                        .cookie(secondRefresh, rotatedCsrf)
+                        .header(BrowserSessionCookies.CSRF_HEADER, rotatedCsrf.getValue()))
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie thirdRefresh = fromSetCookie(rotatedAgain.getResponse().getHeaders("Set-Cookie").stream()
+                .filter(s -> s.startsWith("BANK_REFRESH=")).findFirst().orElseThrow());
+        assertNotEquals(secondRefresh.getValue(), thirdRefresh.getValue());
 
         // Replaying the rotated token is reuse: 401 and the family dies.
         mockMvc.perform(post("/api/v1/auth/browser/refresh")
-                        .cookie(firstRefresh, csrf)
-                        .header(BrowserSessionCookies.CSRF_HEADER, csrf.getValue()))
+                        .cookie(firstRefresh, rotatedCsrf)
+                        .header(BrowserSessionCookies.CSRF_HEADER, rotatedCsrf.getValue()))
                 .andExpect(status().isUnauthorized());
 
-        // The replacement died with its family too.
+        // Both replacements died with the family.
         mockMvc.perform(post("/api/v1/auth/browser/refresh")
-                        .cookie(secondRefresh, csrf)
-                        .header(BrowserSessionCookies.CSRF_HEADER, csrf.getValue()))
+                        .cookie(secondRefresh, rotatedCsrf)
+                        .header(BrowserSessionCookies.CSRF_HEADER, rotatedCsrf.getValue()))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/auth/browser/refresh")
+                        .cookie(thirdRefresh, rotatedCsrf)
+                        .header(BrowserSessionCookies.CSRF_HEADER, rotatedCsrf.getValue()))
                 .andExpect(status().isUnauthorized());
     }
 

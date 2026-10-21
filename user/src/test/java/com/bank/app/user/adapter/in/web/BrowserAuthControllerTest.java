@@ -75,6 +75,18 @@ class BrowserAuthControllerTest {
         return request;
     }
 
+    private BrowserAuthController secureController() {
+        return new BrowserAuthController(loginUserUseCase, logoutUseCase,
+                refreshSessionUseCase, clientIpResolver, csrfBinding, jwtPort,
+                userContextService, new BrowserSessionProperties(true),
+                new SessionTokenLifetimeProperties(900000L, 604800000L));
+    }
+
+    private static String cookieHeader(List<String> headers, String prefix) {
+        return headers.stream().filter(header -> header.startsWith(prefix))
+                .findFirst().orElseThrow();
+    }
+
     @Test
     void loginSetsThreeCookiesAndReturnsPrincipal() {
         when(clientIpResolver.resolveClientIp(any(), any())).thenReturn("10.0.0.1");
@@ -93,6 +105,64 @@ class BrowserAuthControllerTest {
         assertThat(response.getHeaderValues("Set-Cookie")).hasSize(3);
         assertThat(response.getHeader("Cache-Control")).contains("no-store");
         verify(csrfBinding).issueCsrfToken("7");
+    }
+
+    @Test
+    void loginIssuesHostPrefixedSecureCookiesWithScopedLifetimes() {
+        // R-T02: the production (secure) cookie contract — __Host- session and
+        // CSRF names, __Secure- path-scoped refresh name, Secure on all three,
+        // HttpOnly on everything except the JS-readable CSRF cookie.
+        when(clientIpResolver.resolveClientIp(any(), any())).thenReturn("10.0.0.1");
+        when(loginUserUseCase.execute(any(AuthRequest.class), eq("10.0.0.1")))
+                .thenReturn(new AuthResponse("access", "refresh", 7L, "alice", 900000L));
+        when(csrfBinding.issueCsrfToken("7")).thenReturn("csrf-1");
+        MockHttpServletResponse secureResponse = new MockHttpServletResponse();
+
+        secureController().login(new AuthWebRequest("alice", "Secret123456"),
+                new MockHttpServletRequest(), secureResponse);
+
+        List<String> headers = secureResponse.getHeaders("Set-Cookie");
+        assertThat(headers).hasSize(3);
+        String session = cookieHeader(headers, "__Host-BANK_SESSION=");
+        String refresh = cookieHeader(headers, "__Secure-BANK_REFRESH=");
+        String csrf = cookieHeader(headers, "__Host-BANK_CSRF=");
+        assertThat(session).contains("__Host-BANK_SESSION=access", "Secure", "HttpOnly",
+                "SameSite=Strict", "Path=/", "Max-Age=900");
+        assertThat(refresh).contains("__Secure-BANK_REFRESH=refresh", "Secure", "HttpOnly",
+                "SameSite=Strict", "Path=/api/v1/auth/browser", "Max-Age=604800");
+        assertThat(csrf).contains("__Host-BANK_CSRF=csrf-1", "Secure", "SameSite=Strict",
+                "Path=/", "Max-Age=604800");
+        assertThat(csrf).doesNotContain("HttpOnly");
+    }
+
+    @Test
+    void refreshReissuesFreshCsrfCookieWithRefreshLifetimeInSecureMode() {
+        // R-T03: after the 15-minute access token expires, the refresh call
+        // must still have a valid CSRF pair (cookie lifetime = refresh
+        // lifetime) and must rotate the value for the next rotation.
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("__Host-BANK_CSRF", "old-csrf"),
+                new Cookie("__Secure-BANK_REFRESH", "rt"));
+        request.addHeader("X-CSRF-Token", "old-csrf");
+        when(jwtPort.verifyAndDecode("rt"))
+                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
+        when(csrfBinding.verifyCsrfToken("old-csrf", "old-csrf", "7")).thenReturn(true);
+        when(csrfBinding.issueCsrfToken("7")).thenReturn("new-csrf");
+        when(refreshSessionUseCase.execute("rt"))
+                .thenReturn(new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
+        MockHttpServletResponse secureResponse = new MockHttpServletResponse();
+
+        ResponseEntity<?> result = secureController().refresh(request, secureResponse);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> headers = secureResponse.getHeaders("Set-Cookie");
+        assertThat(headers).hasSize(3);
+        assertThat(cookieHeader(headers, "__Host-BANK_SESSION=new-access"))
+                .contains("Max-Age=900");
+        assertThat(cookieHeader(headers, "__Secure-BANK_REFRESH=new-refresh"))
+                .contains("Max-Age=604800");
+        assertThat(cookieHeader(headers, "__Host-BANK_CSRF=new-csrf"))
+                .contains("Max-Age=604800").doesNotContain("HttpOnly");
     }
 
     @Test

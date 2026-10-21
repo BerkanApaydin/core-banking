@@ -86,7 +86,7 @@ class RefreshSessionUseCaseImplTest {
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
         when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
-        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(freshUser()));
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(freshUser()));
         when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
         when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
         when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
@@ -174,7 +174,7 @@ class RefreshSessionUseCaseImplTest {
         assertThatThrownBy(() -> useCase.execute(REFRESH))
                 .isExactlyInstanceOf(AuthenticationFailedException.class);
 
-        verify(refreshTokenPort, never()).revokeFamily(anyString());
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
     }
 
     @Test
@@ -190,7 +190,7 @@ class RefreshSessionUseCaseImplTest {
         assertThatThrownBy(() -> useCase.execute(REFRESH))
                 .isExactlyInstanceOf(RefreshTokenReuseException.class);
 
-        verify(refreshTokenPort).revokeFamily("family-1");
+        verify(refreshTokenPort).revokeFamily("family-1", 7L);
         verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
     }
 
@@ -206,7 +206,7 @@ class RefreshSessionUseCaseImplTest {
         when(refreshTokenPort.findByTokenHash(HASH))
                 .thenReturn(Optional.of(stored()))
                 .thenReturn(Optional.of(rotated));
-        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(freshUser()));
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(freshUser()));
         when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
         when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
         when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
@@ -216,7 +216,7 @@ class RefreshSessionUseCaseImplTest {
         assertThatThrownBy(() -> useCase.execute(REFRESH))
                 .isExactlyInstanceOf(RefreshTokenReuseException.class);
 
-        verify(refreshTokenPort).revokeFamily("family-1");
+        verify(refreshTokenPort).revokeFamily("family-1", 7L);
         verify(refreshTokenPort, never()).save(anyString(), anyLong(), anyString(), any());
     }
 
@@ -273,7 +273,7 @@ class RefreshSessionUseCaseImplTest {
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
-        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(versionedUser(4L)));
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(versionedUser(4L)));
         when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(4L);
         when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 4L)).thenReturn("new-refresh");
         when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 4L)).thenReturn("new-access");
@@ -293,7 +293,7 @@ class RefreshSessionUseCaseImplTest {
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
-        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.of(versionedUser(2L)));
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(versionedUser(2L)));
         when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(1L);
 
         assertThatThrownBy(() -> useCase.execute(REFRESH))
@@ -317,7 +317,7 @@ class RefreshSessionUseCaseImplTest {
         when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
         when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
-        when(loadUserPort.findByUsername("alice")).thenReturn(Optional.empty());
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.execute(REFRESH))
                 .isExactlyInstanceOf(AuthenticationFailedException.class);

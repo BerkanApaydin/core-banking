@@ -317,4 +317,46 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         // Factor gone: plain login works again.
         login("mfa_carol", "My_passw0rd12", null);
     }
+
+    @Test
+    @DisplayName("R-T12: wrong MFA disable passwords share the account lockout budget")
+    void wrongDisablePasswordIsRateLimited() throws Exception {
+        register("mfa_carol", "My_passw0rd12");
+        String token = login("mfa_carol", "My_passw0rd12", null);
+        MvcResult enrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String base32 = objectMapper.readTree(enrollment.getResponse().getContentAsString())
+                .get("base32Secret").asText();
+        mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
+                .andExpect(status().isNoContent());
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/v1/auth/mfa/disable")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\": \"Wrong_passw0rd99\", \"code\": \""
+                                    + currentCode(base32) + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("MFA_CODE_INVALID"));
+        }
+
+        // The sixth call is rejected by the shared budget before the password
+        // is checked — even with both correct factors.
+        mockMvc.perform(post("/api/v1/auth/mfa/disable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_FAILED_MFA_ATTEMPTS"));
+        assertThat(userRepository.findByUsername("mfa_carol").orElseThrow().isMfaEnabled()).isTrue();
+    }
 }

@@ -133,7 +133,7 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
 
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
-        verify(refreshTokenPort).revokeFamily("family-1");
+        verify(refreshTokenPort).revokeFamily("family-1", 7L);
         verify(refreshTokenPort, never()).revoke(anyString());
     }
 
@@ -150,7 +150,7 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
 
         InOrder order = inOrder(refreshTokenPort, tokenBlacklistPort);
-        order.verify(refreshTokenPort).revokeFamily("family-1");
+        order.verify(refreshTokenPort).revokeFamily("family-1", 7L);
         order.verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
     }
 
@@ -180,7 +180,7 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute("Bearer valid-jwt-token", "unknown");
 
         verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("unknown"));
-        verify(refreshTokenPort, never()).revokeFamily(anyString());
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
     }
 
     @Test
@@ -244,7 +244,7 @@ class LogoutUseCaseImplTest {
 
         logoutUseCase.execute("Basic token123", "refresh-9");
 
-        verify(refreshTokenPort).revokeFamily("family-9");
+        verify(refreshTokenPort).revokeFamily("family-9", 7L);
         verifyNoInteractions(tokenBlacklistPort);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditEventPort).publish(auditCaptor.capture());

@@ -13,6 +13,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.bank.app.common.domain.exception.CommitOnFailure;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 
@@ -118,6 +119,20 @@ public class UseCaseTransactionAspect {
         try {
             result = joinPoint.proceed();
         } catch (Throwable ex) {
+            // CommitOnFailure: the exception reports a completed security
+            // response whose DB side effects must survive (for example a
+            // refresh-token theft response that revoked the family before
+            // returning 401). Any other failure rolls back as usual, so an
+            // audit-store outage after the revoke still aborts it.
+            if (ex instanceof CommitOnFailure) {
+                try {
+                    transactionManager.commit(status);
+                } catch (Throwable commitFailure) {
+                    commitFailure.addSuppressed(ex);
+                    throw commitFailure;
+                }
+                throw ex;
+            }
             try {
                 transactionManager.rollback(status);
             } catch (Throwable rollbackFailure) {

@@ -86,7 +86,7 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         }
         if (stored.replacedByHash() != null) {
             // Reuse of a rotated token: probable theft. Kill the family.
-            revokeFamilyWithAudit(stored.familyId(), verified,
+            revokeFamilyWithAudit(stored.familyId(), stored.userId(), verified,
                     "Refresh token reuse detected; token family revoked.",
                     "Refresh token reuse detected: family revoked");
             throw new RefreshTokenReuseException();
@@ -106,7 +106,12 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         // rejected here and the client must re-authenticate. Access tokens
         // stay valid until their (short) expiry — the residual window is
         // bounded by the access lifetime, by design.
-        User user = loadUserPort.findByUsername(verified.username())
+        //
+        // R-T10: the row is locked for the rest of this transaction so a
+        // concurrent logout/theft-revoke (which locks the same user row before
+        // its family UPDATE) cannot scan the family before this rotation's
+        // successor is committed.
+        User user = loadUserPort.findByUsernameForUpdate(verified.username())
                 .orElseThrow(() -> new AuthenticationFailedException("Invalid refresh token."));
         long tokenVersion = jwtPort.extractTokenVersion(refreshToken);
         if (tokenVersion != user.getTokenVersion()) {
@@ -137,7 +142,7 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
             // applies. Anything else is a stale/unknown token.
             StoredRefresh current = refreshTokenPort.findByTokenHash(hash).orElse(null);
             if (current != null && current.revoked() && current.replacedByHash() != null) {
-                revokeFamilyWithAudit(stored.familyId(), verified,
+                revokeFamilyWithAudit(stored.familyId(), stored.userId(), verified,
                         "Refresh token reuse detected; token family revoked.",
                         "Refresh token reuse detected: family revoked");
                 throw new RefreshTokenReuseException();
@@ -151,12 +156,14 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
                 verified.username(), jwtPort.getExpirationMs());
     }
 
-    private void revokeFamilyWithAudit(String familyId, JwtPort.VerifiedToken verified,
-            String auditDetails, String logMessage) {
-        refreshTokenPort.revokeFamily(familyId);
+    private void revokeFamilyWithAudit(String familyId, Long userId,
+            JwtPort.VerifiedToken verified, String auditDetails, String logMessage) {
+        refreshTokenPort.revokeFamily(familyId, userId);
         // Theft response joins this transaction (K11/D4): if the audit
         // write fails, the family revocation rolls back with it — a
-        // half-revoked family with no audit trail is worse than retry.
+        // half-revoked family with no audit trail is worse than retry. The
+        // RefreshTokenReuseException thrown next is a CommitOnFailure marker,
+        // so the revoke + audit commit even though the caller receives 401.
         auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED, auditDetails,
                 LocalDateTime.now(clockProvider.clock()), verified.username(),
                 verified.userId()));

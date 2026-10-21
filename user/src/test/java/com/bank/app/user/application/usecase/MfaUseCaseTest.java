@@ -335,6 +335,25 @@ class MfaUseCaseTest {
             verify(auditEventPort).publish(argThat(event ->
                     AuditEvent.MFA_REAUTH_FAILED.equals(event.action())));
         }
+
+        @Test
+        @DisplayName("R-T12: should reject before password verification when the attempt budget is exhausted")
+        void shouldRejectWhenAttemptBudgetExhausted() {
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(mfaAttemptPort.isBlocked(7L)).thenReturn(true);
+            when(mfaAttemptPort.getWindowMinutes()).thenReturn(15);
+
+            assertThatThrownBy(() -> disable.execute(7L, "Secret123", "123456"))
+                    .isInstanceOf(TooManyFailedMfaAttemptsException.class);
+
+            verify(authenticationPort, never()).authenticate(any(), any());
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
+            verify(saveUserPort, never()).save(any());
+            verify(mfaSecretPort, never()).deleteSecret(any());
+            verify(refreshTokenPort, never()).revokeAllForUser(anyLong());
+        }
     }
 
     @Test

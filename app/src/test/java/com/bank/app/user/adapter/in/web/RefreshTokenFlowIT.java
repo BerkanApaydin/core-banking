@@ -210,4 +210,28 @@ class RefreshTokenFlowIT extends AbstractSpringBootIntegrationTest {
                                 Map.of("refreshToken", pair.get("refreshToken").asText()))))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void shouldRevokeWholeFamilyOnLogoutWithAlreadyRotatedToken() throws Exception {
+        JsonNode pair = login(username());
+        String firstRefresh = pair.get("refreshToken").asText();
+        String secondRefresh = refresh(firstRefresh);
+
+        // The browser may still hold the rotated token after a failed refresh.
+        // Logging out with it must revoke the family, including the successor
+        // the rotation already issued — otherwise the replacement survives
+        // logout for its full lifetime (R-T04).
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + pair.get("token").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                Map.of("refreshToken", firstRefresh))))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                Map.of("refreshToken", secondRefresh))))
+                .andExpect(status().isUnauthorized());
+    }
 }

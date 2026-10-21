@@ -97,7 +97,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         String hash = TokenDigest.sha256Hex(refreshToken);
         StoredRefresh stored = refreshTokenPort.findByTokenHash(hash).orElse(null);
         if (stored != null) {
-            refreshTokenPort.revokeFamily(stored.familyId());
+            refreshTokenPort.revokeFamily(stored.familyId(), stored.userId());
             return;
         }
         refreshTokenPort.revoke(hash);

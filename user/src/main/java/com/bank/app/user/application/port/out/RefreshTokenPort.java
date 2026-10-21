@@ -23,8 +23,15 @@ public interface RefreshTokenPort {
     /** Revokes a single session (logout); unknown hashes are ignored. */
     void revoke(String tokenHash);
 
-    /** Revokes every session of a family (theft response, logout-all). */
-    void revokeFamily(String familyId);
+    /**
+     * Revokes every session of a family (theft response, logout). The owning
+     * user row is locked first so a concurrent rotation — which takes the same
+     * lock before retiring the presented token — cannot commit a successor
+     * after this revoke has already scanned the family. Without that
+     * serialization a logout racing a refresh could leave the freshly issued
+     * refresh token alive.
+     */
+    void revokeFamily(String familyId, Long userId);
 
     /** Revokes every session belonging to a user (MFA policy change). */
     void revokeAllForUser(Long userId);

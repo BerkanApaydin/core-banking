@@ -16,6 +16,7 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.support.DefaultTransactionStatus;
+import com.bank.app.common.domain.exception.CommitOnFailure;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,6 +110,39 @@ class UseCaseTransactionAspectTest {
         assertEquals("test error", ex.getMessage());
         verify(transactionManager).rollback(transactionStatus);
         verify(transactionManager, never()).commit(any());
+    }
+
+    @Test
+    void shouldCommitWhenTheFailureIsACommittedSecurityResponse() throws Throwable {
+        stubTransaction();
+        CommittedResponseFailure failure = new CommittedResponseFailure();
+        when(joinPoint.proceed()).thenThrow(failure);
+
+        CommittedResponseFailure thrown = assertThrows(CommittedResponseFailure.class,
+                () -> aspect.around(joinPoint));
+
+        assertEquals(failure, thrown);
+        verify(transactionManager).commit(transactionStatus);
+        verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void shouldRollbackWhenCommitOnFailureCommitItselfFails() throws Throwable {
+        stubTransaction();
+        CommittedResponseFailure failure = new CommittedResponseFailure();
+        when(joinPoint.proceed()).thenThrow(failure);
+        doThrow(new TransactionSystemException("commit failed"))
+                .when(transactionManager).commit(transactionStatus);
+
+        TransactionSystemException thrown = assertThrows(TransactionSystemException.class,
+                () -> aspect.around(joinPoint));
+
+        assertEquals("commit failed", thrown.getMessage());
+        assertEquals(failure, thrown.getSuppressed()[0]);
+    }
+
+    private static final class CommittedResponseFailure extends RuntimeException
+            implements CommitOnFailure {
     }
 
     @Test

@@ -15,11 +15,14 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     private static final int BULK_TX_TIMEOUT_SECONDS = 30;
 
     private final RefreshTokenJpaRepository repository;
+    private final UserJpaRepository userRepository;
     private final TransactionBoundaryPort transactionBoundary;
 
     public RefreshTokenPersistenceAdapter(RefreshTokenJpaRepository repository,
+            UserJpaRepository userRepository,
             TransactionBoundaryPort transactionBoundary) {
         this.repository = repository;
+        this.userRepository = userRepository;
         this.transactionBoundary = transactionBoundary;
     }
 
@@ -95,17 +98,37 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     }
 
     @Override
-    public void revokeFamily(String familyId) {
+    public void revokeFamily(String familyId, Long userId) {
         Objects.requireNonNull(familyId, "Family ID must not be null");
-        // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips. A
-        // dedicated transaction keeps the logout path (intentionally not
-        // transactional: blacklist/audit are not DB work) working.
+        Objects.requireNonNull(userId, "User ID must not be null");
+        // P-2: single bulk UPDATE — no SELECT + N UPDATE round trips. The
+        // logout path is intentionally not transactional, so it still gets a
+        // dedicated transaction; the refresh/reuse path already runs inside
+        // one and joins it (K11/D4: a failed audit must roll the revoke back
+        // instead of deadlocking on a nested REQUIRES_NEW).
         try {
+            if (transactionBoundary.isTransactionActive()) {
+                revokeFamilyLockingUser(familyId, userId);
+                return;
+            }
             transactionBoundary.executeRequiresNew(
-                    () -> repository.revokeFamilyBulk(familyId), BULK_TX_TIMEOUT_SECONDS);
+                    () -> revokeFamilyLockingUser(familyId, userId), BULK_TX_TIMEOUT_SECONDS);
         } catch (DataAccessException e) {
             throw new AuthenticationBackendUnavailableException(e);
         }
+    }
+
+    /**
+     * R-T10: serialize family revocation against rotation on the user row.
+     * Both this method and the rotation path lock the same user row before
+     * touching refresh rows, so a rotation either commits its successor
+     * before this scan (and that successor is revoked too) or waits and then
+     * fails on the already-revoked token. Lock ordering is always
+     * user row -> refresh rows, so no deadlock is possible.
+     */
+    private int revokeFamilyLockingUser(String familyId, Long userId) {
+        userRepository.findByIdForUpdate(userId);
+        return repository.revokeFamilyBulk(familyId);
     }
 
     @Override

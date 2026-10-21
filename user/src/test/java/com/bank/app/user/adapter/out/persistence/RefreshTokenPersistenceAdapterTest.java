@@ -30,6 +30,9 @@ class RefreshTokenPersistenceAdapterTest {
     private RefreshTokenJpaRepository repository;
 
     @Mock
+    private UserJpaRepository userRepository;
+
+    @Mock
     private TransactionBoundaryPort transactionBoundary;
 
     @InjectMocks
@@ -90,16 +93,35 @@ class RefreshTokenPersistenceAdapterTest {
     }
 
     @Test
-    void shouldRevokeFamily() {
+    void shouldRevokeFamilyInDedicatedTransactionWhenNoneIsActive() {
         // P-2: single bulk UPDATE instead of SELECT + N UPDATE.
         when(transactionBoundary.executeRequiresNew(any(), anyInt()))
                 .thenAnswer(invocation -> invocation.<java.util.function.Supplier<Integer>>getArgument(0).get());
         when(repository.revokeFamilyBulk("family-1")).thenReturn(2);
 
-        adapter.revokeFamily("family-1");
+        adapter.revokeFamily("family-1", 7L);
 
-        verify(repository).revokeFamilyBulk("family-1");
+        // R-T10: the owning user row is locked before the family scan so a
+        // concurrent rotation cannot commit a successor behind it.
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(userRepository, repository);
+        order.verify(userRepository).findByIdForUpdate(7L);
+        order.verify(repository).revokeFamilyBulk("family-1");
         verify(repository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldJoinExistingTransactionAndLockUserWhenOneIsActive() {
+        // Choosing REQUIRES_NEW inside the refresh transaction would deadlock:
+        // this transaction already holds the user-row lock the family revoke
+        // needs (R-T10 / K11/D4).
+        when(transactionBoundary.isTransactionActive()).thenReturn(true);
+        when(repository.revokeFamilyBulk("family-1")).thenReturn(2);
+
+        adapter.revokeFamily("family-1", 7L);
+
+        verify(userRepository).findByIdForUpdate(7L);
+        verify(repository).revokeFamilyBulk("family-1");
+        verify(transactionBoundary, never()).executeRequiresNew(any(), anyInt());
     }
 
     @Test
@@ -170,7 +192,9 @@ class RefreshTokenPersistenceAdapterTest {
                 .isExactlyInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> adapter.markRotated(null, "new"))
                 .isExactlyInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> adapter.revokeFamily(null))
+        assertThatThrownBy(() -> adapter.revokeFamily(null, 7L))
+                .isExactlyInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> adapter.revokeFamily("f", null))
                 .isExactlyInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> adapter.deleteExpiredBefore(null))
                 .isExactlyInstanceOf(NullPointerException.class);

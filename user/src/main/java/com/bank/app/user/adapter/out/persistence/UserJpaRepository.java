@@ -22,6 +22,15 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     Optional<UserJpaEntity> findByUsernameForUpdate(@Param("username") String username);
 
     /**
+     * R-T10: primary-key row lock used by family revocation. Rotation takes
+     * the same lock before retiring a refresh token, which serializes
+     * "revoke family" against "rotate and insert a successor".
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM UserJpaEntity e WHERE e.id = :userId")
+    Optional<UserJpaEntity> findByIdForUpdate(@Param("userId") Long userId);
+
+    /**
      * MFA secret writes bypass the aggregate mapper on purpose (see
      * UserJpaMapper): ciphertext must never be round-tripped through generic
      * user saves. clearAutomatically + flushAutomatically match the other
