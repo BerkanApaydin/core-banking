@@ -47,6 +47,9 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     @Query("SELECT e.mfaSecretEncrypted FROM UserJpaEntity e WHERE e.id = :userId")
     Optional<String> findMfaSecret(@Param("userId") Long userId);
 
+    @Query("SELECT e.mfaEnabled FROM UserJpaEntity e WHERE e.id = :userId")
+    Optional<Boolean> findMfaEnabled(@Param("userId") Long userId);
+
     /**
      * TOTP replay protection (V56). The counter is advanced ONLY by a
      * strictly newer value, so a replayed code (or two concurrent replays of

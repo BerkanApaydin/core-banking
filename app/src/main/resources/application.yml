@@ -134,6 +134,15 @@ jwt:
   access-expiration: ${JWT_ACCESS_EXPIRATION:${JWT_EXPIRATION:900000}}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   allow-default-secret: ${JWT_ALLOW_DEFAULT_SECRET:false}
+  # Tokens are pinned to this service; a sibling service sharing the HMAC
+  # key must not be able to mint tokens accepted here.
+  issuer: ${JWT_ISSUER:clean-architecture-bank}
+  audience: ${JWT_AUDIENCE:clean-architecture-bank-api}
+  # Published in the JWT header so a future multi-key rotation can select the
+  # verification key without guessing.
+  key-id: ${JWT_KEY_ID:primary}
+  # Bounded tolerance for node clock drift (0-300 seconds).
+  clock-skew-seconds: ${JWT_CLOCK_SKEW_SECONDS:30}
 
 app:
   proxy:

@@ -254,6 +254,32 @@ class UserJpaAdapterTest {
         }
     }
 
+    @Test
+    void shouldReadMfaEnabledProjection() {
+        when(userJpaRepository.findMfaEnabled(1L)).thenReturn(Optional.of(true));
+
+        Optional<Boolean> result = adapter.findMfaEnabledById(1L);
+
+        assertTrue(result.isPresent());
+        assertTrue(result.get());
+        verify(userJpaRepository).findMfaEnabled(1L);
+    }
+
+    @Test
+    void shouldReturnEmptyMfaProjectionForNullId() {
+        assertTrue(adapter.findMfaEnabledById(null).isEmpty());
+        verifyNoInteractions(userJpaRepository);
+    }
+
+    @Test
+    void shouldClassifyMfaProjectionFailureAsBackendUnavailable() {
+        when(userJpaRepository.findMfaEnabled(1L))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> adapter.findMfaEnabledById(1L));
+    }
+
     @Nested
     @DisplayName("findByUsername")
     class FindByUsername {

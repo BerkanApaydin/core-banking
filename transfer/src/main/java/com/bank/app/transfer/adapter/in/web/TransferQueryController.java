@@ -13,7 +13,6 @@ import com.bank.app.transfer.application.port.in.GenerateTransferReportTotalsQue
 import com.bank.app.transfer.application.port.in.GenerateTransferReportWithTotalsQuery;
 import com.bank.app.transfer.application.port.in.GetTransferDetailQuery;
 import com.bank.app.transfer.application.port.in.GetTransferHistoryQuery;
-import com.bank.app.transfer.application.service.TransferReportEtagService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -79,7 +78,7 @@ public class TransferQueryController {
 
     /**
      * I-10: weak ETag over identity + optimistic-lock version (same
-     * {@code W/"..."} shape as {@link TransferReportEtagService}). A null
+     * {@code W/"..."} shape as {@link TransferReportEtag}). A null
      * version (pre-persist shapes in tests) falls back to status+createdAt so
      * the validator is never empty — and any persist round-trip changes the
      * version, invalidating stale client copies.
@@ -121,7 +120,7 @@ public class TransferQueryController {
         TransferReportResponse body = includeTotals
                 ? generateTransferReportWithTotalsQuery.execute(criteria)
                 : generateTransferReportQuery.execute(criteria);
-        String etag = TransferReportEtagService.etagFor(body);
+        String etag = TransferReportEtag.etagFor(body);
         if (IfNoneMatch.matches(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag)
                     .cacheControl(CacheControl.noStore()).build();
@@ -154,7 +153,7 @@ public class TransferQueryController {
                 accountId, startDate, endDate, page, size, cursorCreatedAt, cursorId);
         TransferReportResponse body = generateTransferReportWithTotalsQuery.execute(criteria);
         return ResponseEntity.ok()
-                .eTag(TransferReportEtagService.etagFor(body))
+                .eTag(TransferReportEtag.etagFor(body))
                 .cacheControl(CacheControl.noStore())
                 .header("Deprecation", "true")
                 .header("Sunset", COMBINED_SUNSET_HTTP_DATE)

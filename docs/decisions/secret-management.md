@@ -82,6 +82,24 @@ For any deployment beyond staging:
    (`kubectl exec … env | grep -c` must be 0 for the old fingerprint —
    exact values never leave the manager).
 
+## Token identity claims
+
+JWT issuance and verification are pinned to `jwt.issuer` and
+`jwt.audience` (defaults: `clean-architecture-bank` /
+`clean-architecture-bank-api`). A token signed with the same HMAC key by a
+sibling service is rejected unless it also carries both claims; issuer/audience
+pinning is defense-in-depth, not a substitute for per-service keys. Every token also
+publishes `kid` (`jwt.key-id`, default `primary`) in its header for future
+multi-key rotation, and verification tolerates a bounded clock skew
+(`jwt.clock-skew-seconds`, default 30, maximum 300). The skew also extends the
+blacklist TTL so a revoked token cannot reappear during the grace period.
+
+**Rollout note:** tokens minted before this change have no `iss`/`aud` and are
+rejected. Access tokens would age out within 15 minutes, but refresh tokens
+are rejected immediately, so deploy with a release note that users must sign
+in again. `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_KEY_ID` and
+`JWT_CLOCK_SKEW_SECONDS` override the defaults without a rebuild.
+
 ## 2026-10 dev-default rotation (O-1)
 
 The former DEFAULT_JWT_SECRET value appeared in git history and therefore counts as compromised. It was replaced with a deliberately non-secret, zero-entropy marker: the Base64 value `ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=` (decodes to `dev-only-NOT-FOR-PROD-0000000000`, exactly 32 bytes, R-O07). The same literal is used in `JwtTokenProvider.DEFAULT_JWT_SECRET`, `application-dev.yml` and `docker-compose.yml`; `scripts/check_compose_jwt_default.py` fails CI if the three drift or if the value stops being a documented `NOT-FOR-PROD` marker, and `.gitleaks.toml` allowlists both forms. Prod behavior is unchanged: the marker is refused twice (`allow-default-secret: false` + `ApplicationStartupValidator`).

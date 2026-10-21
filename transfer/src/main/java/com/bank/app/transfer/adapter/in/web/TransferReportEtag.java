@@ -1,13 +1,13 @@
-package com.bank.app.transfer.application.service;
+package com.bank.app.transfer.adapter.in.web;
 
 import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
 import java.util.stream.Collectors;
 
 /**
- * Cache validators for transfer report responses (extracted from the former
- * fat {@code TransferController}: hashing report content is application
- * logic, not web plumbing, and deserves direct unit tests).
+ * HTTP cache validators for transfer report responses. ETag syntax and weak
+ * validator shape are transport concerns, so this helper lives in the web
+ * adapter rather than the application layer.
  *
  * <p>ETag: SHA-256 over stable report content (account + page + volume +
  * cursor + item fingerprint + whole-range totals). 32-bit Objects.hash
@@ -21,9 +21,9 @@ import java.util.stream.Collectors;
  * the tag when the range aggregates move even if the page is identical.
  * Clients send If-None-Match (or *) to get 304 without re-render.
  */
-public final class TransferReportEtagService {
+public final class TransferReportEtag {
 
-    private TransferReportEtagService() {
+    private TransferReportEtag() {
     }
 
     public static String etagFor(TransferReportResponse body) {

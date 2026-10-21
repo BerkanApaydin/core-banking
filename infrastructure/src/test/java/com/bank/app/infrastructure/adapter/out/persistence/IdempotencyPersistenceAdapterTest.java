@@ -1,16 +1,12 @@
 package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
+import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -134,26 +130,25 @@ class IdempotencyPersistenceAdapterTest {
     }
 
     @Test
-    void shouldWarnWhenCompletionLosesRaceWithPendingReaper() {
+    void shouldFailClosedWhenCompletionLosesRaceWithPendingReaper() {
         var entity = new IdempotencyKeyJpaEntity("key1", "FAILED", null, 200, LocalDateTime.now());
         when(repository.completeIfPending("key1", "response", 200, true)).thenReturn(0);
         when(repository.findById("key1")).thenReturn(Optional.of(entity));
-        Logger adapterLogger = (Logger) LoggerFactory.getLogger(IdempotencyPersistenceAdapter.class);
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        adapterLogger.addAppender(appender);
-        try {
-            adapter.markCompleted("key1", "response", 200);
-        } finally {
-            adapterLogger.detachAppender(appender);
-        }
 
-        assertThat(appender.list).anySatisfy(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getFormattedMessage())
-                    .contains("key=key1")
-                    .doesNotContain("response");
-        });
+        assertThrows(ConcurrentRequestException.class,
+                () -> adapter.markCompleted("key1", "response", 200));
+
+        verify(repository).completeIfPending("key1", "response", 200, true);
+    }
+
+    @Test
+    void shouldFailClosedWhenCompletionFindsAnUnexpectedPendingReservation() {
+        var entity = new IdempotencyKeyJpaEntity("key1", "PENDING", null, 200, LocalDateTime.now());
+        when(repository.completeIfPending("key1", "response", 200, true)).thenReturn(0);
+        when(repository.findById("key1")).thenReturn(Optional.of(entity));
+
+        assertThrows(ConcurrentRequestException.class,
+                () -> adapter.markCompleted("key1", "response", 200));
     }
 
     @Test

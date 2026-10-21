@@ -80,7 +80,8 @@ Rotation retires every outstanding session at once: all users log in again.
 There is no dual-key overlap (single `jwt.secret`), so rotate in a
 maintenance-light window, not mid-incident, unless the key is compromised
 (compromise outranks convenience: rotate immediately, then handle the
-re-login wave).
+re-login wave). The `kid` header is emitted for diagnostics and a future key
+ring; with a single configured secret it does not select a second key.
 
 1. Generate: `JWT_SECRET="$(openssl rand -base64 32)"` — 32 bytes minimum
    when base64-decoded; anything shorter fails fast at boot with the exact

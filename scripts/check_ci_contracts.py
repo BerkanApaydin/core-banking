@@ -203,6 +203,23 @@ def problems_for_supply_chain() -> list[str]:
         problems.append("release.yml lost the tag-SHA equality guard")
     if "aquasecurity/trivy-action" not in ci:
         problems.append("ci.yml lost the trivy image scan (O-1)")
+    if "Scan released image" not in release or "aquasecurity/trivy-action" not in release:
+        problems.append(
+            "release.yml lost the scan of the exact pushed digest (O-1)"
+        )
+    for workflow in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        for match in re.finditer(
+            r"(?m)^\s*uses:\s*(\S+)",
+            workflow.read_text(encoding="utf-8"),
+        ):
+            ref = match.group(1)
+            if ref.startswith(("./", "docker://")):
+                continue
+            if not re.search(r"@[0-9a-f]{40}$", ref):
+                problems.append(
+                    f"{workflow.name} uses a mutable action ref {ref!r}; "
+                    "pin a full commit SHA"
+                )
     try:
         manifest_contract = read("scripts/check_k8s_manifest_contract.py")
     except FileNotFoundError as exc:
@@ -333,8 +350,8 @@ def main() -> int:
         return 1
     print(
         "CI contracts OK: image tag, image-pin encoding, migration "
-        "soak/content, supply chain, deployment presence, local parity, "
-        "tool-only sources"
+        "soak/content, supply chain (incl. SHA-pinned actions), deployment "
+        "presence, local parity, tool-only sources"
     )
     return 0
 

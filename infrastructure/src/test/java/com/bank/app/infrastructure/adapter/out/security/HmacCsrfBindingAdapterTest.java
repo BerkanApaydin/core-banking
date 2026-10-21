@@ -19,7 +19,7 @@ class HmacCsrfBindingAdapterTest {
     @DisplayName("should round-trip via JwtProperties-derived key (K7/D8)")
     void shouldRoundTrip() {
         HmacCsrfBindingAdapter adapter =
-                new HmacCsrfBindingAdapter(new JwtProperties(SECRET, 900000L, 604800000L, true));
+                new HmacCsrfBindingAdapter(properties());
 
         String token = adapter.issueCsrfToken("42");
 
@@ -31,7 +31,7 @@ class HmacCsrfBindingAdapterTest {
     @DisplayName("should fail closed on null inputs (K7/D8)")
     void shouldFailClosed() {
         HmacCsrfBindingAdapter adapter =
-                new HmacCsrfBindingAdapter(new JwtProperties(SECRET, 900000L, 604800000L, true));
+                new HmacCsrfBindingAdapter(properties());
         String token = adapter.issueCsrfToken("42");
 
         assertThat(adapter.verifyCsrfToken(null, token, "42")).isFalse();
@@ -43,7 +43,7 @@ class HmacCsrfBindingAdapterTest {
     @DisplayName("tokens from different secrets must not verify (key separation)")
     void shouldIsolateKeys() {
         HmacCsrfBindingAdapter first =
-                new HmacCsrfBindingAdapter(new JwtProperties(SECRET, 900000L, 604800000L, true));
+                new HmacCsrfBindingAdapter(properties());
         HmacCsrfBindingAdapter second =
                 new HmacCsrfBindingAdapter("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".getBytes(
                         StandardCharsets.UTF_8));
@@ -51,5 +51,10 @@ class HmacCsrfBindingAdapterTest {
         String token = first.issueCsrfToken("42");
 
         assertThat(second.verifyCsrfToken(token, token, "42")).isFalse();
+    }
+
+    private static JwtProperties properties() {
+        return new JwtProperties(SECRET, 900000L, 604800000L, true,
+                "test-issuer", "test-audience", "test-key", 30L);
     }
 }

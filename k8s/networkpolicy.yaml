@@ -30,22 +30,23 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Ingress controller -> app.
+    # Ingress controller -> public application port only. Actuator is on the
+    # private management port below and is intentionally unreachable here.
     - from:
         - namespaceSelector:
             matchLabels:
-              name: ingress-nginx
+              kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
           port: 8080
-    # Prometheus scraper (adjust to the monitoring namespace).
+    # Prometheus scraper -> private management port only.
     - from:
         - namespaceSelector:
             matchLabels:
-              name: monitoring
+              kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8081
   egress:
     # Cluster DNS. TCP 53 is required for truncated UDP answers (large
     # responses / DNSSEC) and is also used by some DNS implementations.
@@ -56,7 +57,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # PostgreSQL.
+    # PostgreSQL. In-cluster compose/dev topology.
     - to:
         - podSelector:
             matchLabels:
@@ -64,7 +65,7 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-    # Redis.
+    # Redis (in-cluster compose/dev topology).
     - to:
         - podSelector:
             matchLabels:
@@ -72,11 +73,27 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
-    # OTLP collector (tracing export; harmless if absent).
+    # Managed PostgreSQL/Redis: add the provider CIDR(s) here, for example:
+    #   - to:
+    #       - ipBlock:
+    #           cidr: 10.0.0.0/8
+    #     ports:
+    #       - { protocol: TCP, port: 5432 }
+    #       - { protocol: TCP, port: 6379 }
+    # Without this, a managed database/cache outside the cluster is blocked.
+    # OTLP collector in the application namespace (k8s/otel-collector.yaml).
+    - to:
+        - podSelector:
+            matchLabels:
+              app: otel-collector
+      ports:
+        - protocol: TCP
+          port: 4318
+    # External OTLP collector in the monitoring namespace (optional).
     - to:
         - namespaceSelector:
             matchLabels:
-              name: monitoring
+              kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
           port: 4318

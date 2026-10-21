@@ -119,6 +119,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             ErrorCode.ACCESS_DENIED.code(), "Invalid browser CSRF token",
                             request.getRequestURI());
                     return;
+                case MFA_REQUIRED:
+                    reject(response, HttpStatus.FORBIDDEN,
+                            ErrorCode.ACCESS_DENIED.code(),
+                            "Admin MFA enrollment required",
+                            request.getRequestURI());
+                    return;
                 case BACKEND_UNAVAILABLE:
                     SecurityContextHolder.clearContext();
                     rejectServiceUnavailable(response, request.getRequestURI());

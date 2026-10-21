@@ -41,4 +41,15 @@ public interface LoadUserPort {
     default Optional<Long> findTokenVersionById(Long userId) {
         return findById(userId).map(User::getTokenVersion);
     }
+
+    /**
+     * Narrow projection for the admin MFA gate. Admin paths refuse a
+     * password-only session (see {@code AdminMfaValidator}); the account can
+     * still log in and enroll through the non-admin MFA endpoints, then the
+     * next admin request sees the updated flag. Defaults to the findById
+     * mapping; the JPA adapter overrides it with a lighter select.
+     */
+    default Optional<Boolean> findMfaEnabledById(Long userId) {
+        return findById(userId).map(User::isMfaEnabled);
+    }
 }

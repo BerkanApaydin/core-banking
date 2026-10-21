@@ -62,6 +62,7 @@ class AuditAdminAuthorizationIT extends AbstractSpringBootIntegrationTest {
         admin.setUsername("audit_admin");
         admin.setPassword(passwordEncoder.encode("Admin_pass12"));
         admin.setRole(Role.ROLE_ADMIN);
+        admin.setMfaEnabled(true);
         admin = userRepository.save(admin);
         adminToken = jwtPort.generateToken(admin.getId(), admin.getUsername(), "ROLE_ADMIN");
 
@@ -79,6 +80,24 @@ class AuditAdminAuthorizationIT extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/audit-logs")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("password-only admin gets 403 until MFA enrollment")
+    void shouldForbidAdminWithoutMfa() throws Exception {
+        UserJpaEntity passwordOnlyAdmin = new UserJpaEntity();
+        passwordOnlyAdmin.setUsername("audit_password_only_admin");
+        passwordOnlyAdmin.setPassword(passwordEncoder.encode("Admin_pass12"));
+        passwordOnlyAdmin.setRole(Role.ROLE_ADMIN);
+        passwordOnlyAdmin = userRepository.save(passwordOnlyAdmin);
+        String passwordOnlyToken = jwtPort.generateToken(passwordOnlyAdmin.getId(),
+                passwordOnlyAdmin.getUsername(), "ROLE_ADMIN");
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .header("Authorization", "Bearer " + passwordOnlyToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("ACCESS_DENIED")))
+                .andExpect(jsonPath("$.message", is("Admin MFA enrollment required")));
     }
 
     @Test

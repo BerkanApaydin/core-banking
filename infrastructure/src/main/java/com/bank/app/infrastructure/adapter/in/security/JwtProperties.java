@@ -15,7 +15,11 @@ public record JwtProperties(
         String secret,
         @DefaultValue("900000") long accessExpiration,
         @DefaultValue("604800000") long refreshExpiration,
-        @DefaultValue("false") boolean allowDefaultSecret
+        @DefaultValue("false") boolean allowDefaultSecret,
+        @DefaultValue("clean-architecture-bank") String issuer,
+        @DefaultValue("clean-architecture-bank-api") String audience,
+        @DefaultValue("primary") String keyId,
+        @DefaultValue("30") long clockSkewSeconds
 ) {
     public JwtProperties {
         if (secret == null || secret.isBlank()) {
@@ -28,6 +32,19 @@ public record JwtProperties(
         }
         if (refreshExpiration <= 0) {
             throw new IllegalArgumentException("JWT refresh expiration must be positive");
+        }
+        if (issuer == null || issuer.isBlank()) {
+            throw new IllegalArgumentException("JWT issuer must not be blank");
+        }
+        if (audience == null || audience.isBlank()) {
+            throw new IllegalArgumentException("JWT audience must not be blank");
+        }
+        if (keyId == null || keyId.isBlank()) {
+            throw new IllegalArgumentException("JWT key id must not be blank");
+        }
+        if (clockSkewSeconds < 0 || clockSkewSeconds > 300) {
+            throw new IllegalArgumentException(
+                "JWT clock skew must be between 0 and 300 seconds");
         }
     }
 }

@@ -131,9 +131,10 @@ class BrowserSessionClockExpiryIntegrationTest extends AbstractSpringBootIntegra
         mockMvc.perform(get("/api/v1/accounts/capabilities").cookie(session, csrf))
                 .andExpect(status().isOk());
 
-        // The access token is 15 minutes; move beyond it but keep the
-        // 7-day refresh token valid.
-        clock.advance(Duration.ofMinutes(15).plusSeconds(1));
+        // The access token is 15 minutes plus the configured 30-second
+        // verification skew; move beyond both but keep the 7-day refresh
+        // token valid.
+        clock.advance(Duration.ofMinutes(15).plusSeconds(31));
 
         mockMvc.perform(get("/api/v1/accounts/capabilities").cookie(session, csrf))
                 .andExpect(status().isUnauthorized());

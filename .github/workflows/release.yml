@@ -32,7 +32,7 @@ jobs:
       contents: read
       actions: read
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       with:
         fetch-depth: 0
 
@@ -58,7 +58,7 @@ jobs:
     environment: production
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       with:
         fetch-depth: 0
         fetch-tags: true
@@ -119,7 +119,7 @@ jobs:
         echo "Runtime: $RUNTIME"
 
     - name: Log in to GHCR
-      uses: docker/login-action@v3
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -127,7 +127,7 @@ jobs:
 
     - name: Docker metadata
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
       with:
         images: ghcr.io/${{ github.repository_owner }}/bank-app
         tags: |
@@ -135,7 +135,7 @@ jobs:
 
     - name: Build and push
       id: push
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         context: .
         push: true
@@ -145,6 +145,20 @@ jobs:
         build-args: |
           BASE_BUILDER_IMAGE=${{ steps.bases.outputs.builder }}
           BASE_RUNTIME_IMAGE=${{ steps.bases.outputs.runtime }}
+
+    - name: Scan released image (trivy, HIGH/CRITICAL fail-closed)
+      # CI scans a local rebuild, but the release publishes a different build;
+      # scanning the exact pushed digest keeps the two gates equivalent and
+      # stops a vulnerable image before it is pinned into the manifest.
+      uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # v0.24.0
+      env:
+        TRIVY_USERNAME: ${{ github.actor }}
+        TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        image-ref: 'ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}'
+        format: 'table'
+        severity: 'HIGH,CRITICAL'
+        exit-code: '1'
 
     - name: Pin flyway image to digest
       # O-7/R-O05: the source manifest is already pinned to the Flyway version
@@ -180,7 +194,7 @@ jobs:
         { echo "$PINNED"; echo "pinned_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "git_sha=$(git rev-parse HEAD)"; echo "tag=$TAG"; } > k8s/.image-digest
 
     - name: Record digest in release notes
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
       with:
         tag_name: ${{ inputs.tag }}
         files: |

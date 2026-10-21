@@ -289,6 +289,15 @@ class ProductionConfigContractTest {
         }
 
         @Test
+        @DisplayName("production management port must default off the public application port")
+        void productionManagementPortMustDefaultPrivate() {
+            assertThat(property("management.server.port", ""))
+                    .as("a prod process without MANAGEMENT_SERVER_PORT must not serve "
+                            + "actuator on the public 8080 application port")
+                    .isEqualTo("8081");
+        }
+
+        @Test
         @DisplayName("production must keep swagger disabled")
         void productionMustKeepSwaggerDisabled() {
             assertThat(property("springdoc.api-docs.enabled", ""))

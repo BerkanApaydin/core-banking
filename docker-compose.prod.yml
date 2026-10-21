@@ -40,6 +40,8 @@ services:
   app:
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # Keep actuator off the published 8080 port; 8081 is not published.
+      MANAGEMENT_SERVER_PORT: 8081
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: ${DB_USERNAME:?prod requires DB_USERNAME}

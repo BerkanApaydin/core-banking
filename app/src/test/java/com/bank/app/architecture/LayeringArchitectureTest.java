@@ -110,6 +110,17 @@ class LayeringArchitectureTest extends ArchitectureTest {
     }
 
     @Test
+    void webAdaptersShouldNotDependOnConcreteUseCaseImplementations() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("..adapter.in.web..", "..infrastructure.web..")
+                .should().dependOnClassesThat().resideInAnyPackage("..application.usecase..")
+                .because("web adapters must talk to input ports, not concrete use-case implementations")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
     void useCasesShouldResideInApplicationLayer() {
         ArchRule rule = classes()
                 .that().haveSimpleNameEndingWith("UseCase")

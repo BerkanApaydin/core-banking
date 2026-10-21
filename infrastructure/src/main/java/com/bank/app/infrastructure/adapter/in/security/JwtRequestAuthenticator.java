@@ -28,6 +28,7 @@ final class JwtRequestAuthenticator {
         PASS_THROUGH,
         UNAUTHORIZED,
         FORBIDDEN,
+        MFA_REQUIRED,
         BACKEND_UNAVAILABLE
     }
 
@@ -38,6 +39,7 @@ final class JwtRequestAuthenticator {
     private final CsrfBindingPort csrfBinding;
     private final BrowserSessionCookies browserSessionCookies;
     private final AdminTokenVersionValidator tokenVersionValidator;
+    private final AdminMfaValidator adminMfaValidator;
 
     JwtRequestAuthenticator(JwtPort jwtPort,
             TokenBlacklistPort tokenBlacklistPort,
@@ -49,6 +51,7 @@ final class JwtRequestAuthenticator {
         this.csrfBinding = csrfBinding;
         this.browserSessionCookies = browserSessionCookies;
         this.tokenVersionValidator = new AdminTokenVersionValidator(jwtPort, loadUserPort);
+        this.adminMfaValidator = new AdminMfaValidator(loadUserPort);
     }
 
     Result authenticate(HttpServletRequest request, String path, String jwt, boolean bearerAuth) {
@@ -90,7 +93,7 @@ final class JwtRequestAuthenticator {
             return Result.UNAUTHORIZED;
         }
         if (FilterRequestDecisions.isAdminRequest(path)) {
-            Result adminCheck = verifyAdminTokenVersion(request, jwt, userId);
+            Result adminCheck = verifyAdminAccess(jwt, userId);
             if (adminCheck != Result.AUTHENTICATED) {
                 return adminCheck;
             }
@@ -125,17 +128,20 @@ final class JwtRequestAuthenticator {
 
     /**
      * Admin paths re-validate the token generation against the user store
-     * (SEC-01), closing the G-2 demotion window where it matters most. An
-     * unreadable store fails closed, never silently authorizing a possibly
-     * demoted admin.
+     * (SEC-01), closing the G-2 demotion window where it matters most, and
+     * require an enrolled second factor. An unreadable store fails closed,
+     * never silently authorizing a possibly demoted or password-only admin.
      */
-    private Result verifyAdminTokenVersion(HttpServletRequest request, String jwt, Long userId) {
+    private Result verifyAdminAccess(String jwt, Long userId) {
         try {
-            return tokenVersionValidator.hasCurrentTokenVersion(jwt, userId)
+            if (!tokenVersionValidator.hasCurrentTokenVersion(jwt, userId)) {
+                return Result.UNAUTHORIZED;
+            }
+            return adminMfaValidator.isMfaEnabled(userId)
                     ? Result.AUTHENTICATED
-                    : Result.UNAUTHORIZED;
+                    : Result.MFA_REQUIRED;
         } catch (RuntimeException storeUnavailable) {
-            log.warn("User store unavailable during admin token-version check");
+            log.warn("User store unavailable during admin security re-check");
             SecurityContextHolder.clearContext();
             return Result.BACKEND_UNAVAILABLE;
         }

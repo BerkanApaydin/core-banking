@@ -634,11 +634,43 @@ class JwtAuthenticationFilterTest {
             // AV-2: the filter reads the narrow token-version projection, not
             // the full User aggregate.
             when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+            when(loadUserPort.findMfaEnabledById(7L)).thenReturn(Optional.of(true));
 
             filter.doFilterInternal(request, response, filterChain);
 
             verify(filterChain).doFilter(request, response);
             assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        }
+
+        @Test
+        @DisplayName("refuses admin calls until the account has enrolled MFA")
+        void rejectsAdminWithoutMfaEnrollment() throws Exception {
+            stubAdminBearer();
+            when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+            when(loadUserPort.findMfaEnabledById(7L)).thenReturn(Optional.of(false));
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 403, "ACCESS_DENIED",
+                    "Admin MFA enrollment required");
+            verifyNoInteractions(filterChain);
+            assertNull(SecurityContextHolder.getContext().getAuthentication());
+        }
+
+        @Test
+        @DisplayName("returns 503 when the MFA projection is unreadable (fail closed)")
+        void returns503WhenMfaProjectionIsDown() throws Exception {
+            stubAdminBearer();
+            when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+            when(loadUserPort.findMfaEnabledById(7L)).thenThrow(new RuntimeException("db down"));
+
+            MockHttpServletResponse errorResponse = new MockHttpServletResponse();
+            filter.doFilterInternal(request, errorResponse, filterChain);
+
+            assertProblemResponse(errorResponse, 503, "SECURITY_BACKEND_UNAVAILABLE",
+                    "Security service temporarily unavailable");
+            verifyNoInteractions(filterChain);
         }
 
         @Test

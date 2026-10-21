@@ -7,7 +7,9 @@ bytes.
 
 ## Flow
 
-1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then verifies that `inputs.tag` is SemVer-shaped and points at the checked-out commit. Base-image inputs may be tags for convenience, but the workflow resolves each to a `@sha256` digest and builds with those digests. The push includes BuildKit provenance and SBOM attestations, then pins the app manifest to the pushed `@sha256` digest and the Flyway Job manifest to the `<flyway.version>` from `pom.xml` plus its multi-arch index digest (never the rolling `11-alpine` tag).
+1. Cut the release from the Actions tab ("Run workflow" on `Release (digest-pinned image)`, input `tag: v0.0.2`): pushing a git tag alone builds nothing by design. The workflow first refuses red commits (`verify-green-ci` requires a successful `ci.yml` run on the exact SHA), then verifies that `inputs.tag` is SemVer-shaped and points at the checked-out commit. Base-image inputs may be tags for convenience, but the workflow resolves each to a `@sha256` digest and builds with those digests. The push includes BuildKit provenance and SBOM attestations, then pins the app manifest to the pushed `@sha256` digest and the Flyway Job manifest to the `<flyway.version>` from `pom.xml` plus its multi-arch index digest (never the rolling `11-alpine` tag). Before
+   pinning, a Trivy HIGH/CRITICAL gate scans the exact pushed digest (not a
+   local rebuild), and every third-party Action is pinned to a commit SHA.
    `.github/workflows/release.yml` builds the `Dockerfile`, pushes to
    GHCR (`ghcr.io/<owner>/bank-app:<tag>`), pins `k8s/bank-app.yaml`
    to the resolved digest (`bank-app@sha256:…`, verified with `grep`

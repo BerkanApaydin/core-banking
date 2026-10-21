@@ -24,17 +24,22 @@ The script sends only unauthenticated GET requests. It requires HTTP 200 and JSO
 
 Redirects, HTML login pages, malformed/oversized responses, DOWN status and network errors fail the check. Exit code 0 means all selected checks passed, 1 means a check failed, and 2 means invalid command arguments. `--timeout` is a socket timeout per request, not a total deployment deadline. Output does not include response bodies or credentials. Save `--json` output with the release identifier and check time as rollout evidence.
 
-The production readiness group includes `readinessState`, `db`, and the custom `redisBackends` indicator. An UP readiness response therefore requires both backing stores to answer at that moment. The global health check is retained as an independent check; neither result proves data integrity or downstream delivery. Liveness remains a process-health signal so a shared dependency outage does not restart every replica. The Kubernetes startup probe gives the application up to five minutes to complete initialization; its 60-second termination grace allows the configured 30-second graceful shutdown plus routing/drain time. Measure these budgets in staging before relying on them.
+The production readiness group includes `readinessState` and `db`; the custom `redisBackends` indicator is deliberately excluded (a short Redis blip must not remove every replica from the Service). Redis state remains visible in the global health endpoint and in Prometheus alerts. The global health check is retained as an independent check; neither result proves data integrity or downstream delivery. Liveness remains a process-health signal so a shared dependency outage does not restart every replica. The Kubernetes startup probe gives the application up to five minutes to complete initialization; its 60-second termination grace allows the configured 30-second graceful shutdown plus routing/drain time. Measure these budgets in staging before relying on them.
 
-`/actuator/prometheus` is exposed by Actuator configuration and whitelisted for
-anonymous scraping **in the prod profile only** (`application-prod.yml`), where
-`k8s/networkpolicy.yaml` isolates it to the `monitoring` namespace. The live
-smoke (`health_smoke.py --require-metrics --allow-metrics-secured`) treats
-401/403 as "deliberately gated" but fails on 404, so dropping the endpoint from
-the exposure list breaks CI instead of silently killing every alert. The
-regression is pinned by `ProductionConfigContractTest` in `app`. Non-prod
-profiles keep the endpoint authentication-gated (`ActuatorSecurityIntegrationTest`
-pins the 401/403 behavior there).
+Actuator is served on a private management port (prod default
+`MANAGEMENT_SERVER_PORT=8081`; Kubernetes sets it explicitly): the ingress
+routes only 8080, and
+`k8s/networkpolicy.yaml` allows 8081 only from the `monitoring` namespace.
+`/actuator/prometheus` remains whitelisted for anonymous scraping **in the prod
+profile only** (`application-prod.yml`), but it is no longer reachable through
+the public application port. The live smoke
+(`health_smoke.py --require-metrics --allow-metrics-secured`) treats 401/403 as
+"deliberately gated" but fails on 404, so dropping the endpoint from the
+exposure list breaks CI instead of silently killing every alert. The regression
+is pinned by `ProductionConfigContractTest` in `app`. Non-prod profiles keep the
+endpoint authentication-gated (`ActuatorSecurityIntegrationTest` pins the
+401/403 behavior there). When running the smoke check against a pod, target the
+management port directly (for example `http://bank-app:8081 --require-probes`).
 
 ## Configuration and connection budget
 

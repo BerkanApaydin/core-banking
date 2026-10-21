@@ -51,6 +51,16 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort {
     }
 
     @Override
+    public Optional<Boolean> findMfaEnabledById(Long userId) {
+        if (userId == null) return Optional.empty();
+        try {
+            return repository.findMfaEnabled(userId);
+        } catch (DataAccessException e) {
+            throw new AuthenticationBackendUnavailableException(e);
+        }
+    }
+
+    @Override
     public User save(User user) {
         // AV-4: the unique-constraint translation lives here (adapter), not in
         // the application layer — RegisterUserUseCaseImpl must stay free of

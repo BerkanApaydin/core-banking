@@ -12,6 +12,12 @@ deleted user, 503 when the user store is unreadable). The refresh path
 (`RefreshSessionUseCaseImpl`) compares `tokenVersion` against the DB and
 closes the window there.
 
+**Token identity (2026-10):** access and refresh tokens now carry `iss`/`aud`
+and a `kid` header; verification requires the issuer/audience match and allows
+a bounded 30-second clock skew. This does not change the accepted access-token
+window above: a password reset still retires refresh tokens immediately, while
+an already-issued non-admin access token remains valid until its short TTL.
+
 **Why accepted:** A per-request DB lookup would throw away every benefit of
 stateless JWT (scale, latency); the 15-minute window plus short TTL plus
 rotation (family revoke) bounds the risk. The comment in

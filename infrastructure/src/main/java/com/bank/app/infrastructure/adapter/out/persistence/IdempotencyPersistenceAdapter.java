@@ -1,6 +1,8 @@
 package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
+import com.bank.app.common.domain.exception.ConcurrentRequestException;
+import com.bank.app.common.messages.MessageKeys;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 
 import org.slf4j.Logger;
@@ -98,11 +100,15 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
             if (current.isEmpty()) {
                 throw new IllegalStateException("Idempotency reservation is missing");
             }
-            if ("FAILED".equals(current.get().getStatus())) {
+            if (!"COMPLETED".equals(current.get().getStatus())) {
                 // The pending reaper won the race between the reservation load
-                // and this write. The caller sees a failure while the original
-                // work may have succeeded; keep the warning free of the body.
+                // and this write. Failing closed is mandatory: the business
+                // transaction must roll back, otherwise the money moves while
+                // the key remains FAILED and a client retry re-executes it.
                 log.warn("Idempotency completion lost the race with the pending reaper: key={}", key);
+                throw new ConcurrentRequestException(
+                        MessageKeys.CONCURRENT_REQUEST, null,
+                        "The idempotency reservation expired before completion; the operation was rolled back. Retry with the same key.");
             }
         }
     }

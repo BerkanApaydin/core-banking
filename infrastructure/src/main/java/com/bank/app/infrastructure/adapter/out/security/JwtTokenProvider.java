@@ -23,7 +23,9 @@ import java.util.function.Function;
 /**
  * JWT issuance and verification behind {@link JwtPort}.
  *
- * <p>The remaining narrow readers ({@code extractUsername},
+ * <p>Issued tokens carry the configured {@code iss}/{@code aud} claims and a
+ * {@code kid} header; the parser requires the issuer/audience match and
+ * applies a bounded clock skew. The remaining narrow readers ({@code extractUsername},
  * {@code extractTokenType}, {@code getRemainingMs}) all re-verify the
  * signature on every call and fail closed (null/zero on any JWT failure), so
  * no caller can ever act on unverified claims. In particular
@@ -67,6 +69,10 @@ public class JwtTokenProvider implements JwtPort {
     private long accessExpiration;
     private long refreshExpiration;
     private final boolean allowDefaultSecret;
+    private final String issuer;
+    private final String audience;
+    private final String keyId;
+    private final long clockSkewSeconds;
     private volatile SecretKey signingKey;
     private volatile JwtParser verifiedParser;
     // Time-strategy seam (docs/decisions/time-strategy.md): jjwt requires
@@ -84,16 +90,31 @@ public class JwtTokenProvider implements JwtPort {
     @Autowired
     public JwtTokenProvider(JwtProperties properties) {
         this(properties.secret(), properties.accessExpiration(),
-                properties.refreshExpiration(), properties.allowDefaultSecret());
+                properties.refreshExpiration(), properties.allowDefaultSecret(),
+                properties.issuer(), properties.audience(), properties.keyId(),
+                properties.clockSkewSeconds());
     }
 
     // Legacy constructor kept for isolated unit tests (no Spring context).
     public JwtTokenProvider(String secretKey, long accessExpiration,
                             long refreshExpiration, boolean allowDefaultSecret) {
+        this(secretKey, accessExpiration, refreshExpiration, allowDefaultSecret,
+                "clean-architecture-bank", "clean-architecture-bank-api",
+                "primary", 30L);
+    }
+
+    private JwtTokenProvider(String secretKey, long accessExpiration,
+                             long refreshExpiration, boolean allowDefaultSecret,
+                             String issuer, String audience, String keyId,
+                             long clockSkewSeconds) {
         this.secretKey = secretKey;
         this.accessExpiration = accessExpiration;
         this.refreshExpiration = refreshExpiration;
         this.allowDefaultSecret = allowDefaultSecret;
+        this.issuer = issuer;
+        this.audience = audience;
+        this.keyId = keyId;
+        this.clockSkewSeconds = clockSkewSeconds;
     }
 
     @PostConstruct
@@ -127,7 +148,17 @@ public class JwtTokenProvider implements JwtPort {
                 "Generate a secure key with: openssl rand -base64 32");
         }
         signingKey = Keys.hmacShaKeyFor(keyBytes);
-        verifiedParser = Jwts.parser().verifyWith(signingKey).build();
+        // Issuer/audience pin the token to this service: a token minted by a
+        // sibling service sharing the HMAC key must not be accepted here.
+        // Clock skew absorbs small node clock drift; it widens the accepted
+        // lifetime by only the bounded grace configured here.
+        verifiedParser = Jwts.parser()
+                .verifyWith(signingKey)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
+                .clock(() -> Date.from(clock.instant()))
+                .clockSkewSeconds(clockSkewSeconds)
+                .build();
     }
 
     @Override
@@ -140,9 +171,12 @@ public class JwtTokenProvider implements JwtPort {
             String role = claims.get("role", String.class);
             Date expiration = claims.getExpiration();
             if (username == null || username.isBlank() || userId == null || role == null
-                    || role.isBlank() || expiration == null || !expiration.after(Date.from(clock.instant()))) {
+                    || role.isBlank() || expiration == null) {
                 return null;
             }
+            // Expiry (including the configured clock skew) is enforced by the
+            // parser above; re-checking against the raw clock here would
+            // reject tokens the parser deliberately accepts during skew.
             return new VerifiedToken(username, userId.longValue(), role,
                     claims.getId(), expiration.getTime());
         } catch (JwtException | IllegalArgumentException invalid) {
@@ -203,6 +237,9 @@ public class JwtTokenProvider implements JwtPort {
         extraClaims.put(TOKEN_TYPE_CLAIM, tokenType);
         return Jwts.builder()
                 .claims(extraClaims)
+                .issuer(issuer)
+                .audience().add(audience).and()
+                .header().keyId(keyId).and()
                 .subject(username)
                 .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(clock.instant()))
@@ -250,7 +287,13 @@ public class JwtTokenProvider implements JwtPort {
     @Override
     public long getRemainingMs(String token) {
         try {
-            long remaining = extractExpiration(token).getTime() - clock.millis();
+            Date expiration = extractExpiration(token);
+            if (expiration == null) {
+                return 0;
+            }
+            // A token remains accepted for clockSkewSeconds after its exp, so
+            // a blacklist entry must outlive that grace period too.
+            long remaining = expiration.getTime() + clockSkewSeconds * 1000L - clock.millis();
             return Math.max(remaining, 0);
         } catch (JwtException | IllegalArgumentException e) {
             return 0;

@@ -52,7 +52,7 @@ WORKDIR /app
 
 # Copy the executable jar from the app module target directory
 COPY --from=builder /build/app/target/*.jar app.jar
-EXPOSE 8080
+EXPOSE 8080 8081
 
 # Container-aware heap defaults; override with JAVA_OPTS env (e.g. -Xmx1g).
 # user.timezone=UTC + TZ=UTC: since V46 wall-clock columns are TIMESTAMPTZ, so
@@ -60,9 +60,12 @@ EXPOSE 8080
 # UTC keeps every replica, the DB session and the logs on the same clock.
 ENV TZ=UTC
 ENV SPRING_PROFILES_ACTIVE=prod
+# Actuator is private by default; the public HTTP port remains 8080.
+ENV MANAGEMENT_SERVER_PORT=8081
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
+  CMD curl -fsS "http://localhost:${MANAGEMENT_SERVER_PORT:-8081}/actuator/health" \
+      || curl -fsS "http://localhost:8080/actuator/health" || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

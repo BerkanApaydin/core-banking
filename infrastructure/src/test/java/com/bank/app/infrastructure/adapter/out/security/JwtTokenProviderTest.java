@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +11,9 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
 import javax.crypto.SecretKey;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,6 +94,64 @@ class JwtTokenProviderTest {
     void shouldVerifyGeneratedToken() {
         String token = jwtTokenProvider.generateToken(1L, "testUser");
         assertNotNull(jwtTokenProvider.verifyAndDecode(token));
+    }
+
+    @Test
+    void shouldStampIssuerAudienceAndKeyId() {
+        String token = jwtTokenProvider.generateToken(1L, "testUser");
+
+        var parsed = Jwts.parser()
+                .verifyWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .build()
+                .parseSignedClaims(token);
+
+        assertEquals("clean-architecture-bank", parsed.getPayload().getIssuer());
+        assertTrue(parsed.getPayload().getAudience().contains("clean-architecture-bank-api"));
+        assertEquals("primary", parsed.getHeader().getKeyId());
+    }
+
+    @Test
+    void shouldRejectTokenWithWrongIssuerOrAudience() {
+        JwtTokenProvider verifier = provider("test-issuer", "test-audience");
+        JwtTokenProvider wrongIssuer = provider("other-issuer", "test-audience");
+        JwtTokenProvider wrongAudience = provider("test-issuer", "other-audience");
+
+        assertNull(verifier.verifyAndDecode(wrongIssuer.generateToken(1L, "testUser")));
+        assertNull(verifier.verifyAndDecode(wrongAudience.generateToken(1L, "testUser")));
+    }
+
+    @Test
+    void shouldAcceptTokenWithinConfiguredClockSkew() {
+        JwtTokenProvider verifier = provider("test-issuer", "test-audience");
+
+        assertNotNull(verifier.verifyAndDecode(expiredBySeconds(10L)));
+        assertNull(verifier.verifyAndDecode(expiredBySeconds(40L)));
+    }
+
+    @Test
+    void shouldVerifyAgainstInjectedClock() {
+        JwtTokenProvider provider = provider("test-issuer", "test-audience");
+        provider.setClockForTests(
+                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+        String token = provider.generateToken(1L, "testUser");
+
+        provider.setClockForTests(
+                Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC));
+        assertNotNull(provider.verifyAndDecode(token));
+
+        provider.setClockForTests(
+                Clock.fixed(Instant.parse("2026-01-03T00:00:00Z"), ZoneOffset.UTC));
+        assertNull(provider.verifyAndDecode(token));
+        assertEquals(0L, provider.getRemainingMs(token));
+    }
+
+    @Test
+    void shouldExtendBlacklistTtlByClockSkew() {
+        JwtTokenProvider verifier = provider("test-issuer", "test-audience");
+
+        long remaining = verifier.getRemainingMs(expiredBySeconds(10L));
+
+        assertTrue(remaining > 0 && remaining <= 30_000L);
     }
 
     @Test
@@ -193,7 +255,8 @@ class JwtTokenProviderTest {
 
         long remaining = jwtTokenProvider.getRemainingMs(token);
 
-        assertTrue(remaining > 0 && remaining <= 86400000L);
+        // The TTL includes the 30s skew grace so blacklist entries outlive it.
+        assertTrue(remaining > 0 && remaining <= 86_430_000L);
     }
 
     @Test
@@ -265,5 +328,27 @@ class JwtTokenProviderTest {
         long refreshRemaining = provider.getRemainingMs(
                 provider.generateRefreshToken(1L, "testUser", "ROLE_USER"));
         assertTrue(refreshRemaining - accessRemaining > 600_000_000L);
+    }
+
+    private static JwtTokenProvider provider(String issuer, String audience) {
+        return new JwtTokenProvider(new JwtProperties(
+                SECRET, 86400000L, 604800000L, true,
+                issuer, audience, "test-key", 30L));
+    }
+
+    private static String expiredBySeconds(long seconds) {
+        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET));
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .issuer("test-issuer")
+                .audience().add("test-audience").and()
+                .header().keyId("test-key").and()
+                .subject("testUser")
+                .claim("userId", 1L)
+                .claim("role", "ROLE_USER")
+                .issuedAt(new Date(now - 3_600_000L))
+                .expiration(new Date(now - seconds * 1000L))
+                .signWith(key)
+                .compact();
     }
 }
