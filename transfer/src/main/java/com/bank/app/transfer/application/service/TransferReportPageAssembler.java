@@ -67,6 +67,9 @@ public final class TransferReportPageAssembler {
         // cannot be empty): no defensive isEmpty check — dead conditions hide
         // real branches from mutation testing.
         if (hasNext) {
+            // Transfer.createdAt is the business timestamp mapped to
+            // business_created_at — the same key the report queries filter and
+            // order by. Never swap this for an auditing timestamp.
             Transfer last = transfers.get(transfers.size() - 1);
             nextCursorCreatedAt = last.getCreatedAt().toString();
             nextCursorId = last.getId();

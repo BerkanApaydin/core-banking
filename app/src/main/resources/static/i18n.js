@@ -518,7 +518,9 @@ function __(key, ...args) {
         || key;
     if (args.length > 0) {
         args.forEach((arg, i) => {
-            text = text.replace(`{${i}}`, arg);
+            // A function replacement keeps `$&`, `$'` and `$1` in user data
+            // literal instead of letting String.replace interpret them.
+            text = text.replace(`{${i}}`, () => String(arg));
         });
     }
     return text;

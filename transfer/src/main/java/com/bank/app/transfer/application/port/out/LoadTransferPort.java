@@ -25,9 +25,11 @@ public interface LoadTransferPort {
     List<Transfer> findHistoryBetween(Long accountId, LocalDateTime start, LocalDateTime end, int page, int size);
 
     /**
-     * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET.
-     * Null cursor = first page. Limit is the logical page size; the adapter
-     * over-fetches one row to derive hasNext without a second query.
+     * DB-2/Perf-3 keyset pagination: cursor (business createdAt,id) replaces
+     * OFFSET. The cursor is the transfer's domain createdAt, the same business
+     * timestamp the report filters and orders by. Null cursor = first page.
+     * Limit is the logical page size; the adapter over-fetches one row to
+     * derive hasNext without a second query.
      */
     List<Transfer> findHistoryBetweenKeyset(Long accountId, LocalDateTime start, LocalDateTime end,
             LocalDateTime cursorCreatedAt, Long cursorId, int size);

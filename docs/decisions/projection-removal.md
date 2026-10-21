@@ -5,8 +5,8 @@ together with its refresh pipeline (`TransferReportProjectionRefresher`,
 `TransferProjectionRefreshAdapter`, `RefreshTransferProjectionPort`).
 
 **Why:** No read path ever queried the view — totals and reports run directly
-against `transfers` via the V28 per-side indexes, V43 covering indexes and
-UNION ALL aggregates. The nightly `REFRESH ... CONCURRENTLY` only cost write
+against `transfers` via the V61 per-side business-time indexes, the V43
+insert-order indexes and UNION ALL aggregates. The nightly `REFRESH ... CONCURRENTLY` only cost write
 amplification and scheduler noise while creating a false "projection exists"
 impression (a future reader could have served stale data without a freshness
 guard).

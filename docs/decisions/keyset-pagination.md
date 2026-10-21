@@ -1,9 +1,12 @@
 # DB-2: Keyset Pagination Contract
 
-**Decision:** Report/history pagination is cursor-based:
-`(created_at, id) < (cursorCreatedAt, cursorId)` with
-`ORDER BY created_at DESC, id DESC`. No OFFSET; the V43 covering indexes
-(`sender/created/id`, `receiver/created/id`) feed the ordering.
+**Decision:** Report pagination is cursor-based:
+`(business_created_at, id) < (cursorCreatedAt, cursorId)` with
+`ORDER BY business_created_at DESC, id DESC`. No OFFSET; the V61 covering
+indexes (`sender/business_created/id`, `receiver/business_created/id`) feed
+the ordering. The cursor is the transfer's domain `createdAt` (business time),
+the same column the report filters by — never the auditing insert timestamp.
+The history endpoint remains insert-ordered and keeps the V43 indexes.
 
 **Contract:**
 - `cursorCreatedAt=null, cursorId=null` = first page (or legacy offset path).
@@ -13,7 +16,7 @@
 - `/report/combined` accepts the same cursor; totals are whole-range
   aggregates independent of the cursor.
 
-**Why:** OFFSET + `ORDER BY created_at` sorts the full match set
+**Why:** OFFSET + `ORDER BY business_created_at` sorts the full match set
 (`O(n log n)` + `work_mem` spill). Keyset does one range scan + over-fetch
 (`size+1`) and derives `hasNext` with no second query.
 
@@ -22,7 +25,7 @@
 **R6 guard:** pure-offset windows with `page*size > 10_000`
 (`ReportCriteria.MAX_OFFSET_WINDOW`, shared by `GetTransferHistoryQueryImpl`)
 are rejected with 400 — OFFSET cost is bounded by construction, and unbounded
-scrolling must use the cursor. The V43 covering indexes serve both the cursor
+scrolling must use the cursor. The V61 covering indexes serve both the cursor
 range scan and the surviving shallow-offset path.
 
 **UI adoption:** the bundled report UI loads page 0 by offset and every deeper

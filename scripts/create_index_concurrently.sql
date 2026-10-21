@@ -12,7 +12,17 @@
 -- or copy the matching block and run it manually during a maintenance window.
 -- Always run ANALYZE afterwards so the planner sees the new index immediately.
 --
--- Example: covering keyset indexes (V43) on a hot table:
+-- Example: covering report keyset indexes (V61) on a hot table:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_sender_business_created_id
+--       ON transfers (sender_account_id, business_created_at DESC, id DESC);
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_receiver_business_created_id
+--       ON transfers (receiver_account_id, business_created_at DESC, id DESC);
+--   -- V61 drops the subsumed V28 prefix indexes after these exist:
+--   DROP INDEX CONCURRENTLY IF EXISTS idx_transfers_sender_business_created;
+--   DROP INDEX CONCURRENTLY IF EXISTS idx_transfers_receiver_business_created;
+--   ANALYZE transfers;
+--
+-- Example: covering history insert-order indexes (V43):
 --   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_sender_created_id
 --       ON transfers (sender_account_id, created_at DESC, id DESC);
 --   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transfers_receiver_created_id

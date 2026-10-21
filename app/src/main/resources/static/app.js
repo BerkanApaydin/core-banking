@@ -695,8 +695,12 @@ function initUxEnhancements() {
     window.addEventListener('offline', () => showAlert(__('general.offline'), 'warning'));
     window.addEventListener('online', () => showAlert(__('general.back_online')));
 
-    // Backend liveness (GET /actuator/health: public, not rate-limited).
-    // Only the dot color + footer label change; i18n-managed texts untouched.
+    // Backend liveness. Only the dot color + footer label change; i18n-managed
+    // texts untouched. In prod the actuator is public but listens on the
+    // private management port (8081), which the ingress never routes, so this
+    // same-origin probe 404s there. Fall back to a public same-origin API
+    // path when actuator is not served on the application port; any HTTP
+    // response below 500 still proves the application is reachable.
     window.__healthOk = true;
     const applyHealth = (ok) => {
         window.__healthOk = ok;
@@ -710,21 +714,36 @@ function initUxEnhancements() {
             label.classList.toggle('health-bad', !ok);
         }
     };
-    const checkBackendHealth = async () => {
+    const fetchHealth = async (url) => {
+        const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const t = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
         try {
-            const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-            const t = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
-            const res = await fetch('/actuator/health', {
+            return await fetch(url, {
                 headers: { 'Accept': 'application/json' },
                 ...(ctrl ? { signal: ctrl.signal } : {})
             });
+        } finally {
             if (t) clearTimeout(t);
-            let up = res.ok;
-            try {
-                const j = await res.json();
-                up = res.ok && !!j && j.status === 'UP';
-            } catch (e) { /* keep res.ok */ }
-            applyHealth(up);
+        }
+    };
+    const checkBackendHealth = async () => {
+        try {
+            const res = await fetchHealth('/actuator/health');
+            if (res.status !== 404 && res.status !== 405) {
+                let up = res.ok;
+                try {
+                    const j = await res.json();
+                    up = res.ok && !!j && j.status === 'UP';
+                } catch (e) { /* keep res.ok */ }
+                applyHealth(up);
+                return;
+            }
+        } catch (e) {
+            // Fall through to the same-origin API probe.
+        }
+        try {
+            const res = await fetchHealth('/api/v1/auth/browser/session');
+            applyHealth(res.status < 500);
         } catch (e) {
             applyHealth(false);
         }

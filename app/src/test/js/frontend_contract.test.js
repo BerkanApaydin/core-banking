@@ -175,6 +175,9 @@ test('browser loads feature scripts in dependency order', () => {
     }
     assert.equal(vm.runInContext('getLanguage()', context), 'tr');
     assert.notEqual(vm.runInContext("__('app.title')", context), 'app.title');
+    assert.ok(vm.runInContext(
+        "__('transfer.own_iban_note', 'A$&B$`C$\\'D$1E')", context)
+        .includes('A$&B$`C$\'D$1E'));
     assert.equal(vm.runInContext('typeof getIdempotencyKey', context), 'function');
     assert.equal(vm.runInContext('typeof loadAccounts', context), 'function');
     assert.equal(vm.runInContext('typeof populateTransferDropdowns', context), 'function');

@@ -52,8 +52,11 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     // The previous COALESCE(business_created_at, created_at) fallback defeated
     // the V21 business-time index (a function over the column cannot use a plain
     // btree range scan). Legacy rows were backfilled in V20/V28, so the direct
-    // column predicate keeps the index usable. Ordering stays on the auditing
-    // created_at (insert order) by design.
+    // column predicate keeps the index usable. Ordering uses the same
+    // business_created_at key as the report cursor: nextCursorCreatedAt is
+    // Transfer.createdAt (the domain/business instant, mapped to
+    // business_created_at), so ordering by the auditing created_at would skip
+    // or duplicate rows whenever the two timestamps differ (V61 indexes).
     //
     // P-1 (same pattern as summarizeRange below): UNION ALL instead of
     // {@code sender = :id OR receiver = :id} so each branch range-scans its
@@ -68,7 +71,7 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
             + "SELECT t.* FROM transfers t "
             + "WHERE t.receiver_account_id = :accountId "
             + "AND t.business_created_at BETWEEN :start AND :end) combined "
-            + "ORDER BY combined.created_at DESC, combined.id DESC",
+            + "ORDER BY combined.business_created_at DESC, combined.id DESC",
             nativeQuery = true)
     List<TransferJpaEntity> findHistoryBetween(
             @Param("accountId") Long accountId,
@@ -135,9 +138,12 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
     long countById(@Param("id") Long id);
 
     /**
-     * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET so
-     * the covering index serves the range without sorting the full match set.
-     * Null cursor = first page.
+     * DB-2/Perf-3 keyset pagination: cursor (businessCreatedAt,id) replaces
+     * OFFSET so the covering index serves the range without sorting the full
+     * match set. Null cursor = first page. The cursor key MUST be the same
+     * business timestamp the report filters and orders by: it comes from
+     * Transfer.createdAt (mapped to business_created_at), not from the
+     * auditing created_at.
      *
      * <p>P-1: UNION ALL per-side branches (same disjointness argument as
      * {@link #findHistoryBetween}). The {@code CAST(:cursorCreatedAt AS
@@ -148,21 +154,21 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      * unreachable while the cursor is null.
      *
      * <p>PERF-4: the cursor predicate uses ANSI row comparison
-     * {@code (created_at, id) < (cursor)} — only the ROW() syntax lets
-     * PostgreSQL apply its row-comparison index optimization against the V43
-     * covering indexes; the {@code OR} disjunction falls back to BitmapOr.
+     * {@code (business_created_at, id) < (cursor)} — only the ROW() syntax
+     * lets PostgreSQL apply its row-comparison index optimization against the
+     * V61 covering indexes; the {@code OR} disjunction falls back to BitmapOr.
      */
     @Query(value = "SELECT * FROM ("
             + "SELECT t.* FROM transfers t "
             + "WHERE t.sender_account_id = :accountId "
             + "AND t.business_created_at BETWEEN :start AND :end "
-            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.created_at, t.id) < (:cursorCreatedAt, :cursorId)) "
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.business_created_at, t.id) < (:cursorCreatedAt, :cursorId)) "
             + "UNION ALL "
             + "SELECT t.* FROM transfers t "
             + "WHERE t.receiver_account_id = :accountId "
             + "AND t.business_created_at BETWEEN :start AND :end "
-            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.created_at, t.id) < (:cursorCreatedAt, :cursorId))) combined "
-            + "ORDER BY combined.created_at DESC, combined.id DESC",
+            + "AND (CAST(:cursorCreatedAt AS TIMESTAMP) IS NULL OR (t.business_created_at, t.id) < (:cursorCreatedAt, :cursorId))) combined "
+            + "ORDER BY combined.business_created_at DESC, combined.id DESC",
             nativeQuery = true)
     List<TransferJpaEntity> findHistoryBetweenKeyset(
             @Param("accountId") Long accountId,

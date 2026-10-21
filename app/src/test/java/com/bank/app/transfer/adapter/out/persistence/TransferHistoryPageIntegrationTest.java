@@ -5,6 +5,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -83,6 +84,32 @@ class TransferHistoryPageIntegrationTest extends AbstractIntegrationTest {
         assertEquals(1, remainder.size());
         assertEquals(10.00, remainder.get(0).getAmount().doubleValue());
         assertEquals(3L, repo.countHistory(201L));
+    }
+
+    @Test
+    void shouldPageReportsByBusinessTimeWhenInsertOrderDiffers() {
+        entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
+        // Business time and auditing insert time deliberately disagree:
+        // newest business transfer was inserted first, oldest was inserted last.
+        entityManager.createNativeQuery(
+                "INSERT INTO transfers (sender_account_id, receiver_account_id, amount, currency, status, business_created_at, created_at) VALUES " +
+                "(201, 202, 10.00, 'TRY', 'COMPLETED', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour'), " +
+                "(202, 201, 20.00, 'TRY', 'COMPLETED', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'), " +
+                "(201, 202, 30.00, 'TRY', 'COMPLETED', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '3 hours')")
+                .executeUpdate();
+
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        List<TransferJpaEntity> first = repo.findHistoryBetween(201L, start, end, PageRequest.of(0, 2));
+        assertEquals(2, first.size());
+        assertEquals(30.00, first.get(0).getAmount().doubleValue());
+        assertEquals(20.00, first.get(1).getAmount().doubleValue());
+
+        TransferJpaEntity cursor = first.get(1);
+        List<TransferJpaEntity> second = repo.findHistoryBetweenKeyset(201L, start, end,
+                cursor.getBusinessCreatedAt(), cursor.getId(), PageRequest.of(0, 2));
+        assertEquals(1, second.size());
+        assertEquals(10.00, second.get(0).getAmount().doubleValue());
     }
 
     @Test

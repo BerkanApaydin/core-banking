@@ -67,6 +67,7 @@ class TransferReportPageAssemblerTest {
         assertEquals(new BigDecimal("350.00"), page.pageVolume());
         assertEquals(2, page.responses().size());
         assertNotNull(page.nextCursorCreatedAt());
+        assertEquals(t2.getCreatedAt().toString(), page.nextCursorCreatedAt());
         assertEquals(11L, page.nextCursorId());
     }
 
