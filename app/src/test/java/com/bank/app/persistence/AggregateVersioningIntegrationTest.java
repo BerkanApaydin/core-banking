@@ -71,7 +71,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
         entityManager.createNativeQuery("UPDATE transfers SET status = 'FAILED', version = 1 WHERE id = 301")
                 .executeUpdate();
         entityManager.clear();
-        stale.complete(Clock.systemUTC());
+        stale.complete(java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
 
         assertThrows(OptimisticLockingFailureException.class, () -> {
             transfers.save(stale);
@@ -126,7 +126,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
     @Test
     void matchingVersionAllowsUpdateAndHibernateAdvancesVersion() {
         Transfer transfer = transfers.findById(301L).orElseThrow();
-        transfer.complete(Clock.systemUTC());
+        transfer.complete(java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
         transfers.save(transfer);
         entityManager.flush();
         entityManager.clear();

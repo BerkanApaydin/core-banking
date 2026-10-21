@@ -58,8 +58,17 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
      * {@code AuditingEntityListener}, so {@code updatedAt} is refreshed
      * explicitly — otherwise balance mutations would leave a stale audit
      * timestamp while the managed-entity path updates it.
+     *
+     * <p>Deliberately no {@code clearAutomatically}: clearing detaches every
+     * managed entity in the persistence context, not just this aggregate, and
+     * the adapter never reads the managed entity after the bulk write (it
+     * returns a freshly reconstructed aggregate). The rare 0-row path
+     * disambiguates with {@link #countById(Long)}, a count query that bypasses
+     * the persistence context, so it cannot be misled by a stale managed copy.
+     * Pinned by
+     * {@code AccountJpaRepositoryIntegrationTest.shouldRefreshUpdatedAtOnVersionedBulkUpdate}.
      */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("UPDATE AccountJpaEntity a SET a.balance = :balance, a.status = :status, "
             + "a.ownerName = :ownerName, a.version = a.version + 1, "
             + "a.updatedAt = CURRENT_TIMESTAMP "
@@ -69,4 +78,13 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
             @Param("balance") BigDecimal balance,
             @Param("status") AccountStatus status,
             @Param("ownerName") String ownerName);
+
+    /**
+     * Existence check that deliberately bypasses the persistence context.
+     * Used only on the bulk-update 0-row path: {@code findById} could return a
+     * stale managed entity (or hide a concurrent delete), while this count
+     * always asks the database.
+     */
+    @Query("SELECT COUNT(a) FROM AccountJpaEntity a WHERE a.id = :id")
+    long countById(@Param("id") Long id);
 }

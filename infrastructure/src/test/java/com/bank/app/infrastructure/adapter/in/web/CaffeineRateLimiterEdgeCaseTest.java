@@ -13,13 +13,13 @@ class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
     void shouldAllowRequestWhenUnderLimit() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         assertTrue(limiter.tryAcquire("client-1"));
     }
 
     @Test
     void shouldBlockRequestWhenOverLimit() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-1"));
         assertFalse(limiter.tryAcquire("client-1"));
@@ -27,7 +27,7 @@ class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
     void shouldAllowDifferentClientsIndependently() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         assertTrue(limiter.tryAcquire("client-1"));
         assertTrue(limiter.tryAcquire("client-2"));
         assertTrue(limiter.tryAcquire("client-3"));
@@ -49,13 +49,13 @@ class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
     void shouldHandleNullClientKey() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         assertThrows(NullPointerException.class, () -> limiter.tryAcquire(null));
     }
 
     @Test
     void shouldHandleHighVolumeClients() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1000, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1000, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         for (int i = 0; i < 1000; i++) {
             assertTrue(limiter.tryAcquire("high-volume"));
         }
@@ -64,7 +64,7 @@ class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
     void shouldHandleManyDistinctClients() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         for (int i = 0; i < 100; i++) {
             assertTrue(limiter.tryAcquire("client-" + i));
         }
@@ -98,7 +98,7 @@ class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
     void shouldIsolateTiersPerBudget() {
-        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 60000, 10000, Clock.systemUTC());
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(2, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
 
         assertTrue(limiter.tryAcquire("tiered"));
         assertTrue(limiter.tryAcquire("tiered"));

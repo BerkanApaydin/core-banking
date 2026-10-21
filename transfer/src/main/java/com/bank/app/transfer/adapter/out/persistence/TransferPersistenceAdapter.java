@@ -3,7 +3,6 @@ package com.bank.app.transfer.adapter.out.persistence;
 import com.bank.app.transfer.application.port.out.LoadTransferPort;
 import com.bank.app.transfer.application.port.out.SaveTransferPort;
 import com.bank.app.transfer.domain.Transfer;
-import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,11 +42,12 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
         // are never allowed (pinned by rejectsMissingVersionForExistingTransfer).
         if (transfer.getVersion() == null) {
             // Exceptional path only (callers always carry the version they read):
-            // one load distinguishes a missing row from a blind write.
-            // Domain NOT_FOUND (404 like the account sibling), never bare
-            // IllegalArgumentException (500).
-            repository.findById(transfer.getId())
-                    .orElseThrow(() -> new TransferNotFoundException(transfer.getId()));
+            // a context-bypassing count distinguishes a missing row from a
+            // blind write. Domain NOT_FOUND (404 like the account sibling),
+            // never bare IllegalArgumentException (500).
+            if (repository.countById(transfer.getId()) == 0) {
+                throw new TransferNotFoundException(transfer.getId());
+            }
             throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
         }
         int updated = repository.updateStatusIfVersionMatch(
@@ -58,8 +58,9 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
                     transfer.getReceiverAccountId(), transfer.getAmount(),
                     transfer.getStatus(), transfer.getCreatedAt(), bumped);
         }
-        repository.findById(transfer.getId())
-                .orElseThrow(() -> new TransferNotFoundException(transfer.getId()));
+        if (repository.countById(transfer.getId()) == 0) {
+            throw new TransferNotFoundException(transfer.getId());
+        }
         throw new ObjectOptimisticLockingFailureException(TransferJpaEntity.class, transfer.getId());
     }
 
@@ -128,18 +129,6 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
                 : row[1] instanceof Number n ? new BigDecimal(n.toString())
                 : BigDecimal.ZERO;
         return new LoadTransferPort.ReportTotals(count, volume);
-    }
-
-    @Override
-    public List<Transfer> findStalePending(LocalDateTime cutoff, int limit) {
-        // Hard cap: one schedule must never page the whole table; the next
-        // schedule continues where this one stopped (oldest-first order).
-        int safeLimit = Math.min(Math.max(limit, 1), 200);
-        Pageable pageable = PageRequest.of(0, safeLimit, Sort.unsorted());
-        return repository.findStalePending(TransferStatus.PENDING, cutoff, pageable)
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
     }
 
     /**

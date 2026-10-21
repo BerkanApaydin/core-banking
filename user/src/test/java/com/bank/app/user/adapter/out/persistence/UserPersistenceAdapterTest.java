@@ -246,7 +246,7 @@ class UserJpaAdapterTest {
         void shouldMapConcurrentDuplicateToConflict() {
             User user = User.create("newuser",
                     EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001"),
-                    null, null, Clock.systemUTC());
+                    null, null, java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
             when(userJpaRepository.save(any(UserJpaEntity.class)))
                     .thenThrow(new DataIntegrityViolationException("duplicate key"));
 

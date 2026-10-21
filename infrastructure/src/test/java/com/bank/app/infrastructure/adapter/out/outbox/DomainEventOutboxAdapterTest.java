@@ -46,7 +46,7 @@ class DomainEventOutboxAdapterTest {
 
         @BeforeEach
         void setUp() throws Exception {
-            adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> Clock.systemUTC(),
+            adapter = new DomainEventOutboxAdapter(outboxPort, objectMapper, () -> java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC),
                     () -> UUID.randomUUID().toString(),
                     new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
         }
@@ -164,7 +164,7 @@ class DomainEventOutboxAdapterTest {
         @Test
         void shouldSerializeWithObjectMapper() throws Exception {
             ObjectMapper realMapper = new ObjectMapper();
-            adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> Clock.systemUTC(),
+            adapter = new DomainEventOutboxAdapter(outboxPort, realMapper, () -> java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC),
                     () -> UUID.randomUUID().toString(),
                     new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
             DomainEvent event = new DomainEvent() {

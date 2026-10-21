@@ -69,6 +69,8 @@ class LoginUserUseCaseTest {
     private static final String USERNAME = "testuser";
     private static final String PASSWORD = "$2a$12$testpasswordhash00000000000000000000001";
     private static final String CLIENT_IP = "192.168.1.1";
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"), ZoneOffset.UTC);
 
 
     @BeforeEach
@@ -99,7 +101,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             when(idGenerator.newId()).thenReturn("family-1");
 
             AuthResponse response = loginUserUseCase.execute(request);
@@ -127,7 +129,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 5L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             AuthResponse response = loginUserUseCase.execute(request);
 
@@ -149,7 +151,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             when(idGenerator.newId()).thenReturn("family-1");
 
             AuthResponse response = loginUserUseCase.execute(request, CLIENT_IP);
@@ -174,7 +176,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             AuthResponse response = loginUserUseCase.execute(request, null);
 
@@ -200,7 +202,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-jwt-token");
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             when(idGenerator.newId()).thenReturn("family-1");
             doThrow(new RuntimeException("session store down"))
                     .when(refreshTokenPort).save(anyString(), eq(100L), anyString(), any());
@@ -284,7 +286,7 @@ class LoginUserUseCaseTest {
         @DisplayName("should map unknown user to generic 401 (no enumeration)")
         void shouldThrowWhenUserNotFound() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
@@ -311,7 +313,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
             when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(false);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             doThrow(new UserNotFoundException("User not found")).when(authenticationPort).authenticate(USERNAME, PASSWORD);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
@@ -428,7 +430,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             loginUserUseCase.execute(request);
 
@@ -454,7 +456,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             loginUserUseCase.execute(request, CLIENT_IP);
 
@@ -468,7 +470,7 @@ class LoginUserUseCaseTest {
         @DisplayName("should publish LOGIN_FAILED on bad credentials")
         void shouldPublishLoginFailed() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             doThrow(new AuthenticationFailedException("Bad credentials"))
                     .when(authenticationPort).authenticate(anyString(), anyString());
 
@@ -492,7 +494,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             doThrow(new RuntimeException("audit down")).when(auditEventPort)
                     .publish(any(AuditEvent.class));
 
@@ -511,7 +513,7 @@ class LoginUserUseCaseTest {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(true);
             when(loginAttemptPort.getWindowMinutes()).thenReturn(15);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class);
@@ -530,7 +532,7 @@ class LoginUserUseCaseTest {
             when(loginAttemptPort.isIpBlocked(CLIENT_IP)).thenReturn(false);
             when(loginAttemptPort.isUsernameBlocked(eq(USERNAME), any())).thenReturn(true);
             when(loginAttemptPort.getWindowMinutes()).thenReturn(15);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
 
             assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class);
@@ -684,7 +686,7 @@ class LoginUserUseCaseTest {
             when(jwtPort.generateRefreshToken(100L, USERNAME, "ROLE_USER", 0L)).thenReturn("mock-refresh-token");
             when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
-            when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             when(idGenerator.newId()).thenReturn("family-1");
 
             AuthResponse response = loginUserUseCase.execute(request);

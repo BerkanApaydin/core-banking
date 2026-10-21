@@ -5,8 +5,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.time.Clock;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -51,11 +49,11 @@ class UserTest {
             assertThat(user.getPassword()).isEqualTo("$2a$12$testrawpasswordhash00000000000000000001");
             assertThat(user.getRole()).isEqualTo(Role.ROLE_USER);
             assertThat(user.getDomainEvents()).isEmpty();
-            assertThatThrownBy(() -> user.recordRegistration(Clock.systemUTC()))
+            assertThatThrownBy(() -> user.recordRegistration(UserTestFactory.FIXED_CLOCK))
                     .isInstanceOf(IllegalStateException.class);
 
             User persisted = new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole());
-            persisted.recordRegistration(Clock.systemUTC());
+            persisted.recordRegistration(UserTestFactory.FIXED_CLOCK);
             assertThat(persisted.getDomainEvents()).hasSize(1);
             assertThat(((UserRegisteredEvent) persisted.getDomainEvents().get(0)).userId()).isEqualTo("42");
         }
@@ -139,12 +137,12 @@ class UserTest {
         void shouldRejectGlobMetacharactersInNewUsername() {
             EncodedPassword encoded = EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001");
 
-            assertThatThrownBy(() -> User.create("bad*name", encoded, null, null, Clock.systemUTC()))
+            assertThatThrownBy(() -> User.create("bad*name", encoded, null, null, UserTestFactory.FIXED_CLOCK))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Username may contain only letters, digits, '.', '_' and '-'");
-            assertThatThrownBy(() -> User.create("bad?name", encoded, null, null, Clock.systemUTC()))
+            assertThatThrownBy(() -> User.create("bad?name", encoded, null, null, UserTestFactory.FIXED_CLOCK))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> User.create("bad[name]", encoded, null, null, Clock.systemUTC()))
+            assertThatThrownBy(() -> User.create("bad[name]", encoded, null, null, UserTestFactory.FIXED_CLOCK))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
 
@@ -153,7 +151,7 @@ class UserTest {
         void shouldAcceptSafeCharactersInNewUsername() {
             EncodedPassword encoded = EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001");
 
-            User user = User.create("  user.name_1-2  ", encoded, null, null, Clock.systemUTC());
+            User user = User.create("  user.name_1-2  ", encoded, null, null, UserTestFactory.FIXED_CLOCK);
 
             assertThat(user.getUsername()).isEqualTo("user.name_1-2");
         }

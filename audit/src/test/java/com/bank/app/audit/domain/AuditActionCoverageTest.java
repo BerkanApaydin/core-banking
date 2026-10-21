@@ -39,7 +39,7 @@ class AuditActionCoverageTest {
     }
 
     @Test
-    void reaperOutcomeIsPersistable() {
+    void transferMarkedFailedIsPersistable() {
         assertThatCode(() -> AuditAction.fromString(AuditEvent.TRANSFER_MARKED_FAILED))
                 .doesNotThrowAnyException();
     }

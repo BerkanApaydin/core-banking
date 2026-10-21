@@ -7,7 +7,6 @@ import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +106,5 @@ class ProblemResponsesTest {
 
         assertThat(response.getBody().getProperties().get("timestamp").toString())
                 .startsWith("2026-05-01T12:00");
-        assertThat(LocalDateTime.now(Clock.systemUTC()).getYear()).isEqualTo(2026);
     }
 }

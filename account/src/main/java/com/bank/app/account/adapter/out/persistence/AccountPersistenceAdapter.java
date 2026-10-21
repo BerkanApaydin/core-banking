@@ -152,17 +152,20 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
                 return new Account(account.getId(), account.getUserId(), account.getIban(),
                         account.getOwnerName(), account.getBalance(), account.getStatus(), bumped);
             }
-            // 0 rows: distinguish missing row vs concurrent write with one load.
-            repository.findById(account.getId())
-                    .orElseThrow(() -> new AccountNotFoundException(account.getId()));
+            // 0 rows: distinguish missing row vs concurrent write with a
+            // count query that bypasses the persistence context (R-A03).
+            if (repository.countById(account.getId()) == 0) {
+                throw new AccountNotFoundException(account.getId());
+            }
             throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
         }
         // Legacy path (version null): same contract as transfer — a missing row
         // reports not-found, an existing row rejects the blind write with an
         // optimistic failure. Callers always carry the version they read, so
-        // this load runs only on the exceptional path.
-        repository.findById(account.getId())
-                .orElseThrow(() -> new AccountNotFoundException(account.getId()));
+        // this check runs only on the exceptional path.
+        if (repository.countById(account.getId()) == 0) {
+            throw new AccountNotFoundException(account.getId());
+        }
         throw new ObjectOptimisticLockingFailureException(AccountJpaEntity.class, account.getId());
     }
 }

@@ -111,14 +111,28 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      * {@code AuditingEntityListener}, so without the explicit write the
      * column would stay NULL and the transfer audit trail would lose its
      * "last changed" information.
+     *
+     * <p>No {@code clearAutomatically} (R-A03): clearing detaches every
+     * managed entity in the persistence context, while this adapter returns a
+     * freshly reconstructed aggregate and never re-reads the managed row after
+     * the bulk write. The 0-row path uses {@link #countById(Long)}, a count
+     * query that bypasses the persistence context.
      */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("UPDATE TransferJpaEntity t SET t.status = :status, t.version = t.version + 1, "
             + "t.updatedAt = CURRENT_TIMESTAMP "
             + "WHERE t.id = :id AND t.version = :version")
     int updateStatusIfVersionMatch(@Param("id") Long id,
             @Param("version") Long version,
             @Param("status") TransferStatus status);
+
+    /**
+     * Existence check that bypasses the persistence context. Used only on the
+     * 0-row bulk-update path so a stale managed copy cannot turn a concurrent
+     * delete into an optimistic-lock conflict.
+     */
+    @Query("SELECT COUNT(t) FROM TransferJpaEntity t WHERE t.id = :id")
+    long countById(@Param("id") Long id);
 
     /**
      * DB-2/Perf-3 keyset pagination: cursor (createdAt,id) replaces OFFSET so
@@ -156,19 +170,5 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
             @Param("end") LocalDateTime end,
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorId") Long cursorId,
-            Pageable pageable);
-
-    /**
-     * Crash-window scan for the pending reaper: PENDING rows whose business
-     * time predates the cutoff, oldest first. The reaper locks each row
-     * individually ({@code findByIdForUpdate}) and transitions it through the
-     * versioned bulk UPDATE, so concurrent reaper replicas (or a racing
-     * completion) surface as version conflicts, never as double marks.
-     */
-    @Query("SELECT t FROM TransferJpaEntity t WHERE t.status = :status "
-            + "AND t.businessCreatedAt < :cutoff ORDER BY t.businessCreatedAt ASC, t.id ASC")
-    List<TransferJpaEntity> findStalePending(
-            @Param("status") TransferStatus status,
-            @Param("cutoff") LocalDateTime cutoff,
             Pageable pageable);
 }

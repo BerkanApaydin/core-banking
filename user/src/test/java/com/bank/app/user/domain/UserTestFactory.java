@@ -1,6 +1,8 @@
 package com.bank.app.user.domain;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Objects;
 
 /**
@@ -17,6 +19,9 @@ public final class UserTestFactory {
     /** BCrypt-shaped fixture hash. Never a real secret; prefix-valid only. */
     public static final String FIXTURE_HASH = "$2a$12$testfixturehash000000000000000000000001";
 
+    public static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
+
     private UserTestFactory() {}
 
     public static User newUser(String username) {
@@ -25,11 +30,11 @@ public final class UserTestFactory {
 
     public static User newUser(String username, String bcryptHash) {
         Objects.requireNonNull(username, "Username must not be null");
-        return User.create(username, EncodedPassword.of(bcryptHash), null, null, Clock.systemUTC());
+        return User.create(username, EncodedPassword.of(bcryptHash), null, null, FIXED_CLOCK);
     }
 
     public static User newUser(String username, String bcryptHash, EmailAddress email, PhoneNumber phone) {
         Objects.requireNonNull(username, "Username must not be null");
-        return User.create(username, EncodedPassword.of(bcryptHash), email, phone, Clock.systemUTC());
+        return User.create(username, EncodedPassword.of(bcryptHash), email, phone, FIXED_CLOCK);
     }
 }

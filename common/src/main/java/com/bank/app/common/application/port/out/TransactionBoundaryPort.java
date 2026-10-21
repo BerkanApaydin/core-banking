@@ -17,7 +17,7 @@ import java.util.function.Supplier;
  * Use-case demarcation itself stays with the {@code @TransactionalUseCase}
  * markers and {@code UseCaseTransactionAspect} — this port is for adapters
  * that need to <em>observe</em> the boundary (deferred cache eviction,
- * retry suppression, crash-window reaping), not to open business
+ * retry suppression) or persist one row independently, not to open business
  * transactions.
  *
  * <p>Persistence failure <em>types</em> ({@code OptimisticLockingFailureException}
@@ -42,9 +42,10 @@ public interface TransactionBoundaryPort {
 
     /**
      * Runs {@code action} in its own transaction with the given timeout, and
-     * returns its result. Runtime exceptions propagate unchanged. Used for
-     * row-scoped background work (e.g. crash-window reaping) where one
-     * poisoned row must not roll back the rest of the batch.
+     * returns its result. Runtime exceptions propagate unchanged. Used by
+     * adapters that must persist one row in a self-contained transaction
+     * (e.g. refresh-token rotation or MFA secret updates), independent of the
+     * caller's ambient transaction.
      *
      * @param timeoutSeconds transaction timeout; must be positive
      */

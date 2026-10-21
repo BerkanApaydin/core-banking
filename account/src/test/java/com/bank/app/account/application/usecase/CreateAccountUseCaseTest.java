@@ -31,7 +31,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.common.domain.exception.AuthorizationException;
 
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,7 +75,9 @@ class CreateAccountUseCaseTest {
     }
 
     private void stubClock() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(
+                java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC));
     }
 
     private CreateAccountRequest validRequest() {

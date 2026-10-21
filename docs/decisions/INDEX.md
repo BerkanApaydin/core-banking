@@ -20,7 +20,6 @@ is the single map: ID → file → one-sentence decision.
 | DB-1 | `docs/decisions/enum-types.md` | Native enum decision + value-add procedure; VARCHAR+CHECK roadmap for status. |
 | V32 | `docs/release.md` (lock measurement) | Staging lock measurement mandatory before `ALTER TYPE` on large tables. |
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
-| R-1 | `docs/decisions/pending-reaper.md` | Crash-window reaper marks stale PENDING transfers FAILED via the domain; no distributed lock, version conflicts counted. |
 | T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
 | K19 | `docs/decisions/api-versioning.md` | URL versioning via `@ApiVersion` + additive-change rules; published language evolves by addition only. |
 | — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout/MFA/reset), observe-after-commit (dispatch). |
@@ -30,7 +29,7 @@ is the single map: ID → file → one-sentence decision.
 | K18 | `docs/decisions/saga-readiness.md` | Documented (not implemented) saga path; tripwire comments at the ACL calls. |
 | — | `docs/decisions/test-placement.md` | Spring-context tests live in `app`; unit tests live in their owning modules. |
 | — | `docs/decisions/transaction-strategy.md` | Marker-aspect programmatic tx for use cases; declarative `@Transactional` for single-boundary adapters. |
-| S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained (reachable via the pending reaper); R-2 relay (`TransferFailedOutboxRelay`) closed the consumer gap; revisit if async placement stays absent. |
+| S10/D18 | `docs/decisions/transfer-failed-state.md` | FAILED state retained for the documented async placement path (no production caller today); relay stays wired for that future flow; revisit if async placement stays absent. |
 | S11/D23 | `docs/decisions/mfa-totp.md` | TOTP MFA (per-user opt-in, AES-GCM secrets, fail-fast prod key) + enumeration-safe password reset; authenticated MFA failures are 400 (`MFA_CODE_INVALID`), login stays uniform 401. |
 | MFA-1 (2026-10) | `docs/decisions/mfa-totp.md` | MFA code checks share one service: account-keyed attempt budget (429) enforced at every call site (the login path consults it after the password check), TOTP replay counter consumed by the login path only, `/api/v1/auth/mfa/*` in the tight rate-limit tier. |
 | OUTBOX-1 (2026-10) | `docs/decisions/retry-policy.md`, V57 | A failed outbox event waits for an exponential backoff before the next attempt: `max-retries` is a budget, not a count. |
@@ -48,7 +47,6 @@ is the single map: ID → file → one-sentence decision.
 - `keyset-pagination.md` (DB-2: cursor contract)
 - `kafka-readiness.md` (long term: OutboxPort → broker migration)
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
-- `pending-reaper.md` (R-1: stale-PENDING crash-window recovery through the domain)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 | O-1 | `docs/decisions/secret-management.md` (2026-10 rotation) | Leaked dev-default JWT secret rotated; history still counts as compromised. |

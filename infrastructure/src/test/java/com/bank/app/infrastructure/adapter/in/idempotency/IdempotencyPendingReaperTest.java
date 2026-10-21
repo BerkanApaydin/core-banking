@@ -32,7 +32,8 @@ class IdempotencyPendingReaperTest {
     @Mock
     private ClockProviderPort clockProvider;
 
-    private final Clock fixedClock = Clock.systemUTC();
+    private final Clock fixedClock = Clock.fixed(
+            java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC);
     private SimpleMeterRegistry meters;
     private IdempotencyPendingReaper reaper;
 

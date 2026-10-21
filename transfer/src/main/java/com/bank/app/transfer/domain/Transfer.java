@@ -144,11 +144,10 @@ public class Transfer extends BaseAggregateRoot {
      * Marks a pending transfer as failed. The synchronous placement path rolls
      * the transaction back instead of persisting a FAILED row (see
      * PlaceTransferUseCaseImpl), so a failure never leaves a half-written
-     * transfer behind. The production caller for crash leftovers is
-     * {@code TransferPendingReaper}, which transitions stale PENDING rows
-     * (JVM crash between the two saves) to FAILED through this method —
-     * together with {@code TransferStatus.FAILED} and the report UI that
-     * already renders it.
+     * transfer behind. There is no production caller today: the method and
+     * {@code TransferStatus.FAILED} are retained for the documented async
+     * placement path (see docs/decisions/transfer-failed-state.md), where a
+     * worker must reconcile a PENDING row that outlived its placement.
      */
     public void markFailed(Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");

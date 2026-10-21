@@ -134,13 +134,13 @@ class TransferPersistenceAdapterTest {
         Transfer domainTransfer = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00",
 Currency.TRY), TransferStatus.COMPLETED, now);
 
-        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+        when(springDataRepo.countById(999L)).thenReturn(0L);
 
         // Domain NOT_FOUND (404 like the account sibling), never bare
         // IllegalArgumentException (500).
         TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
                 () -> repository.save(domainTransfer));
-        verify(springDataRepo).findById(999L);
+        verify(springDataRepo).countById(999L);
         verify(springDataRepo, never()).save(any());
     }
     @Test
@@ -400,7 +400,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(999L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);
-        when(springDataRepo.findById(999L)).thenReturn(Optional.empty());
+        when(springDataRepo.countById(999L)).thenReturn(0L);
 
         assertThrows(TransferNotFoundException.class,
                 () -> repository.save(missing));
@@ -413,9 +413,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);
-        when(springDataRepo.findById(10L)).thenReturn(Optional.of(
-                createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY,
-                        TransferStatus.COMPLETED, 2L, now)));
+        when(springDataRepo.countById(10L)).thenReturn(1L);
 
         assertThrows(ObjectOptimisticLockingFailureException.class, () -> repository.save(stale));
     }

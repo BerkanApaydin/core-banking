@@ -11,10 +11,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Audit follow-up: FAILED transfers previously had no outbox relay, so a
- * reaped transfer was visible only in the audit trail — downstream consumers
+ * FAILED transfer was visible only in the audit trail — downstream consumers
  * (notifications, future saga participants) never learned about it. This relay
  * closes that gap with the same at-least-once + dedup contract as the
- * COMPLETED/CANCELLED relays.
+ * COMPLETED/CANCELLED relays. It stays dormant until the documented async
+ * placement/reconciliation flow starts producing FAILED transfers.
  */
 @Component
 public class TransferFailedOutboxRelay extends AbstractTransferOutboxRelay {

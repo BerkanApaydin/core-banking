@@ -7,7 +7,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,12 +21,14 @@ class LedgerEntryTest {
 
     private static final Money AMOUNT = Money.of("200.00", Currency.TRY);
     private static final Money BALANCE = Money.of("800.00", Currency.TRY);
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
 
     @Test
     @DisplayName("debit and credit factories assign direction and timestamp")
     void shouldBuildLegs() {
         TransactionRef ref = LedgerEntry.newTransactionRef();
-        Clock clock = Clock.systemUTC();
+        Clock clock = FIXED_CLOCK;
 
         LedgerEntry debit = LedgerEntry.debit(1L, AMOUNT, BALANCE, ref, clock);
         LedgerEntry credit = LedgerEntry.credit(2L, AMOUNT, BALANCE, ref, clock);
@@ -82,7 +86,7 @@ class LedgerEntryTest {
     @DisplayName("debitFromBefore derives balanceAfter by subtraction")
     void shouldDeriveDebitBalanceAfter() {
         Money before = Money.of("1000.00", Currency.TRY);
-        LedgerEntry leg = LedgerEntry.debitFromBefore(1L, AMOUNT, before, new TransactionRef("ref-1"), Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.debitFromBefore(1L, AMOUNT, before, new TransactionRef("ref-1"), FIXED_CLOCK);
 
         assertThat(leg.getDirection()).isEqualTo(LedgerDirection.DEBIT);
         assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("800.00", Currency.TRY));
@@ -93,7 +97,7 @@ class LedgerEntryTest {
     @DisplayName("creditFromBefore derives balanceAfter by addition")
     void shouldDeriveCreditBalanceAfter() {
         Money before = Money.of("500.00", Currency.TRY);
-        LedgerEntry leg = LedgerEntry.creditFromBefore(2L, AMOUNT, before, new TransactionRef("ref-2"), Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.creditFromBefore(2L, AMOUNT, before, new TransactionRef("ref-2"), FIXED_CLOCK);
 
         assertThat(leg.getDirection()).isEqualTo(LedgerDirection.CREDIT);
         assertThat(leg.getBalanceAfter()).isEqualTo(Money.of("700.00", Currency.TRY));
@@ -102,7 +106,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("toString renders entry fields")
     void shouldRenderToString() {
-        LedgerEntry leg = LedgerEntry.debit(1L, AMOUNT, BALANCE, new TransactionRef("ref-9"), Clock.systemUTC());
+        LedgerEntry leg = LedgerEntry.debit(1L, AMOUNT, BALANCE, new TransactionRef("ref-9"), FIXED_CLOCK);
 
         assertThat(leg.toString())
                 .contains("account=1")

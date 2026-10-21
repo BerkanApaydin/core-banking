@@ -35,6 +35,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,6 +78,8 @@ class PlaceTransferUseCaseImplTest {
     private static final Long SENDER_USER_ID = 100L;
     private static final Long RECEIVER_USER_ID = 200L;
     private static final BigDecimal AMOUNT = new BigDecimal("250.00");
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"), ZoneOffset.UTC);
 
     @Captor
     private ArgumentCaptor<Transfer> transferCaptor;
@@ -91,7 +95,7 @@ class PlaceTransferUseCaseImplTest {
     }
 
     private void stubClock() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
     }
 
     private AccountInfo senderInfo() {

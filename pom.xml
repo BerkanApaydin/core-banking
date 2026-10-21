@@ -239,7 +239,7 @@
                              driver/JVM zone IS the stored clock. Production pins
                              UTC via Dockerfile TZ + -Duser.timezone=UTC; tests
                              must run in the same zone or business-time
-                             comparisons (reaper cutoff, cancellation window)
+                             comparisons (window cutoffs, cancellation window)
                              shift by the host offset (found: +03:00 host made
                              a 1h-old row look future-dated). -->
                         <argLine>@{jacoco.argLine} -Dfile.encoding=${project.build.sourceEncoding} -Duser.timezone=UTC</argLine>

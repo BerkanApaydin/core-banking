@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import com.bank.app.common.domain.AccountId;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -279,7 +280,9 @@ class AccountAclAdapterTest {
             // Three lookups: the leader probes twice (outside and inside the
             // flight), the waiter probes once before joining the flight.
             assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
-            Thread.sleep(100);
+            await().atMost(Duration.ofSeconds(5)).until(() ->
+                    waiter.getState() == Thread.State.WAITING
+                            || waiter.getState() == Thread.State.TIMED_WAITING);
             releaseLoader.countDown();
             leader.join(5_000);
             waiter.join(5_000);
@@ -325,7 +328,9 @@ class AccountAclAdapterTest {
             });
             waiter.start();
             assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
-            Thread.sleep(100);
+            await().atMost(Duration.ofSeconds(5)).until(() ->
+                    waiter.getState() == Thread.State.WAITING
+                            || waiter.getState() == Thread.State.TIMED_WAITING);
             releaseLoader.countDown();
             leader.join(5_000);
             waiter.join(5_000);

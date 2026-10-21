@@ -3,11 +3,11 @@
 ## Status
 
 Accepted — `Transfer.markFailed()`, `TransferStatus.FAILED`, the `chk_transfers_status`
-values and the report UI's FAILED rendering stay. Update (R-1): `markFailed()`
-now HAS a production caller — `TransferPendingReaper` transitions crash-window
-PENDING leftovers to FAILED through the domain (see `pending-reaper.md`).
-The async-placement rationale below still holds, but the method is no longer
-dead code.
+values and the report UI's FAILED rendering stay. There is no production caller
+today: the synchronous placement path rolls back instead of persisting FAILED,
+and the former crash-window reaper was retired (placement runs both saves in one
+transaction, so a crash cannot commit a PENDING row). The async-placement
+rationale below still holds.
 
 ## Context
 
@@ -15,6 +15,10 @@ The synchronous placement path (`PlaceTransferUseCaseImpl`) rolls the
 transaction back on failure instead of persisting a FAILED row, so a failure
 never leaves a half-written transfer behind. `markFailed()` is therefore dead
 production code by the strict YAGNI reading.
+
+Both saves in the synchronous path participate in the same `@TransactionalUseCase`
+transaction. A JVM crash or connection loss before commit therefore rolls the
+whole unit of work back; there is no committed PENDING row to reconcile.
 
 ## Decision
 
@@ -36,16 +40,10 @@ removing all three, which is the actual cost:
 - `Transfer.cancel()` keeps rejecting FAILED transfers explicitly
   (`TransferNotCancellableException`), so the retained state cannot be
   misused as cancellable.
-- Update (R-2, audit): `TransferPendingReaper` now publishes the FAILED
-  transition to the outbox in the same `REQUIRES_NEW` row transaction
-  (atomic commit — a publish failure rolls the FAILED row back and the
-  next schedule retries), and `TransferFailedOutboxRelay` delivers it to
-  `TransferEventConsumer` (at-least-once + persistent dedup, same contract
-  as COMPLETED/CANCELLED). `AsyncTransferFailedEvent.from(transfer)` keeps
-  the legacy creation-time fallback; new code uses
-  `from(transfer, failedAt)` with the actual failure instant.
-  The "no FAILED consumer" gap is closed; the audit row remains as the
-  human-readable trail.
+- `TransferFailedOutboxRelay` and `AsyncTransferFailedEvent` remain wired, but
+  are dormant until an async placement/reconciliation flow starts invoking
+  `markFailed()`; they then deliver the FAILED transition with the same
+  at-least-once + persistent-dedup contract as COMPLETED/CANCELLED.
 - If async placement is still absent after the next two release cycles,
   revisit: delete the method, keep the enum value (DB CHECK/enum compat).
 

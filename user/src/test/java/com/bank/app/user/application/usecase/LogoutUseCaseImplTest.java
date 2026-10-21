@@ -18,7 +18,6 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,7 +51,9 @@ class LogoutUseCaseImplTest {
     }
 
     private void stubClock() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(
+                java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC));
     }
 
     @Test

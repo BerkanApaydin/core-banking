@@ -149,7 +149,7 @@ class CancelTransferUseCaseTest {
         stubClock();
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
-        Transfer transfer = Transfer.create(new AccountId(10L), new AccountId(20L), amount, Clock.systemUTC());
+        Transfer transfer = Transfer.create(new AccountId(10L), new AccountId(20L), amount, FIXED_CLOCK);
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
         when(accountAclPort.getAccountInfo(new AccountId(10L)))

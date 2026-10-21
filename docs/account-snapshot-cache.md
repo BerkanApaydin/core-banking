@@ -50,7 +50,11 @@ Properties of this race in this codebase:
   `status`, and nothing in the transfer context reads it. The
   authorization decision is made by `Account.debit()` on the aggregate
   re-read under `PESSIMISTIC_WRITE`, so a stale `ACTIVE` snapshot can
-  never authorize a suspended account.
+  never authorize a suspended account. Pinned by
+  `AccountTest.Debit.shouldThrowOnSuspendedAccount` (the aggregate rejects
+  the movement) and `PlaceTransferUseCaseImplTest.FailureHandling.
+  shouldNotCompensateOnDebitFailure` (a cached `ACTIVE` lookup followed by a
+  failed mutation propagates and never completes the transfer).
 - **Would need a fencing token to close.** The industry-standard fix is a
   monotonic revision on the snapshot plus a compare-and-set write (the
   cache rejects a write whose revision is older than the last invalidation

@@ -24,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
-import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -64,7 +63,9 @@ class RegisterUserUseCaseTest {
     }
 
     private void stubClock() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(
+                java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC));
     }
 
     @Nested

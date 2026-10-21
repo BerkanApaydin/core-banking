@@ -174,6 +174,10 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
                 new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Test User");
 
         assertEquals(1, updated);
+        // The bulk update deliberately does not clear the persistence context
+        // (R-A03); clear explicitly to assert the database state a fresh
+        // transaction would read.
+        entityManager.clear();
         AccountJpaEntity reloaded = repo.findById(savedEntityId).orElseThrow();
         assertEquals(1L, reloaded.getVersion());
         assertNotNull(reloaded.getUpdatedAt(),

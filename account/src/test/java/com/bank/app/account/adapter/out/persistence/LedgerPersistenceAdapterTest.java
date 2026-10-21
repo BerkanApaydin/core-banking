@@ -46,7 +46,7 @@ class LedgerPersistenceAdapterTest {
         var adapter = new LedgerPersistenceAdapter(repository, new LedgerJpaMapper());
         Money amount = Money.of("200.00", Currency.TRY);
         Money balance = Money.of("800.00", Currency.TRY);
-        LedgerEntry entry = LedgerEntry.debit(1L, amount, balance, new TransactionRef("ref-1"), Clock.systemUTC());
+        LedgerEntry entry = LedgerEntry.debit(1L, amount, balance, new TransactionRef("ref-1"), java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
         LedgerEntryJpaEntity persisted = new LedgerEntryJpaEntity();
         persisted.setId(5L);
         persisted.setTransactionRef("ref-1");

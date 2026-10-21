@@ -14,7 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -34,7 +33,9 @@ class AuditLoggerTest {
 
     @BeforeEach
     void setUp() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(
+                java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC));
         auditLogger = new AuditLoggerUseCaseImpl(saveAuditLogPort, userContextService, clockProvider);
     }
 

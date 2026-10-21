@@ -10,7 +10,7 @@ class AuditActionTest {
     @Test
     void shouldHaveAllExpectedEnumValues() {
         // 7 money-movement actions + 5 authentication-lifecycle actions (K11/D4)
-        // + 1 crash-window reaper outcome (TRANSFER_MARKED_FAILED)
+        // + 1 reserved reconciliation outcome (TRANSFER_MARKED_FAILED)
         // + 4 MFA/password-reset lifecycle actions (V54/V55)
         // + 1 MFA re-authentication failure (R-U08/V58).
         assertEquals(18, AuditAction.values().length);

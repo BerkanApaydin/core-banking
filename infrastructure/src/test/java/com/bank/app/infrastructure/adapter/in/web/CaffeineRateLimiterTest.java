@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SuppressWarnings("null")
 class CaffeineRateLimiterTest {
 
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock = Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneId.of("UTC"));
 
     @Test
     void shouldAllowRequestsUntilLimit() {

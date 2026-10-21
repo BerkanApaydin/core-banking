@@ -29,7 +29,6 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Clock;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -88,7 +87,9 @@ class AdjustAccountBalancesUseCaseImplTest {
     }
 
     private void stubClockAndSave() {
-        when(clockProvider.clock()).thenReturn(Clock.systemUTC());
+        when(clockProvider.clock()).thenReturn(
+                java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC));
         // D-1: seeded ref — one move() consumes exactly one ID.
         when(idGenerator.newId()).thenReturn("test-operation-ref");
         // 7.2: the adapter echoes the saved aggregate (with bumped version);

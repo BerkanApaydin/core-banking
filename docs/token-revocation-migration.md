@@ -93,9 +93,8 @@ re-login wave).
    old-signed tokens, new pods accept new-signed ones; no shared revocation
    state depends on the key.
 4. After the rollout, force re-login is automatic (old signatures no longer
-   verify → 401 → login). Confirm `transfer.pending.reaped` and login rates
-   return to baseline; watch for a 401 spike that does not decay (stuck
-   clients caching the old token).
+   verify → 401 → login). Confirm login rates return to baseline; watch for a
+   401 spike that does not decay (stuck clients caching the old token).
 5. Alternative without rotation: bump per-user `tokenVersion` (role/password
    flows already do) to retire one identity's sessions at next refresh.
 

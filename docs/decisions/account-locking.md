@@ -22,7 +22,8 @@ they are not two alternatives accidentally left on.
 comparison per write and buys: (a) a fail-loud tripwire if a future code path
 writes without locking, (b) the 409 contract the API already exposes
 (`OPTIMISTIC_LOCK_CONFLICT`, alert `OptimisticLockConflictsRising`), (c) the
-reaper's conflict counting. Removing it saves nothing measurable.
+fail-loud cross-check for every bulk status update. Removing it saves nothing
+measurable.
 
 **Why not optimistic-only (drop `FOR UPDATE`)?** Balances are read-modify-write
 with a domain invariant (`debit` insufficient-funds check) computed in Java.

@@ -81,11 +81,10 @@ class AccountPersistenceAdapterTest {
     void shouldRejectStaleVersionOnSave() {
         Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
-        AccountJpaEntity managedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 2L);
 
         when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
                 .thenReturn(0);
-        when(springDataRepo.findById(1L)).thenReturn(Optional.of(managedEntity));
+        when(springDataRepo.countById(1L)).thenReturn(1L);
 
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> repository.save(domainAccount));
@@ -100,7 +99,7 @@ class AccountPersistenceAdapterTest {
 
         when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
                 .thenReturn(0);
-        when(springDataRepo.findById(1L)).thenReturn(Optional.empty());
+        when(springDataRepo.countById(1L)).thenReturn(0L);
 
         assertThrows(AccountNotFoundException.class,
                 () -> repository.save(domainAccount));
@@ -120,7 +119,7 @@ class AccountPersistenceAdapterTest {
         Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
                 Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
-        when(springDataRepo.findById(9L)).thenReturn(Optional.empty());
+        when(springDataRepo.countById(9L)).thenReturn(0L);
 
         assertThrows(AccountNotFoundException.class, () -> repository.save(domainAccount));
         verify(springDataRepo, never()).save(any(AccountJpaEntity.class));
@@ -132,9 +131,7 @@ class AccountPersistenceAdapterTest {
         Iban iban = new Iban("TR770006200000000000000111");
         Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
                 Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
-        AccountJpaEntity managed = new AccountJpaEntity(9L, 100L, iban.value(), "Ahmet",
-                new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, 2L);
-        when(springDataRepo.findById(9L)).thenReturn(Optional.of(managed));
+        when(springDataRepo.countById(9L)).thenReturn(1L);
 
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> repository.save(domainAccount));

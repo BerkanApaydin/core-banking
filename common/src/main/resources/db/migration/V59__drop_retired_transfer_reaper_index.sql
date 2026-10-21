@@ -1,0 +1,12 @@
+-- Owner: transfer
+-- Reason: drop the V49 partial index that only served the retired pending reaper
+--
+-- V59__drop_retired_transfer_reaper_index.sql
+--
+-- R-A02: the crash-window reaper was removed because placement saves the
+-- PENDING row and the completion in one transaction; a crash rolls both back,
+-- so no committed PENDING row can be orphaned. The V49 index
+-- idx_transfers_pending_business_created had no other consumer, so keeping it
+-- would charge partial-index maintenance on every transfer insert for no
+-- query. Drop it; the status/created_at index used by the report queries stays.
+DROP INDEX IF EXISTS idx_transfers_pending_business_created;

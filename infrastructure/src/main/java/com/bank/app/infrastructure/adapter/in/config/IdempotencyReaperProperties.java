@@ -11,8 +11,7 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Kept separate from {@link IdempotencyProperties}: that record is
  * constructed positionally in tests, so widening it would break every call
- * site for an unrelated concern (same split as
- * {@code TransferReaperProperties} vs {@code TransferProperties}).
+ * site for an unrelated concern.
  */
 @Validated
 @ConfigurationProperties(prefix = "app.idempotency.reaper")

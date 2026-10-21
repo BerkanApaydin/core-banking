@@ -16,10 +16,9 @@ public enum AuditAction {
     LOGOUT,
     PASSWORD_CHANGED,
     TOKEN_REVOKED,
-    // Crash-window reaper outcome (TransferPendingReaper): stale PENDING rows
-    // transitioned to FAILED. Missing this value broke the reaper's audit
-    // write (UnknownAuditActionException rolled back the FAILED transition);
-    // DB value added in V50.
+    // PENDING -> FAILED reconciliation outcome, reserved for the documented
+    // async placement path. No production caller today; the value and DB enum
+    // entry (V50) stay for compatibility with the persisted audit trail.
     TRANSFER_MARKED_FAILED,
     // MFA lifecycle + password reset (V54/V55): enrollment, removal and
     // reset-request/completion are security-sensitive and audited. DB values

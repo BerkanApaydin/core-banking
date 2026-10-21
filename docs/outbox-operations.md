@@ -22,10 +22,10 @@ The startup check cannot identify a count change when there is no out-of-range p
 
 `TransferCompletedEvent` and `TransferCancelledEvent` fan out to the
 notification channels via `TransferCompletedOutboxRelay` /
-`TransferCancelledOutboxRelay`; reaped transfers additionally publish
-`TransferFailedEvent` through `TransferFailedOutboxRelay` (R-2), and user
-registrations through `UserEventOutboxRelay` — all at-least-once with the
-key lifecycle below. A durable consumer inbox and explicit replay state
+`TransferCancelledOutboxRelay`; FAILED transfers publish `TransferFailedEvent`
+through `TransferFailedOutboxRelay` (dormant until an async reconciliation
+flow marks one), and user registrations through `UserEventOutboxRelay` — all
+at-least-once with the key lifecycle below. A durable consumer inbox and explicit replay state
 machine are needed before general replay can be automated.
 
 ## Key lifecycle
