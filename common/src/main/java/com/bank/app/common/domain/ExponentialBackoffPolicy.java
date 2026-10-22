@@ -42,7 +42,11 @@ public final class ExponentialBackoffPolicy {
         long jitter = ThreadLocalRandom.current().nextLong(jitterBound);
         // The contract allows jitter to exceed maxDelayMs, but the addition must
         // not wrap around.
-        return doubled > Long.MAX_VALUE - jitter ? Long.MAX_VALUE : doubled + jitter;
+        try {
+            return Math.addExact(doubled, jitter);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 
     @Override

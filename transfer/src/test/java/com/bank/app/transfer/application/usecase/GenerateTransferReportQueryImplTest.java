@@ -199,6 +199,24 @@ class GenerateTransferReportQueryImplTest {
     }
 
     @Test
+    void shouldClampToConfiguredMaximumPageSize() {
+        GenerateTransferReportQuery capped = new GenerateTransferReportQueryImpl(loadTransferPort,
+                new TransferViewEnricher(accountOperationPort), transferAuthorizationService, 1);
+        LocalDateTime start = LocalDateTime.now().minusDays(5);
+        LocalDateTime end = LocalDateTime.now();
+        AccountInfo info = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
+
+        when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(info);
+        when(accountOperationPort.getIbansForAccounts(anySet())).thenReturn(Map.of());
+        when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 1))
+                .thenReturn(Collections.emptyList());
+
+        capped.execute(new ReportCriteria(1L, start, end));
+
+        verify(loadTransferPort).findHistoryBetween(1L, start, end, 0, 1);
+    }
+
+    @Test
     void shouldReportNoNextPageWhenExactlyOnePageReturned() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);

@@ -107,4 +107,36 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(6));
     }
+
+    @Test
+    void shouldReturnNotModifiedForMatchingEtagById() throws Exception {
+        when(getAccountByIdQuery.execute(5L)).thenReturn(response(5L));
+
+        mockMvc.perform(get("/accounts/5")
+                        .header("If-None-Match",
+                                "W/\"old\", W/\"account-5-ACTIVE-1000.00\""))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string("ETag", "W/\"account-5-ACTIVE-1000.00\""));
+    }
+
+    @Test
+    void shouldReturnNotModifiedForMatchingEtagByIban() throws Exception {
+        when(getAccountByIbanQuery.execute("TR770006200000000000000111")).thenReturn(response(6L));
+
+        mockMvc.perform(get("/accounts/iban/TR770006200000000000000111")
+                        .header("If-None-Match", "*"))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string("ETag", "W/\"account-6-ACTIVE-1000.00\""));
+    }
+
+    @Test
+    void shouldReturnBodyForStaleEtag() throws Exception {
+        when(getAccountByIdQuery.execute(5L)).thenReturn(response(5L));
+
+        mockMvc.perform(get("/accounts/5")
+                        .header("If-None-Match", "W/\"account-5-ACTIVE-999.00\""))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "W/\"account-5-ACTIVE-1000.00\""))
+                .andExpect(jsonPath("$.id").value(5));
+    }
 }

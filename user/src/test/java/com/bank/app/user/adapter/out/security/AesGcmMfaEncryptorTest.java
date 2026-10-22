@@ -54,6 +54,49 @@ class AesGcmMfaEncryptorTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> encryptor.decryptFromBase64(Base64.getEncoder().encodeToString(new byte[4])));
+        // Exactly an IV with no ciphertext/tag is the largest truncated input.
+        assertThrows(IllegalArgumentException.class,
+                () -> encryptor.decryptFromBase64(Base64.getEncoder().encodeToString(new byte[12])));
+    }
+
+    @Test
+    void shouldGenerateIndependentEphemeralKeys() {
+        AesGcmMfaEncryptor first = AesGcmMfaEncryptor.ephemeral();
+        AesGcmMfaEncryptor second = AesGcmMfaEncryptor.ephemeral();
+        String stored = first.encryptToBase64("secret".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(IllegalStateException.class, () -> second.decryptFromBase64(stored));
+    }
+
+    @Test
+    void shouldRejectVersionPrefixWithoutKeyIdSeparator() {
+        AesGcmMfaEncryptor encryptor = new AesGcmMfaEncryptor(KEY);
+
+        assertFalse(encryptor.isCurrentKey("v1:no-separator"));
+        assertThrows(IllegalArgumentException.class,
+                () -> encryptor.decryptFromBase64("v1:no-separator"));
+    }
+
+    @Test
+    void shouldFailClosedWhenCiphertextIsTampered() {
+        AesGcmMfaEncryptor encryptor = new AesGcmMfaEncryptor(KEY);
+        String stored = encryptor.encryptToBase64("secret".getBytes(StandardCharsets.UTF_8));
+        int separator = stored.indexOf(':', 3);
+        byte[] raw = Base64.getDecoder().decode(stored.substring(separator + 1));
+        raw[raw.length - 1] ^= 0x01;
+
+        String tampered = stored.substring(0, separator + 1)
+                + Base64.getEncoder().encodeToString(raw);
+
+        assertThrows(IllegalStateException.class, () -> encryptor.decryptFromBase64(tampered));
+    }
+
+    @Test
+    void shouldTreatNullOrLegacyValueAsNotCurrentKey() {
+        AesGcmMfaEncryptor encryptor = new AesGcmMfaEncryptor(KEY);
+
+        assertFalse(encryptor.isCurrentKey(null));
+        assertFalse(encryptor.isCurrentKey("legacy-ciphertext-without-version"));
     }
 
     @Test
@@ -127,6 +170,21 @@ class AesGcmMfaEncryptorTest {
         assertFalse(rotated.isCurrentKey(legacy));
         assertArrayEquals(plaintext, rotated.decryptFromBase64(legacy));
         assertArrayEquals(plaintext, new AesGcmMfaEncryptor(KEY).decryptFromBase64(legacy));
+    }
+
+    @Test
+    void shouldLoadPreviousKeyFromCsvAndSkipBlankEntries() {
+        String primary = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=";
+        String previous = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=";
+        AesGcmMfaEncryptor old = new AesGcmMfaEncryptor(KEY);
+        String legacy = old.encryptToBase64("legacy".getBytes(StandardCharsets.UTF_8));
+        legacy = legacy.substring(legacy.indexOf(':', 3) + 1);
+
+        AesGcmMfaEncryptor rotated = AesGcmMfaEncryptor.fromBase64OrEphemeral(
+                primary, " , " + previous + " , ");
+
+        assertArrayEquals("legacy".getBytes(StandardCharsets.UTF_8),
+                rotated.decryptFromBase64(legacy));
     }
 
     @Test

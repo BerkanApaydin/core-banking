@@ -51,13 +51,22 @@ public class GlobalExceptionHandler {
     }
 
     private static boolean isUniqueViolation(Throwable failure) {
-        for (Throwable current = failure; current != null && current != current.getCause(); current = current.getCause()) {
-            if (current instanceof SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
+        // Bound the walk: initCause allows cycles, and a corrupt chain must
+        // not hang request error handling.
+        for (int depth = 0; failure != null && depth < MAX_CAUSE_DEPTH; depth++) {
+            if (failure instanceof SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
                 return true;
             }
+            Throwable next = failure.getCause();
+            if (next == failure) {
+                return false;
+            }
+            failure = next;
         }
         return false;
     }
+
+    private static final int MAX_CAUSE_DEPTH = 16;
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGeneralException(Exception ex, WebRequest request) {

@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
@@ -76,5 +79,47 @@ class SecurityConfigTest {
         // which translates it to UserNotFoundException and lets the login use
         // case burn a dummy BCrypt.
         assertFalse(daoProvider.isHideUserNotFoundExceptions());
+    }
+
+    @Test
+    void authenticationProviderUsesConfiguredPasswordEncoder() {
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
+        org.springframework.security.core.userdetails.UserDetails user =
+                org.springframework.security.core.userdetails.User.withUsername("alice")
+                        .password(encoder.encode("secret"))
+                        .roles("USER")
+                        .build();
+        when(userDetailsService.loadUserByUsername("alice")).thenReturn(user);
+
+        var authentication = securityConfig.authenticationProvider().authenticate(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "alice", "secret"));
+
+        assertTrue(authentication.isAuthenticated());
+        assertEquals("alice", authentication.getName());
+    }
+
+    @Test
+    void authenticationManagerDelegatesToConfiguration() throws Exception {
+        org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration config =
+                mock(org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration.class);
+        org.springframework.security.authentication.AuthenticationManager manager =
+                mock(org.springframework.security.authentication.AuthenticationManager.class);
+        when(config.getAuthenticationManager()).thenReturn(manager);
+
+        assertSame(manager, securityConfig.authenticationManager(config));
+    }
+
+    @Test
+    void securityFilterChainBuildsAndReturnsHttpSecurityChain() throws Exception {
+        org.springframework.security.config.annotation.web.builders.HttpSecurity http =
+                mock(org.springframework.security.config.annotation.web.builders.HttpSecurity.class,
+                        org.mockito.Answers.RETURNS_SELF);
+        org.springframework.security.web.DefaultSecurityFilterChain chain =
+                mock(org.springframework.security.web.DefaultSecurityFilterChain.class);
+        when(http.build()).thenReturn(chain);
+
+        assertSame(chain, securityConfig.securityFilterChain(http, corsConfigurationSource));
+        verify(http).build();
     }
 }

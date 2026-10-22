@@ -383,6 +383,41 @@ class LoginUserUseCaseTest {
         }
 
         @Test
+        @DisplayName("should mint the timing-oracle dummy hash once for repeated unknown users")
+        void shouldCacheDummyHashAcrossUnknownUserLogins() {
+            // Minting a full-cost BCrypt hash per unknown username would turn
+            // failed logins into a CPU-exhaustion amplifier.
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+            when(passwordEncoderPort.encode("login-timing-oracle-dummy")).thenReturn("$2a$12$dummy");
+            doThrow(new UserNotFoundException("User not found"))
+                    .when(authenticationPort).authenticate(anyString(), anyString());
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD)))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD)))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(passwordEncoderPort, times(1)).encode("login-timing-oracle-dummy");
+            verify(passwordEncoderPort, times(2)).matches(eq(PASSWORD), eq("$2a$12$dummy"));
+        }
+
+        @Test
+        @DisplayName("should still reject generically when the dummy comparison itself fails")
+        void shouldNotTurnDummyComparisonFailureIntoServerError() {
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+            when(passwordEncoderPort.encode(anyString())).thenReturn("$2a$12$dummy");
+            doThrow(new IllegalStateException("encoder misconfigured"))
+                    .when(passwordEncoderPort).matches(anyString(), anyString());
+            doThrow(new UserNotFoundException("User not found"))
+                    .when(authenticationPort).authenticate(anyString(), anyString());
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD)))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(auditEventPort).publish(any(AuditEvent.class));
+        }
+
+        @Test
         @DisplayName("should propagate unexpected errors rather than turn them into bad credentials")
         void shouldPropagateUnexpectedExceptionWithoutIp() {
             AuthRequest request = new AuthRequest(USERNAME, PASSWORD);
@@ -620,6 +655,10 @@ class LoginUserUseCaseTest {
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             verify(loginAttemptPort).recordFailure(CLIENT_IP, USERNAME);
+            // A missing code must burn the account-keyed MFA budget too;
+            // otherwise the login endpoint is a free probe that never feeds
+            // the shared lockout enforced by the management endpoints.
+            verify(mfaAttemptPort).recordFailure(100L);
             verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
         }
 
@@ -679,6 +718,39 @@ class LoginUserUseCaseTest {
             // The shared attempt store is the login guard too: an outage must
             // not be double-counted as a credential failure (or rendered 401).
             verify(loginAttemptPort, never()).recordFailure(any(), any());
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should turn an unexpected secret-store failure into the generic 401")
+        void shouldFailClosedWhenSecretStoreThrows() {
+            stubSuccess();
+            when(mfaSecretPort.findSecret(100L)).thenThrow(new IllegalStateException("decrypt failed"));
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "123456");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+            verify(jwtPort, never()).generateRefreshToken(anyLong(), anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("should surface a secret-store outage as infrastructure, not a credential failure")
+        void shouldPropagateSecretStoreOutageWithoutChargingLoginBudget() {
+            stubSuccess();
+            AuthenticationBackendUnavailableException failure = new AuthenticationBackendUnavailableException(
+                    new RuntimeException("KMS down"));
+            when(mfaSecretPort.findSecret(100L)).thenThrow(failure);
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "123456");
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isSameAs(failure);
+
+            // An outage must not consume the user's brute-force budget or be
+            // rendered as a misleading 401.
+            verify(loginAttemptPort, never()).recordFailure(any(), any());
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
             verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
         }
 

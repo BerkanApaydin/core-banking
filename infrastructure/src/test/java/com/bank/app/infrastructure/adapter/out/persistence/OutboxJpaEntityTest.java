@@ -55,6 +55,17 @@ class OutboxJpaEntityTest {
     void shouldCreateEntityWithNoArgsConstructor() {
         OutboxJpaEntity entity = new OutboxJpaEntity();
         assertNotNull(entity);
+        assertTrue(entity.isNew());
+        assertNull(entity.getNextAttemptAt());
+    }
+
+    @Test
+    void shouldBecomeExistingAfterPersistenceLifecycleCallback() {
+        OutboxJpaEntity entity = new OutboxJpaEntity();
+
+        assertTrue(entity.isNew());
+        entity.markNotNew();
+        assertFalse(entity.isNew());
     }
 
     @Test
@@ -73,6 +84,7 @@ class OutboxJpaEntityTest {
         entity.setDeadLetter(true);
         entity.setLastError("fail");
         entity.setPartition(1);
+        entity.setNextAttemptAt(now.plusMinutes(5));
 
         assertEquals("id-3", entity.getId());
         assertEquals("type", entity.getAggregateType());
@@ -86,5 +98,6 @@ class OutboxJpaEntityTest {
         assertTrue(entity.isDeadLetter());
         assertEquals("fail", entity.getLastError());
         assertEquals(1, entity.getPartition());
+        assertEquals(now.plusMinutes(5), entity.getNextAttemptAt());
     }
 }

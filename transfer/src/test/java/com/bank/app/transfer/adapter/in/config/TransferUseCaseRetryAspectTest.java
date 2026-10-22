@@ -20,6 +20,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -185,8 +186,7 @@ class TransferUseCaseRetryAspectTest {
 
         @Test
         @DisplayName("should bypass retry inside an existing transaction")
-        void shouldBypassRetryInsideTransaction() throws Throwable {
-            // Kills the NegateConditionals mutant on the transaction check:
+        void shouldBypassRetryInsideTransaction() throws Throwable {            // Kills the NegateConditionals mutant on the transaction check:
             // inside a transaction the join point must run exactly once with
             // no retry, even for lock failures. Transaction state arrives
             // through the port (stubbed active here); production wires the
@@ -212,6 +212,38 @@ class TransferUseCaseRetryAspectTest {
             when(joinPoint.proceed()).thenReturn("success");
             assertThat(txAspect.around(joinPoint)).isEqualTo("success");
             verify(joinPoint, times(1)).proceed();
+        }
+
+        @Test
+        @DisplayName("should not retry a lock failure inside an active transaction")
+        void shouldNotRetryLockFailureInsideTransaction() throws Throwable {
+            TransactionBoundaryPort activeBoundary = mock(TransactionBoundaryPort.class);
+            when(activeBoundary.isTransactionActive()).thenReturn(true);
+            TransferUseCaseRetryAspect txAspect = new TransferUseCaseRetryAspect(
+                    new TransferProperties(Duration.ofHours(24), 3, 50, 500, 100), activeBoundary);
+            OptimisticLockingFailureException failure =
+                    new OptimisticLockingFailureException("conflict");
+            when(joinPoint.proceed()).thenThrow(failure);
+
+            // The negation mutant treats the active transaction as inactive and
+            // retries the lock failure (three proceeds instead of one).
+            assertThatThrownBy(() -> txAspect.around(joinPoint)).isSameAs(failure);
+            verify(joinPoint, times(1)).proceed();
+        }
+
+        @Test
+        @DisplayName("should still retry lock failures when no transaction is active")
+        void shouldRetryLockFailureOutsideTransaction() throws Throwable {
+            TransactionBoundaryPort inactiveBoundary = mock(TransactionBoundaryPort.class);
+            when(inactiveBoundary.isTransactionActive()).thenReturn(false);
+            TransferUseCaseRetryAspect txAspect = new TransferUseCaseRetryAspect(
+                    new TransferProperties(Duration.ofHours(24), 3, 50, 500, 100), inactiveBoundary);
+            when(joinPoint.proceed())
+                    .thenThrow(new OptimisticLockingFailureException("conflict"))
+                    .thenReturn("success");
+
+            assertThat(txAspect.around(joinPoint)).isEqualTo("success");
+            verify(joinPoint, times(2)).proceed();
         }
 
         @Test

@@ -121,8 +121,18 @@ class DomainEventOutboxAdapterTest {
         }
 
         @Test
+        void shouldAcceptPayloadExactlyAtTheMaximum() throws Exception {
+            DomainEvent event = createEvent(AGGREGATE_ID);
+            when(objectMapper.writeValueAsString(event))
+                    .thenReturn("x".repeat(DomainEventOutboxAdapter.MAX_PAYLOAD_CHARS));
+
+            adapter.publish(event);
+
+            verify(outboxPort).save(any());
+        }
+
+        @Test
         void shouldRejectOversizedPayloadInsteadOfPersistingIt() throws Exception {
-            stubSerializer();
             DomainEvent event = createEvent(AGGREGATE_ID);
             when(objectMapper.writeValueAsString(event))
                     .thenReturn("x".repeat(DomainEventOutboxAdapter.MAX_PAYLOAD_CHARS + 1));
@@ -180,5 +190,39 @@ class DomainEventOutboxAdapterTest {
             assertNotNull(entryCaptor.getValue().payload());
             assertTrue(entryCaptor.getValue().payload().contains("test-event"));
         }
+    }
+
+    @Test
+    void shouldAcceptTheExactMaximumPayloadFromATopLevelTest() throws Exception {
+        OutboxPort port = mock(OutboxPort.class);
+        ObjectMapper mapper = mock(ObjectMapper.class);
+        DomainEvent event = new DomainEvent() {
+            @Override
+            public LocalDateTime occurredAt() {
+                return LocalDateTime.of(2026, 6, 22, 10, 0);
+            }
+
+            @Override
+            public String aggregateType() {
+                return AGGREGATE_TYPE;
+            }
+
+            @Override
+            public String aggregateId() {
+                return AGGREGATE_ID;
+            }
+        };
+        when(mapper.writeValueAsString(event))
+                .thenReturn("x".repeat(DomainEventOutboxAdapter.MAX_PAYLOAD_CHARS));
+        DomainEventOutboxAdapter topLevelAdapter = new DomainEventOutboxAdapter(
+                port, mapper,
+                () -> Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                        java.time.ZoneOffset.UTC),
+                () -> UUID.randomUUID().toString(),
+                new OutboxProperties(5, 50, 0, 2000, 30, 4, 12, 30));
+
+        topLevelAdapter.publish(event);
+
+        verify(port).save(any());
     }
 }

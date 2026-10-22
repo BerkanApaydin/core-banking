@@ -25,6 +25,11 @@ class IbanLogMaskTest {
     }
 
     @Test
+    void masksTheShortestRemainRecognizableValue() {
+        assertEquals("TR123456*******7890", IbanLogMask.mask("TR1234567890"));
+    }
+
+    @Test
     void masksValueObject() {
         assertEquals("TR770006*******0111",
                 IbanLogMask.mask(new Iban("TR770006200000000000000111")));

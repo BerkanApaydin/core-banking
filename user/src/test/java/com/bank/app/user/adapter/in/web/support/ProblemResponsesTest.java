@@ -1,10 +1,12 @@
 package com.bank.app.user.adapter.in.web.support;
 
+import com.bank.app.common.adapter.in.api.ProblemBody;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 
+import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -35,6 +37,10 @@ class ProblemResponsesTest {
         assertThat(response.getBody().getInstance()).isNotNull();
         assertThat(response.getBody().getInstance().toString())
                 .isEqualTo("/api/v1/auth/browser/session");
+        // Kills the setType VoidMethodCall mutant: the semantic RFC 9457 type
+        // must match the shared ProblemBody derivation, not about:blank.
+        assertThat(response.getBody().getType()).isEqualTo(URI.create(
+                ProblemBody.PROBLEM_TYPE_BASE + "authentication_failed"));
     }
 
     @Test
@@ -106,5 +112,17 @@ class ProblemResponsesTest {
 
         assertThat(response.getBody().getProperties().get("timestamp").toString())
                 .startsWith("2026-05-01T12:00");
+    }
+
+    @Test
+    void clearingThePinnedClockRestoresTheSystemClock() {
+        ProblemResponses.setClockForTests(
+                Clock.fixed(Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC));
+        ProblemResponses.setClockForTests(null);
+
+        var response = ProblemResponses.unauthorized("x", "/p");
+
+        assertThat(response.getBody().getProperties().get("timestamp").toString())
+                .doesNotStartWith("2026-05-01T12:00");
     }
 }

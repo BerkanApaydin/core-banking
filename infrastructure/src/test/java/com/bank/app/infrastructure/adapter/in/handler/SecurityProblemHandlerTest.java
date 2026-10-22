@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 
+import com.bank.app.infrastructure.testsupport.LogCapture;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
@@ -111,6 +112,48 @@ class SecurityProblemHandlerTest {
 
         assertNotNull(response.getBody());
         assertEquals("Access denied.", response.getBody().getProperties().get("message"));
+    }
+
+    @Test
+    void shouldLogAvailabilityFailuresWithoutACause() {
+        when(messageSource.getMessage(eq("error.security_backend_unavailable"), isNull(), any(Locale.class)))
+                .thenReturn("Security service temporarily unavailable.");
+
+        try (LogCapture logs = LogCapture.attach(SecurityProblemHandler.class)) {
+            handler.handleLoginAttemptStoreUnavailable(
+                    new LoginAttemptStoreUnavailableException((Throwable) null), null);
+            handler.handleAuthenticationBackendUnavailable(
+                    new AuthenticationBackendUnavailableException((Throwable) null), null);
+            handler.handleRevocationStoreUnavailable(
+                    new RevocationStoreUnavailableException((Throwable) null), null);
+
+            assertEquals(3, logs.messages().size());
+            assertTrue(logs.messages().stream()
+                    .anyMatch(message -> message.contains(LoginAttemptStoreUnavailableException.class.getSimpleName())));
+            assertTrue(logs.messages().stream()
+                    .anyMatch(message -> message.contains(AuthenticationBackendUnavailableException.class.getSimpleName())));
+            assertTrue(logs.messages().stream()
+                    .anyMatch(message -> message.contains(RevocationStoreUnavailableException.class.getSimpleName())));
+        }
+    }
+
+    @Test
+    void shouldLogTheCauseClassWhenPresent() {
+        when(messageSource.getMessage(eq("error.security_backend_unavailable"), isNull(), any(Locale.class)))
+                .thenReturn("Security service temporarily unavailable.");
+
+        try (LogCapture logs = LogCapture.attach(SecurityProblemHandler.class)) {
+            handler.handleLoginAttemptStoreUnavailable(
+                    new LoginAttemptStoreUnavailableException(new IllegalStateException("db")), null);
+            handler.handleAuthenticationBackendUnavailable(
+                    new AuthenticationBackendUnavailableException(new IllegalArgumentException("redis")), null);
+            handler.handleRevocationStoreUnavailable(
+                    new RevocationStoreUnavailableException(new UnsupportedOperationException("sql")), null);
+
+            assertTrue(logs.messages().stream().anyMatch(message -> message.contains("IllegalStateException")));
+            assertTrue(logs.messages().stream().anyMatch(message -> message.contains("IllegalArgumentException")));
+            assertTrue(logs.messages().stream().anyMatch(message -> message.contains("UnsupportedOperationException")));
+        }
     }
 
     @Test

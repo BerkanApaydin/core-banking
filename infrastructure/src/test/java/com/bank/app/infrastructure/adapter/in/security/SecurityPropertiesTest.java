@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("SecurityProperties")
 class SecurityPropertiesTest {
@@ -55,6 +56,40 @@ class SecurityPropertiesTest {
 
             assertThat(props.whitelistPaths()).doesNotContain("/actuator/prometheus");
             assertThat(props.whitelistPaths()).contains("/actuator/health/**");
+        }
+    }
+
+    @Nested
+    @DisplayName("validation bounds")
+    class ValidationBounds {
+
+        @Test
+        @DisplayName("accepts the inclusive BCrypt strength range")
+        void shouldAcceptBcryptBoundaries() {
+            assertThat(new SecurityProperties(null, 4, 0).passwordEncoderStrength()).isEqualTo(4);
+            assertThat(new SecurityProperties(null, 31, 0).passwordEncoderStrength()).isEqualTo(31);
+        }
+
+        @Test
+        @DisplayName("rejects BCrypt strength outside [4, 31]")
+        void shouldRejectBcryptOutOfRange() {
+            // Below 4 is not a meaningful work factor; above 31 risks a login
+            // CPU DoS and is not representable by the encoder.
+            assertThatThrownBy(() -> new SecurityProperties(null, 3, 0))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("BCrypt strength");
+            assertThatThrownBy(() -> new SecurityProperties(null, 32, 0))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("BCrypt strength");
+        }
+
+        @Test
+        @DisplayName("accepts zero HSTS max-age but rejects negative")
+        void shouldValidateHstsMaxAge() {
+            assertThat(new SecurityProperties(null, 12, 0).hstsMaxAgeSeconds()).isZero();
+            assertThatThrownBy(() -> new SecurityProperties(null, 12, -1))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("HSTS max-age");
         }
     }
 

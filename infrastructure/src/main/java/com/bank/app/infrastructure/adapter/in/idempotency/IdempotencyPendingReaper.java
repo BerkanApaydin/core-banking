@@ -92,7 +92,7 @@ public class IdempotencyPendingReaper {
                 Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
                 threshold = LocalDateTime.now(clock).minus(properties.olderThan());
                 int reaped = idempotencyPort.failStalePending(threshold);
-                if (reaped > 0) {
+                if (reaped != 0) {
                     count(REAPED_COUNTER, reaped);
                     log.info("Reaped {} stale idempotency PENDING key(s) older than {}", reaped, threshold);
                 } else {

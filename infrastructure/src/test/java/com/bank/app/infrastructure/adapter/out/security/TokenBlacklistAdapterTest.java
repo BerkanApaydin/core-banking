@@ -101,6 +101,23 @@ class TokenBlacklistAdapterTest {
         }
 
         @Test
+        @DisplayName("should evict cached entries after their write expiry")
+        void shouldEvictExpiredCacheEntries() throws Exception {
+            TokenBlacklistAdapter shortLived = new TokenBlacklistAdapter(
+                    new TokenBlacklistProperties(1L, 5L));
+            shortLived.blacklist("expired-entry", 5L);
+
+            Thread.sleep(25L);
+            shortLived.cleanExpired();
+
+            Field cacheField = TokenBlacklistAdapter.class.getDeclaredField("blacklist");
+            cacheField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Cache<String, Long> cache = (Cache<String, Long>) cacheField.get(shortLived);
+            assertThat(cache.estimatedSize()).isZero();
+        }
+
+        @Test
         @DisplayName("should handle empty blacklist")
         void shouldHandleEmptyBlacklist() {
             adapter.cleanExpired();

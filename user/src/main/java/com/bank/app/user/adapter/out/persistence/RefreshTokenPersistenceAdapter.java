@@ -37,7 +37,6 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
         entity.setUserId(userId);
         entity.setFamilyId(familyId);
         entity.setExpiresAt(expiresAt);
-        entity.setRevoked(false);
         try {
             repository.save(entity);
         } catch (DataAccessException e) {

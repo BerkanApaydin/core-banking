@@ -105,6 +105,23 @@ class TransferEventConsumerTest {
     }
 
     @Test
+    void shouldSuppressLaterFailedFailuresIntoTheFirst() {
+        RuntimeException first = new RuntimeException("smtp down");
+        RuntimeException second = new RuntimeException("sms down");
+        doThrow(first).when(email).notifyTransferFailed(any());
+        doThrow(second).when(sms).notifyTransferFailed(any());
+        AsyncTransferFailedEvent event = new AsyncTransferFailedEvent(5L, 10L, 20L,
+                Money.of("25.00", Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
+
+        assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
+                .handleTransferFailed(event))
+                .isSameAs(first)
+                .hasSuppressedException(second);
+        verify(email).notifyTransferFailed(any());
+        verify(sms).notifyTransferFailed(any());
+    }
+
+    @Test
     void shouldDeliverNothingWhenNoChannelsRegistered() {
         new TransferEventConsumer(List.of()).handleTransferCompleted(completedEvent());
         new TransferEventConsumer(List.of()).handleTransferCancelled(

@@ -437,6 +437,15 @@ class TransferTest {
     class EqualsAndHashCode {
 
         @Test
+        @DisplayName("equals should return true for the same instance")
+        void equalsWhenSameInstance() {
+            Transfer transfer = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT,
+                    TransferStatus.COMPLETED, now());
+
+            assertThat(transfer).isEqualTo(transfer);
+        }
+
+        @Test
         @DisplayName("equals should return true when same ID")
         void equalsWhenSameId() {
             Transfer t1 = new Transfer(1L, new AccountId(1L), new AccountId(2L), AMOUNT, TransferStatus.COMPLETED,

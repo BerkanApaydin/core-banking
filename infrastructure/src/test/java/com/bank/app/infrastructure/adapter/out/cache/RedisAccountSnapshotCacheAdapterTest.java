@@ -21,6 +21,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -220,6 +221,92 @@ class RedisAccountSnapshotCacheAdapterTest {
                 .thenReturn(Arrays.asList("TR1", null));
 
         assertTrue(adapter.getIbans(Set.of(1L, 2L)).isEmpty());
+    }
+
+    @Test
+    void shouldRejectBulkReadContainingNullIdWithoutTouchingRedis() {
+        // The defensive null check must run before sorted(); otherwise a single
+        // null in the id collection throws NPE inside the cache adapter and
+        // turns an optional cache read into a request failure.
+        assertTrue(adapter.getIbans(Arrays.asList(1L, null)).isEmpty());
+
+        verify(valueOps, never()).multiGet(any());
+    }
+
+    @Test
+    void shouldSkipBatchWriteWhenEveryMappingIsNullOrBlank() {
+        Map<Long, String> ibans = new HashMap<>();
+        ibans.put(1L, null);
+        ibans.put(2L, "");
+        ibans.put(3L, "   ");
+        ibans.put(null, "TRNULL");
+
+        adapter.putIbans(Set.of(1L, 2L, 3L), ibans);
+
+        verify(redisTemplate, never()).execute(any(DefaultRedisScript.class), anyList());
+    }
+
+    @Test
+    void shouldFallBackToDelWhenUnlinkIsUnavailable() {
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, true, false);
+        when(cursor.next()).thenReturn("k1", "k2");
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
+                .thenThrow(new RuntimeException("unknown command 'UNLINK'"));
+
+        adapter.evictAll();
+
+        verify(redisTemplate).delete(anyList());
+        verify(cursor).close();
+    }
+
+    @Test
+    void shouldSwallowDelFailureAfterUnlinkFallback() {
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, false);
+        when(cursor.next()).thenReturn("k1");
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
+                .thenThrow(new RuntimeException("unknown command 'UNLINK'"));
+        when(redisTemplate.delete(anyList()))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        assertDoesNotThrow(() -> adapter.evictAll());
+
+        verify(cursor).close();
+    }
+
+    @Test
+    void shouldEvictAllInFullBatchesAndThenTheRemainder() {
+        adapter = new RedisAccountSnapshotCacheAdapter(redisTemplate,
+                new CacheProperties.AccountInfoCache("caffeine", 1000, 60, 2));
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, true, true, false);
+        when(cursor.next()).thenReturn("k1", "k2", "k3");
+
+        adapter.evictAll();
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<String>> keysCaptor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate, times(2)).execute(any(DefaultRedisScript.class), keysCaptor.capture());
+        assertEquals(List.of(List.of("k1", "k2"), List.of("k3")), keysCaptor.getAllValues());
+        verify(cursor).close();
+    }
+
+    @Test
+    void shouldFilterNullBlankAndEmptyIbanMappings() {
+        Map<Long, String> ibans = new HashMap<>();
+        ibans.put(1L, "TR1");
+        ibans.put(2L, null);
+        ibans.put(3L, "");
+        ibans.put(4L, "TR4");
+        ibans.put(null, "TRNULL");
+
+        adapter.putIbans(Set.of(1L, 2L, 3L, 4L), ibans);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:4")),
+                eq("60"), eq("TR1"), eq("TR4"));
     }
 
     @Test

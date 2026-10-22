@@ -383,6 +383,35 @@ class PlaceTransferUseCaseImplTest {
         }
 
         @Test
+        @DisplayName("should not publish or audit when the COMPLETED save fails")
+        void shouldNotPublishWhenCompletionSaveFails() {
+            stubClock();
+            stubAccountLookup();
+            doNothing().when(userContextService).checkUserAuthorization(eq(SENDER_USER_ID), anyString());
+            when(saveTransferPort.save(any(Transfer.class)))
+                    .thenAnswer(invocation -> {
+                        Transfer t = invocation.getArgument(0);
+                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                                t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
+                    })
+                    .thenThrow(new RuntimeException("Database unavailable on completion save"));
+            stubBalanceAdjustment();
+
+            assertThatThrownBy(() -> placeTransferUseCase.execute(validRequest()))
+                    .isExactlyInstanceOf(RuntimeException.class)
+                    .hasMessage("Database unavailable on completion save");
+
+            // Money moved and the PENDING row exists, but the transfer never
+            // committed as COMPLETED: no COMPLETED event and no audit row may
+            // escape before the transaction rolls back.
+            verify(saveTransferPort, times(2)).save(any(Transfer.class));
+            verify(accountAclPort).debitAndCredit(any(), any(), any());
+            verify(accountAclPort, never()).reverseBalancesForCancellation(any(), any(), any());
+            verify(domainEventPublisherService, never()).publishEvents(any());
+            verifyNoInteractions(auditEventPort);
+        }
+
+        @Test
         @DisplayName("should throw when receiver currency does not match sender")
         void shouldThrowOnReceiverCurrencyMismatch() {
             stubClock();

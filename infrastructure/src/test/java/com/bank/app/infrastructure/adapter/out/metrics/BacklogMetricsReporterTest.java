@@ -5,20 +5,26 @@ import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.sql.ResultSet;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings("null")
@@ -61,11 +67,12 @@ class BacklogMetricsReporterTest {
         reporter.scan();
 
         assertEquals(2, gauge("outbox.pending.current"));
-        assertTrue(gauge("outbox.oldest_pending.age_seconds") >= 299);
+        assertEquals(300, gauge("outbox.oldest_pending.age_seconds"));
         assertEquals(1, gauge("idempotency.http.pending.current"));
-        assertTrue(gauge("idempotency.http.oldest_pending.age_seconds") >= 119);
+        assertEquals(120, gauge("idempotency.http.oldest_pending.age_seconds"));
         assertEquals(0, gauge("audit.default_partition.rows"));
-        assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
+        assertEquals(Instant.parse("2026-05-01T12:00:00Z").getEpochSecond(),
+                gauge("backlog.last_success_epoch_seconds"));
 
         reporter.scan();
 
@@ -118,6 +125,36 @@ class BacklogMetricsReporterTest {
         assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
+    void rowMapperReadsNullableOldestInstant() throws Exception {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(4, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0);
+
+        reporter.scan();
+
+        ArgumentCaptor<RowMapper> captor = ArgumentCaptor.forClass(RowMapper.class);
+        verify(jdbc).queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), captor.capture());
+        RowMapper<BacklogMetricsReporter.Backlog> mapper = captor.getValue();
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getLong(1)).thenReturn(4L);
+        OffsetDateTime oldest = OffsetDateTime.parse("2026-05-01T11:55:00Z");
+        when(resultSet.getObject(2, OffsetDateTime.class)).thenReturn(null, oldest);
+
+        BacklogMetricsReporter.Backlog withoutOldest = mapper.mapRow(resultSet, 0);
+        assertEquals(4, withoutOldest.count());
+        assertNull(withoutOldest.oldest());
+
+        BacklogMetricsReporter.Backlog withOldest = mapper.mapRow(resultSet, 1);
+        assertEquals(4, withOldest.count());
+        assertEquals(oldest.toLocalDateTime(), withOldest.oldest());
+    }
+
     @Test
     void keepsPreviousSnapshotWhenEitherQueryFails() {
         when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
@@ -137,6 +174,71 @@ class BacklogMetricsReporterTest {
         assertEquals(2, gauge("outbox.pending.current"));
         assertEquals(1, gauge("idempotency.http.pending.current"));
         assertEquals(previousSuccess, gauge("backlog.last_success_epoch_seconds"));
+    }
+
+    @Test
+    void keepsPreviousSnapshotWhenAggregateQueryReturnsNoRow() {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(2,
+                        LocalDateTime.now().minusMinutes(5)))
+                .thenReturn(null);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(1,
+                        LocalDateTime.now().minusMinutes(2)));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0, 0);
+
+        reporter.scan();
+        double previousSuccess = gauge("backlog.last_success_epoch_seconds");
+        reporter.scan();
+
+        // A no-row aggregate is a broken query, not an empty backlog: zeroing
+        // the gauge would silently hide a growing queue from alerting.
+        assertEquals(2, gauge("outbox.pending.current"));
+        assertEquals(1, gauge("idempotency.http.pending.current"));
+        assertEquals(previousSuccess, gauge("backlog.last_success_epoch_seconds"));
+    }
+
+    @Test
+    void keepsPreviousAuditCountWhenBoundedCountReturnsNoRow() {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0, 1);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_COUNT_SQL),
+                eq(Long.class), eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_SCAN_LIMIT)))
+                .thenReturn(7L)
+                .thenReturn((Long) null);
+
+        reporter.scan();
+        double previousSuccess = gauge("backlog.last_success_epoch_seconds");
+        reporter.scan();
+
+        assertEquals(7, gauge("audit.default_partition.rows"));
+        assertEquals(previousSuccess, gauge("backlog.last_success_epoch_seconds"));
+    }
+
+    @Test
+    void treatsNullTableProbeAsAbsentWithoutRunningTheCount() {
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(0, null));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn((Integer) null);
+
+        reporter.scan();
+
+        assertEquals(0, gauge("audit.default_partition.rows"));
+        assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
+        org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never()).queryForObject(
+                eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_COUNT_SQL), eq(Long.class),
+                eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_SCAN_LIMIT));
     }
 
     private double gauge(String name) {

@@ -116,10 +116,18 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
         long tokenVersion = jwtPort.extractTokenVersion(refreshToken);
         if (tokenVersion != user.getTokenVersion()) {
             log.warn("Stale refresh token generation rejected: userId={}", verified.userId());
-            auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
-                    "Stale refresh token generation rejected; re-authentication required.",
-                    LocalDateTime.now(clockProvider.clock()), verified.username(),
-                    verified.userId()));
+            // Rejection only, no state change: audit is best-effort-auth
+            // (docs/decisions/audit-atomicity.md). An audit-store outage must
+            // not replace the contract's 401 with a 500.
+            try {
+                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
+                        "Stale refresh token generation rejected; re-authentication required.",
+                        LocalDateTime.now(clockProvider.clock()), verified.username(),
+                        verified.userId()));
+            } catch (Exception auditFailure) {
+                log.warn("Stale refresh token audit write failed: userId={}, failureType={}",
+                        verified.userId(), auditFailure.getClass().getSimpleName());
+            }
             throw new AuthenticationFailedException("Session is no longer valid. Please log in again.");
         }
         return user;

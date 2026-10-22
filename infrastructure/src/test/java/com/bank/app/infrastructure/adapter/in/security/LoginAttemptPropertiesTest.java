@@ -29,6 +29,22 @@ class LoginAttemptPropertiesTest {
     }
 
     @Test
+    @DisplayName("should derive the global threshold for zero and negative sentinels")
+    void shouldDeriveGlobalThresholdForDisabledSentinel() {
+        assertThat(new LoginAttemptProperties(0, 15L, 10000).globalAccountMaxAttempts())
+                .isEqualTo(10);
+        assertThat(new LoginAttemptProperties(-5, 15L, 10000).globalAccountMaxAttempts())
+                .isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("should scale the global threshold for positive attempts")
+    void shouldScaleGlobalThreshold() {
+        assertThat(new LoginAttemptProperties(7, 15L, 10000).globalAccountMaxAttempts())
+                .isEqualTo(70);
+    }
+
+    @Test
     @DisplayName("should reject non-positive windows because counters must expire")
     void shouldRejectNonPositiveWindow() {
         assertThatThrownBy(() -> new LoginAttemptProperties(5, 0, 10000))
@@ -42,5 +58,25 @@ class LoginAttemptPropertiesTest {
     void shouldRejectOversizedWindow() {
         assertThatThrownBy(() -> new LoginAttemptProperties(5, (long) Integer.MAX_VALUE + 1, 10000))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("should reject non-positive cache and negative global threshold")
+    void shouldRejectInvalidCacheAndGlobalThreshold() {
+        // A zero-sized Caffeine cache would evict on every put, silently
+        // disabling the guard; a negative account budget is never valid.
+        assertThatThrownBy(() -> new LoginAttemptProperties(5, 15L, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cache size");
+        assertThatThrownBy(() -> new LoginAttemptProperties(5, -1, 15L, 10000))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("global account threshold");
+    }
+
+    @Test
+    @DisplayName("should cap the derived global threshold instead of overflowing")
+    void shouldCapDerivedGlobalThreshold() {
+        assertThat(new LoginAttemptProperties(Integer.MAX_VALUE, 15L, 10000)
+                .globalAccountMaxAttempts()).isEqualTo(Integer.MAX_VALUE);
     }
 }

@@ -154,7 +154,7 @@ public class RequestBodySizeLimitFilter implements Filter {
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
             int n = delegate.read(b, off, len);
-            if (n > 0) {
+            if (n != -1) {
                 count(n);
             }
             return n;

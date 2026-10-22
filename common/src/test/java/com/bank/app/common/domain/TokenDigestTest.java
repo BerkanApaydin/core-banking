@@ -28,4 +28,22 @@ class TokenDigestTest {
         assertThatThrownBy(() -> TokenDigest.sha256Hex(null))
                 .isExactlyInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    void shouldMatchStandardSha256Vectors() {
+        // Pins the algorithm and UTF-8 encoding, not just self-consistency:
+        // a different digest would silently invalidate every stored token hash.
+        assertThat(TokenDigest.sha256Hex(""))
+                .isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assertThat(TokenDigest.sha256Hex("abc"))
+                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    @Test
+    void shouldDigestWhitespaceAndUnicodeStably() {
+        assertThat(TokenDigest.sha256Hex(" ")).hasSize(64).isEqualTo(TokenDigest.sha256Hex(" "));
+        assertThat(TokenDigest.sha256Hex("şifre-ü")).hasSize(64)
+                .isEqualTo(TokenDigest.sha256Hex("şifre-ü"))
+                .isNotEqualTo(TokenDigest.sha256Hex("sifre-u"));
+    }
 }

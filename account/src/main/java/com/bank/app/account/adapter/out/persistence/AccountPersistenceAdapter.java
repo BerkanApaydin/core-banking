@@ -186,7 +186,9 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
 
     private static boolean isDuplicateIbanViolation(DataIntegrityViolationException ex) {
         Throwable current = ex;
-        while (current != null) {
+        // Bound the walk: initCause allows cycles, and a corrupt chain must
+        // not hang a request thread while classifying the failure.
+        for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
             if (current instanceof SQLException sqlException
                     && "23505".equals(sqlException.getSQLState())) {
                 return true;
@@ -203,6 +205,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         }
         return false;
     }
+
+    private static final int MAX_CAUSE_DEPTH = 16;
 
     private static boolean namesIbanUniqueness(String message) {
         String lower = message.toLowerCase(Locale.ROOT);

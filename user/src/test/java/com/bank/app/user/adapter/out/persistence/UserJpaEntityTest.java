@@ -28,4 +28,21 @@ class UserJpaEntityTest {
         assertEquals("$2a$12$testpass2hash00000000000000000000000001", empty.getPassword());
         assertEquals(Role.ROLE_ADMIN, empty.getRole());
     }
+
+    @Test
+    void shouldExposeMfaState() {
+        UserJpaEntity entity = new UserJpaEntity();
+
+        assertFalse(entity.isMfaEnabled());
+        assertNull(entity.getMfaSecretEncrypted());
+        assertNull(entity.getMfaLastTotpCounter());
+
+        entity.setMfaEnabled(true);
+        entity.setMfaSecretEncrypted("v1:keyid:ciphertext");
+        entity.setMfaLastTotpCounter(987654L);
+
+        assertTrue(entity.isMfaEnabled());
+        assertEquals("v1:keyid:ciphertext", entity.getMfaSecretEncrypted());
+        assertEquals(987654L, entity.getMfaLastTotpCounter());
+    }
 }

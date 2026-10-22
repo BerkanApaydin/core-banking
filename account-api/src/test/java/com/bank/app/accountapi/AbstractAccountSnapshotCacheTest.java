@@ -152,6 +152,24 @@ class AbstractAccountSnapshotCacheTest {
     }
 
     @Test
+    void shouldMissBulkReadWhenAnyIdIsNull() {
+        cache.putIbans(Set.of(1L), Map.of(1L, "TR1"));
+
+        assertThat(cache.getIbans(java.util.Arrays.asList(1L, null))).isEmpty();
+    }
+
+    @Test
+    void shouldIgnoreBatchPutsWithoutWritableEntries() {
+        Map<Long, String> entries = new LinkedHashMap<>();
+        entries.put(1L, "");
+        entries.put(null, "TR1");
+
+        cache.putIbans(Set.of(1L), entries);
+
+        assertThat(cache.mappings).isEmpty();
+    }
+
+    @Test
     void shouldEvictIdAndItsIbanEntriesButKeepUnrelated() {
         cache.putById(1L, SNAPSHOT_1);
         cache.putByIban("TR450006100519786456841234", SNAPSHOT_1);
@@ -238,9 +256,12 @@ class AbstractAccountSnapshotCacheTest {
         } finally {
             blocking.releaseWrite.countDown();
         }
-        writer.join(5_000);
-        evictor.join(5_000);
+        writer.join(200);
+        evictor.join(200);
 
+        assertThat(evictionDone.await(200, TimeUnit.MILLISECONDS))
+                .as("eviction must complete once the write releases the stripe")
+                .isTrue();
         // The write completed, so the eviction removed the IBAN snapshot.
         assertThat(blocking.getByIban("TR1")).isEmpty();
     }
@@ -276,9 +297,12 @@ class AbstractAccountSnapshotCacheTest {
         } finally {
             blocking.releaseMappingWrite.countDown();
         }
-        writer.join(5_000);
-        evictor.join(5_000);
+        writer.join(200);
+        evictor.join(200);
 
+        assertThat(evictionDone.await(200, TimeUnit.MILLISECONDS))
+                .as("eviction must complete once the batch write releases its stripes")
+                .isTrue();
         // The batch write completed, so the eviction removed its mapping.
         assertThat(blocking.getIbans(Set.of(1L))).isEmpty();
     }
@@ -305,7 +329,7 @@ class AbstractAccountSnapshotCacheTest {
         evictor.start();
 
         try {
-            assertThat(evictionDone.await(5, TimeUnit.SECONDS))
+            assertThat(evictionDone.await(200, TimeUnit.MILLISECONDS))
                     .as("an eviction of an unrelated account must not wait for another account's write")
                     .isTrue();
         } finally {
@@ -342,14 +366,34 @@ class AbstractAccountSnapshotCacheTest {
         } finally {
             blocking.releaseWrite.countDown();
         }
-        writer.join(5_000);
-        resetter.join(5_000);
+        writer.join(200);
+        resetter.join(200);
+        assertThat(resetDone.await(200, TimeUnit.MILLISECONDS))
+                .as("evict-all must complete once the write releases the stripe")
+                .isTrue();
     }
 
     /**
      * The account locks must be free again after a full reset and after a
      * granular eviction — otherwise the next mutation would block forever.
      */
+    @Test
+    void shouldReleaseEveryStripeAfterBatchWrite() throws Exception {
+        cache.putIbans(Set.of(1L, 2L), Map.of(1L, "TR1", 2L, "TR2"));
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            cache.evictAll();
+            done.countDown();
+        });
+        worker.start();
+
+        assertThat(done.await(200, TimeUnit.MILLISECONDS))
+                .as("a batch write must release every stripe it acquired")
+                .isTrue();
+        worker.join(200);
+    }
+
     @Test
     void shouldReleaseAccountLocksAfterEvictAllAndEvictById() throws Exception {
         cache.evictById(1L);
@@ -362,10 +406,76 @@ class AbstractAccountSnapshotCacheTest {
         });
         worker.start();
 
-        assertThat(done.await(5, TimeUnit.SECONDS))
+        assertThat(done.await(200, TimeUnit.MILLISECONDS))
                 .as("the account lock must be released after eviction")
                 .isTrue();
-        worker.join(5_000);
+        worker.join(200);
+    }
+
+    @Test
+    void shouldReleaseEveryStripeAfterEvictAll() throws Exception {
+        cache.evictAll();
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            cache.putById(0L, SNAPSHOT_1);
+            done.countDown();
+        });
+        worker.start();
+
+        assertThat(done.await(200, TimeUnit.MILLISECONDS))
+                .as("evict-all must release the first stripe as well")
+                .isTrue();
+        worker.join(200);
+    }
+
+    @Test
+    void shouldReleaseTheStripeLockAfterPutById() throws Exception {
+        cache.putById(0L, SNAPSHOT_1);
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            cache.putById(0L, SNAPSHOT_2);
+            done.countDown();
+        });
+        worker.start();
+
+        assertThat(done.await(200, TimeUnit.MILLISECONDS))
+                .as("putById must release its stripe lock")
+                .isTrue();
+        worker.join(200);
+    }
+
+    @Test
+    void shouldMissBulkReadWhenAStoredMappingIsEmpty() {
+        cache.mappings.put(1L, "");
+
+        assertThat(cache.getIbans(Set.of(1L))).isEmpty();
+    }
+
+    @Test
+    void shouldIgnoreNullIbanMappingsButWriteValidSiblings() {
+        Map<Long, String> entries = new LinkedHashMap<>();
+        entries.put(1L, null);
+        entries.put(2L, "TR2");
+
+        cache.putIbans(Set.of(1L, 2L), entries);
+
+        assertThat(cache.mappings).doesNotContainKey(1L).containsEntry(2L, "TR2");
+        assertThat(cache.getIbans(Set.of(2L))).contains(Map.of(2L, "TR2"));
+    }
+
+    @Test
+    void shouldServeTheLatestSnapshotAfterARefresh() {
+        cache.putById(1L, SNAPSHOT_1);
+        cache.putByIban("TR1", SNAPSHOT_1);
+
+        AccountSnapshot refreshed = new AccountSnapshot(1L, 10L, "TRY", "SUSPENDED");
+        cache.putById(1L, refreshed);
+        cache.putByIban("TR1", refreshed);
+
+        assertThat(cache.getById(1L)).contains(refreshed);
+        assertThat(cache.getByIban("TR1")).contains(refreshed);
     }
 
     private static Thread daemonThread(Runnable body) {

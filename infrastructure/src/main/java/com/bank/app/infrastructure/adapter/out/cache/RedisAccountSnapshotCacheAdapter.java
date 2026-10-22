@@ -173,10 +173,10 @@ public class RedisAccountSnapshotCacheAdapter implements AccountSnapshotCache {
         if (accountIds == null || accountIds.isEmpty()) {
             return Optional.empty();
         }
-        List<Long> ids = accountIds.stream().distinct().sorted().toList();
-        if (ids.stream().anyMatch(id -> id == null)) {
+        if (accountIds.stream().anyMatch(id -> id == null)) {
             return Optional.empty();
         }
+        List<Long> ids = accountIds.stream().distinct().sorted().toList();
         // All-or-nothing bulk read in a single MGET round trip.
         List<String> keys = ids.stream().map(id -> SnapshotKeys.mapKey(id)).toList();
         try {

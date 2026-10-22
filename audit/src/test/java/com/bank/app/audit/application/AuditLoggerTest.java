@@ -81,4 +81,15 @@ class AuditLoggerTest {
         AuditLog saved = captor.getValue();
         assertEquals("jane.doe", saved.getUsername());
     }
+
+    @Test
+    void shouldPropagatePersistenceFailureInsteadOfClaimingTheAuditWasRecorded() {
+        doThrow(new IllegalStateException("audit store unavailable"))
+                .when(saveAuditLogPort).save(any(AuditLog.class));
+
+        assertThrows(IllegalStateException.class,
+                () -> auditLogger.log("user123", AuditAction.ACCOUNT_CREATED, "details"));
+
+        verify(saveAuditLogPort).save(any(AuditLog.class));
+    }
 }

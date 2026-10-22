@@ -104,16 +104,15 @@ class ProblemDetailFactoryTest {
         @DisplayName("null clock resets to system UTC")
         void shouldResetClockOnNull() {
             ProblemDetailFactory.setClockForTests(Clock.fixed(
-                    Instant.parse("2026-05-01T12:00:00Z"), ZoneOffset.UTC));
+                    Instant.parse("1999-05-01T12:00:00Z"), ZoneOffset.UTC));
             ProblemDetailFactory.setClockForTests(null);
 
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
                     ErrorCode.RESOURCE_NOT_FOUND, "Not found", null);
 
-            // System clock: any 2026 timestamp proves the fixed clock is gone
-            // without coupling to the wall clock.
             assertThat(response.getBody().getProperties().get("timestamp").toString())
-                    .startsWith("2026");
+                    .doesNotStartWith("1999")
+                    .startsWith(String.valueOf(java.time.LocalDateTime.now().getYear()));
         }
     }
 
@@ -207,6 +206,20 @@ class ProblemDetailFactoryTest {
                     .contains("/api/v1/accounts");
             // Kills the setCharacterEncoding mutant.
             assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
+        }
+
+        @Test
+        @DisplayName("should explicitly set the UTF-8 response encoding")
+        void shouldSetUtf8Encoding() throws Exception {
+            jakarta.servlet.http.HttpServletResponse response =
+                    mock(jakarta.servlet.http.HttpServletResponse.class);
+            when(response.getWriter()).thenReturn(
+                    new java.io.PrintWriter(new java.io.StringWriter()));
+
+            ProblemDetailFactory.writeProblem(response, new ObjectMapper(), HttpStatus.BAD_REQUEST,
+                    ErrorCode.INVALID_ARGUMENT.code(), "Bad request", null);
+
+            verify(response).setCharacterEncoding("UTF-8");
         }
 
         @Test

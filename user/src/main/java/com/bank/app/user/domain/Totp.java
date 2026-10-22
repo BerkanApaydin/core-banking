@@ -1,6 +1,7 @@
 package com.bank.app.user.domain;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -57,13 +58,13 @@ public final class Totp {
     /** RFC 4648 Base32 without padding (what authenticator apps accept). */
     public static String base32Encode(byte[] data) {
         Objects.requireNonNull(data, "Data must not be null");
-        StringBuilder out = new StringBuilder((data.length * 8 + 4) / 5);
+        StringBuilder out = new StringBuilder();
         int buffer = 0;
         int bitsLeft = 0;
         for (byte b : data) {
             buffer = (buffer << 8) | (b & 0xFF);
             bitsLeft += 8;
-            while (bitsLeft >= 5) {
+            while (bitsLeft > 4) {
                 bitsLeft -= 5;
                 out.append(BASE32_ALPHABET.charAt((buffer >> bitsLeft) & 0x1F));
             }
@@ -195,7 +196,10 @@ public final class Totp {
             int periodSeconds, int digits, int allowedSkewWindows) {
         Objects.requireNonNull(secret, "Secret must not be null");
         Objects.requireNonNull(clock, "Clock must not be null");
-        if (code == null || periodSeconds <= 0 || allowedSkewWindows < 0) {
+        // An empty secret cannot produce a code (generateCode rejects it). It
+        // comes from a corrupt/legacy row, so fail closed like any other
+        // wrong code instead of throwing a 500 through the login path.
+        if (secret.length == 0 || code == null || periodSeconds <= 0 || allowedSkewWindows < 0) {
             return OptionalLong.empty();
         }
         String candidate = code.strip();
@@ -230,14 +234,15 @@ public final class Totp {
 
     private static String urlEncode(String value) {
         StringBuilder out = new StringBuilder(value.length());
-        for (char c : value.toCharArray()) {
+        for (byte b : value.getBytes(StandardCharsets.UTF_8)) {
+            int c = b & 0xFF;
             if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
-                out.append(c);
+                out.append((char) c);
             } else if (c == ' ') {
                 out.append("%20");
             } else {
-                out.append(String.format(Locale.ROOT, "%%%02X", (int) c));
+                out.append(String.format(Locale.ROOT, "%%%02X", c));
             }
         }
         return out.toString();

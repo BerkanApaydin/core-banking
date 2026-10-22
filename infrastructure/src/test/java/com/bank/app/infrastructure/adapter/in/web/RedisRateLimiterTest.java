@@ -92,6 +92,35 @@ class RedisRateLimiterTest {
     }
 
     @Test
+    void shouldUseSystemClockWhenProviderIsNull() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000, 10000);
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(),
+                anyString(), anyString(), anyString())).thenReturn(1L);
+
+        RedisRateLimiter limiter = new RedisRateLimiter(redisTemplate, props,
+                (com.bank.app.common.application.port.out.ClockProviderPort) null);
+
+        assertTrue(limiter.tryAcquire("user1"));
+    }
+
+    @Test
+    void shouldUseClockProviderClock() {
+        Clock fixed = Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
+        com.bank.app.common.application.port.out.ClockProviderPort provider =
+                org.mockito.Mockito.mock(com.bank.app.common.application.port.out.ClockProviderPort.class);
+        when(provider.clock()).thenReturn(fixed);
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(List.class), anyString(),
+                anyString(), anyString(), anyString())).thenReturn(1L);
+
+        RedisRateLimiter limiter = new RedisRateLimiter(redisTemplate,
+                new RateLimitProperties(null, null, 5, 10_000, 120, 60000, 10000), provider);
+
+        assertTrue(limiter.tryAcquire("user1"));
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                any(List.class), eq(String.valueOf(fixed.millis())), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void shouldUseInjectedClockForLuaTimestamp() {
         Clock fixed = Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
         RateLimitProperties props = new RateLimitProperties(null, null, 5, 10_000, 120, 60000, 10000);

@@ -2,11 +2,16 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -96,6 +101,25 @@ class IdempotencyPersistenceAdapterTest {
 
         assertThat(adapter.tryResetFailed("key1", now)).isTrue();
         verify(repository).resetFailed("key1", null, now);
+    }
+
+    @Test
+    void shouldNotClaimFailedKeyWhenConditionalUpdateLoses() {
+        var now = LocalDateTime.now();
+        when(repository.resetFailed("key1", null, now)).thenReturn(0);
+        when(repository.resetFailed("key1", "hash", now)).thenReturn(0);
+
+        assertThat(adapter.tryResetFailed("key1", now)).isFalse();
+        assertThat(adapter.tryResetFailed("key1", "hash", now)).isFalse();
+    }
+
+    @Test
+    void shouldCreateHandlerKeyOnlyWhenInsertWins() {
+        var now = LocalDateTime.now();
+        when(repository.tryInsert("handler", null, now, "HANDLER")).thenReturn(1, 0);
+
+        assertThat(adapter.tryCreateHandler("handler", now)).isTrue();
+        assertThat(adapter.tryCreateHandler("handler", now)).isFalse();
     }
 
     @Test
@@ -262,5 +286,26 @@ class IdempotencyPersistenceAdapterTest {
 
         assertThat(reaped).isEqualTo(2);
         verify(repository).failStalePending(threshold);
+    }
+
+    @Test
+    void shouldRunRetentionBatchInConfiguredRequiresNewTransaction() {
+        var txManager = mock(PlatformTransactionManager.class);
+        var status = new SimpleTransactionStatus();
+        when(txManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        var transactionalAdapter = new IdempotencyPersistenceAdapter(
+                repository, txManager, new TransactionProperties(17));
+        var threshold = LocalDateTime.now();
+        when(repository.deleteExpiredTerminalRequestsBatch(threshold, 1000)).thenReturn(3);
+
+        assertThat(transactionalAdapter.deleteExpired(threshold)).isEqualTo(3);
+
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(txManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        assertThat(definition.getValue().getTimeout()).isEqualTo(17);
+        verify(txManager).commit(status);
     }
 }

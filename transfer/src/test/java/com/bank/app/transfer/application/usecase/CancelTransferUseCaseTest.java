@@ -186,6 +186,58 @@ class CancelTransferUseCaseTest {
         verifyNoInteractions(accountAclPort);
     }
 
+    @Test
+    void shouldNotSaveOrPublishWhenReversalFails() {
+        stubClock();
+        Long transferId = 1L;
+        AccountId senderAccountId = new AccountId(10L);
+        Transfer transfer = createCompletedTransfer(transferId, senderAccountId, new AccountId(20L),
+                new Money(new BigDecimal("100.00"), Currency.TRY));
+
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+        when(accountAclPort.getAccountInfo(senderAccountId))
+                .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
+        doThrow(new RuntimeException("Receiver already spent the funds"))
+                .when(accountAclPort).reverseBalancesForCancellation(any(), any(), any());
+
+        assertThrows(RuntimeException.class, () -> cancelTransferUseCase.execute(transferId));
+
+        // The CANCELLED status, transfer event and audit row belong to the
+        // same transaction as the reversal. A failed reversal must leave no
+        // trace of a cancellation behind.
+        verify(saveTransferPort, never()).save(any());
+        verify(domainEventPublisherService, never()).publishEvents(any());
+        verifyNoInteractions(auditEventPort);
+    }
+
+    @Test
+    void shouldNotPublishOrAuditWhenCancellationSaveFails() {
+        stubClock();
+        Long transferId = 1L;
+        AccountId senderAccountId = new AccountId(10L);
+        AccountId receiverAccountId = new AccountId(20L);
+        Transfer transfer = createCompletedTransfer(transferId, senderAccountId, receiverAccountId,
+                new Money(new BigDecimal("100.00"), Currency.TRY));
+
+        when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+        when(accountAclPort.getAccountInfo(senderAccountId))
+                .thenReturn(new AccountInfo(senderAccountId, 100L, "TRY", "ACTIVE"));
+        when(accountAclPort.reverseBalancesForCancellation(any(), any(), any()))
+                .thenReturn(new AccountAclPort.MutationResult(senderAccountId, receiverAccountId,
+                        new Money(new BigDecimal("1100.00"), Currency.TRY),
+                        new Money(new BigDecimal("900.00"), Currency.TRY)));
+        doThrow(new RuntimeException("Database unavailable"))
+                .when(saveTransferPort).save(transfer);
+
+        assertThrows(RuntimeException.class, () -> cancelTransferUseCase.execute(transferId));
+
+        // A save failure must roll the reversal back and must not announce a
+        // cancellation that never committed.
+        verify(saveTransferPort).save(transfer);
+        verify(domainEventPublisherService, never()).publishEvents(any());
+        verifyNoInteractions(auditEventPort);
+    }
+
     private static Transfer createCompletedTransfer(Long id, AccountId senderId, AccountId receiverId, Money amount) {
         Transfer transfer = new Transfer(id, senderId, receiverId, amount,
                 TransferStatus.COMPLETED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600), ZoneOffset.UTC));

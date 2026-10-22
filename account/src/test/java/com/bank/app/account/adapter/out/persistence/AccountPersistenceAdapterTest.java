@@ -320,6 +320,36 @@ class AccountPersistenceAdapterTest {
             assertTrue(repository.findIbansByIds(List.of()).isEmpty());
             verifyNoInteractions(springDataRepo);
         }
+
+        @Test
+        @DisplayName("should return empty when the info projection finds no row")
+        void shouldReturnEmptyInfoWhenProjectionFindsNoRow() {
+            when(springDataRepo.findInfoById(99L)).thenReturn(List.of());
+
+            assertTrue(repository.findInfoById(99L).isEmpty());
+        }
+
+        @Test
+        @DisplayName("should return empty when the IBAN info projection finds no row")
+        void shouldReturnEmptyInfoByIbanWhenProjectionFindsNoRow() {
+            Iban iban = new Iban("TR770006200000000000000111");
+            when(springDataRepo.findInfoByIban("TR770006200000000000000111")).thenReturn(List.of());
+
+            assertTrue(repository.findInfoByIban(iban).isEmpty());
+        }
+
+        @Test
+        @DisplayName("should skip projection rows that do not carry a Long id and String IBAN pair")
+        void shouldSkipMalformedIbanProjectionRows() {
+            when(springDataRepo.findIbansByIds(List.of(1L, 2L, 3L))).thenReturn(List.<Object[]>of(
+                    new Object[]{1L, "TR770006200000000000000111"},
+                    new Object[]{"2", "TR870006200000000000000222"},
+                    new Object[]{3L, 999L}));
+
+            var ibans = repository.findIbansByIds(List.of(1L, 2L, 3L));
+
+            assertEquals(Map.of(1L, "TR770006200000000000000111"), ibans);
+        }
     }
 }
 

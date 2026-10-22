@@ -251,4 +251,16 @@ class DataSeederTest {
 
         assertThat(failure).hasMessageContaining("app.demo.seed.ahmet-password");
     }
+
+    @Test
+    void shouldFailFastWhenSeedPasswordIsNull() {
+        DataSeeder seeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort,
+                loadAccountPort, new DemoSeedProperties(null, "Ayse12345678"));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> seeder.seedData().run());
+
+        assertThat(failure).hasMessageContaining("app.demo.seed.ahmet-password");
+    }
 }

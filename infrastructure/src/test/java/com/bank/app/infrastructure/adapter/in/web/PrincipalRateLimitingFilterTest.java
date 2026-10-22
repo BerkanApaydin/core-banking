@@ -69,6 +69,11 @@ class PrincipalRateLimitingFilterTest {
     }
 
     @Test
+    void backendLabelIdentifiesPrincipalLimiter() {
+        assertEquals("Principal rate limiting", filter().backendLabel());
+    }
+
+    @Test
     void anonymousResourcePassesThrough() throws Exception {
         MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1");
         MockHttpServletResponse response = new MockHttpServletResponse();

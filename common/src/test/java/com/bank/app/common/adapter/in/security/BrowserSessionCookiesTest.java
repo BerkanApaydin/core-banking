@@ -120,6 +120,12 @@ class BrowserSessionCookiesTest {
                     .isExactlyInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> BrowserSessionCookies.boundToken(random32(), MAC_KEY, " "))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> BrowserSessionCookies.boundToken(null, MAC_KEY, "42"))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> BrowserSessionCookies.boundToken(random32(), null, "42"))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> BrowserSessionCookies.boundToken(random32(), MAC_KEY, null))
+                    .isExactlyInstanceOf(IllegalArgumentException.class);
         }
 
         @Test

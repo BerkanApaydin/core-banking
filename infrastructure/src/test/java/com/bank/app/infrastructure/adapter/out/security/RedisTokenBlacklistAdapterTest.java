@@ -102,6 +102,16 @@ class RedisTokenBlacklistAdapterTest {
         }
 
         @Test
+        @DisplayName("should check the legacy key at the exact maximum supported length")
+        void shouldCheckLegacyKeyAtExactMaximumLength() {
+            stubLookup(0L);
+
+            assertThat(adapter.isBlacklisted("x".repeat(2048))).isFalse();
+
+            verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("1"));
+        }
+
+        @Test
         @DisplayName("should skip the legacy raw-token lookup for oversized input (SEC-05)")
         void shouldSkipLegacyLookupForOversizedToken() {
             String oversized = "x".repeat(2049);
@@ -110,8 +120,30 @@ class RedisTokenBlacklistAdapterTest {
             assertThat(adapter.isBlacklisted(oversized)).isFalse();
             // The legacy key is not even part of the script's key list for an
             // oversized token: the script skips it via the flag argument.
-            verify(redisTemplate, times(1)).execute(any(DefaultRedisScript.class), anyList(), any(String.class));
+            verify(redisTemplate, times(1)).execute(any(DefaultRedisScript.class), anyList(), eq("0"));
         }
+    }
+
+    @Test
+    @DisplayName("checks the legacy key at the exact 2048-character boundary")
+    void shouldCheckLegacyAtTheExactBoundaryFromTopLevel() {
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+                .thenReturn(0L);
+
+        assertThat(adapter.isBlacklisted("x".repeat(2048))).isFalse();
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("1"));
+    }
+
+    @Test
+    @DisplayName("skips the legacy key above the 2048-character boundary")
+    void shouldSkipLegacyAboveTheBoundaryFromTopLevel() {
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+                .thenReturn(0L);
+
+        assertThat(adapter.isBlacklisted("x".repeat(2049))).isFalse();
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("0"));
     }
 
     @Nested

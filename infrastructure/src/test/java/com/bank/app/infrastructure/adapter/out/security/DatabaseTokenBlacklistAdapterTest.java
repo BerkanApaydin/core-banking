@@ -6,6 +6,7 @@ import com.bank.app.common.domain.TokenDigest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +54,11 @@ class DatabaseTokenBlacklistAdapterTest {
 
         verify(jdbc).update(contains("INSERT INTO token_revocations"),
                 eq(TokenDigest.sha256Hex("token")), any(OffsetDateTime.class));
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         verify(transactionManager).commit(status);
     }
 
@@ -96,5 +102,22 @@ class DatabaseTokenBlacklistAdapterTest {
         adapter.cleanExpired();
 
         verify(jdbc, times(2)).update(anyString());
+    }
+
+    @Test
+    void shouldStopCleanupAfterExactlyTenFullBatches() {
+        when(jdbc.update(anyString())).thenReturn(1000);
+
+        adapter.cleanExpired();
+
+        verify(jdbc, times(10)).update(anyString());
+    }
+
+    @Test
+    void shouldReportNonRevokedTokenAsNotBlacklisted() {
+        String hash = TokenDigest.sha256Hex("token");
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(hash))).thenReturn(false);
+
+        assertThat(adapter.isBlacklisted("token")).isFalse();
     }
 }

@@ -116,8 +116,9 @@ public class OutboxPersistenceAdapter implements OutboxPort {
         int base = Math.max(1, backoffBaseSeconds);
         int max = Math.max(base, backoffMaxSeconds);
         int exponent = Math.max(0, retryCount - 1);
-        // Shift with a cap: 2^exponent can overflow for a large retry count.
-        long delay = exponent >= 31 ? max : (long) base << exponent;
+        // Cap the exponent before multiplying: 2^exponent can overflow for a
+        // large retry count, while any capped value still saturates at max.
+        long delay = (long) base * (1L << Math.min(exponent, 31));
         return (int) Math.min(delay, max);
     }
 

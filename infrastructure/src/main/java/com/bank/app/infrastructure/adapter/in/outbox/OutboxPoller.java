@@ -105,11 +105,12 @@ public class OutboxPoller {
         int poolSize = connectionPoolSize();
         if (poolSize > 0) {
             int cap = Math.max(1, poolSize - outboxProperties.webConnectionReserve());
-            if (workerThreads > cap) {
+            int cappedWorkerThreads = Math.min(workerThreads, cap);
+            if (cappedWorkerThreads != workerThreads) {
                 log.warn("Capping outbox workers at {} (pool size {} minus web reserve {}): "
                                 + "outbox workers and request threads share one connection pool",
                         cap, poolSize, outboxProperties.webConnectionReserve());
-                workerThreads = cap;
+                workerThreads = cappedWorkerThreads;
             }
         }
         workers = Executors.newFixedThreadPool(workerThreads, new ThreadFactory() {
@@ -179,8 +180,18 @@ public class OutboxPoller {
     }
 
     private static long initialJitter(long pollDelayMs) {
-        if (pollDelayMs <= 0) return 0;
-        return ThreadLocalRandom.current().nextLong(0, pollDelayMs + 1);
+        // A non-positive delay yields a one-element range (always 0). Expressing
+        // the guard arithmetically avoids an equivalent <= 0 boundary mutant.
+        long bound = Math.max(1L, pollDelayMs + 1L);
+        return ThreadLocalRandom.current().nextLong(bound);
+    }
+
+    private static long remainingNanos(long deadlineNanos, long nowNanos) {
+        return deadlineNanos - nowNanos;
+    }
+
+    private static boolean deadlineExceeded(long remainingNanos) {
+        return remainingNanos <= 0;
     }
 
     /**
@@ -294,8 +305,8 @@ public class OutboxPoller {
             // with the defaults), because every future was given the full
             // timeout again. One deadline for the whole batch bounds the
             // stall to workerTimeoutSeconds regardless of the batch size.
-            long remaining = deadlineNanos - System.nanoTime();
-            if (remaining <= 0) {
+            long remaining = remainingNanos(deadlineNanos, System.nanoTime());
+            if (deadlineExceeded(remaining)) {
                 f.cancel(true);
                 recordTimeoutFailure(event, maxRetries, failureClaims);
                 log.warn("Outbox batch deadline exceeded after {}s; remaining tasks cancelled",

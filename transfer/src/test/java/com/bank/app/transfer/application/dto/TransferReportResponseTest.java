@@ -41,4 +41,26 @@ class TransferReportResponseTest {
         assertThrows(NullPointerException.class,
                 () -> new TransferReportResponse(1L, 0L, BigDecimal.ZERO, "TRY", null));
     }
+
+    @Test
+    void shouldDefaultCursorAndTotalsWhenHasNextIsProvided() {
+        TransferReportResponse resp = new TransferReportResponse(
+                1L, 2L, BigDecimal.valueOf(200), "TRY", List.of(), true);
+
+        assertTrue(resp.hasNext());
+        assertNull(resp.nextCursorCreatedAt());
+        assertNull(resp.nextCursorId());
+        assertNull(resp.totalCount());
+        assertNull(resp.totalVolume());
+    }
+
+    @Test
+    void shouldExposeHasNextFalseWithoutCursor() {
+        TransferReportResponse resp = new TransferReportResponse(
+                1L, 2L, BigDecimal.valueOf(200), "TRY", List.of(), false);
+
+        assertFalse(resp.hasNext());
+        assertNull(resp.nextCursorCreatedAt());
+        assertNull(resp.nextCursorId());
+    }
 }

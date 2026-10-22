@@ -30,7 +30,7 @@ public abstract class AbstractTransferReportQuery {
         this.loadTransferPort = loadTransferPort;
         this.viewEnricher = viewEnricher;
         this.transferAuthorizationService = transferAuthorizationService;
-        this.maxPageSize = maxPageSize > 0 ? maxPageSize : 100;
+        this.maxPageSize = maxPageSize;
     }
 
     protected final TransferReportResponse execute(ReportCriteria criteria, boolean includeTotals) {

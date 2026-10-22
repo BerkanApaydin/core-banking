@@ -123,7 +123,7 @@ public final class AesGcmMfaEncryptor implements MfaSecretEncryptorPort {
             return false;
         }
         int separator = encryptedBase64.indexOf(':', KEY_VERSION_PREFIX.length());
-        if (separator < 0) {
+        if (separator == -1) {
             return false;
         }
         return primaryKeyId.equals(encryptedBase64.substring(KEY_VERSION_PREFIX.length(), separator));
@@ -138,7 +138,7 @@ public final class AesGcmMfaEncryptor implements MfaSecretEncryptorPort {
         Objects.requireNonNull(stored, "Stored secret must not be null");
         if (stored.startsWith(KEY_VERSION_PREFIX)) {
             int separator = stored.indexOf(':', KEY_VERSION_PREFIX.length());
-            if (separator < 0) {
+            if (separator == -1) {
                 throw new IllegalArgumentException("Stored MFA secret has a malformed key id");
             }
             String keyId = stored.substring(KEY_VERSION_PREFIX.length(), separator);

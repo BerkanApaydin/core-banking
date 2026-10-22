@@ -85,7 +85,7 @@ public class RedisMfaAttemptAdapter implements MfaAttemptPort {
         if (userId == null) {
             return;
         }
-        withRedis(() -> redisTemplate.delete(key(userId)));
+        withRedisVoid(() -> redisTemplate.delete(key(userId)));
     }
 
     @Override
@@ -100,6 +100,14 @@ public class RedisMfaAttemptAdapter implements MfaAttemptPort {
     private <T> T withRedis(Supplier<T> operation) {
         try {
             return operation.get();
+        } catch (DataAccessException | NumberFormatException ex) {
+            throw new LoginAttemptStoreUnavailableException(ex);
+        }
+    }
+
+    private void withRedisVoid(Runnable operation) {
+        try {
+            operation.run();
         } catch (DataAccessException | NumberFormatException ex) {
             throw new LoginAttemptStoreUnavailableException(ex);
         }

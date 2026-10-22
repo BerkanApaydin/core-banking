@@ -1,10 +1,16 @@
 package com.bank.app.user.adapter.in.web;
 
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
+import com.bank.app.user.adapter.in.web.dto.MfaConfirmWebRequest;
+import com.bank.app.user.adapter.in.web.dto.MfaDisableWebRequest;
+import com.bank.app.user.adapter.in.web.dto.MfaEnableWebRequest;
+import com.bank.app.user.adapter.in.web.dto.PasswordResetConfirmWebRequest;
+import com.bank.app.user.adapter.in.web.dto.PasswordResetRequestWebRequest;
 import com.bank.app.user.adapter.in.web.dto.RefreshTokenRequest;
 import com.bank.app.user.adapter.in.web.dto.RegisterWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
+import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.MfaStatusUseCase;
@@ -23,14 +29,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -62,15 +76,17 @@ class AuthControllerTest {
     @Mock private UserContextService userContextService;
 
     private MockMvc mockMvc;
+    private AuthController controller;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(
+        controller = new AuthController(
                 registerUserUseCase, loginUserUseCase, clientIpResolver,
                 logoutUseCase, refreshSessionUseCase, mfaStatusUseCase, enableMfaUseCase, confirmMfaUseCase,
                 disableMfaUseCase, requestPasswordResetUseCase, confirmPasswordResetUseCase,
-                userContextService)).build();
+                userContextService);
+        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
     @Test
@@ -120,6 +136,25 @@ class AuthControllerTest {
     }
 
     @Test
+    void shouldRejectWhitespaceOnlyAuthorizationHeader() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .header("Authorization", "   ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+
+        verify(logoutUseCase, never()).execute(any(), any());
+    }
+
+    @Test
+    void shouldRejectBlankRefreshTokenBodyOnDirectInvocation() {
+        ResponseEntity<?> result = controller.logout(null,
+                new RefreshTokenRequest("   "), new MockHttpServletRequest());
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(logoutUseCase, never()).execute(any(), any());
+    }
+
+    @Test
     void shouldLogoutWithBearerHeader() throws Exception {
         mockMvc.perform(post("/auth/logout")
                         .header("Authorization", "Bearer tok-1")
@@ -138,4 +173,129 @@ class AuthControllerTest {
 
         verify(logoutUseCase).execute(eq(null), eq("rt-9"));
     }
+
+    @Test
+    void shouldReturnMfaStatusForTheCurrentUser() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+        when(mfaStatusUseCase.isEnabled(7L)).thenReturn(true);
+
+        mockMvc.perform(get("/auth/mfa/status"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.mfaEnabled").value(true));
+    }
+
+    @Test
+    void shouldRejectAnonymousMfaStatus() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/auth/mfa/status"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldStartEnrollmentForTheCurrentUser() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+        when(enableMfaUseCase.execute(7L, "Str0ngPassw0rd!"))
+                .thenReturn(new MfaEnrollment("otpauth://totp/x", "BASE32SECRET"));
+
+        mockMvc.perform(post("/auth/mfa/enable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaEnableWebRequest("Str0ngPassw0rd!"))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.base32Secret").value("BASE32SECRET"));
+    }
+
+    @Test
+    void shouldRejectAnonymousEnrollment() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/auth/mfa/enable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaEnableWebRequest("Str0ngPassw0rd!"))))
+                .andExpect(status().isUnauthorized());
+
+        verify(enableMfaUseCase, never()).execute(any(), any());
+    }
+
+    @Test
+    void shouldConfirmEnrollmentForTheCurrentUser() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+
+        mockMvc.perform(post("/auth/mfa/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaConfirmWebRequest("Str0ngPassw0rd!", "123456"))))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        verify(confirmMfaUseCase).execute(7L, "Str0ngPassw0rd!", "123456");
+    }
+
+    @Test
+    void shouldRejectAnonymousConfirmation() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/auth/mfa/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaConfirmWebRequest("Str0ngPassw0rd!", "123456"))))
+                .andExpect(status().isUnauthorized());
+
+        verify(confirmMfaUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectAnonymousDisable() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/auth/mfa/disable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaDisableWebRequest("Str0ngPassw0rd!", "123456"))))
+                .andExpect(status().isUnauthorized());
+
+        verify(disableMfaUseCase, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    void shouldDisableMfaForTheCurrentUser() throws Exception {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+
+        mockMvc.perform(post("/auth/mfa/disable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new MfaDisableWebRequest("Str0ngPassw0rd!", "123456"))))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        verify(disableMfaUseCase).execute(7L, "Str0ngPassw0rd!", "123456");
+    }
+
+    @Test
+    void shouldAcceptPasswordResetRequest() throws Exception {
+        mockMvc.perform(post("/auth/password/reset/request")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetRequestWebRequest("alice"))))
+                .andExpect(status().isAccepted());
+
+        verify(requestPasswordResetUseCase).execute("alice");
+    }
+
+    @Test
+    void shouldConfirmPasswordReset() throws Exception {
+        mockMvc.perform(post("/auth/password/reset/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetConfirmWebRequest("token-1", "New_passw0rd12"))))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        verify(confirmPasswordResetUseCase).execute("token-1", "New_passw0rd12");
+    }
 }
+

@@ -9,6 +9,7 @@ import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.user.application.port.out.AuthenticationPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.MfaAttemptPort;
+import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.service.MfaCodeVerificationService;
@@ -24,11 +25,13 @@ import com.bank.app.user.domain.exception.InvalidMfaCodeException;
 import com.bank.app.user.domain.exception.MfaAlreadyEnabledException;
 import com.bank.app.user.domain.exception.MfaNotEnrolledException;
 import com.bank.app.user.domain.exception.TooManyFailedMfaAttemptsException;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,6 +65,7 @@ class MfaUseCaseTest {
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
     @Mock private MfaAttemptPort mfaAttemptPort;
+    @Mock private MfaSecretEncryptorPort encryptorPort;
 
     private final AesGcmMfaEncryptor encryptor = AesGcmMfaEncryptor.ephemeral();
     private final TotpPolicy totpPolicy = new TotpPolicy(30, 6, 1);
@@ -89,9 +94,8 @@ class MfaUseCaseTest {
     }
 
     private static User persistedUser(Long id, String username) {
-        User user = UserTestFactory.newUser(username);
-        // Simulate a persisted identity for audit logging (id is informational here).
-        return user;
+        return new User(new UserId(id), username, UserTestFactory.FIXTURE_HASH,
+                Role.ROLE_USER, null, null, 0L);
     }
 
     private String currentCode(byte[] secret) {
@@ -123,6 +127,63 @@ class MfaUseCaseTest {
             // R-U08: enrolment has no second factor, so a successful password
             // step-up clears the shared verification budget.
             verify(mfaAttemptPort).reset(7L);
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_ENABLED.equals(event.action())
+                            && "alice".equals(event.username())
+                            && Long.valueOf(7L).equals(event.actorUserId())));
+        }
+
+        @Test
+        @DisplayName("should reject an unknown user")
+        void shouldRejectUnknownUser() {
+            when(loadUserPort.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> enable.execute(99L, "Secret123"))
+                    .isInstanceOf(UserNotFoundException.class);
+            verify(mfaSecretPort, never()).saveSecret(any(), any());
+        }
+
+        @Test
+        @DisplayName("should carry the configured policy into the provisioning URI")
+        void shouldBuildFromPolicy() {
+            TotpPolicy policy = new TotpPolicy(60, 8, 2);
+            EnableMfaUseCaseImpl policyBound = EnableMfaUseCaseImpl.withPolicy(
+                    loadUserPort, mfaReauthentication, mfaSecretPort, encryptorPort,
+                    "test-issuer", policy, clockProvider, auditEventPort);
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, false));
+            when(encryptorPort.encrypt(any())).thenReturn("cipher");
+
+            MfaEnrollment enrollment = policyBound.execute(7L, "Secret123");
+
+            assertThat(enrollment.otpauthUri())
+                    .contains("digits=8")
+                    .contains("period=60");
+            assertThat(enrollment.base32Secret()).hasSize(32);
+        }
+
+        @Test
+        @DisplayName("should zeroize the plaintext secret after building enrollment material")
+        void shouldZeroizePlaintextSecret() {
+            EnableMfaUseCaseImpl encryptorBacked = new EnableMfaUseCaseImpl(
+                    loadUserPort, mfaReauthentication, mfaSecretPort, encryptorPort,
+                    "test-issuer", clockProvider, auditEventPort);
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, false));
+            ArgumentCaptor<byte[]> plaintext = ArgumentCaptor.forClass(byte[].class);
+            when(encryptorPort.encrypt(plaintext.capture())).thenReturn("cipher");
+
+            encryptorBacked.execute(7L, "Secret123");
+
+            assertThat(plaintext.getValue()).isNotEmpty().containsOnly((byte) 0);
         }
 
         @Test
@@ -173,6 +234,23 @@ class MfaUseCaseTest {
             verify(authenticationPort, never()).authenticate(any(), any());
             verify(mfaSecretPort, never()).saveSecret(any(), any());
         }
+
+        @Test
+        @DisplayName("should keep the uniform 400 when the re-auth audit store is down")
+        void shouldKeepUniformFailureWhenAuditStoreIsDown() {
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(authenticationPort.authenticate("alice", "nope"))
+                    .thenThrow(new AuthenticationFailedException());
+            doThrow(new IllegalStateException("audit down"))
+                    .when(auditEventPort).publish(any());
+
+            assertThatThrownBy(() -> enable.execute(7L, "nope"))
+                    .isInstanceOf(InvalidMfaCodeException.class);
+            verify(mfaAttemptPort).recordFailure(7L);
+            verify(mfaSecretPort, never()).saveSecret(any(), any());
+        }
     }
 
     @Nested
@@ -198,6 +276,63 @@ class MfaUseCaseTest {
             assertThat(user.getTokenVersion()).isEqualTo(1L);
             verify(saveUserPort).save(user);
             verify(refreshTokenPort).revokeAllForUser(7L);
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_ENABLED.equals(event.action())
+                            && event.details().contains("confirmed")
+                            && "alice".equals(event.username())
+                            && Long.valueOf(7L).equals(event.actorUserId())));
+        }
+
+        @Test
+        @DisplayName("should reject an unknown user")
+        void shouldRejectUnknownUser() {
+            when(loadUserPort.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> confirm.execute(99L, "Secret123", "123456"))
+                    .isInstanceOf(UserNotFoundException.class);
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject an already-enabled account before the password step-up")
+        void shouldRejectAlreadyEnabledBeforePasswordStepUp() {
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> confirm.execute(7L, "Secret123", "123456"))
+                    .isInstanceOf(MfaAlreadyEnabledException.class);
+
+            verify(authenticationPort, never()).authenticate(any(), any());
+            verify(mfaSecretPort, never()).findSecret(any());
+            verify(saveUserPort, never()).save(any());
+            verify(refreshTokenPort, never()).revokeAllForUser(any());
+        }
+
+        @Test
+        @DisplayName("should reject before the code check when the budget is exhausted mid-request")
+        void shouldRejectWhenBlockedAfterPasswordBeforeCode() {
+            // The shared budget can be exhausted by a concurrent attempt
+            // between re-authentication and the code check: the request must
+            // not spend a code comparison or consume the step counter.
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, false));
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(Totp.generateSecret())));
+            when(mfaAttemptPort.isBlocked(7L)).thenReturn(false, true);
+            when(mfaAttemptPort.getWindowMinutes()).thenReturn(15);
+
+            assertThatThrownBy(() -> confirm.execute(7L, "Secret123", "123456"))
+                    .isInstanceOf(TooManyFailedMfaAttemptsException.class)
+                    .hasMessageContaining("15");
+
+            verify(mfaSecretPort, never()).recordAcceptedTotpCounter(any(), anyLong());
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
+            verify(saveUserPort, never()).save(any());
+            verify(refreshTokenPort, never()).revokeAllForUser(any());
         }
 
         @Test
@@ -282,6 +417,20 @@ class MfaUseCaseTest {
             verify(mfaSecretPort).deleteSecret(7L);
             verify(mfaSecretPort).recordAcceptedTotpCounter(eq(7L), anyLong());
             verify(refreshTokenPort).revokeAllForUser(7L);
+            verify(auditEventPort).publish(argThat(event ->
+                    AuditEvent.MFA_DISABLED.equals(event.action())
+                            && "alice".equals(event.username())
+                            && Long.valueOf(7L).equals(event.actorUserId())));
+        }
+
+        @Test
+        @DisplayName("should reject an unknown user")
+        void shouldRejectUnknownUser() {
+            when(loadUserPort.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> disable.execute(99L, "Secret123", "123456"))
+                    .isInstanceOf(UserNotFoundException.class);
+            verify(saveUserPort, never()).save(any());
         }
 
         @Test
@@ -293,6 +442,53 @@ class MfaUseCaseTest {
             assertThatThrownBy(() -> disable.execute(7L, "Secret123", "123456"))
                     .isInstanceOf(MfaNotEnrolledException.class);
             verify(authenticationPort, never()).authenticate(any(), any());
+        }
+
+        @Test
+        @DisplayName("should reject a missing secret after the password step-up")
+        void shouldRejectWhenSecretMissingAfterPassword() {
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, true));
+            when(mfaSecretPort.findSecret(7L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> disable.execute(7L, "Secret123", "123456"))
+                    .isInstanceOf(MfaNotEnrolledException.class);
+
+            verify(authenticationPort).authenticate("alice", "Secret123");
+            verify(mfaSecretPort, never()).recordAcceptedTotpCounter(any(), anyLong());
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
+            verify(saveUserPort, never()).save(any());
+            verify(mfaSecretPort, never()).deleteSecret(any());
+            verify(refreshTokenPort, never()).revokeAllForUser(any());
+        }
+
+        @Test
+        @DisplayName("should reject before the code check when the budget is exhausted mid-request")
+        void shouldRejectWhenBlockedAfterPasswordBeforeCode() {
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, true));
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(Totp.generateSecret())));
+            when(mfaAttemptPort.isBlocked(7L)).thenReturn(false, true);
+            when(mfaAttemptPort.getWindowMinutes()).thenReturn(15);
+
+            assertThatThrownBy(() -> disable.execute(7L, "Secret123", "123456"))
+                    .isInstanceOf(TooManyFailedMfaAttemptsException.class)
+                    .hasMessageContaining("15");
+
+            verify(mfaSecretPort, never()).recordAcceptedTotpCounter(any(), anyLong());
+            verify(mfaAttemptPort, never()).recordFailure(anyLong());
+            verify(saveUserPort, never()).save(any());
+            verify(mfaSecretPort, never()).deleteSecret(any());
+            verify(refreshTokenPort, never()).revokeAllForUser(any());
         }
 
         @Test

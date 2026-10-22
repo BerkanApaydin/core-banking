@@ -372,6 +372,19 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldPassThroughLogoutWhenTheAccessTokenCannotBeVerified() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer expired-token");
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getServletPath()).thenReturn("/api/v1/auth/logout");
+        when(JwtTokenProvider.verifyAndDecode("expired-token")).thenReturn(null);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
     void shouldStillCheckRevocationForOtherMethodsAtLogoutPath() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer revoked-token");
         when(request.getMethod()).thenReturn("GET");
@@ -717,6 +730,8 @@ class JwtAuthenticationFilterTest {
         void returns503WhenUserStoreIsDown() throws Exception {
             stubAdminBearer();
             when(loadUserPort.findTokenVersionById(7L)).thenThrow(new RuntimeException("db down"));
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken("stale", "creds"));
 
             MockHttpServletResponse errorResponse = new MockHttpServletResponse();
             filter.doFilterInternal(request, errorResponse, filterChain);
@@ -724,6 +739,7 @@ class JwtAuthenticationFilterTest {
             assertProblemResponse(errorResponse, 503, "SECURITY_BACKEND_UNAVAILABLE",
                     "Security service temporarily unavailable");
             verifyNoInteractions(filterChain);
+            assertNull(SecurityContextHolder.getContext().getAuthentication());
         }
 
         @Test

@@ -157,4 +157,27 @@ class AuditPersistenceAdapterTest {
         assertEquals("carol", result.get(0).getUsername());
         assertEquals(AuditAction.TRANSFER_EXECUTED, result.get(0).getAction());
     }
+
+    @Test
+    void shouldStopImmediatelyWhenNoRowsAreEligibleForRetention() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(365);
+        when(springDataRepo.deleteBatchOlderThan(cutoff,
+                AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE)).thenReturn(0);
+
+        assertEquals(0, adapter.deleteOlderThan(cutoff));
+        verify(springDataRepo, times(1))
+                .deleteBatchOlderThan(cutoff, AuditLogPersistenceAdapter.RETENTION_BATCH_SIZE);
+    }
+
+    @Test
+    void shouldFloorNonPositivePageSizeAtAdapterBoundary() {
+        when(springDataRepo.findByActorUserIdOrderByTimestampDescIdDesc(eq(7L), any()))
+                .thenReturn(List.of());
+
+        adapter.findByActor(7L, 0);
+
+        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(springDataRepo).findByActorUserIdOrderByTimestampDescIdDesc(eq(7L), pageCaptor.capture());
+        assertEquals(1, pageCaptor.getValue().getPageSize());
+    }
 }

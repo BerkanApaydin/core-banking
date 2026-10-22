@@ -70,6 +70,19 @@ class IdempotencyPendingReaperTest {
         }
 
         @Test
+        @DisplayName("uses exactly now minus the configured age as the cutoff")
+        void shouldUseExactStalenessCutoff() {
+            when(clockProvider.clock()).thenReturn(fixedClock);
+            when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(1);
+
+            reaper.reapStalePending();
+
+            // A boundary error here either reaps a live request (older-than
+            // too small) or never recovers a crashed one (older-than too big).
+            verify(idempotencyPort).failStalePending(LocalDateTime.of(2026, 6, 22, 9, 45));
+        }
+
+        @Test
         @DisplayName("does nothing when no stale rows exist")
         void shouldDoNothingWhenEmpty() {
             when(clockProvider.clock()).thenReturn(fixedClock);
@@ -78,7 +91,7 @@ class IdempotencyPendingReaperTest {
             reaper.reapStalePending();
 
             verify(idempotencyPort).failStalePending(any(LocalDateTime.class));
-            assertThat(meters.counter(IdempotencyPendingReaper.REAPED_COUNTER).count()).isZero();
+            assertThat(meters.find(IdempotencyPendingReaper.REAPED_COUNTER).counter()).isNull();
         }
 
         @Test
@@ -136,6 +149,35 @@ class IdempotencyPendingReaperTest {
 
             verify(idempotencyPort, never()).failStalePending(any(LocalDateTime.class));
         }
+    }
+
+    @Test
+    @DisplayName("updates the reaped counter exactly when at least one row changed")
+    void shouldUpdateCounterOnlyForNonZeroRows() {
+        when(clockProvider.clock()).thenReturn(fixedClock);
+        when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(0);
+        reaper.reapStalePending();
+        assertThat(meters.find(IdempotencyPendingReaper.REAPED_COUNTER).counter()).isNull();
+
+        when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(2);
+        reaper.reapStalePending();
+        assertThat(meters.counter(IdempotencyPendingReaper.REAPED_COUNTER).count())
+                .isEqualTo(2.0);
+    }
+
+    @Test
+    @DisplayName("convenience constructors run without a meter registry or clock seam")
+    void shouldSupportProductionConvenienceConstructors() {
+        IdempotencyReaperProperties properties =
+                new IdempotencyReaperProperties(true, Duration.ofMinutes(15));
+        when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(0);
+
+        new IdempotencyPendingReaper(idempotencyPort, properties).reapStalePending();
+        new IdempotencyPendingReaper(idempotencyPort, properties,
+                AdvisorySchedulerLock.alwaysRun()).reapStalePending();
+
+        verify(idempotencyPort, org.mockito.Mockito.times(2))
+                .failStalePending(any(LocalDateTime.class));
     }
 
     @Nested

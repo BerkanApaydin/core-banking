@@ -73,6 +73,13 @@ class ClientIpResolverTest {
         void shouldHandleCaseInsensitiveUnknown() {
             assertThat(resolver.resolveClientIp("Unknown", "10.0.0.1")).isEqualTo("10.0.0.1");
         }
+
+        @Test
+        @DisplayName("should fall back to remote address when every forwarded hop is unknown")
+        void shouldFallbackWhenEveryHopIsUnknown() {
+            assertThat(resolver.resolveClientIp("unknown, UNKNOWN, Unknown", "10.0.0.1"))
+                    .isEqualTo("10.0.0.1");
+        }
     }
 
     @Nested

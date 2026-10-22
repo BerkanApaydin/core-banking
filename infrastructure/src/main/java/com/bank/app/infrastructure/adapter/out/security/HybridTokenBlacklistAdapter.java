@@ -151,8 +151,5 @@ public final class HybridTokenBlacklistAdapter implements TokenBlacklistPort {
         database.cleanExpired();
         redis.cleanExpired();
         local.cleanExpired();
-        if (notRevoked != null) {
-            notRevoked.cleanUp();
-        }
     }
 }

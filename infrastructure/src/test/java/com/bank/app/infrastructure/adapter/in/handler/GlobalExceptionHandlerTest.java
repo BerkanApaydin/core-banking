@@ -79,6 +79,72 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldFindUniqueStateWhenItSitsDeepInTheCauseChain() {
+        SQLException unique = new SQLException("duplicate", "23505");
+        RuntimeException middle = new RuntimeException("wrapped", new RuntimeException("inner", unique));
+        when(messageSource.getMessage(eq("error.unique_constraint_violation"), isNull(), any(Locale.class)))
+                .thenReturn("Unique constraint violation");
+
+        ResponseEntity<ProblemDetail> response = handler.handleDataIntegrityViolationException(
+                new DataIntegrityViolationException("Violation", middle), null);
+
+        assertNotNull(response.getBody());
+        assertEquals("UNIQUE_CONSTRAINT_VIOLATION", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldNotHangOnACyclicCauseChain() {
+        RuntimeException first = new RuntimeException("first");
+        RuntimeException second = new RuntimeException("second", first);
+        first.initCause(second);
+        when(messageSource.getMessage(eq("error.db_integrity_violation"), isNull(), any(Locale.class)))
+                .thenReturn("DB integrity violation");
+
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+            ResponseEntity<ProblemDetail> response = handler.handleDataIntegrityViolationException(
+                    new DataIntegrityViolationException("Violation", first), null);
+            assertNotNull(response.getBody());
+            assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().getProperties().get("code"));
+        });
+    }
+
+    @Test
+    void shouldStopUniqueLookupAtTheCauseDepthLimit() {
+        SQLException unique = new SQLException("duplicate", "23505");
+        Throwable current = unique;
+        for (int i = 0; i < 15; i++) {
+            current = new RuntimeException("wrapper-" + i, current);
+        }
+        when(messageSource.getMessage(eq("error.db_integrity_violation"), isNull(), any(Locale.class)))
+                .thenReturn("DB integrity violation");
+
+        ResponseEntity<ProblemDetail> response = handler.handleDataIntegrityViolationException(
+                new DataIntegrityViolationException("Violation", current), null);
+
+        assertNotNull(response.getBody());
+        assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldTreatASelfCausedThrowableAsNonUnique() {
+        when(messageSource.getMessage(eq("error.db_integrity_violation"), isNull(), any(Locale.class)))
+                .thenReturn("DB integrity violation");
+
+        ResponseEntity<ProblemDetail> response = handler.handleDataIntegrityViolationException(
+                new DataIntegrityViolationException("Violation", new SelfCausedException()), null);
+
+        assertNotNull(response.getBody());
+        assertEquals("DB_INTEGRITY_VIOLATION", response.getBody().getProperties().get("code"));
+    }
+
+    private static final class SelfCausedException extends RuntimeException {
+        @Override
+        public Throwable getCause() {
+            return this;
+        }
+    }
+
+    @Test
     void shouldHandleGeneralException() {
         Exception ex = new Exception("General error");
 

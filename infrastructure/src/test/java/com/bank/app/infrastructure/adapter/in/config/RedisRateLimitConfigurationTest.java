@@ -10,6 +10,7 @@ import org.springframework.data.redis.connection.lettuce.LettucePoolingClientCon
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
@@ -136,6 +137,63 @@ class RedisRateLimitConfigurationTest {
 
                     assertThat(lettuce.getPort())
                             .isEqualTo(6379);
+                });
+    }
+
+    @Test
+    void shouldCreatePlainClientWithoutPoolingWhenLettucePoolIsAbsent() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        // RedisProperties always constructs a Lettuce block; clear its pool to
+        // represent a configuration that never opted into pooling.
+        ReflectionTestUtils.setField(properties.getLettuce(), "pool", null);
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        // No pool block means the shared multiplexed connection is used.
+        assertThat(factory.getClientConfiguration())
+                .isNotInstanceOf(LettucePoolingClientConfiguration.class);
+    }
+
+    @Test
+    void shouldApplyConnectTimeout() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        properties.setConnectTimeout(Duration.ofSeconds(4));
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        var options = factory.getClientConfiguration().getClientOptions().orElseThrow();
+        assertThat(options.getSocketOptions().getConnectTimeout()).isEqualTo(Duration.ofSeconds(4));
+    }
+
+    @Test
+    void shouldCreateRedisBeansWhenTokenBlacklistBackendIsHybrid() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
+                        "app.security.token-blacklist.backend=hybrid")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(RedisConnectionFactory.class);
+                    assertThat(context).hasSingleBean(StringRedisTemplate.class);
+                });
+    }
+
+    @Test
+    void shouldCreateRedisBeansWhenLoginAttemptBackendIsRedis() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.data.redis.host=localhost",
+                        "spring.data.redis.port=6379",
+                        "app.security.failed-login.backend=redis")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(RedisConnectionFactory.class);
+                    assertThat(context).hasSingleBean(StringRedisTemplate.class);
                 });
     }
 

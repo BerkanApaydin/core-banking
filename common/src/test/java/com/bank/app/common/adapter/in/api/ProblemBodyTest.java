@@ -53,4 +53,13 @@ class ProblemBodyTest {
         assertThat(ProblemBody.of(500, "GENERAL_INTERNAL_ERROR", null, FIXED, null, null).message())
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("derives a stable lower-case problem type from the wire code")
+    void derivesProblemTypeFromCode() {
+        ProblemBody body = new ProblemBody(400, "RULE_VIOLATION", "m", "t", null, null);
+
+        assertThat(body.problemType())
+                .isEqualTo(ProblemBody.PROBLEM_TYPE_BASE + "rule_violation");
+    }
 }

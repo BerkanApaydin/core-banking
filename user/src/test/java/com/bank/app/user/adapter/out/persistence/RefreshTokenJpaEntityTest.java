@@ -18,4 +18,13 @@ class RefreshTokenJpaEntityTest {
 
         assertThat(entity.isNew()).isFalse();
     }
+
+    @Test
+    void shouldExposeRevocationState() {
+        var entity = new RefreshTokenJpaEntity();
+
+        assertThat(entity.isRevoked()).isFalse();
+        entity.setRevoked(true);
+        assertThat(entity.isRevoked()).isTrue();
+    }
 }

@@ -108,6 +108,16 @@ class CorrelationIdFilterEdgeCaseTest {
     }
 
     @Test
+    void shouldAcceptCorrelationIdAtMaximumLength() throws Exception {
+        String maxLength = "a".repeat(64);
+        when(request.getHeader("X-Correlation-ID")).thenReturn(maxLength);
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setHeader("X-Correlation-ID", maxLength);
+    }
+
+    @Test
     void shouldRejectOversizedCorrelationId() throws Exception {
         when(request.getHeader("X-Correlation-ID")).thenReturn("a".repeat(65));
 

@@ -156,9 +156,28 @@ class RefreshSessionUseCaseImplTest {
         when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> useCase.execute(REFRESH))
-                .isExactlyInstanceOf(AuthenticationFailedException.class);
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("expired");
 
         verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("should reject a token expiring exactly at the current instant")
+    void shouldRejectExpiryBoundaryAtNow() {
+        stubClock();
+        StoredRefresh boundary = new StoredRefresh(HASH, 7L, "family-1",
+                LocalDateTime.now(FIXED), false, null);
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(boundary));
+
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("expired");
+
+        verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
     }
 
     @Test
@@ -217,6 +236,30 @@ class RefreshSessionUseCaseImplTest {
                 .isExactlyInstanceOf(RefreshTokenReuseException.class);
 
         verify(refreshTokenPort).revokeFamily("family-1", 7L);
+        verify(refreshTokenPort, never()).save(anyString(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("should reject a vanished token on a lost rotation race without revoking a family")
+    void shouldRejectLostRotationRaceWhenRereadIsMissing() {
+        stubClock();
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH))
+                .thenReturn(Optional.of(stored()))
+                .thenReturn(Optional.empty());
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(freshUser()));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
+        doThrow(new IllegalArgumentException("Unknown refresh token"))
+                .when(refreshTokenPort).markRotated(eq(HASH), anyString());
+
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("Invalid refresh token");
+
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
         verify(refreshTokenPort, never()).save(anyString(), anyLong(), anyString(), any());
     }
 
@@ -308,6 +351,29 @@ class RefreshSessionUseCaseImplTest {
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditEventPort).publish(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo("TOKEN_REVOKED");
+    }
+
+    @Test
+    @DisplayName("should keep the 401 contract when the stale-generation audit write fails")
+    void shouldRejectStaleVersionEvenWhenAuditFails() {
+        stubClock();
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(versionedUser(2L)));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(1L);
+        doThrow(new IllegalStateException("audit store down"))
+                .when(auditEventPort).publish(any());
+
+        // best-effort-auth (ADR): the audit gap is logged, never surfaced as
+        // a 500 on a session that must simply be rejected.
+        assertThatThrownBy(() -> useCase.execute(REFRESH))
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("no longer valid");
+
+        verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+        verify(jwtPort, never()).generateRefreshToken(anyLong(), anyString(), anyString(), anyLong());
     }
 
     @Test

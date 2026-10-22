@@ -36,6 +36,11 @@ class RateLimitingFilterTest {
     }
 
     @Test
+    void shouldReportRateLimitingBackendLabel() {
+        assertEquals("Rate limiting", filter.backendLabel());
+    }
+
+    @Test
     void shouldNotLimitNonMonitoredPath() throws IOException, ServletException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/health");

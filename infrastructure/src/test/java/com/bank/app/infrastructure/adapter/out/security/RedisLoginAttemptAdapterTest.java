@@ -16,10 +16,12 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -211,6 +213,42 @@ class RedisLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldRecordOnlyTheIpBucketWhenUsernameIsMissing() {
+        // An unresolvable username must not create a "user:null" counter.
+        when(redisTemplate.execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)),
+                eq("900000"))).thenReturn(1L);
+
+        adapter.recordFailure(TEST_IP, null);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+                eq(List.of("login_attempt:ip:" + TEST_IP)),
+                eq("900000"));
+    }
+
+    @Test
+    void shouldFailClosedWhenAccountIpCounterIsCorrupt() {
+        stubOpsForValue();
+        when(valueOps.get("login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP))
+                .thenReturn("corrupt");
+
+        assertThatThrownBy(() -> adapter.isUsernameBlocked(TEST_USERNAME, TEST_IP))
+                .isInstanceOf(LoginAttemptStoreUnavailableException.class)
+                .hasCauseInstanceOf(NumberFormatException.class);
+    }
+
+    @Test
+    void shouldFailClosedWhenScanReturnsNoCursor() {
+        // A null cursor is a broken client, not "no keys": silently treating it
+        // as empty would leave the account counters alive forever.
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(null);
+
+        assertThatThrownBy(() -> adapter.resetByUsername(TEST_USERNAME))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no cursor");
+    }
+
+    @Test
     void shouldRecordFailure() {
         // Three budgets are incremented in one atomic script: the IP bucket,
         // the account+IP bucket and the account-only bucket.
@@ -297,6 +335,19 @@ class RedisLoginAttemptAdapterTest {
     }
 
     @Test
+    void shouldDeleteScannedAccountIpBuckets() {
+        String bucket = "login_attempt:account_ip:" + TEST_USERNAME + "|" + TEST_IP;
+        Cursor<String> cursor = mock(Cursor.class);
+        when(cursor.hasNext()).thenReturn(true, false);
+        when(cursor.next()).thenReturn(bucket);
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+
+        adapter.resetByUsername(TEST_USERNAME);
+
+        verify(redisTemplate).delete(java.util.Set.of(bucket));
+    }
+
+    @Test
     void shouldEscapeGlobMetacharactersWhenResettingByUsername() {
         // A legacy username containing glob syntax must be matched literally;
         // otherwise its reset could delete every account's pair bucket.
@@ -315,6 +366,9 @@ class RedisLoginAttemptAdapterTest {
     private Cursor<String> emptyCursor() {
         Cursor<String> cursor = mock(Cursor.class);
         when(cursor.hasNext()).thenReturn(false);
+        // If the loop condition is negated, next() fails immediately instead
+        // of spinning forever (PIT TIMED_OUT). Unused on the correct path.
+        lenient().when(cursor.next()).thenThrow(new NoSuchElementException("exhausted"));
         return cursor;
     }
 

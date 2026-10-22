@@ -41,4 +41,39 @@ class UserExceptionContractTest {
         assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.NOT_FOUND);
         assertThat(ex.getErrorCode()).isEqualTo("USER_NOT_FOUND");
     }
+
+    @Test
+    void invalidMfaCodeShouldExposeRuleViolation() {
+        var ex = new InvalidMfaCodeException();
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.RULE_VIOLATION);
+        assertThat(ex.getErrorCode()).isEqualTo("MFA_CODE_INVALID");
+    }
+
+    @Test
+    void mfaAlreadyEnabledShouldExposeConflict() {
+        var ex = new MfaAlreadyEnabledException();
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.CONFLICT);
+        assertThat(ex.getErrorCode()).isEqualTo("MFA_ALREADY_ENABLED");
+    }
+
+    @Test
+    void mfaNotEnrolledShouldExposeNotFound() {
+        var ex = new MfaNotEnrolledException();
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.NOT_FOUND);
+        assertThat(ex.getErrorCode()).isEqualTo("MFA_NOT_ENROLLED");
+    }
+
+    @Test
+    void passwordResetTokenInvalidShouldExposeRuleViolation() {
+        var ex = new PasswordResetTokenInvalidException();
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.RULE_VIOLATION);
+        assertThat(ex.getErrorCode()).isEqualTo("PASSWORD_RESET_TOKEN_INVALID");
+    }
+
+    @Test
+    void tooManyFailedMfaAttemptsShouldExposeRateLimited() {
+        var ex = new TooManyFailedMfaAttemptsException("locked");
+        assertThat(ex.getFailureKind()).isEqualTo(BusinessFailureKind.RATE_LIMITED);
+        assertThat(ex.getErrorCode()).isEqualTo("TOO_MANY_FAILED_MFA_ATTEMPTS");
+    }
 }

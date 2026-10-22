@@ -201,10 +201,11 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
      * code and must never bypass the factor or leak its cause.
      */
     private boolean verifySecondFactor(AuthenticationPort.AuthenticatedUser user, String code) {
-        if (code == null || code.isBlank()) {
-            return false;
-        }
         try {
+            // A missing/blank code is still a failed second-factor attempt:
+            // delegate it so it feeds the same account-keyed MFA budget as a
+            // wrong or replayed code. Rejecting it locally would let a client
+            // probe the login endpoint without ever exhausting that budget.
             return mfaCodeVerification.verifyAndConsume(user.id().value(), code);
         } catch (AuthenticationBackendUnavailableException unavailable) {
             // Secret-store outage is infrastructure (503), not a wrong code:

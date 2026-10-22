@@ -95,12 +95,20 @@ class RefreshTokenPersistenceAdapterTest {
     @Test
     void shouldRevokeFamilyInDedicatedTransactionWhenNoneIsActive() {
         // P-2: single bulk UPDATE instead of SELECT + N UPDATE.
+        java.util.concurrent.atomic.AtomicReference<Integer> supplierResult =
+                new java.util.concurrent.atomic.AtomicReference<>();
         when(transactionBoundary.executeRequiresNew(any(), anyInt()))
-                .thenAnswer(invocation -> invocation.<java.util.function.Supplier<Integer>>getArgument(0).get());
+                .thenAnswer(invocation -> {
+                    Integer result = invocation.<java.util.function.Supplier<Integer>>getArgument(0).get();
+                    supplierResult.set(result);
+                    return result;
+                });
         when(repository.revokeFamilyBulk("family-1")).thenReturn(2);
 
         adapter.revokeFamily("family-1", 7L);
 
+        // The transactional body must return the actual bulk-update count.
+        assertThat(supplierResult.get()).isEqualTo(2);
         // R-T10: the owning user row is locked before the family scan so a
         // concurrent rotation cannot commit a successor behind it.
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(userRepository, repository);
@@ -126,12 +134,19 @@ class RefreshTokenPersistenceAdapterTest {
 
     @Test
     void shouldRevokeAllSessionsForUser() {
+        java.util.concurrent.atomic.AtomicReference<Integer> supplierResult =
+                new java.util.concurrent.atomic.AtomicReference<>();
         when(transactionBoundary.executeRequiresNew(any(), anyInt()))
-                .thenAnswer(invocation -> invocation.<java.util.function.Supplier<Integer>>getArgument(0).get());
+                .thenAnswer(invocation -> {
+                    Integer result = invocation.<java.util.function.Supplier<Integer>>getArgument(0).get();
+                    supplierResult.set(result);
+                    return result;
+                });
         when(repository.revokeAllForUserBulk(7L)).thenReturn(3);
 
         adapter.revokeAllForUser(7L);
 
+        assertThat(supplierResult.get()).isEqualTo(3);
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(userRepository, repository);
         order.verify(userRepository).findByIdForUpdate(7L);
         order.verify(repository).revokeAllForUserBulk(7L);
@@ -198,6 +213,62 @@ class RefreshTokenPersistenceAdapterTest {
         assertThatThrownBy(() -> adapter.markRotated("ghost", "new"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown refresh token");
+    }
+
+    @Test
+    void shouldWrapSaveDataAccessFailure() {
+        when(repository.save(any())).thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.save("hash-1", 7L, "family-1", EXPIRY))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void shouldWrapLookupDataAccessFailure() {
+        when(repository.findById("hash-1"))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.findByTokenHash("hash-1"))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void shouldWrapRotationDataAccessFailure() {
+        when(repository.rotateIfActive("old", "new"))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.markRotated("old", "new"))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void shouldWrapFamilyRevokeDataAccessFailure() {
+        when(transactionBoundary.executeRequiresNew(any(), anyInt()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.revokeFamily("family-1", 7L))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void shouldWrapRevokeAllDataAccessFailure() {
+        when(transactionBoundary.executeRequiresNew(any(), anyInt()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> adapter.revokeAllForUser(7L))
+                .isExactlyInstanceOf(AuthenticationBackendUnavailableException.class)
+                .hasCauseInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void shouldIgnoreNullHashOnRevoke() {
+        adapter.revoke(null);
+
+        verify(repository, never()).revokeIfActive(any());
     }
 
     @Test

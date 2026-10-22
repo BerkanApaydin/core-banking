@@ -1,7 +1,11 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.infrastructure.adapter.in.security.LoginAttemptProperties;
+import com.github.benmanes.caffeine.cache.Cache;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,6 +24,16 @@ class CaffeineLoginAttemptAdapterTest {
         CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(-1, 15, 10000));
         assertFalse(adapter.isIpBlocked(IP_A));
         assertFalse(adapter.isUsernameBlocked("user", IP_A));
+    }
+
+    @Test
+    void shouldBlockImmediatelyWhenZeroAttemptsAreAllowed() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(0, 15, 10000));
+
+        adapter.recordFailure(IP_A, "user");
+
+        assertTrue(adapter.isIpBlocked(IP_A));
+        assertTrue(adapter.isUsernameBlocked("user", IP_A));
     }
 
     @Test
@@ -49,6 +63,30 @@ class CaffeineLoginAttemptAdapterTest {
 
         assertTrue(adapter.isUsernameBlocked("user", IP_A));
         assertFalse(adapter.isUsernameBlocked("user", IP_B));
+    }
+
+    @Test
+    void shouldBlockGloballyAtTheExactLooseBudget() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(
+                new LoginAttemptProperties(100, 2, 15, 10000));
+
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_B, "user");
+
+        assertTrue(adapter.isUsernameBlocked("user", IP_C));
+    }
+
+    @Test
+    void shouldClearTheGlobalAccountBudgetOnUsernameReset() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(
+                new LoginAttemptProperties(100, 2, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_B, "user");
+        assertTrue(adapter.isUsernameBlocked("user", IP_C));
+
+        adapter.resetByUsername("user");
+
+        assertFalse(adapter.isUsernameBlocked("user", IP_C));
     }
 
     @Test
@@ -89,6 +127,33 @@ class CaffeineLoginAttemptAdapterTest {
         // negative (which would grant a budget larger than the window).
         adapter.recordIpSuccess(IP_A);
         assertFalse(adapter.isIpBlocked(IP_A));
+    }
+
+    @Test
+    void shouldDecayExactlyOneFailurePerSuccess() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(2, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        assertTrue(adapter.isIpBlocked(IP_A));
+
+        adapter.recordIpSuccess(IP_A);
+        assertFalse(adapter.isIpBlocked(IP_A));
+        adapter.recordFailure(IP_A, "user");
+        assertTrue(adapter.isIpBlocked(IP_A));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldRemoveIpCounterWhenItReachesZero() throws Exception {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(1, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordIpSuccess(IP_A);
+
+        Field field = CaffeineLoginAttemptAdapter.class.getDeclaredField("ipCache");
+        field.setAccessible(true);
+        Cache<String, AtomicInteger> cache = (Cache<String, AtomicInteger>) field.get(adapter);
+
+        assertNull(cache.getIfPresent(IP_A));
     }
 
     @Test
@@ -136,6 +201,22 @@ class CaffeineLoginAttemptAdapterTest {
 
         adapter.resetByUsername("user");
         assertFalse(adapter.isUsernameBlocked("user", IP_A));
+    }
+
+    @Test
+    void shouldResetOnlyTheRequestedUsersPairBuckets() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(2, 15, 10000));
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_A, "user");
+        adapter.recordFailure(IP_B, "other");
+        adapter.recordFailure(IP_B, "other");
+        assertTrue(adapter.isUsernameBlocked("user", IP_A));
+        assertTrue(adapter.isUsernameBlocked("other", IP_B));
+
+        adapter.resetByUsername("user");
+
+        assertFalse(adapter.isUsernameBlocked("user", IP_A));
+        assertTrue(adapter.isUsernameBlocked("other", IP_B));
     }
 
     @Test

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.context.NoSuchMessageException;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
@@ -33,6 +34,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.MapBindingResult;
+import org.springframework.validation.ObjectError;
 import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -127,17 +129,30 @@ class RequestProblemHandlerTest {
     static void dummyEndpoint(int size) {
     }
 
-    private static HandlerMethodValidationException methodValidationFailure() throws Exception {
+    private static HandlerMethodValidationException methodValidationFailure(
+            MessageSourceResolvable error) throws Exception {
         MethodParameter param = new MethodParameter(
                 RequestProblemHandlerTest.class.getDeclaredMethod("dummyEndpoint", int.class), 0);
         param.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
-        FieldError fieldError = new FieldError("size", "size", 200, false, null, null,
-                "must be less than or equal to 100");
-        ParameterValidationResult result = new ParameterValidationResult(param, 200, List.of(fieldError),
+        ParameterValidationResult result = new ParameterValidationResult(param, 200, List.of(error),
                 null, null, null, (resolvable, type) -> null);
         MethodValidationResult validationResult = mock(MethodValidationResult.class);
         when(validationResult.getParameterValidationResults()).thenReturn(List.of(result));
         return new HandlerMethodValidationException(validationResult);
+    }
+
+    private static HandlerMethodValidationException methodValidationFailure(
+            MethodParameter param, MessageSourceResolvable error) throws Exception {
+        ParameterValidationResult result = new ParameterValidationResult(param, 200, List.of(error),
+                null, null, null, (resolvable, type) -> null);
+        MethodValidationResult validationResult = mock(MethodValidationResult.class);
+        when(validationResult.getParameterValidationResults()).thenReturn(List.of(result));
+        return new HandlerMethodValidationException(validationResult);
+    }
+
+    private static HandlerMethodValidationException methodValidationFailure() throws Exception {
+        return methodValidationFailure(new FieldError("request", "amount", 200, false, null, null,
+                "must be less than or equal to 100"));
     }
 
     @Test
@@ -151,7 +166,64 @@ class RequestProblemHandlerTest {
         Map<String, String> errors =
                 (Map<String, String>) response.getBody().getProperties().get("errors");
         assertNotNull(errors);
-        assertEquals("must be less than or equal to 100", errors.get("size.size"));
+        assertEquals("must be less than or equal to 100", errors.get("size.amount"));
+    }
+
+    @Test
+    void shouldReportObjectNameForNonFieldMethodValidationError() throws Exception {
+        ObjectError error = new ObjectError("account", "invalid account");
+        ResponseEntity<ProblemDetail> response =
+                handler.handleMethodValidation(methodValidationFailure(error), null);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertNotNull(errors);
+        assertEquals("invalid account", errors.get("size.account"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUseRequestFieldAndFallbackMessageForNonStandardErrors() throws Exception {
+        // A custom resolvable (neither FieldError nor ObjectError) still needs a
+        // stable client-facing key, and its null message must not serialize as
+        // a JSON null that clients treat as a missing error entry.
+        MessageSourceResolvable custom = new MessageSourceResolvable() {
+            @Override
+            public String[] getCodes() {
+                return new String[] {"validation.custom"};
+            }
+
+            @Override
+            public String getDefaultMessage() {
+                return null;
+            }
+        };
+        MethodParameter param = new MethodParameter(
+                RequestProblemHandlerTest.class.getDeclaredMethod("dummyEndpoint", int.class), 0);
+        param.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
+
+        ResponseEntity<ProblemDetail> response =
+                handler.handleMethodValidation(methodValidationFailure(param, custom), null);
+
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertEquals("Invalid value", errors.get("size.request"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldOmitParameterPrefixWhenMethodParameterNameIsUnknown() throws Exception {
+        MethodParameter unnamed = new MethodParameter(
+                RequestProblemHandlerTest.class.getDeclaredMethod("dummyEndpoint", int.class), 0);
+
+        ResponseEntity<ProblemDetail> response = handler.handleMethodValidation(
+                methodValidationFailure(unnamed, new FieldError("request", "amount", 200, false,
+                        null, null, "must be less than or equal to 100")), null);
+
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertEquals("must be less than or equal to 100", errors.get("amount"));
     }
 
     @Test
@@ -245,6 +317,24 @@ class RequestProblemHandlerTest {
         Map<String, String> errors = (Map<String, String>) response.getBody().getProperties().get("errors");
         assertNotNull(errors);
         assertEquals("Invalid parameter value", errors.get("id"));
+    }
+
+    @Test
+    void shouldStopBodyTooLargeLookupAtTheCauseDepthLimit() {
+        Throwable current = new RequestBodyTooLargeException("Request body exceeded 1024 bytes");
+        for (int i = 0; i < 15; i++) {
+            current = new RuntimeException("wrapper-" + i, current);
+        }
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException(
+                "wrapped", current, mock(HttpInputMessage.class));
+        when(messageSource.getMessage(eq("error.invalid_format"), isNull(), any(Locale.class)))
+                .thenReturn("Invalid format");
+
+        ResponseEntity<ProblemDetail> response = handler.handleHttpMessageNotReadableException(ex, null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("INVALID_FORMAT", response.getBody().getProperties().get("code"));
     }
 
     @Test
@@ -415,5 +505,46 @@ class RequestProblemHandlerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("VALIDATION_FAILED", response.getBody().getProperties().get("code"));
+        @SuppressWarnings("unchecked")
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertNotNull(errors);
+        assertEquals("must be less than or equal to 100", errors.get("size"));
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void shouldUseParameterKeyWhenConstraintPathIsMissing() {
+        ConstraintViolation violation = mock(ConstraintViolation.class);
+        when(violation.getPropertyPath()).thenReturn(null);
+        when(violation.getMessage()).thenReturn("must not be null");
+        Set violations = new HashSet(List.of(violation));
+        ConstraintViolationException ex =
+                new ConstraintViolationException("validation failed", violations);
+
+        ResponseEntity<ProblemDetail> response = handler.handleConstraintViolationException(ex, null);
+
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertEquals("must not be null", errors.get("parameter"));
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void shouldKeepTopLevelConstraintPathWithoutDot() {
+        ConstraintViolation violation = mock(ConstraintViolation.class);
+        Path path = mock(Path.class);
+        when(path.toString()).thenReturn("size");
+        when(violation.getPropertyPath()).thenReturn(path);
+        when(violation.getMessage()).thenReturn("must be positive");
+        Set violations = new HashSet(List.of(violation));
+        ConstraintViolationException ex =
+                new ConstraintViolationException("validation failed", violations);
+
+        ResponseEntity<ProblemDetail> response = handler.handleConstraintViolationException(ex, null);
+
+        Map<String, String> errors =
+                (Map<String, String>) response.getBody().getProperties().get("errors");
+        assertEquals("must be positive", errors.get("size"));
     }
 }

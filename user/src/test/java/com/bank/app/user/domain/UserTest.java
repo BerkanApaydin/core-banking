@@ -93,6 +93,16 @@ class UserTest {
         }
 
         @Test
+        @DisplayName("should reject a negative persisted token version")
+        void shouldRejectNegativeTokenVersion() {
+            assertThatThrownBy(() -> new User(new UserId(1L), "testuser",
+                    "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER,
+                    null, null, 0L, -1L))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Token version must not be negative");
+        }
+
+        @Test
         @DisplayName("should reject blank username")
         void shouldRejectBlankUsername() {
             assertThatThrownBy(() -> new User(new UserId(1L), "   ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))

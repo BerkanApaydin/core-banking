@@ -111,6 +111,20 @@ class BusinessErrorHttpMapperTest {
     }
 
     @Test
+    void shouldDefaultNullFailureKindToBadRequest() {
+        // An exception that forgot to override the kind must not fall through
+        // to a 500 (or NPE); the contract treats it as a client-side failure.
+        BusinessException exception = new BusinessException("error.test", null, "test") {
+            @Override
+            public BusinessFailureKind getFailureKind() {
+                return null;
+            }
+        };
+
+        assertThat(BusinessErrorHttpMapper.toStatus(exception).value()).isEqualTo(400);
+    }
+
+    @Test
     void shouldMapEveryBusinessFailureKind() {
         for (BusinessFailureKind kind : BusinessFailureKind.values()) {
             BusinessException exception = new BusinessException("error.test", null, "test") {

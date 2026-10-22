@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.config;
 
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
+import com.bank.app.infrastructure.testsupport.LogCapture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -181,6 +182,30 @@ class ApplicationStartupValidatorTest {
                 .withProperty("app.cache.account-info.eviction-batch-size", "0");
         assertThatThrownBy(() -> new ApplicationStartupValidator(environment).validateProductionConfig())
                 .hasMessageContaining("eviction-batch-size");
+    }
+
+    @Test
+    void warnsOnlyWhenDefaultJwtSecretIsUsedOutsideProduction() {
+        MockEnvironment withDefaultSecret = new MockEnvironment()
+                .withProperty("app.cache.account-info.backend", "redis")
+                .withProperty("app.security.token-blacklist.backend", "redis")
+                .withProperty("jwt.secret", JwtTokenProvider.DEFAULT_JWT_SECRET);
+        withDefaultSecret.setActiveProfiles("dev");
+        try (LogCapture logs = LogCapture.attach(ApplicationStartupValidator.class)) {
+            new ApplicationStartupValidator(withDefaultSecret).validateProductionConfig();
+            org.assertj.core.api.Assertions.assertThat(logs.messages())
+                    .anyMatch(message -> message.contains("Default JWT secret"));
+        }
+
+        MockEnvironment withCustomSecret = new MockEnvironment()
+                .withProperty("app.cache.account-info.backend", "redis")
+                .withProperty("app.security.token-blacklist.backend", "redis")
+                .withProperty("jwt.secret", "custom-secret");
+        withCustomSecret.setActiveProfiles("dev");
+        try (LogCapture logs = LogCapture.attach(ApplicationStartupValidator.class)) {
+            new ApplicationStartupValidator(withCustomSecret).validateProductionConfig();
+            org.assertj.core.api.Assertions.assertThat(logs.messages()).isEmpty();
+        }
     }
 
     @Test

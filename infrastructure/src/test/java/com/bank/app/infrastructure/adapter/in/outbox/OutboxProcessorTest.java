@@ -71,7 +71,7 @@ class OutboxProcessorTest {
         when(outboxPort.findByIdForUpdateSkipLocked("evt-done")).thenReturn(Optional.of(stale));
 
         outboxProcessor.processEvent(stale);
-        outboxProcessor.recordFailure(stale, new RuntimeException("stale failure"), 5);
+        assertFalse(outboxProcessor.recordFailure(stale, new RuntimeException("stale failure"), 5));
 
         verifyNoInteractions(handler);
         verify(outboxPort, never()).markProcessed(any());
@@ -110,7 +110,7 @@ class OutboxProcessorTest {
                 "{}", 4, false, false, null, 0, LocalDateTime.now());
         when(outboxPort.findByIdForUpdateSkipLocked("evt-4")).thenReturn(Optional.of(event));
 
-        outboxProcessor.recordFailure(event, new RuntimeException("fail"), 5);
+        assertTrue(outboxProcessor.recordFailure(event, new RuntimeException("fail"), 5));
 
         verify(outboxPort).markDeadLetter("evt-4", RuntimeException.class.getName(), 5);
     }
@@ -121,7 +121,7 @@ class OutboxProcessorTest {
                 "{}", 1, false, false, null, 0, LocalDateTime.now());
         when(outboxPort.findByIdForUpdateSkipLocked("evt-5")).thenReturn(Optional.of(event));
 
-        outboxProcessor.recordFailure(event, new RuntimeException("transient"), 5);
+        assertTrue(outboxProcessor.recordFailure(event, new RuntimeException("transient"), 5));
 
         verify(outboxPort).markFailed("evt-5", RuntimeException.class.getName(), 2);
     }
@@ -131,7 +131,7 @@ class OutboxProcessorTest {
         EventEntry fallback = event("evt-missing", "TransferCompletedEvent");
         when(outboxPort.findByIdForUpdateSkipLocked("evt-missing")).thenReturn(Optional.empty());
 
-        outboxProcessor.recordFailure(fallback, new RuntimeException("fail"), 5);
+        assertFalse(outboxProcessor.recordFailure(fallback, new RuntimeException("fail"), 5));
 
         verify(outboxPort, never()).markProcessed(any());
         verify(outboxPort, never()).markFailed(any(), any(), anyInt());

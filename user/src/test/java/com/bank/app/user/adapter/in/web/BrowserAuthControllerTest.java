@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -185,6 +186,44 @@ class BrowserAuthControllerTest {
     }
 
     @Test
+    void refreshRejectsHeaderWithoutCsrfCookie() {
+        MockHttpServletRequest request = requestWithCookies(new Cookie("BANK_REFRESH", "rt"));
+        request.addHeader("X-CSRF-Token", "c");
+
+        ResponseEntity<?> result = controller.refresh(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(jwtPort, never()).verifyAndDecode(anyString());
+    }
+
+    @Test
+    void refreshRejectsBlankRefreshCookie() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "  "));
+        request.addHeader("X-CSRF-Token", "c");
+
+        ResponseEntity<?> result = controller.refresh(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(jwtPort, never()).verifyAndDecode(anyString());
+    }
+
+    @Test
+    void refreshClearsCookiesWhenVerifiedTokenHasNoUserId() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
+        request.addHeader("X-CSRF-Token", "c");
+        when(jwtPort.verifyAndDecode("rt"))
+                .thenReturn(new VerifiedToken("alice", null, "ROLE_USER", "jti", 999L));
+
+        ResponseEntity<?> result = controller.refresh(request, response);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getHeaderValues("Set-Cookie")).hasSize(3);
+        verify(csrfBinding, never()).verifyCsrfToken(any(), any(), any());
+    }
+
+    @Test
     void refreshClearsCookiesWhenTokenUnverifiable() {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "stale"));
@@ -289,6 +328,16 @@ class BrowserAuthControllerTest {
     @Test
     void sessionRejectsMissingPrincipal() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
+
+        ResponseEntity<?> result = controller.session(new MockHttpServletRequest());
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void sessionRejectsPrincipalWithoutUsername() {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+        when(userContextService.getCurrentUsername()).thenReturn(Optional.empty());
 
         ResponseEntity<?> result = controller.session(new MockHttpServletRequest());
 

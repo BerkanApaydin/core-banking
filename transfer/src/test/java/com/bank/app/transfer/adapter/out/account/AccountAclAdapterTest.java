@@ -45,6 +45,20 @@ class AccountAclAdapterTest {
     }
 
     @Nested
+    @DisplayName("constructor")
+    class Constructor {
+        @Test
+        void shouldRejectInvalidAwaitTimeout() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new AccountAclAdapter(accountApi, cache, Duration.ZERO));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new AccountAclAdapter(accountApi, cache, Duration.ofSeconds(-1)));
+            assertThrows(NullPointerException.class,
+                    () -> new AccountAclAdapter(accountApi, cache, null));
+        }
+    }
+
+    @Nested
     @DisplayName("getAccountInfo")
     class GetAccountInfo {
         @Test
@@ -101,6 +115,15 @@ class AccountAclAdapterTest {
 
             verify(accountApi, times(1)).getSnapshotByIban("TR450006100519786456841234");
         }
+
+        @Test
+        void shouldPropagateAccountNotFoundForUnknownIban() {
+            when(accountApi.getSnapshotByIban("TR450006100519786456841234"))
+                    .thenThrow(new AccountNotFoundException("TR450006100519786456841234"));
+
+            assertThrows(AccountNotFoundException.class,
+                    () -> adapter.getAccountInfoForTransfer("TR450006100519786456841234"));
+        }
     }
 
     @Nested
@@ -154,6 +177,39 @@ class AccountAclAdapterTest {
 
             verify(accountApi, times(1)).getIbansForAccounts(Set.of(1L));
         }
+
+        @Test
+        void shouldNotCollapseDifferentIbanSetsIntoOneFlight() throws Exception {
+            Map<Long, String> first = Map.of(1L, "TR450006100519786456841234");
+            Map<Long, String> second = Map.of(2L, "TR180006100519786456841235");
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getIbansForAccounts(Set.of(1L))).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                return first;
+            });
+            when(accountApi.getIbansForAccounts(Set.of(2L))).thenReturn(second);
+            var bounded = new AccountAclAdapter(accountApi, cache, Duration.ofSeconds(1));
+
+            Thread leader = new Thread(() -> bounded.getIbansForAccounts(Set.of(1L)));
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Map<Long, String> secondResult;
+            try {
+                // Called on the test thread so the key computation is attributed
+                // to this test. A different id set must use its own flight key
+                // and reach the backend immediately; an empty-key mutant would
+                // wait for (and then receive) the first set's result.
+                secondResult = bounded.getIbansForAccounts(Set.of(2L));
+            } finally {
+                releaseLoader.countDown();
+            }
+            leader.join(5_000);
+
+            assertEquals(second, secondResult);
+        }
     }
 
     @Nested
@@ -180,6 +236,18 @@ class AccountAclAdapterTest {
         void shouldRejectNullAmount() {
             assertThrows(NullPointerException.class, () -> adapter.debitAndCredit(new AccountId(1L), new AccountId(2L), null));
             verifyNoInteractions(accountApi);
+        }
+
+        @Test
+        void shouldPropagateAccountNotFoundFromBalanceAdjustment() {
+            Money amount = Money.of("200.00", Currency.TRY);
+            when(accountApi.adjustBalances(1L, 2L, amount))
+                    .thenThrow(new AccountNotFoundException(1L));
+
+            assertThrows(AccountNotFoundException.class,
+                    () -> adapter.debitAndCredit(new AccountId(1L), new AccountId(2L), amount));
+            verify(accountApi).adjustBalances(1L, 2L, amount);
+            verifyNoMoreInteractions(accountApi);
         }
     }
 
@@ -264,6 +332,46 @@ class AccountAclAdapterTest {
             when(accountApi.getSnapshotById(1L)).thenThrow(new AccountNotFoundException(1L));
 
             assertThrows(AccountNotFoundException.class, () -> adapter.getAccountInfo(new AccountId(1L)));
+        }
+
+        @Test
+        void shouldShareTheLeadersValueWithWaitingCallers() throws Exception {
+            // The waiter must receive the leader's completed value, not a
+            // null/second backend read. The leader blocks in the loader until
+            // the waiter has joined the flight, so the shared-future success
+            // path is exercised deterministically.
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            var snapshot = new AccountSnapshot(1L, 10L, "TRY", "ACTIVE");
+            when(accountApi.getSnapshotById(1L)).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                return snapshot;
+            });
+
+            var counting = new CountingLookupCache();
+            var shared = new AccountAclAdapter(accountApi, counting);
+            var leaderResult = new AtomicReference<AccountAclPort.AccountInfo>();
+            var waiterResult = new AtomicReference<AccountAclPort.AccountInfo>();
+
+            Thread leader = daemonThread(() -> leaderResult.set(shared.getAccountInfo(new AccountId(1L))));
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+
+            Thread waiter = daemonThread(() -> waiterResult.set(shared.getAccountInfo(new AccountId(1L))));
+            waiter.start();
+            assertTrue(counting.lookups.await(5, TimeUnit.SECONDS));
+            await().atMost(Duration.ofSeconds(5)).until(() ->
+                    waiter.getState() == Thread.State.WAITING
+                            || waiter.getState() == Thread.State.TIMED_WAITING);
+            releaseLoader.countDown();
+            leader.join(5_000);
+            waiter.join(5_000);
+
+            assertNotNull(waiterResult.get(), "the waiting caller must receive the leader's value");
+            assertEquals(10L, waiterResult.get().userId());
+            assertEquals(leaderResult.get().userId(), waiterResult.get().userId());
+            verify(accountApi, times(1)).getSnapshotById(1L);
         }
 
         @Test

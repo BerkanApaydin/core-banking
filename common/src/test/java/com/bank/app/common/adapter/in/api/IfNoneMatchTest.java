@@ -49,4 +49,33 @@ class IfNoneMatchTest {
         assertThat(IfNoneMatch.matches("*", null)).isFalse();
         assertThat(IfNoneMatch.matches("*", "transfer-7-5")).isFalse();
     }
+
+    @Test
+    void shouldTrimSurroundingWhitespaceOnStar() {
+        assertThat(IfNoneMatch.matches("  *  ", CURRENT)).isTrue();
+    }
+
+    @Test
+    void shouldRejectCommaOnlyOrUnquotedCandidates() {
+        assertThat(IfNoneMatch.matches(", ,", CURRENT)).isFalse();
+        assertThat(IfNoneMatch.matches(", " + CURRENT, CURRENT)).isTrue();
+        assertThat(IfNoneMatch.matches("w/\"transfer-7-5\"", CURRENT)).isFalse();
+    }
+
+    @Test
+    void shouldNotMatchAcrossAnUnclosedQuotedTag() {
+        assertThat(IfNoneMatch.matches("\"unclosed, " + CURRENT, CURRENT)).isFalse();
+    }
+
+    @Test
+    void shouldMatchWellFormedEmptyEntityTag() {
+        assertThat(IfNoneMatch.matches("\"\"", "\"\"")).isTrue();
+    }
+
+    @Test
+    void shouldRejectWhitespaceOnlyAndLoneQuoteHeaders() {
+        assertThat(IfNoneMatch.matches("   ", CURRENT)).isFalse();
+        assertThat(IfNoneMatch.matches("\"", "\"")).isFalse();
+        assertThat(IfNoneMatch.matches("W/\"", CURRENT)).isFalse();
+    }
 }

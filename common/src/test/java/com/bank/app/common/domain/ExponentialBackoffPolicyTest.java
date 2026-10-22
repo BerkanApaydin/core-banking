@@ -99,6 +99,15 @@ class ExponentialBackoffPolicyTest {
     }
 
     @Test
+    void shouldNotMistakeTheHalfwayPointForSaturation() {
+        // With an odd/overflow-prone max the exact half point still doubles
+        // (Long.MAX_VALUE - 1); the division-to-multiplication and >= boundary
+        // mutants both cap one step early at Long.MAX_VALUE.
+        var policy = new ExponentialBackoffPolicy(1, Long.MAX_VALUE, 0);
+        assertThat(policy.nextDelay(Long.MAX_VALUE / 2)).isEqualTo(Long.MAX_VALUE - 1);
+    }
+
+    @Test
     void shouldSaturateAtMaxForHugeCurrentDelayWithoutJitter() {
         var policy = new ExponentialBackoffPolicy(500, 2000, 0);
         assertThat(policy.nextDelay(Long.MAX_VALUE)).isEqualTo(2000);
@@ -111,6 +120,16 @@ class ExponentialBackoffPolicyTest {
         for (int i = 0; i < 100; i++) {
             long next = policy.nextDelay(Long.MAX_VALUE);
             assertThat(next).isBetween(maxDelayMs, Long.MAX_VALUE);
+        }
+    }
+
+    @Test
+    void shouldNotOverflowWhenJitterItselfIsLongMaxValue() {
+        // The jitter bound cannot use jitterMs + 1 (overflow); Long.MAX_VALUE
+        // must still yield a non-negative, non-decreasing delay.
+        var policy = new ExponentialBackoffPolicy(1, Long.MAX_VALUE, Long.MAX_VALUE);
+        for (int i = 0; i < 100; i++) {
+            assertThat(policy.nextDelay(1)).isBetween(2L, Long.MAX_VALUE);
         }
     }
 

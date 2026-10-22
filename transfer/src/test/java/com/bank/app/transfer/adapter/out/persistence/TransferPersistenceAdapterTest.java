@@ -404,6 +404,40 @@ Currency.TRY), TransferStatus.COMPLETED, now);
     }
 
     @Test
+    void shouldRejectBlindWriteWhenVersionIsMissing() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer blind = new Transfer(10L, new AccountId(1L), new AccountId(2L),
+                Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, null);
+        when(springDataRepo.countById(10L)).thenReturn(1L);
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> repository.save(blind));
+        verify(springDataRepo, never()).updateStatusIfVersionMatch(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenVersionIsMissingAndRowIsGone() {
+        LocalDateTime now = LocalDateTime.now();
+        Transfer blind = new Transfer(999L, new AccountId(1L), new AccountId(2L),
+                Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, null);
+        when(springDataRepo.countById(999L)).thenReturn(0L);
+
+        assertThrows(TransferNotFoundException.class, () -> repository.save(blind));
+    }
+
+    @Test
+    void shouldSummarizeNonNumericAggregateRowAsZero() {
+        LocalDateTime start = LocalDateTime.now().minusDays(1);
+        LocalDateTime end = LocalDateTime.now().plusDays(1);
+        when(springDataRepo.summarizeRange(eq(1L), eq(start), eq(end)))
+                .thenReturn(List.<Object[]>of(new Object[]{"3", "not-a-number"}));
+
+        var totals = repository.summarizeRange(1L, start, end);
+
+        assertEquals(0L, totals.count());
+        assertEquals(BigDecimal.ZERO, totals.volume());
+    }
+
+    @Test
     void shouldThrowNotFoundWhenBulkUpdateHitsMissingRow() {
         // Kills the NullReturnVals mutant on lambda$save$1: the 0-row bulk path
         // must distinguish "row gone" (TransferNotFoundException/404) from conflict.

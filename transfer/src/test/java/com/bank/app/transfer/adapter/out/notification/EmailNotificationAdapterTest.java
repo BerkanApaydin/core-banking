@@ -4,6 +4,7 @@ import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
 import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,44 @@ class EmailNotificationAdapterTest {
     @Test
     void shouldHandleNullCancelGracefully() {
         assertDoesNotThrow(() -> adapter.notifyTransferCancelled(null));
+    }
+
+    @Test
+    void shouldLogFailedNotificationWithChannel() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(EmailNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            adapter.notifyTransferFailed(new AsyncTransferFailedEvent(
+                    11L, 10L, 20L, Money.of("75.00", Currency.TRY),
+                    TransferStatus.FAILED, LocalDateTime.now()));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage())
+                        .contains("Email").contains("11").contains("failed"));
+    }
+
+    @Test
+    void shouldHandleNullFailureGracefully() {
+        Logger logger =
+                (Logger) LoggerFactory.getLogger(EmailNotificationAdapter.class);
+        ListAppender<ILoggingEvent> appender =
+                new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertDoesNotThrow(() -> adapter.notifyTransferFailed(null));
+        } finally {
+            logger.detachAppender(appender);
+        }
+        assertThat(appender.list)
+                .anySatisfy(e -> assertThat(e.getFormattedMessage())
+                        .contains("Email").contains("null event"));
     }
 
     @Test

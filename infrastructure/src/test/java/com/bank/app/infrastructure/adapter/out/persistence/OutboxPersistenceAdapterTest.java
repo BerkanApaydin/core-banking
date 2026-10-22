@@ -1,6 +1,8 @@
 package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
+import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +11,9 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -136,6 +141,13 @@ class OutboxPersistenceAdapterTest {
     }
 
     @Test
+    void shouldCountPendingRowsOutsideThePartitionRange() {
+        when(repository.countPendingOutsidePartitionRange(4)).thenReturn(7L);
+
+        assertThat(adapter.countPendingOutsidePartitionRange(4)).isEqualTo(7L);
+    }
+
+    @Test
     void shouldDeleteProcessedBeforeCutoffInBatches() {
         LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
         when(repository.deleteProcessedBatchBefore(eq(cutoff),
@@ -165,5 +177,27 @@ class OutboxPersistenceAdapterTest {
         verify(repository, times(OutboxPersistenceAdapter.MAX_BATCHES_PER_RUN))
                 .deleteProcessedBatchBefore(eq(cutoff),
                         eq(OutboxPersistenceAdapter.RETENTION_BATCH_SIZE));
+    }
+
+    @Test
+    void shouldRunRetentionBatchInConfiguredRequiresNewTransaction() {
+        var txManager = mock(PlatformTransactionManager.class);
+        var status = new SimpleTransactionStatus();
+        when(txManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        var transactionalAdapter = new OutboxPersistenceAdapter(repository,
+                new OutboxProperties(5, 50, 2, 2000L, 30, 4, 12, 30L), null,
+                txManager, new TransactionProperties(17));
+        LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
+        when(repository.deleteProcessedBatchBefore(cutoff, 1000)).thenReturn(3);
+
+        assertThat(transactionalAdapter.deleteProcessedBefore(cutoff)).isEqualTo(3);
+
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(txManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        assertThat(definition.getValue().getTimeout()).isEqualTo(17);
+        verify(txManager).commit(status);
     }
 }

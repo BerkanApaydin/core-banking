@@ -1,5 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.aspect;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.Signature;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -16,11 +19,14 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.support.DefaultTransactionStatus;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.bank.app.common.domain.exception.CommitOnFailure;
 import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.testsupport.LogCapture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -84,6 +90,25 @@ class UseCaseTransactionAspectTest {
     }
 
     @Test
+    void shouldLogWhenJoiningAnExistingTransaction() throws Throwable {
+        stubTransaction();
+        when(joinPoint.proceed()).thenReturn("result");
+        Logger logger = (Logger) LoggerFactory.getLogger(UseCaseTransactionAspect.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try (LogCapture logs = LogCapture.attach(UseCaseTransactionAspect.class)) {
+            aspect.around(joinPoint);
+
+            assertTrue(logs.messages().stream()
+                    .anyMatch(message -> message.contains("Joining existing transaction")));
+        } finally {
+            TransactionSynchronizationManager.clear();
+            logger.setLevel(previousLevel);
+        }
+    }
+
+    @Test
     void shouldProceedOnAroundReadOnly() throws Throwable {
         stubTransaction();
         when(joinPoint.proceed()).thenReturn("result");
@@ -109,6 +134,26 @@ class UseCaseTransactionAspectTest {
         RuntimeException ex = assertThrows(RuntimeException.class, () -> aspect.around(joinPoint));
         assertEquals("test error", ex.getMessage());
         verify(transactionManager).rollback(transactionStatus);
+        verify(transactionManager, never()).commit(any());
+    }
+
+    @Test
+    void shouldPreserveOriginalFailureWhenRollbackItselfFails() throws Throwable {
+        // A broken transaction manager during rollback must surface as a
+        // TransactionSystemException while keeping the real business failure
+        // attached, otherwise the incident loses its root cause.
+        stubTransaction();
+        RuntimeException businessFailure = new RuntimeException("business failed");
+        TransactionSystemException rollbackFailure =
+                new TransactionSystemException("rollback failed");
+        when(joinPoint.proceed()).thenThrow(businessFailure);
+        doThrow(rollbackFailure).when(transactionManager).rollback(transactionStatus);
+
+        TransactionSystemException thrown = assertThrows(TransactionSystemException.class,
+                () -> aspect.around(joinPoint));
+
+        assertEquals(rollbackFailure, thrown);
+        assertEquals(businessFailure, thrown.getSuppressed()[0]);
         verify(transactionManager, never()).commit(any());
     }
 

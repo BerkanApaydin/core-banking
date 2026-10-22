@@ -41,14 +41,7 @@ class IdempotentRetryExecutor {
         this(idempotencyGuard, responseCodec, transactionTemplate, maxAttempts,
                 new ExponentialBackoffPolicy(
                         Math.max(1, initialDelayMs), MAX_BACKOFF_MS, 100),
-                delay -> {
-                    try {
-                        Thread.sleep(delay);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw e;
-                    }
-                });
+                Thread::sleep);
     }
 
     // Test seam: explicit policy + sleeper.

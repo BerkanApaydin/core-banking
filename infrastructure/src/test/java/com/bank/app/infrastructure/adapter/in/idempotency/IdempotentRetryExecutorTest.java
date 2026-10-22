@@ -225,6 +225,22 @@ class IdempotentRetryExecutorTest {
         assertThat(Thread.interrupted()).isTrue();
     }
 
+    @Test
+    @DisplayName("should preserve the original failure when failing the key also fails")
+    void shouldPreserveOriginalFailureWhenCleanupFails() throws Throwable {
+        // A DB outage during failRequest must not hide the business failure
+        // that caused the rollback; the cleanup error is attached as suppressed.
+        IllegalStateException businessFailure = new IllegalStateException("rule violated");
+        IllegalStateException cleanupFailure = new IllegalStateException("cleanup unavailable");
+        when(joinPoint.proceed()).thenThrow(businessFailure);
+        org.mockito.Mockito.doThrow(cleanupFailure).when(idempotencyGuard).failRequest(KEY);
+        runInTransaction();
+
+        assertThatThrownBy(() -> executor.execute(KEY, joinPoint))
+                .isSameAs(businessFailure);
+        assertThat(businessFailure.getSuppressed()).containsExactly(cleanupFailure);
+    }
+
     /** Runs the transaction callback inline against the mocked status. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void runInTransaction() {

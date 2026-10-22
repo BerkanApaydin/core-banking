@@ -83,6 +83,27 @@ class UserJpaMapperTest {
         }
 
         @Test
+        @DisplayName("should round-trip the MFA enabled flag")
+        void shouldRoundTripMfaEnabled() {
+            User user = new User(new UserId(42L), "johndoe",
+                    "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
+                    null, null, 1L);
+            user.enableMfa();
+
+            UserJpaEntity entity = mapper.toJpaEntity(user);
+            assertThat(entity.isMfaEnabled()).isTrue();
+            assertThat(mapper.toDomain(entity).isMfaEnabled()).isTrue();
+
+            UserJpaEntity disabled = new UserJpaEntity();
+            disabled.setMfaEnabled(true);
+            User plain = new User(new UserId(42L), "johndoe",
+                    "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
+                    null, null, 1L);
+            mapper.updateJpaEntity(disabled, plain);
+            assertThat(disabled.isMfaEnabled()).isFalse();
+        }
+
+        @Test
         @DisplayName("should throw when user is null")
         void shouldThrowWhenUserIsNull() {
             assertThatThrownBy(() -> mapper.toJpaEntity(null))

@@ -22,6 +22,13 @@ class OrphanIntegrityPropertiesTest {
     }
 
     @Test
+    void shouldRejectNullCron() {
+        assertThatThrownBy(() -> new OrphanIntegrityProperties(true, null, 0))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("orphanCheckCron");
+    }
+
+    @Test
     void shouldRejectInvalidCron() {
         assertThatThrownBy(() -> new OrphanIntegrityProperties(true, "not-a-cron", 0))
                 .isExactlyInstanceOf(IllegalArgumentException.class)

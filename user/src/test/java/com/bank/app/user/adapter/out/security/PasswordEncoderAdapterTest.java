@@ -34,6 +34,14 @@ class PasswordEncoderAdapterTest {
     }
 
     @Test
+    void shouldDelegateAMismatch() {
+        PasswordEncoderAdapter adapter = new PasswordEncoderAdapter(passwordEncoder);
+        when(passwordEncoder.matches("raw", "enc")).thenReturn(false);
+
+        assertEquals(false, adapter.matches("raw", "enc"));
+    }
+
+    @Test
     void shouldFailClosedOnNullMatchesInput() {
         PasswordEncoderAdapter adapter = new PasswordEncoderAdapter(passwordEncoder);
 

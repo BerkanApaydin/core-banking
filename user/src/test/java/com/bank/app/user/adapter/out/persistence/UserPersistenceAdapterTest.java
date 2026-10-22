@@ -9,6 +9,7 @@ import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.exception.UsernameAlreadyTakenException;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -178,6 +179,33 @@ class UserJpaAdapterTest {
         }
     }
 
+    @Test
+    void shouldReturnEmptyForNullUserIdWithoutQuerying() {
+        assertTrue(adapter.findById(null).isEmpty());
+        verifyNoInteractions(userJpaRepository);
+    }
+
+    @Test
+    void shouldFindById() {
+        UserJpaEntity entity = new UserJpaEntity();
+        entity.setId(1L);
+        entity.setUsername("testuser");
+        entity.setPassword("$2a$12$testpasswordhash00000000000000000000001");
+        entity.setRole(Role.ROLE_USER);
+        when(userJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
+
+        assertTrue(adapter.findById(1L).isPresent());
+        verify(userJpaRepository).findById(1L);
+    }
+
+    @Test
+    void shouldClassifyFindByIdFailureAsBackendUnavailable() {
+        when(userJpaRepository.findById(1L))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThrows(AuthenticationBackendUnavailableException.class, () -> adapter.findById(1L));
+    }
+
     @Nested
     @DisplayName("save existing user")
     class SaveExistingUser {
@@ -217,6 +245,38 @@ class UserJpaAdapterTest {
         }
 
         @Test
+        @DisplayName("should reject a stale aggregate version instead of overwriting")
+        void shouldRejectStaleVersion() {
+            UserJpaEntity existingEntity = new UserJpaEntity();
+            existingEntity.setId(1L);
+            existingEntity.setVersion(2L);
+            when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
+
+            User stale = new User(new UserId(1L), "testuser",
+                    "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 1L);
+
+            // AV: a concurrent update (for example a token-version bump) must
+            // not be silently overwritten by a stale in-memory aggregate.
+            assertThrows(ObjectOptimisticLockingFailureException.class, () -> adapter.save(stale));
+            verify(userJpaRepository, never()).save(any(UserJpaEntity.class));
+        }
+
+        @Test
+        @DisplayName("should reject an aggregate without a version for an existing row")
+        void shouldRejectMissingVersion() {
+            UserJpaEntity existingEntity = new UserJpaEntity();
+            existingEntity.setId(1L);
+            existingEntity.setVersion(0L);
+            when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
+
+            User unversioned = new User(new UserId(1L), "testuser",
+                    "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
+
+            assertThrows(ObjectOptimisticLockingFailureException.class, () -> adapter.save(unversioned));
+            verify(userJpaRepository, never()).save(any(UserJpaEntity.class));
+        }
+
+        @Test
         @DisplayName("should set email and phone to null when not present")
         void shouldSetEmailAndPhoneToNullWhenNotPresent() {
             stubSaveEcho();
@@ -250,7 +310,9 @@ class UserJpaAdapterTest {
             when(userJpaRepository.save(any(UserJpaEntity.class)))
                     .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-            assertThrows(UsernameAlreadyTakenException.class, () -> adapter.save(user));
+            UsernameAlreadyTakenException failure = assertThrows(
+                    UsernameAlreadyTakenException.class, () -> adapter.save(user));
+            assertTrue(failure.getMessage().contains("newuser"));
         }
     }
 

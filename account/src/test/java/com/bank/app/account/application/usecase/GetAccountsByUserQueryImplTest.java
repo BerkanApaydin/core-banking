@@ -90,6 +90,58 @@ class GetAccountsByUserQueryImplTest {
     }
 
     @Nested
+    @DisplayName("pagination bounds")
+    class PaginationBounds {
+
+        private void stubPage(int expectedPage, int expectedSize) {
+            when(accountAuthorizationService.getCurrentUserId()).thenReturn(100L);
+            when(loadAccountPort.findPageByUserId(100L, expectedPage, expectedSize))
+                    .thenReturn(new LoadAccountPort.AccountPage(List.of(), 0));
+        }
+
+        @Test
+        @DisplayName("should clamp a negative page to zero")
+        void shouldClampNegativePage() {
+            stubPage(0, 20);
+
+            PageResponse<AccountResponse> response = query.execute(-3, 20);
+
+            assertThat(response.page()).isZero();
+            assertThat(response.size()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("should clamp a zero size to one")
+        void shouldClampZeroSize() {
+            stubPage(0, 1);
+
+            PageResponse<AccountResponse> response = query.execute(0, 0);
+
+            assertThat(response.size()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should clamp a negative size to one")
+        void shouldClampNegativeSize() {
+            stubPage(0, 1);
+
+            PageResponse<AccountResponse> response = query.execute(0, -10);
+
+            assertThat(response.size()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should cap an oversized page at 100")
+        void shouldCapOversizedSize() {
+            stubPage(0, 100);
+
+            PageResponse<AccountResponse> response = query.execute(0, Integer.MAX_VALUE);
+
+            assertThat(response.size()).isEqualTo(100);
+        }
+    }
+
+    @Nested
     @DisplayName("authorization")
     class Authorization {
 

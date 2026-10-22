@@ -92,10 +92,10 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
         transactionTemplate.executeWithoutResult(status -> {
             entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
                             + "(SELECT id FROM users WHERE username IN "
-                            + "('mfa_alice', 'reset_bob', 'mfa_carol'))")
+                            + "('mfa_alice', 'reset_bob', 'mfa_carol', 'mfa_dave'))")
                     .executeUpdate();
             entityManager.createNativeQuery("DELETE FROM users WHERE username IN "
-                            + "('mfa_alice', 'reset_bob', 'mfa_carol')")
+                            + "('mfa_alice', 'reset_bob', 'mfa_carol', 'mfa_dave')")
                     .executeUpdate();
         });
     }
@@ -127,6 +127,17 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
     private String currentCode(String base32Secret) {
         byte[] secret = Totp.base32Decode(base32Secret);
         long step = Instant.now().getEpochSecond() / 30L;
+        return Totp.generateCode(secret, step, 6);
+    }
+
+    /**
+     * The code for the next step. The verifier tolerates ±1 skew, so this is
+     * a legitimate code now while guaranteeing that consuming it advances the
+     * stored replay counter past the current step.
+     */
+    private String nextStepCode(String base32Secret) {
+        byte[] secret = Totp.base32Decode(base32Secret);
+        long step = Instant.now().getEpochSecond() / 30L + 1;
         return Totp.generateCode(secret, step, 6);
     }
 
@@ -351,6 +362,67 @@ class MfaFlowIntegrationTest extends AbstractSpringBootIntegrationTest {
 
         // Factor gone: plain login works again.
         login("mfa_carol", "My_passw0rd12", null);
+    }
+
+    @Test
+    @DisplayName("disable clears the TOTP replay counter so re-enrollment works in the same step")
+    void disableClearsReplayCounterForReenrollment() throws Exception {
+        register("mfa_dave", "My_passw0rd12");
+        String token = login("mfa_dave", "My_passw0rd12", null);
+
+        MvcResult enrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String base32 = objectMapper.readTree(enrollment.getResponse().getContentAsString())
+                .get("base32Secret").asText();
+        mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(base32) + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // A real login advances the persisted TOTP step counter.
+        login("mfa_dave", "My_passw0rd12", currentCode(base32));
+        assertThat(userRepository.findByUsername("mfa_dave").orElseThrow()
+                .getMfaLastTotpCounter()).isNotNull();
+
+        // Consuming a next-step code pushes the stored counter ahead of the
+        // wall clock, so the post-enrollment login below is deterministically
+        // in the counter's shadow if disable leaves it behind.
+        mockMvc.perform(post("/api/v1/auth/mfa/disable")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + nextStepCode(base32) + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // The counter belongs to the deleted secret. Keeping it would make a
+        // fresh secret's code look like a replay when enable+confirm+login
+        // happen inside the same 30-second step (or right after a skew code).
+        assertThat(userRepository.findByUsername("mfa_dave").orElseThrow()
+                .getMfaLastTotpCounter()).isNull();
+
+        String plainToken = login("mfa_dave", "My_passw0rd12", null);
+        MvcResult reenrollment = mockMvc.perform(post("/api/v1/auth/mfa/enable")
+                        .header("Authorization", "Bearer " + plainToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String newBase32 = objectMapper.readTree(reenrollment.getResponse().getContentAsString())
+                .get("base32Secret").asText();
+        mockMvc.perform(post("/api/v1/auth/mfa/confirm")
+                        .header("Authorization", "Bearer " + plainToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"My_passw0rd12\", \"code\": \""
+                                + currentCode(newBase32) + "\"}"))
+                .andExpect(status().isNoContent());
+
+        login("mfa_dave", "My_passw0rd12", currentCode(newBase32));
     }
 
     @Test

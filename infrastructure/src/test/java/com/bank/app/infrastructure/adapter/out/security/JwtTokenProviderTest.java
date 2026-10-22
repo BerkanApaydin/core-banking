@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -77,6 +78,18 @@ class JwtTokenProviderTest {
         var verified = jwtTokenProvider.verifyAndDecode(token);
         assertNotNull(verified);
         assertEquals(1L, verified.userId());
+        assertEquals("ROLE_ADMIN", verified.role());
+    }
+
+    @Test
+    void shouldGenerateAccessTokenFromAdditionalClaims() {
+        String token = jwtTokenProvider.generateToken(
+                new java.util.HashMap<>(Map.of("role", "ROLE_ADMIN")), 9L, "claimUser");
+
+        var verified = jwtTokenProvider.verifyAndDecode(token);
+        assertNotNull(verified);
+        assertEquals("claimUser", verified.username());
+        assertEquals(9L, verified.userId());
         assertEquals("ROLE_ADMIN", verified.role());
     }
 
@@ -245,6 +258,63 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void shouldRejectNonBase64SecretWithActionableMessage() {
+        // A pasted/short non-Base64 secret must fail at startup with the fix
+        // command, not with a raw DecodingException the operator cannot act on.
+        JwtTokenProvider invalid = new JwtTokenProvider(
+                "!!!!not-base64!!!!", 86400000L, 604800000L, true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                invalid::validateSecret);
+
+        assertTrue(ex.getMessage().contains("valid Base64"));
+        assertNotNull(ex.getCause());
+    }
+
+    @Test
+    void shouldRejectBlankToken() {
+        assertNull(jwtTokenProvider.verifyAndDecode("   "));
+    }
+
+    @Test
+    void shouldRejectTokenMissingAnyRequiredClaim() {
+        // Each shape is a valid signature but must never become a
+        // half-valid VerifiedToken (downstream code assumes all claims).
+        assertNull(jwtTokenProvider.verifyAndDecode(
+                tokenWithClaims("user", 1L, null, true, null)));
+        assertNull(jwtTokenProvider.verifyAndDecode(
+                tokenWithClaims("   ", 1L, "ROLE_USER", true, null)));
+        assertNull(jwtTokenProvider.verifyAndDecode(
+                tokenWithClaims("user", 1L, "  ", true, null)));
+        assertNull(jwtTokenProvider.verifyAndDecode(
+                tokenWithClaims("user", null, "ROLE_USER", true, null)));
+    }
+
+    @Test
+    void shouldRejectTokenWithoutExpirationAndReportZeroRemaining() {
+        String token = tokenWithClaims("user", 1L, "ROLE_USER", false, null);
+
+        assertNull(jwtTokenProvider.verifyAndDecode(token));
+        assertEquals(0L, jwtTokenProvider.getRemainingMs(token));
+    }
+
+    @Test
+    void shouldFailClosedForNullAndBlankTokenReaders() {
+        assertEquals("access", jwtTokenProvider.extractTokenType(null));
+        assertEquals("access", jwtTokenProvider.extractTokenType("   "));
+        assertEquals(0L, jwtTokenProvider.extractTokenVersion(null));
+        assertEquals(0L, jwtTokenProvider.getRemainingMs(null));
+    }
+
+    @Test
+    void shouldTreatBlankTokenTypeAsAccess() {
+        // A forged/blank type must degrade toward the non-refresh flow.
+        String token = tokenWithClaims("user", 1L, "ROLE_USER", true, "  ");
+
+        assertEquals("access", jwtTokenProvider.extractTokenType(token));
+    }
+
+    @Test
     void shouldReturnExpirationMs() {
         assertEquals(86400000L, jwtTokenProvider.getExpirationMs());
     }
@@ -334,6 +404,30 @@ class JwtTokenProviderTest {
         return new JwtTokenProvider(new JwtProperties(
                 SECRET, 86400000L, 604800000L, true,
                 issuer, audience, "test-key", 30L));
+    }
+
+    private static String tokenWithClaims(String subject, Long userId, String role,
+            boolean withExpiration, String tokenType) {
+        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET));
+        var builder = Jwts.builder()
+                .issuer("clean-architecture-bank")
+                .audience().add("clean-architecture-bank-api").and()
+                .header().keyId("primary").and()
+                .subject(subject)
+                .issuedAt(new Date());
+        if (userId != null) {
+            builder.claim("userId", userId);
+        }
+        if (role != null) {
+            builder.claim("role", role);
+        }
+        if (tokenType != null) {
+            builder.claim("typ", tokenType);
+        }
+        if (withExpiration) {
+            builder.expiration(new Date(System.currentTimeMillis() + 86400000L));
+        }
+        return builder.signWith(key).compact();
     }
 
     private static String expiredBySeconds(long seconds) {

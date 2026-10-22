@@ -56,4 +56,16 @@ class CustomUserDetailsTest {
         assertEquals(0L, new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities).getTokenVersion());
         assertEquals(9L, new CustomUserDetails(42L, "testuser", "$2a$12$testpasswordhash00000000000000000000001", authorities, 9L).getTokenVersion());
     }
+
+    @Test
+    void shouldDefaultMfaDisabledAndAcceptExplicitFlag() {
+        var authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+
+        assertFalse(new CustomUserDetails(42L, "testuser",
+                "$2a$12$testpasswordhash00000000000000000000001", authorities).isMfaEnabled());
+        assertFalse(new CustomUserDetails(42L, "testuser",
+                "$2a$12$testpasswordhash00000000000000000000001", authorities, 3L).isMfaEnabled());
+        assertTrue(new CustomUserDetails(42L, "testuser",
+                "$2a$12$testpasswordhash00000000000000000000001", authorities, 3L, true).isMfaEnabled());
+    }
 }

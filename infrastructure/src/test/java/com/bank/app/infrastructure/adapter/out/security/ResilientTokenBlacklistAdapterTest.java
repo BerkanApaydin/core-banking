@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -38,6 +39,14 @@ class ResilientTokenBlacklistAdapterTest {
         when(redis.isBlacklisted("t")).thenReturn(true);
 
         assertThat(adapter.isBlacklisted("t")).isTrue();
+        verify(redis).isBlacklisted("t");
+    }
+
+    @Test
+    void shouldReturnFalseWhenNeitherBackendHasRevokedTheToken() {
+        when(redis.isBlacklisted("t")).thenReturn(false);
+
+        assertThat(adapter.isBlacklisted("t")).isFalse();
         verify(redis).isBlacklisted("t");
     }
 
@@ -95,5 +104,15 @@ class ResilientTokenBlacklistAdapterTest {
         doThrow(new RedisConnectionFailureException("down")).when(redis).cleanExpired();
 
         assertThatNoException().isThrownBy(() -> adapter.cleanExpired());
+    }
+
+    @Test
+    void shouldAlwaysDelegateCleanupToTheLocalFallback() {
+        TokenBlacklistAdapter localFallback = mock(TokenBlacklistAdapter.class);
+
+        new ResilientTokenBlacklistAdapter(redis, localFallback).cleanExpired();
+
+        verify(redis).cleanExpired();
+        verify(localFallback).cleanExpired();
     }
 }

@@ -23,6 +23,18 @@ class MfaPropertiesTest {
     }
 
     @Test
+    void shouldDeriveTheTotpPolicy() {
+        MfaProperties props = new MfaProperties("bank", "", "", 60, 8, 2, 15, 5, 15, 10000);
+
+        var policy = props.toTotpPolicy();
+
+        assertThat(policy).isNotNull();
+        assertThat(policy.periodSeconds()).isEqualTo(60);
+        assertThat(policy.digits()).isEqualTo(8);
+        assertThat(policy.allowedSkewWindows()).isEqualTo(2);
+    }
+
+    @Test
     void shouldRejectInvalidConfiguration() {
         assertThatThrownBy(() -> new MfaProperties(" ", "k", "", 30, 6, 1, 15, 5, 15, 10000))
                 .isInstanceOf(IllegalArgumentException.class);

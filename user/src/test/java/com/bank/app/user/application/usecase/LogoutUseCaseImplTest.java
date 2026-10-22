@@ -18,6 +18,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -181,6 +182,52 @@ class LogoutUseCaseImplTest {
 
         verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("unknown"));
         verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("an already-revoked access token still revokes the presented refresh family")
+    void shouldRevokeFamilyForAlreadyRevokedAccessToken() {
+        when(tokenBlacklistPort.isBlacklisted("revoked-jwt-token")).thenReturn(true);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("refresh-9")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("refresh-9"), 7L, "family-9",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
+
+        logoutUseCase.execute("Bearer revoked-jwt-token", "refresh-9");
+
+        verify(refreshTokenPort).revokeFamily("family-9", 7L);
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
+        verifyNoInteractions(auditEventPort);
+    }
+
+    @Test
+    @DisplayName("an unreadable revocation store falls through to a normal logout")
+    void shouldContinueWhenRevocationCheckFails() {
+        stubClock();
+        when(tokenBlacklistPort.isBlacklisted("valid-jwt-token"))
+                .thenThrow(new RuntimeException("redis down"));
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(jwtPort.extractUsername("valid-jwt-token")).thenReturn("alice");
+
+        logoutUseCase.execute("Bearer valid-jwt-token");
+
+        verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals("alice", auditCaptor.getValue().username());
+    }
+
+    @Test
+    @DisplayName("best-effort attribution falls back to system for null and blank tokens")
+    void shouldFallBackToSystemForNullAndBlankTokens() throws Exception {
+        Method bestEffort = LogoutUseCaseImpl.class.getDeclaredMethod(
+                "bestEffortUsername", String[].class);
+        bestEffort.setAccessible(true);
+
+        Object username = bestEffort.invoke(logoutUseCase, (Object) new String[]{null, " "});
+
+        assertEquals("system", username);
+        verifyNoInteractions(jwtPort);
     }
 
     @Test

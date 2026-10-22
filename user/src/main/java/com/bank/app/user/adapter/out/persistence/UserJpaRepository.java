@@ -40,8 +40,15 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     @Query("UPDATE UserJpaEntity e SET e.mfaSecretEncrypted = :secret WHERE e.id = :userId")
     int updateMfaSecret(@Param("userId") Long userId, @Param("secret") String encryptedBase64);
 
+    /**
+     * Removing the factor also drops the replay counter: a later re-enrollment
+     * gets a new secret, and keeping the old step counter would reject a valid
+     * code from the new secret when enrollment and login happen inside the
+     * same 30-second step.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE UserJpaEntity e SET e.mfaSecretEncrypted = NULL WHERE e.id = :userId")
+    @Query("UPDATE UserJpaEntity e SET e.mfaSecretEncrypted = NULL, e.mfaLastTotpCounter = NULL "
+            + "WHERE e.id = :userId")
     int clearMfaSecret(@Param("userId") Long userId);
 
     @Query("SELECT e.mfaSecretEncrypted FROM UserJpaEntity e WHERE e.id = :userId")

@@ -53,7 +53,7 @@ public class RedisRateLimitConfiguration {
                     new GenericObjectPoolConfig<>();
             if (pool.getMaxActive() > 0) poolConfig.setMaxTotal(pool.getMaxActive());
             if (pool.getMaxIdle() > 0) poolConfig.setMaxIdle(pool.getMaxIdle());
-            if (pool.getMinIdle() > 0) poolConfig.setMinIdle(pool.getMinIdle());
+            poolConfig.setMinIdle(pool.getMinIdle());
             if (pool.getMaxWait() != null) poolConfig.setMaxWait(pool.getMaxWait());
             client = LettucePoolingClientConfiguration.builder().poolConfig(poolConfig);
         } else {

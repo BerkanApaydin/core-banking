@@ -2,6 +2,7 @@ package com.bank.app.user.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -99,6 +100,40 @@ class TotpTest {
         String uri = Totp.provisioningUri("bank", "alice", "JBSWY3DPEHPK3PXP");
 
         assertEquals("otpauth://totp/bank:alice?secret=JBSWY3DPEHPK3PXP&issuer=bank&algorithm=SHA1&digits=6&period=30",
+                uri);
+    }
+
+    @Test
+    void shouldEncodeBase32BlockRemainders() {
+        // 5 bytes = 40 bits: exact block multiple, no remainder.
+        assertEquals("JBSWY3DP", Totp.base32Encode("Hello".getBytes(StandardCharsets.US_ASCII)));
+        // 1 byte = 8 bits: one full 5-bit group plus a 3-bit remainder. A
+        // right-shift mutation of the discard turns 0xFF into "77" not "74".
+        assertEquals("74", Totp.base32Encode(new byte[]{(byte) 0xFF}));
+        // 20-byte RFC secret: boundary between 5-bit groups and the remainder.
+        assertEquals("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                Totp.base32Encode(RFC_SECRET));
+        assertEquals("", Totp.base32Encode(new byte[0]));
+    }
+
+    @Test
+    void shouldCompareConstantTimeStringsByContent() throws Exception {
+        Method equals = Totp.class.getDeclaredMethod("constantTimeEquals", String.class, String.class);
+        equals.setAccessible(true);
+
+        assertTrue((Boolean) equals.invoke(null, "94287082", "94287082"));
+        assertFalse((Boolean) equals.invoke(null, "94287082", "94287083"));
+        assertFalse((Boolean) equals.invoke(null, "94287082", "9428708"));
+        assertFalse((Boolean) equals.invoke(null, "9428708", "94287082"));
+        assertTrue((Boolean) equals.invoke(null, "", ""));
+    }
+
+    @Test
+    void shouldLeaveUnreservedUriCharactersUnencodedAtAsciiBoundaries() {
+        String uri = Totp.provisioningUri("azAZ09", "ZzAa09", "JBSWY3DPEHPK3PXP");
+
+        assertEquals("otpauth://totp/azAZ09:ZzAa09?secret=JBSWY3DPEHPK3PXP"
+                        + "&issuer=azAZ09&algorithm=SHA1&digits=6&period=30",
                 uri);
     }
 

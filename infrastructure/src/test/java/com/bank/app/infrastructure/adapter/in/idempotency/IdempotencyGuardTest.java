@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
+import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.infrastructure.adapter.in.idempotency.IdempotencyGuard.IdempotencyResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -167,6 +168,71 @@ class IdempotencyGuardTest {
                     () -> guard.startRequest(null));
             assertEquals("Idempotency key must not be null", ex.getMessage());
         }
+
+        @Test
+        @DisplayName("should fall back to the system clock when no clock provider is supplied")
+        void shouldFallBackToSystemClock() {
+            IdempotencyGuard guardWithNullClock = new IdempotencyGuard(idempotencyPort, null);
+            when(idempotencyPort.findById("key-clock")).thenReturn(Optional.empty());
+            when(idempotencyPort.tryCreate(eq("key-clock"), any(LocalDateTime.class))).thenReturn(true);
+
+            assertEquals(IdempotencyResult.Status.NEW,
+                    guardWithNullClock.startRequest("key-clock").status());
+        }
+
+        @Test
+        @DisplayName("should reject a reused key with a different request hash")
+        void shouldRejectDifferentRequestHash() {
+            Entry existing = new Entry("key-1", "PENDING", null, null,
+                    LocalDateTime.now(), "hash-a", true);
+            when(idempotencyPort.findById("key-1")).thenReturn(Optional.of(existing));
+
+            assertThrows(ConcurrentRequestException.class,
+                    () -> guard.startRequest("key-1", "hash-b"));
+        }
+
+        @Test
+        @DisplayName("should fail closed on an unknown persisted status")
+        void shouldRejectUnknownPersistedStatus() {
+            // A corrupt/manually-edited row must never be treated as NEW
+            // (which would re-execute a money movement under a reused key).
+            Entry corrupt = new Entry("key-1", "CORRUPT", null, null, LocalDateTime.now());
+            when(idempotencyPort.findById("key-1")).thenReturn(Optional.of(corrupt));
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> guard.startRequest("key-1"));
+
+            assertTrue(ex.getMessage().contains("CORRUPT"));
+            verify(idempotencyPort, never()).tryCreate(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("should replay the winner when a FAILED claim loses to a completed request")
+        void shouldReplayCompletedWinnerAfterFailedClaimLoses() {
+            Entry failed = new Entry("key-1", "FAILED", null, null, LocalDateTime.now());
+            Entry completed = new Entry("key-1", "COMPLETED", "winner", 200,
+                    LocalDateTime.now(), null, true);
+            when(idempotencyPort.findById("key-1"))
+                    .thenReturn(Optional.of(failed), Optional.of(completed));
+            when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class)))
+                    .thenReturn(false);
+
+            IdempotencyResult result = guard.startRequest("key-1");
+
+            assertEquals(IdempotencyResult.Status.COMPLETED, result.status());
+            assertEquals("winner", result.responseBody());
+        }
+    }
+
+    @Test
+    @DisplayName("three-argument result constructor derives replayability from status")
+    void shouldDeriveReplayabilityFromStatus() {
+        assertTrue(new IdempotencyResult(IdempotencyResult.Status.COMPLETED, "body", 200)
+                .replayable());
+        assertFalse(new IdempotencyResult(IdempotencyResult.Status.PENDING, null, null)
+                .replayable());
+        assertFalse(new IdempotencyResult(IdempotencyResult.Status.NEW, null, null)
+                .replayable());
     }
 
     @Nested

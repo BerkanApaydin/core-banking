@@ -141,14 +141,14 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
     public void reset(String ip) {
         // Never delete "login_attempt:ip:null".
         if (ip == null) return;
-        withRedis(() -> redisTemplate.delete(IP_PREFIX + ip));
+        withRedisVoid(() -> redisTemplate.delete(IP_PREFIX + ip));
     }
 
     @Override
     public void resetByUsername(String username) {
         if (username == null) return;
         String normalized = normalizeUsername(username);
-        withRedis(() -> {
+        withRedisVoid(() -> {
             redisTemplate.delete(ACCOUNT_PREFIX + normalized);
             // Pair buckets carry the account in the key prefix, so they are
             // cleared by pattern. The username is escaped: it is user input and
@@ -156,7 +156,6 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
             // and clear other accounts' counters. SCAN, never KEYS: KEYS blocks
             // the Redis main thread for the whole keyspace.
             deleteByPattern(ACCOUNT_IP_PREFIX + escapeGlob(normalized) + "|*");
-            return Boolean.TRUE;
         });
     }
 
@@ -188,6 +187,14 @@ public class RedisLoginAttemptAdapter implements LoginAttemptPort {
     private <T> T withRedis(Supplier<T> operation) {
         try {
             return operation.get();
+        } catch (DataAccessException | NumberFormatException ex) {
+            throw new LoginAttemptStoreUnavailableException(ex);
+        }
+    }
+
+    private void withRedisVoid(Runnable operation) {
+        try {
+            operation.run();
         } catch (DataAccessException | NumberFormatException ex) {
             throw new LoginAttemptStoreUnavailableException(ex);
         }

@@ -11,9 +11,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +35,9 @@ class AdvisorySchedulerLockTest {
 
     @Mock
     private TransactionStatus status;
+
+    @Mock
+    private TransactionTemplate template;
 
     private AdvisorySchedulerLock lock() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
@@ -95,6 +100,12 @@ class AdvisorySchedulerLockTest {
     }
 
     @Test
+    @DisplayName("alwaysRun should always acquire without touching the database")
+    void alwaysRunShouldAlwaysAcquire() {
+        assertThat(AdvisorySchedulerLock.alwaysRun().tryAcquire("job")).isTrue();
+    }
+
+    @Test
     @DisplayName("should honor the configured timeout from properties")
     void shouldHonorConfiguredTimeoutFromProperties() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
@@ -113,6 +124,27 @@ class AdvisorySchedulerLockTest {
         assertThat(definition.getValue().getPropagationBehavior())
                 .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRED);
         assertThat(definition.getValue().getTimeout()).isEqualTo(17);
+    }
+
+    @Test
+    @DisplayName("should return a distinct contended outcome from the lock callback")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void shouldReturnContendedOutcomeFromCallback() {
+        when(jdbc.queryForObject(eq(AdvisorySchedulerLock.LOCK_SQL), eq(Boolean.class), eq("job")))
+                .thenReturn(Boolean.FALSE);
+        AtomicReference<Object> callbackResult = new AtomicReference<>();
+        when(template.execute(any(TransactionCallback.class))).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            Object outcome = callback.doInTransaction(status);
+            callbackResult.set(outcome);
+            return outcome;
+        });
+
+        boolean result = new AdvisorySchedulerLock(jdbc, template)
+                .runIfLeader("job", () -> { });
+
+        assertThat(result).isFalse();
+        assertThat(callbackResult.get()).isNotNull().hasToString("CONTENDED");
     }
 
     @Test

@@ -71,7 +71,7 @@ final class FilterRequestDecisions {
         // admin token stayed valid for ~15 min on the encoded alias.
         try {
             String resolved = RequestPathResolver.resolve(request);
-            if (resolved != null && !resolved.isEmpty() && !"/".equals(resolved)) {
+            if (!"/".equals(resolved)) {
                 return resolved;
             }
             // Fall through for bare Mockito mocks that only stub
@@ -87,7 +87,7 @@ final class FilterRequestDecisions {
             raw = servletPath == null ? "" : servletPath;
         } else {
             String contextPath = request.getContextPath();
-            raw = contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
+            raw = contextPath != null && uri.startsWith(contextPath)
                     ? uri.substring(contextPath.length()) : uri;
         }
         return decodePath(raw);

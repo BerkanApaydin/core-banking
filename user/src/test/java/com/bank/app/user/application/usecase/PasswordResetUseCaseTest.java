@@ -5,14 +5,17 @@ import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.PasswordEncoderPort;
 import com.bank.app.user.application.port.out.PasswordResetNotificationPort;
 import com.bank.app.user.application.port.out.PasswordResetTokenPort;
 import com.bank.app.user.application.port.out.PasswordResetTokenPort.PasswordResetToken;
 import com.bank.app.user.application.port.out.SaveUserPort;
+import com.bank.app.user.domain.EmailAddress;
 import com.bank.app.user.domain.EncodedPassword;
 import com.bank.app.user.domain.PasswordPolicy;
+import com.bank.app.user.domain.PhoneNumber;
 import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.domain.UserTestFactory;
@@ -41,9 +44,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,10 +107,50 @@ class PasswordResetUseCaseTest {
             assertThat(issued.getValue().expiresAt())
                     .isEqualTo(LocalDateTime.now(FIXED).plusMinutes(15));
             var token = ArgumentCaptor.forClass(String.class);
-            verify(notificationPort).sendPasswordResetToken(eq("alice"), any(), token.capture());
+            verify(notificationPort).sendPasswordResetToken(eq("alice"), eq("alice"), token.capture());
             // Only the digest is stored — the raw token must differ from it.
+            assertThat(token.getValue()).hasSize(43);
             assertThat(token.getValue()).isNotEqualTo(issued.getValue().tokenHash());
             assertThat(TokenDigest.sha256Hex(token.getValue())).isEqualTo(issued.getValue().tokenHash());
+            var audit = ArgumentCaptor.forClass(AuditEvent.class);
+            verify(auditEventPort).publish(audit.capture());
+            assertThat(audit.getValue().action()).isEqualTo(AuditEvent.PASSWORD_RESET_REQUESTED);
+            assertThat(audit.getValue().username()).isEqualTo("alice");
+            assertThat(audit.getValue().actorUserId()).isEqualTo(7L);
+        }
+
+        @Test
+        @DisplayName("should prefer the email contact and fall back to the phone")
+        void shouldChooseNotificationContact() {
+            User withEmail = new User(new UserId(7L), "alice",
+                    EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
+                    new EmailAddress("alice@example.com"), new PhoneNumber("555-0100"), 1L, 0L);
+            User withPhone = new User(new UserId(8L), "bob",
+                    EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
+                    null, new PhoneNumber("555-0101"), 1L, 0L);
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(withEmail));
+            when(loadUserPort.findByUsernameForUpdate("bob")).thenReturn(Optional.of(withPhone));
+
+            request.execute("alice");
+            request.execute("bob");
+
+            verify(notificationPort).sendPasswordResetToken(eq("alice"), eq("alice@example.com"), any());
+            verify(notificationPort).sendPasswordResetToken(eq("bob"), eq("555-0101"), any());
+        }
+
+        @Test
+        @DisplayName("should mint a fresh token on every request")
+        void shouldMintFreshTokenPerRequest() {
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(user));
+            var tokens = ArgumentCaptor.forClass(String.class);
+
+            request.execute("alice");
+            request.execute("alice");
+
+            verify(notificationPort, times(2))
+                    .sendPasswordResetToken(eq("alice"), eq("alice"), tokens.capture());
+            assertThat(tokens.getAllValues()).hasSize(2).doesNotHaveDuplicates();
         }
 
         @Test
@@ -134,6 +180,59 @@ class PasswordResetUseCaseTest {
             verify(notificationPort, never()).sendPasswordResetToken(any(), any(), any());
             verify(auditEventPort).publish(any());
         }
+
+        @Test
+        @DisplayName("should not query the store for a blank identifier")
+        void shouldSkipStoreForBlankIdentifier() {
+            request.execute("   ");
+
+            verifyNoInteractions(loadUserPort);
+            verifyNoInteractions(resetTokenPort);
+            verifyNoInteractions(notificationPort);
+            verify(auditEventPort).publish(any());
+        }
+
+        @Test
+        @DisplayName("should not issue a token for a user without a persisted id")
+        void shouldNotIssueForTransientUser() {
+            User transientUser = new User(null, "alice",
+                    EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
+                    null, null, null, 0L);
+            when(loadUserPort.findByUsernameForUpdate("alice"))
+                    .thenReturn(Optional.of(transientUser));
+
+            request.execute("alice");
+
+            verifyNoInteractions(resetTokenPort);
+            verifyNoInteractions(notificationPort);
+            verify(auditEventPort).publish(any());
+        }
+
+        @Test
+        @DisplayName("should swallow a post-commit notification failure")
+        void shouldSwallowNotificationFailure() {
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(user));
+            doThrow(new IllegalStateException("mail down"))
+                    .when(notificationPort).sendPasswordResetToken(any(), any(), any());
+
+            request.execute("alice");
+
+            verify(resetTokenPort).issue(any());
+            verify(auditEventPort).publish(any());
+        }
+
+        @Test
+        @DisplayName("should swallow an audit-store failure")
+        void shouldSwallowAuditFailure() {
+            when(loadUserPort.findByUsernameForUpdate("ghost")).thenReturn(Optional.empty());
+            doThrow(new IllegalStateException("audit down"))
+                    .when(auditEventPort).publish(any());
+
+            request.execute("ghost");
+
+            verify(notificationPort, never()).sendPasswordResetToken(any(), any(), any());
+        }
     }
 
     @Nested
@@ -152,7 +251,7 @@ class PasswordResetUseCaseTest {
         void shouldResetPassword() {
             when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
                     .thenReturn(Optional.of(liveToken()));
-            User user = UserTestFactory.newUser("alice");
+            User user = persistedUser(7L, "alice");
             long versionBefore = user.getTokenVersion();
             when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
             when(passwordPolicy.validate("NewStr0ngPass!")).thenReturn(List.of());
@@ -166,6 +265,32 @@ class PasswordResetUseCaseTest {
             verify(saveUserPort).save(user);
             assertThat(user.getTokenVersion()).isEqualTo(versionBefore + 1);
             verify(resetTokenPort).deleteByUserId(7L);
+            var audit = ArgumentCaptor.forClass(AuditEvent.class);
+            verify(auditEventPort).publish(audit.capture());
+            assertThat(audit.getValue().action()).isEqualTo(AuditEvent.PASSWORD_RESET_COMPLETED);
+            assertThat(audit.getValue().username()).isEqualTo("alice");
+            assertThat(audit.getValue().actorUserId()).isEqualTo(7L);
+        }
+
+        @Test
+        @DisplayName("should reject an expired token even when every downstream step would succeed")
+        void shouldRejectExpiredTokenBeforeDownstreamWork() {
+            PasswordResetToken expired = new PasswordResetToken(
+                    TokenDigest.sha256Hex("expired"), 7L,
+                    LocalDateTime.now(FIXED).minusMinutes(1), null);
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex("expired")))
+                    .thenReturn(Optional.of(expired));
+            lenient().when(loadUserPort.findById(7L))
+                    .thenReturn(Optional.of(persistedUser(7L, "alice")));
+            lenient().when(passwordPolicy.validate("NewStr0ngPass!")).thenReturn(List.of());
+            lenient().when(resetTokenPort.tryMarkUsed(any(), any())).thenReturn(true);
+            lenient().when(passwordEncoderPort.encode("NewStr0ngPass!"))
+                    .thenReturn("$2a$12$newhash000000000000000000000000000001");
+
+            assertThatThrownBy(() -> confirm.execute("expired", "NewStr0ngPass!"))
+                    .isInstanceOf(PasswordResetTokenInvalidException.class);
+            verify(saveUserPort, never()).save(any());
+            verify(resetTokenPort, never()).tryMarkUsed(any(), any());
         }
 
         @Test
@@ -188,6 +313,22 @@ class PasswordResetUseCaseTest {
                     .isInstanceOf(PasswordResetTokenInvalidException.class);
             assertThatThrownBy(() -> confirm.execute("used", "NewStr0ngPass!"))
                     .isInstanceOf(PasswordResetTokenInvalidException.class);
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a token expiring exactly at the current instant")
+        void shouldRejectExpiryBoundaryAtNow() {
+            PasswordResetToken boundary = new PasswordResetToken(
+                    TokenDigest.sha256Hex(RAW_TOKEN), 7L,
+                    LocalDateTime.now(FIXED), null);
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(boundary));
+
+            assertThatThrownBy(() -> confirm.execute(RAW_TOKEN, "NewStr0ngPass!"))
+                    .isInstanceOf(PasswordResetTokenInvalidException.class);
+
+            verify(resetTokenPort, never()).tryMarkUsed(any(), any());
             verify(saveUserPort, never()).save(any());
         }
 

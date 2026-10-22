@@ -31,7 +31,7 @@ public record ReportCriteria(
         if (size < 1) throw new IllegalArgumentException("Page size must be at least 1: " + size);
         if (size > 100) throw new IllegalArgumentException("Page size must be at most 100: " + size);
         if (startDate.isAfter(endDate)) throw new IllegalArgumentException("Start date must not be after end date");
-        if (startDate.plusMonths(12).isBefore(endDate))
+        if (exceedsTwelveMonths(startDate, endDate))
             throw new IllegalArgumentException("Report range must not exceed 12 months");
         if ((cursorCreatedAt == null) != (cursorId == null))
             throw new IllegalArgumentException("cursorCreatedAt and cursorId must both be set or both be null");
@@ -46,6 +46,20 @@ public record ReportCriteria(
 
     public ReportCriteria(Long accountId, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
         this(accountId, startDate, endDate, page, size, null, null);
+    }
+
+    /**
+     * {@code startDate.plusMonths(12)} throws when the start date sits at the
+     * top of the {@link LocalDateTime} range (a client can send year
+     * 999999999), which would surface as a 500 instead of a validation
+     * failure. Such an unbounded window is rejected as out of contract.
+     */
+    private static boolean exceedsTwelveMonths(LocalDateTime startDate, LocalDateTime endDate) {
+        try {
+            return startDate.plusMonths(12).isBefore(endDate);
+        } catch (java.time.DateTimeException | ArithmeticException overflow) {
+            return true;
+        }
     }
 
     public boolean isKeyset() {

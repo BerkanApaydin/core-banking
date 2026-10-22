@@ -66,8 +66,8 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         Objects.requireNonNull(direction, "Direction must not be null");
         requireDistinctAccounts(senderId, receiverId);
         OrderedPair<Account> pair = loadOrderedPair(senderId, receiverId);
-        Account sender = resolveSender(pair, senderId, receiverId);
-        Account receiver = resolveReceiver(pair, senderId, receiverId);
+        Account sender = resolveSender(pair, senderId);
+        Account receiver = resolveReceiver(pair, receiverId);
         Clock clock = clockProvider.clock();
         applyMovement(sender, receiver, amount, direction, clock);
         // 7.2: keep the saved aggregates — they carry the bumped @Version.
@@ -163,12 +163,16 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
                         .orElseThrow(() -> new AccountNotFoundException(id2)));
     }
 
-    private static Account resolveSender(OrderedPair<Account> pair, Long senderId, Long receiverId) {
-        return senderId < receiverId ? pair.lowerIdItem() : pair.higherIdItem();
+    private static Account resolveSender(OrderedPair<Account> pair, Long senderId) {
+        return Objects.equals(pair.lowerIdItem().getId(), senderId)
+                ? pair.lowerIdItem()
+                : pair.higherIdItem();
     }
 
-    private static Account resolveReceiver(OrderedPair<Account> pair, Long senderId, Long receiverId) {
-        return senderId < receiverId ? pair.higherIdItem() : pair.lowerIdItem();
+    private static Account resolveReceiver(OrderedPair<Account> pair, Long receiverId) {
+        return Objects.equals(pair.lowerIdItem().getId(), receiverId)
+                ? pair.lowerIdItem()
+                : pair.higherIdItem();
     }
 
 }

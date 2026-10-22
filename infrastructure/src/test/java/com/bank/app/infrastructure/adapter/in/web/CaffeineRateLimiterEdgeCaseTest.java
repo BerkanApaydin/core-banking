@@ -12,6 +12,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class CaffeineRateLimiterEdgeCaseTest {
 
     @Test
+    void shouldUseSystemClockWhenProviderIsNull() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 60000, 120, 60000, 10000);
+
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(props, null);
+
+        assertTrue(limiter.tryAcquire("client-1"));
+    }
+
+    @Test
+    void shouldUseProvidedClock() {
+        RateLimitProperties props = new RateLimitProperties(null, null, 5, 60000, 120, 60000, 10000);
+        com.bank.app.common.application.port.out.ClockProviderPort provider =
+                org.mockito.Mockito.mock(com.bank.app.common.application.port.out.ClockProviderPort.class);
+        org.mockito.Mockito.when(provider.clock()).thenReturn(
+                Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
+
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(props, provider);
+
+        assertTrue(limiter.tryAcquire("client-1"));
+    }
+
+    @Test
     void shouldAllowRequestWhenUnderLimit() {
         CaffeineRateLimiter limiter = new CaffeineRateLimiter(5, 60000, 10000, Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC));
         assertTrue(limiter.tryAcquire("client-1"));

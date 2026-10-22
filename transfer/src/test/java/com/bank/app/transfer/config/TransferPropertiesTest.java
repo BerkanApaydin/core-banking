@@ -30,4 +30,18 @@ class TransferPropertiesTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cancellationWindow");
     }
+
+    @Test
+    void shouldRejectNullCancellationWindow() {
+        assertThatThrownBy(() -> new TransferProperties(null, 3, 500L, 2000L, 100))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cancellationWindow");
+    }
+
+    @Test
+    void shouldRejectNegativeCancellationWindow() {
+        assertThatThrownBy(() -> new TransferProperties(Duration.ofSeconds(-1), 3, 500L, 2000L, 100))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cancellationWindow");
+    }
 }

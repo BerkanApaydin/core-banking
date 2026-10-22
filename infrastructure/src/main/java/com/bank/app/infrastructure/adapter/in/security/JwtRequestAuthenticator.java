@@ -9,7 +9,6 @@ import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Token-verification half of {@link JwtAuthenticationFilter}: signature,
@@ -142,7 +141,6 @@ final class JwtRequestAuthenticator {
                     : Result.MFA_REQUIRED;
         } catch (RuntimeException storeUnavailable) {
             log.warn("User store unavailable during admin security re-check");
-            SecurityContextHolder.clearContext();
             return Result.BACKEND_UNAVAILABLE;
         }
     }

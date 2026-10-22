@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("HmacCsrfBindingAdapter")
 class HmacCsrfBindingAdapterTest {
@@ -28,6 +29,19 @@ class HmacCsrfBindingAdapterTest {
     }
 
     @Test
+    @DisplayName("should use fresh randomness for every issued token")
+    void shouldUseFreshRandomness() {
+        HmacCsrfBindingAdapter adapter = new HmacCsrfBindingAdapter(properties());
+
+        String first = adapter.issueCsrfToken("42");
+        String second = adapter.issueCsrfToken("42");
+
+        assertThat(first).isNotEqualTo(second);
+        assertThat(adapter.verifyCsrfToken(first, first, "42")).isTrue();
+        assertThat(adapter.verifyCsrfToken(second, second, "42")).isTrue();
+    }
+
+    @Test
     @DisplayName("should fail closed on null inputs (K7/D8)")
     void shouldFailClosed() {
         HmacCsrfBindingAdapter adapter =
@@ -37,6 +51,52 @@ class HmacCsrfBindingAdapterTest {
         assertThat(adapter.verifyCsrfToken(null, token, "42")).isFalse();
         assertThat(adapter.verifyCsrfToken(token, null, "42")).isFalse();
         assertThat(adapter.verifyCsrfToken(token, token, null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("should reject a null or empty MAC key at construction")
+    void shouldRejectEmptyMacKey() {
+        assertThatThrownBy(
+                () -> new HmacCsrfBindingAdapter((byte[]) null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("macKey must not be empty");
+
+        assertThatThrownBy(
+                () -> new HmacCsrfBindingAdapter(new byte[0]))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("macKey must not be empty");
+    }
+
+    @Test
+    @DisplayName("should fail closed on malformed or mistyped bound tokens")
+    void shouldRejectMalformedBoundTokens() {
+        HmacCsrfBindingAdapter adapter =
+                new HmacCsrfBindingAdapter(properties());
+        String valid = adapter.issueCsrfToken("42");
+
+        assertThat(adapter.verifyCsrfToken("", "", "42")).isFalse();
+        assertThat(adapter.verifyCsrfToken("short", "short", "42")).isFalse();
+        assertThat(adapter.verifyCsrfToken(valid, valid, null)).isFalse();
+        assertThat(adapter.verifyCsrfToken(valid, valid, " ")).isFalse();
+        // Correct length but no separator at the mandated offset.
+        String noSeparator = "x".repeat(43) + "y".repeat(43);
+        assertThat(adapter.verifyCsrfToken(noSeparator, noSeparator, "42")).isFalse();
+    }
+
+    @Test
+    @DisplayName("should reject a matching pair whose MAC was tampered with")
+    void shouldRejectTamperedMacEvenWhenHeaderMatchesCookie() {
+        HmacCsrfBindingAdapter adapter =
+                new HmacCsrfBindingAdapter(properties());
+        String valid = adapter.issueCsrfToken("42");
+        // Flip the last base64url character: header == cookie still holds, so
+        // only the HMAC comparison can reject the pair.
+        char last = valid.charAt(valid.length() - 1);
+        char replacement = last == 'A' ? 'B' : 'A';
+        String tampered = valid.substring(0, valid.length() - 1) + replacement;
+
+        assertThat(adapter.verifyCsrfToken(tampered, tampered, "42")).isFalse();
+        assertThat(adapter.verifyCsrfToken(valid, valid, "42")).isTrue();
     }
 
     @Test

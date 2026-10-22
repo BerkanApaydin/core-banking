@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -175,6 +176,23 @@ class OrphanIntegrityReporterTest {
         assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
         assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
         assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+    }
+
+    @Test
+    void shouldUseZeroThresholdWhenPropertiesAreMissing() {
+        // The canonical constructor tolerates a missing properties bean at the
+        // boundary; a null threshold must fail closed to alarm-on-any-orphan
+        // rather than silently disabling alerting.
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
+        var registry = new SimpleMeterRegistry();
+        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(
+                jdbc, registry, null, AdvisorySchedulerLock.alwaysRun());
+
+        reporter.reportOrphans();
+
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
     }
 
     @Test
