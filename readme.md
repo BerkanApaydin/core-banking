@@ -2,6 +2,15 @@
 
 A modular simulation of selected core banking workflows—account management and account-to-account transfers—built with **Spring Boot 3.5.16** and **Java 21**. It uses ports and adapters with architecture tests, PostgreSQL transactions, idempotency, and a browser UI. No real funds move, and this project is not a complete banking ledger or payment provider.
 
+## Contents
+
+- [Tech Stack & Prerequisites](#tech-stack--prerequisites)
+- [Architecture & Module Dependency](#architecture--module-dependency)
+- [REST API Endpoints (v1)](#rest-api-endpoints-v1)
+- [Key Features & Design Decisions](#key-features--design-decisions)
+- [Getting Started](#getting-started)
+- [Testing & Quality Gates](#testing--quality-gates)
+
 ---
 
 ## Tech Stack & Prerequisites
@@ -17,16 +26,16 @@ A modular simulation of selected core banking workflows—account management and
 - **PostgreSQL 15:** Relational database with row locks, constraints, and Hibernate optimistic versions.
 - **Flyway:** Database migrations run on startup; Hibernate's `ddl-auto=validate` checks the mapped schema and fails startup on detected mismatches.
 - **Redis 7:** Shared account-snapshot cache in production, login attempts storage, and sliding window rate limiting (via Lua scripts).
-- **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL); production uses Redis for snapshots, rate limiting and login attempts, and PostgreSQL+Redis hybrid token revocation during migration.
+- **Caffeine Cache:** Dev/test default (single-JVM, 60s TTL) when the `dev` profile runs on its own; the Compose dev stack overrides the snapshot cache, rate limiter and login-attempt store to Redis. Production uses Redis for snapshots, rate limiting and login attempts, and PostgreSQL+Redis hybrid token revocation during migration.
 - **Micrometer + Prometheus:** Custom outbox, idempotency-backlog and orphan-integrity metrics exposed via Actuator. A scraper and alert destination must be installed separately.
 - **springdoc-openapi:** Swagger UI for API exploration (disabled in production).
 
 ### Quality Assurance & Testing
 
 - **JUnit 5 & Mockito:** Standard test suites and mocking.
-- **Testcontainers:** Integration testing with a single shared PostgreSQL container (plus per-test Redis containers where needed).
+- **Testcontainers:** Integration testing with a single shared PostgreSQL container (plus test-class-scoped Redis containers where needed).
 - **ArchUnit:** Architecture verification to enforce Hexagonal boundary rules.
-- **JaCoCo:** Quality gates enforcing $\ge 90\%$ Line and $\ge 80\%$ Branch coverage, enforced **per module** across all nine modules by `scripts/check_aggregate_coverage.py` — the single source of truth, with thresholds mirrored from the root-pom `jacoco.line.coverage` / `jacoco.branch.coverage` properties. The `app`-module `jacoco:check` execution only validates that module's own classes, so the aggregate script is what actually gates a build.
+- **JaCoCo:** Quality gates enforcing $\ge 90\%$ Line and $\ge 80\%$ Branch coverage, enforced **per module** across all nine Java modules by `scripts/check_aggregate_coverage.py` (the resources-only `migrations` module has no bytecode) — the single source of truth, with thresholds mirrored from the root-pom `jacoco.line.coverage` / `jacoco.branch.coverage` properties. The `app`-module `jacoco:check` execution only validates that module's own classes, so the aggregate script is what actually gates a build.
 - **Pitest:** A separate CI mutation-testing step is configured with a $\ge 80\%$ mutation threshold; it is not part of `test-all` or Maven `clean verify`.
 
 ### DevOps & Prerequisites
@@ -68,6 +77,7 @@ plus one supporting module (`audit`).
 graph LR
     classDef boot fill:#2B6CB0,stroke:#1A4E8A,color:#fff,stroke-width:2px,rx:12,ry:12;
     classDef ctx fill:#2F855A,stroke:#1F5C3D,color:#fff,stroke-width:2px,rx:12,ry:12;
+    classDef support fill:#805AD5,stroke:#553C9A,color:#fff,stroke-width:2px,rx:12,ry:12;
     classDef plat fill:#4A5568,stroke:#2D3748,color:#fff,stroke-width:2px,rx:12,ry:12;
     classDef infraC fill:#D69E2E,stroke:#975A16,color:#fff,stroke-width:2px,rx:12,ry:12;
 
@@ -78,7 +88,11 @@ graph LR
         transfer[transfer]:::ctx
         account[account]:::ctx
         user[user]:::ctx
-        audit[audit]:::ctx
+    end
+
+    subgraph supporting[Supporting]
+        direction TB
+        audit[audit]:::support
     end
 
     subgraph platform[Platform]
@@ -88,19 +102,27 @@ graph LR
         infra[infrastructure<br/>adapters]:::infraC
     end
 
-    shared[common + persistence<br/>shared kernel]:::plat
+    subgraph shared[Shared Kernel]
+        direction TB
+        common[common]:::plat
+        persistence[persistence]:::plat
+    end
 
     app --> transfer & account & user & audit
+    app --> common & persistence
+    app --> api
     app -- schema resources --> migs
     app -. wires .-> infra
     transfer -- published language --> api
     account -. implements .-> api
-    transfer & account & user --> shared
-    audit -- common only --> shared
-    api -- common only --> shared
-    infra -- compile: common + api --> shared & api
+    transfer & account & user --> common & persistence
+    audit -- common only --> common
+    api -- common only --> common
+    infra -- compile: common + api --> common & api
     infra -. implements ports of .-> user & audit
 ```
+
+Test-scope edges (for example `infrastructure` → `account`/`migrations`) are intentionally omitted; the graph shows compile-time dependencies.
 
 | Rule                                        | Meaning                                                                                                                                                      |
 | :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +132,7 @@ graph LR
 | Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
 | Flyway resource ownership                 | Only `migrations` packages `db/migration`; BCs own their JPA entities, not the schema files. |
 
-> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the above are the only four rules you need to know.
+> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the five rules above cover what you need to know.
 
 > [!NOTE]
 > `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and account mutations invalidate affected cached snapshots.
@@ -119,14 +141,14 @@ graph LR
 
 ## REST API Endpoints (v1)
 
-All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints, both refresh endpoints and both password-reset endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session; reset endpoints are rate-limited and enumeration-safe). Logout is public too: it authenticates with the credentials it presents (the access token and/or the refresh token) and revokes exactly those — requiring a still-valid session would make logging out impossible once the access token had expired. Paths under `/admin/**` require `ROLE_ADMIN`. The auth, account-create, transfer and **MFA** paths have rate limits; the MFA code check additionally has an account-keyed attempt budget. Mutating requests larger than 2 MB (`app.security.request-body.max-bytes`) are rejected with `413` before authentication. MFA (TOTP) is per-user opt-in; see [MFA decision](docs/decisions/mfa-totp.md). Production requires `MFA_ENCRYPTION_KEY` (Base64, 32 bytes) for TOTP-secret encryption at rest.
+All request paths are prefixed with `/api/v1`. Protected endpoints accept `Authorization: Bearer <token>` for API clients or the bundled UI's same-origin browser cookie. Unsafe cookie-authenticated requests also require `X-CSRF-Token`; see the [browser session contract](docs/browser-session.md). Registration, both login endpoints, both refresh endpoints and both password-reset endpoints are public (refresh endpoints authenticate with the refresh token itself, not the session; reset endpoints are rate-limited and enumeration-safe). Logout is public too: it authenticates with the credentials it presents (the access token and/or the refresh token) and revokes exactly those — requiring a still-valid session would make logging out impossible once the access token had expired. Paths under `/admin/**` require `ROLE_ADMIN`, and admin requests (including `/actuator/loggers/**`) also require the admin account to have confirmed TOTP enrollment; otherwise they return `403` with `Admin MFA enrollment required`. The auth, account, transfer, admin and **MFA** paths have rate limits; the MFA code check additionally has an account-keyed attempt budget. Mutating requests larger than 2 MB (`app.security.request-body.max-bytes`) are rejected with `413` before authentication. MFA (TOTP) is per-user opt-in for ordinary users and mandatory for admin-path access; see [MFA decision](docs/decisions/mfa-totp.md). Production requires `MFA_ENCRYPTION_KEY` (Base64, 32 bytes) for TOTP-secret encryption at rest.
 
 | Module | Endpoint | Method | Description / notes |
 | :--- | :--- | :--- | :--- |
 | User | `/auth/register` | `POST` | Register; `Idempotency-Key` recommended. |
 | User | `/auth/login` | `POST` | Obtain a bearer JWT for API clients. MFA-enrolled users must also send `totpCode`. |
 | User | `/auth/refresh` | `POST` | Rotate tokens with a valid refresh token. |
-| User | `/auth/logout` | `POST` | Revoke the bearer JWT. |
+| User | `/auth/logout` | `POST` | Revoke the presented access token and/or refresh-token session. |
 | User | `/auth/mfa/enable` | `POST` | Start TOTP enrollment (auth); returns authenticator material. MFA stays off until confirmed. |
 | User | `/auth/mfa/status` | `GET` | Read MFA enrollment status for the authenticated user (drives the UI). |
 | User | `/auth/mfa/confirm` | `POST` | Confirm enrollment with a TOTP code; enables MFA for subsequent logins. |
@@ -147,15 +169,28 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 | Transfer | `/transfers/{id}` | `GET` | Query transfer details. |
 | Transfer | `/transfers/{id}/cancel` | `POST` | Conditionally reverse a completed transfer; `Idempotency-Key` required. |
 | Transfer | `/transfers/history/{accountId}` | `GET` | Paged transfer history. |
-| Transfer | `/transfers/report` | `GET` | Paged date-range report with `pageTransferCount`, `pageVolume` and `hasNext`; not a full-range export. |
+| Transfer | `/transfers/report` | `GET` | Paged date-range report with `pageTransferCount`, `pageVolume` and `hasNext`; supports `cursorCreatedAt`+`cursorId` keyset paging and `includeTotals=true` for whole-range totals. |
 | Transfer | `/transfers/report/combined` | `GET` | **Deprecated, sunset 2027-06-30** (still served with `Deprecation: true` + `Sunset` headers and a `Link: rel="successor-version"` to `/transfers/report?includeTotals=true`): same page plus whole-range `totalCount`/`totalVolume` in one call. New clients use `/transfers/report?includeTotals=true`. |
-| Transfer | `/transfers/report/totals` | `GET` | Whole-range `totalTransferCount`/`totalVolume` header for the criteria. |
+| Transfer | `/transfers/report/totals` | `GET` | Whole-range `totalTransferCount`/`totalVolume` totals for the criteria. |
+
+**Pagination and caching:** history and report reads reject offset windows above 10,000 rows with `400`; reports also reject a date range longer than 12 months. Use the `/transfers/report` keyset cursor (`cursorCreatedAt` + `cursorId`) beyond the offset window. Account/transfer detail reads and paged report reads support `If-None-Match` and return `304` when the representation is unchanged.
+
+> [!IMPORTANT]
+> **Admin access is not self-service.** The `dev`/`demo` seed creates only `ROLE_USER` accounts (`ahmet` and `ayse`; see `application-dev.yml`), and no role-management endpoint is exposed. For local testing, promote a user in the database and bump both version counters so existing sessions are retired:
+>
+> ```sql
+> UPDATE users
+> SET role = 'ROLE_ADMIN', token_version = token_version + 1, version = version + 1
+> WHERE username = 'ahmet';
+> ```
+>
+> Sign in again, then enroll TOTP through the UI's security section or `POST /auth/mfa/enable` (body: `{"password":"..."}`) followed by `POST /auth/mfa/confirm` (body: `{"password":"...","code":"123456"}`). Admin endpoints keep returning `403 Admin MFA enrollment required` until enrollment is confirmed. This SQL is for a local database only; production needs an audited provisioning process.
 
 ---
 
 ## Key Features & Design Decisions
 
-- **Hexagonal Architecture (Ports & Adapters):** Bounded contexts (`account`, `transfer`, `user`, `audit`) never depend on `infrastructure`; infrastructure implements context-owned ports, and each port lives in its owning module.
+- **Hexagonal Architecture (Ports & Adapters):** Bounded contexts (`account`, `transfer`, `user`) and the supporting `audit` module never depend on `infrastructure`; infrastructure implements context-owned ports, and each port lives in its owning module.
 - **AOP Programmatic Transactions (`UseCaseTransactionAspect`):** Isolates transaction management from business use cases. Mandatory audit records are saved through `AuditEventPublisherAdapter` in the caller's transaction, so an audit write failure rolls back the associated money movement.
 - **Transactional Outbox:** Reliably publishes domain events via the `outbox_events` database table with per-partition polling, `SKIP LOCKED` row selection, and idempotent handlers (at-least-once delivery across restarts and retries; events that exhaust retries go to dead letter). The initial batch lock ends after selection; processing reacquires each event lock in a separate transaction. A failed event waits for an exponential backoff before the next attempt, so `max-retries` is a budget and not a count. Partition changes, dead letters, and retention are covered in [outbox operations](docs/outbox-operations.md).
 - **Optimistic Concurrency Control (OCC):** Hibernate `@Version` rejects stale aggregate updates; transfer balance changes also use pessimistic account locks and domain balance checks.
@@ -172,8 +207,8 @@ All request paths are prefixed with `/api/v1`. Protected endpoints accept `Autho
 ## Getting Started
 
 Starts with a single command; no externally provided secret is needed. Both paths
-mint JWT secrets automatically (compose: zero-setup with the built-in dev
-secret; `start-app-dev`: a fresh 256-bit secret per launch, never printed or
+supply a working JWT secret automatically (compose: zero-setup with the built-in
+dev secret; `start-app-dev`: a fresh 256-bit secret per launch, never printed or
 persisted). The resulting secret is for loopback-bound (`127.0.0.1`) local
 development only; anything real requires
 `export JWT_SECRET="$(openssl rand -base64 32)"`, and the prod profile refuses
@@ -184,7 +219,7 @@ You can run PostgreSQL, Redis and the application together, or run Java on the h
 Two paths lead to the same UI at `http://localhost:8080/` — pick by job, not by habit:
 
 - **Path 1 — Run (all-in-Docker):** just run or demo the app, or validate the
-  production-shaped image. Needs only Docker; every code change costs an
+  containerized image build. Needs only Docker; every code change costs an
   image rebuild.
 - **Path 2 — Develop (host Java):** change code, attach a debugger, iterate
   fast. Needs Docker plus Java 21; only PostgreSQL/Redis run in containers
@@ -205,9 +240,11 @@ cd core-banking
 docker compose up --build --wait
 ```
 
-Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL or `.env` file is needed for this local development setup: local dev boots with an insecure default signing key (a warning is logged; production refuses it — set a generated `JWT_SECRET` for anything real: `export JWT_SECRET="$(openssl rand -base64 32)"`). All published ports are loopback-bound (`127.0.0.1`), so the dev stack is unreachable from the network. The first run downloads images (~2 GB) and Maven dependencies, so it needs internet access and can take 10–20 minutes; later runs reuse the build cache and start in about a minute. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
+Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` database, then the application's Flyway migrations create and update its tables automatically on startup. Hibernate validates the resulting schema. No manual SQL or `.env` file is needed for this local development setup: local dev boots with an insecure default signing key (a warning is logged; production refuses it — set a generated `JWT_SECRET` for anything real: `export JWT_SECRET="$(openssl rand -base64 32)"`). All published ports are loopback-bound (`127.0.0.1`), so the dev stack is unreachable from the network. The first run downloads images and Maven dependencies, so it needs internet access and can take 10–20 minutes; later runs reuse the build cache and start in about a minute. Ports `5432`, `6389` and `8080` must be free on the host; use `docker compose logs --tail=100 app` if startup fails. `docker compose down` stops the services while preserving PostgreSQL data in its named volume.
 
 Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
+
+Running a standalone application with the default `prod` profile fails fast at startup unless deployment-shaped configuration is supplied: a non-default `JWT_SECRET`, a `DB_PASSWORD` that is non-empty and not `bank_password`, `MFA_ENCRYPTION_KEY` (Base64, 32 bytes), and a `CORS_ALLOWED_ORIGINS` value without localhost origins. Prod defaults also require a reachable Redis for rate limiting, the failed-login store and the snapshot cache, with token revocation in hybrid DB+Redis mode; Actuator moves to the private management port `8081`.
 
 ### Path 2: Develop with Java on Your Computer
 
@@ -227,8 +264,10 @@ bash start-app-dev.sh
 
 The launcher stops the Compose app container if it is running, waits for PostgreSQL and Redis, builds the app with tests skipped, then serves the UI at `http://localhost:8080/`. It supplies the Compose database credentials and host Redis port (`6389`) and generates a fresh JWT secret automatically. No `.env` file or manual environment setup is needed. A fresh secret logs out existing browser sessions on each restart. Press Ctrl+C to stop Java; `docker compose down` stops the dependency containers. Run `test-all.cmd` (Windows) or `bash test-all.sh` (macOS/Linux) separately for the standard test suites and coverage checks.
 
+The `dev`/`demo` seed creates `ahmet` and `ayse` as `ROLE_USER`; their passwords come from `DEMO_SEED_AHMET_PASSWORD` / `DEMO_SEED_AYSE_PASSWORD` or the defaults in `application-dev.yml`.
+
 - **Swagger UI (local profiles):** `http://localhost:8080/swagger-ui/index.html` (disabled in `prod`)
-- **Actuator Health:** `http://localhost:8080/actuator/health`
+- **Actuator Health (local dev):** `http://localhost:8080/actuator/health`; in `prod` it is on the private management port at `http://localhost:8081/actuator/health` by default (`MANAGEMENT_SERVER_PORT`).
 
 ---
 
@@ -238,8 +277,8 @@ The launcher stops the Compose app container if it is running, waits for Postgre
 - **Test Suite:** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in `app`, with adapter-level integration tests also in `infrastructure`.
 - **Verify Architecture Boundaries (ArchUnit):** Boundary rules from the table above, verified automatically on every build.
 - **Integration Testing with Testcontainers & Flyway:** Integration tests run against a real PostgreSQL via Testcontainers with Flyway migrations and `ddl-auto=validate` for schema consistency.
-- **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-module report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
-- **Browser contract checks:** `node app/src/test/js/idempotency.test.js` and `node app/src/test/js/frontend_contract.test.js` exercise session/idempotency, report pagination (offset page 0, keyset cursors past it, ETag cache rules) and funding-capability behavior. CI runs both; a real browser/TLS acceptance test is not yet included.
+- **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-Java-module aggregate report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
+- **Browser contract checks:** the `app/src/test/js/*.test.js` suite (`idempotency`, `frontend_contract`, `mfa-security`, `storage`) exercises session/idempotency, report pagination (offset page 0, keyset cursors past it, ETag cache rules), MFA login payload handling, safe storage fallbacks and funding-capability behavior. CI runs the whole suite; a real browser/TLS acceptance test is not yet included.
 - **CI dependency checks:** CI is configured to reject newly introduced high/critical dependency advisories on pull requests and to publish an aggregate CycloneDX SBOM. These checks do not replace a review of vulnerabilities already present in the dependency baseline.
 - **CI image scan & gated releases:** Every build compiles the `Dockerfile` and fails on HIGH/CRITICAL Trivy findings, so the published image is scanned like the libraries. Releases are manual-only and refuse to ship without a successful CI run on the exact SHA (`verify-green-ci`, plus a `production` environment for approval); the app and Flyway manifests ship digest-pinned (see [release automation](docs/release.md)).
 - **Operational checks:** The read-only [health smoke](docs/operations.md) validates health and anonymous authorization responses. The [load-test guide](load_tests/README.md) separates rate-limit verification from data-writing capacity tests on an isolated simulation deployment.
