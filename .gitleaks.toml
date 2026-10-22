@@ -1,11 +1,12 @@
 # I-03: working-tree secret scan. Auto-discovered by `gitleaks detect`
 # (repo root). HIGH-2: no workflow or compose file may embed a real secret
 # literal — CI mints an ephemeral key per run, compose requires JWT_SECRET.
-# The allowlist below contains only documented non-secret dev placeholders;
-# the Base64 marker and its decoded text are kept in sync with
-# JwtTokenProvider.DEFAULT_JWT_SECRET / application-dev.yml / docker-compose.yml
-# by scripts/check_compose_jwt_default.py. Delimiters on both sides prevent a
-# match inside a longer real key (Go/RE2 has no lookbehind).
+# The allowlist below contains only documented non-secret dev placeholders and
+# test-only credential fixtures (generic-api-key false positives on integration
+# test password constants); the Base64 marker and its decoded text are kept in
+# sync with JwtTokenProvider.DEFAULT_JWT_SECRET / application-dev.yml /
+# docker-compose.yml by scripts/check_compose_jwt_default.py. Delimiters on both
+# sides prevent a match inside a longer real key (Go/RE2 has no lookbehind).
 title = "bank-app secret scan"
 
 [extend]
@@ -17,4 +18,6 @@ regexes = [
   '''(^|[^A-Za-z0-9+/])ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=([^A-Za-z0-9+/]|$)''',
   '''(^|[^A-Za-z0-9-])dev-only-NOT-FOR-PROD-0000000000([^A-Za-z0-9-]|$)''',
   '''(^|[^A-Za-z0-9-])dev-only-insecure-fallback-not-for-prod([^A-Za-z0-9-]|$)''',
+  '''(^|[^A-Za-z0-9_-])My_passw0rd12([^A-Za-z0-9_-]|$)''',
+  '''(^|[^A-Za-z0-9_-])Race_passw0rd12([^A-Za-z0-9_-]|$)''',
 ]

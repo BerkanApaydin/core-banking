@@ -25,9 +25,11 @@ without them:
 - `.gitleaks.toml` + the `secret-scan` CI job reject new hardcoded
   secrets; the allowlisted entries are the documented non-secret dev
   placeholders (the Base64 marker and its decoded
-  `dev-only-NOT-FOR-PROD…` text), delimited so they cannot match inside a
-  longer real key. `scripts/check_compose_jwt_default.py` fails CI if the
-  marker drifts between the code constant, `application-dev.yml`,
+  `dev-only-NOT-FOR-PROD…` text) plus the two test-only password constants in
+  `PasswordResetConcurrencyIT` / `MfaTransactionBoundaryIntegrationTest`
+  (generic-api-key false positives). All are delimited so they cannot match
+  inside a longer real key. `scripts/check_compose_jwt_default.py` fails CI if
+  the marker drifts between the code constant, `application-dev.yml`,
   `docker-compose.yml` and the allowlist.
 
 ## Demo seed credentials (R-C06)
