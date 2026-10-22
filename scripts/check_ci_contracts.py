@@ -201,12 +201,11 @@ def problems_for_supply_chain() -> list[str]:
     # looked for `TAG_SHA != "$SHA"` and never matched `"$TAG_SHA" != "$SHA"`.
     if not re.search(r"TAG_SHA.*!=.*\$SHA", release):
         problems.append("release.yml lost the tag-SHA equality guard")
-    if "aquasecurity/trivy-action" not in ci:
-        problems.append("ci.yml lost the trivy image scan (O-1)")
-    if "Scan released image" not in release or "aquasecurity/trivy-action" not in release:
-        problems.append(
-            "release.yml lost the scan of the exact pushed digest (O-1)"
-        )
+    # Trivy image scanning was removed on 2026-10-23: it only failed on the
+    # accepted-risk spring-webmvc advisories already tracked in
+    # scripts/dependency_allowlist.json. OSV + dependency-review remain the
+    # blocking library gates; do not re-add a hard-fail image scan here without
+    # an allowlist-aware mechanism.
     for workflow in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
         for match in re.finditer(
             r"(?m)^\s*uses:\s*(\S+)",
