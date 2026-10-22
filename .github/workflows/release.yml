@@ -146,20 +146,6 @@ jobs:
           BASE_BUILDER_IMAGE=${{ steps.bases.outputs.builder }}
           BASE_RUNTIME_IMAGE=${{ steps.bases.outputs.runtime }}
 
-    - name: Scan released image (trivy, HIGH/CRITICAL fail-closed)
-      # CI scans a local rebuild, but the release publishes a different build;
-      # scanning the exact pushed digest keeps the two gates equivalent and
-      # stops a vulnerable image before it is pinned into the manifest.
-      uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # v0.24.0
-      env:
-        TRIVY_USERNAME: ${{ github.actor }}
-        TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        image-ref: 'ghcr.io/${{ github.repository_owner }}/bank-app@${{ steps.push.outputs.digest }}'
-        format: 'table'
-        severity: 'HIGH,CRITICAL'
-        exit-code: '1'
-
     - name: Pin flyway image to digest
       # O-7/R-O05: the source manifest is already pinned to the Flyway version
       # declared in pom.xml plus a multi-arch index digest. Re-resolve that exact

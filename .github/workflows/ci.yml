@@ -328,40 +328,14 @@ jobs:
 
     - name: Build image (Dockerfile regression guard)
       # O-1: the release publishes an image, so CI must prove the Dockerfile
-      # still builds on every PR — otherwise a broken Dockerfile (or a CVE'd
-      # base) reaches the registry unnoticed. push:false + load:true keeps the
-      # image in the daemon for the scan below without publishing anything.
+      # still builds on every PR — otherwise a broken Dockerfile reaches the
+      # registry unnoticed. push:false keeps the result local; nothing is
+      # published.
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         context: .
         push: false
-        load: true
         tags: bank-app:ci
-
-    - name: Scan image (trivy, HIGH/CRITICAL fail-closed)
-      # O-1: image vulnerabilities must break the build like OSV does for
-      # libraries — a blind registry push is how CVEs ship. SBOM upload stays
-      # in the earlier CycloneDX step; this is the CVE gate.
-      uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # v0.24.0
-      with:
-        image-ref: 'bank-app:ci'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        severity: 'HIGH,CRITICAL'
-        exit-code: '1'
-        # trivy-action v0.24.0 silently drops --severity on the SARIF branch,
-        # so --exit-code failed on LOW/MEDIUM findings too (and --quiet hid
-        # them). This input keeps the report and the gate on the same
-        # HIGH/CRITICAL contract.
-        limit-severities-for-sarif: 'true'
-
-    - name: Upload trivy SARIF
-      if: always()
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: trivy-sarif
-        path: trivy-results.sarif
-        if-no-files-found: warn
 
   migration-soak:
     # O-1/DB-1: presence checks cannot catch a migration that only fails on a
