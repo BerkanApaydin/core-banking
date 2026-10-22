@@ -128,6 +128,32 @@ class AccountAclAdapterTest {
 
             verify(accountApi, times(1)).getIbansForAccounts(Set.of(1L, 2L));
         }
+
+        @Test
+        void shouldCollapseConcurrentBatchMissesIntoOneBackendRead() throws Exception {
+            Map<Long, String> response = Map.of(1L, "TR450006100519786456841234");
+            var loaderEntered = new CountDownLatch(1);
+            var releaseLoader = new CountDownLatch(1);
+            when(accountApi.getIbansForAccounts(Set.of(1L))).thenAnswer(invocation -> {
+                loaderEntered.countDown();
+                releaseLoader.await(5, TimeUnit.SECONDS);
+                return response;
+            });
+
+            Thread leader = new Thread(() -> adapter.getIbansForAccounts(Set.of(1L)));
+            Thread waiter = new Thread(() -> adapter.getIbansForAccounts(Set.of(1L)));
+            leader.start();
+            assertTrue(loaderEntered.await(5, TimeUnit.SECONDS));
+            waiter.start();
+            await().atMost(Duration.ofSeconds(5)).until(() ->
+                    waiter.getState() == Thread.State.WAITING
+                            || waiter.getState() == Thread.State.TIMED_WAITING);
+            releaseLoader.countDown();
+            leader.join(5_000);
+            waiter.join(5_000);
+
+            verify(accountApi, times(1)).getIbansForAccounts(Set.of(1L));
+        }
     }
 
     @Nested

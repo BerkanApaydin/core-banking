@@ -148,12 +148,23 @@ public class TransferQueryController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "100") @Min(1) @Max(100) int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime cursorCreatedAt,
-            @RequestParam(required = false) Long cursorId) {
+            @RequestParam(required = false) Long cursorId,
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
         ReportCriteria criteria = ReportCriteria.criteriaOf(
                 accountId, startDate, endDate, page, size, cursorCreatedAt, cursorId);
         TransferReportResponse body = generateTransferReportWithTotalsQuery.execute(criteria);
+        String etag = TransferReportEtag.etagFor(body);
+        if (IfNoneMatch.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .cacheControl(CacheControl.noStore())
+                    .header("Deprecation", "true")
+                    .header("Sunset", COMBINED_SUNSET_HTTP_DATE)
+                    .header("Link", "</api/v1/transfers/report?includeTotals=true>; rel=\"successor-version\"")
+                    .build();
+        }
         return ResponseEntity.ok()
-                .eTag(TransferReportEtag.etagFor(body))
+                .eTag(etag)
                 .cacheControl(CacheControl.noStore())
                 .header("Deprecation", "true")
                 .header("Sunset", COMBINED_SUNSET_HTTP_DATE)

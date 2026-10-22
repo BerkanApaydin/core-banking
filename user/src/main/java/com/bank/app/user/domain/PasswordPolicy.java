@@ -1,5 +1,6 @@
 package com.bank.app.user.domain;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -50,6 +51,12 @@ public record PasswordPolicy(int minLength, boolean requireUppercase, boolean re
         }
         if (rawPassword.length() < minLength) {
             errors.add("Password must be at least " + minLength + " characters");
+        }
+        // BCrypt hashes at most 72 bytes, silently truncating the rest. The
+        // request DTO caps characters at 72, but multi-byte UTF-8 input can
+        // still exceed the byte budget with fewer characters.
+        if (rawPassword.getBytes(StandardCharsets.UTF_8).length > 72) {
+            errors.add("Password must be at most 72 bytes");
         }
         if (requireUppercase && !rawPassword.chars().anyMatch(Character::isUpperCase)) {
             errors.add("Password must contain at least one uppercase letter");

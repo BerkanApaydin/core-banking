@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Anti-corruption adapter: implements transfer's {@link AccountAclPort} by
@@ -53,7 +54,7 @@ public class AccountAclAdapter implements AccountAclPort {
      * start a second flight for the same key while a second caller was still
      * waiting on the first — two concurrent database reads for one key.
      */
-    private final ConcurrentHashMap<String, CompletableFuture<AccountSnapshot>> inflight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<?>> inflight = new ConcurrentHashMap<>();
 
     public AccountAclAdapter(AccountApi accountApi, AccountSnapshotCache cache) {
         this(accountApi, cache, DEFAULT_AWAIT_TIMEOUT);
@@ -75,14 +76,15 @@ public class AccountAclAdapter implements AccountAclPort {
      * exception type (e.g. AccountNotFoundException) rather than a
      * CompletionException wrapper.
      */
-    private AccountSnapshot singleflight(String key, Supplier<AccountSnapshot> loader) {
-        CompletableFuture<AccountSnapshot> mine = new CompletableFuture<>();
-        CompletableFuture<AccountSnapshot> running = inflight.putIfAbsent(key, mine);
+    @SuppressWarnings("unchecked")
+    private <T> T singleflight(String key, Supplier<T> loader) {
+        CompletableFuture<T> mine = new CompletableFuture<>();
+        CompletableFuture<?> running = inflight.putIfAbsent(key, mine);
         if (running != null) {
-            return await(running, awaitTimeout);
+            return await((CompletableFuture<T>) running, awaitTimeout);
         }
         try {
-            AccountSnapshot value = loader.get();
+            T value = loader.get();
             mine.complete(value);
             return value;
         } catch (RuntimeException | Error failure) {
@@ -96,7 +98,7 @@ public class AccountAclAdapter implements AccountAclPort {
         }
     }
 
-    private static AccountSnapshot await(CompletableFuture<AccountSnapshot> flight, Duration timeout) {
+    private static <T> T await(CompletableFuture<T> flight, Duration timeout) {
         try {
             return flight.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
@@ -149,12 +151,27 @@ public class AccountAclAdapter implements AccountAclPort {
 
     @Override
     public Map<Long, String> getIbansForAccounts(Collection<Long> accountIds) {
+        Objects.requireNonNull(accountIds, "Account IDs must not be null");
         return cache.getIbans(accountIds)
-                .orElseGet(() -> {
-                    Map<Long, String> ibans = accountApi.getIbansForAccounts(accountIds);
-                    cache.putIbans(accountIds, ibans);
-                    return ibans;
-                });
+                .orElseGet(() -> singleflight(ibansFlightKey(accountIds),
+                        () -> cache.getIbans(accountIds).orElseGet(() -> {
+                            Map<Long, String> ibans = accountApi.getIbansForAccounts(accountIds);
+                            cache.putIbans(accountIds, ibans);
+                            return ibans;
+                        })));
+    }
+
+    private static String ibansFlightKey(Collection<Long> accountIds) {
+        // Order-insensitive: callers that pass the same set in a different
+        // order must still collapse onto one backend read. Nulls are ignored
+        // here only for key construction; the cache/API layer keeps the
+        // original contract.
+        return "ibans-" + accountIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
     }
 
     @Override

@@ -516,6 +516,18 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("should accept a case-insensitive Bearer auth scheme")
+    void shouldAcceptCaseInsensitiveBearerScheme() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("bEaReR token");
+        when(JwtTokenProvider.verifyAndDecode("token")).thenReturn(validToken());
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
     @DisplayName("should reject legacy token without role claim instead of DB fallback")
     void shouldRejectLegacyTokenWithoutRoleClaim() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token");

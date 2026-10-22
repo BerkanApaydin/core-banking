@@ -2,6 +2,7 @@ package com.bank.app.user.application.usecase;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.common.domain.UserId;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -38,6 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +60,7 @@ class PasswordResetUseCaseTest {
     @Mock private PasswordPolicy passwordPolicy;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
+    @Mock private TransactionBoundaryPort transactionBoundary;
 
     private RequestPasswordResetUseCaseImpl request;
     private ConfirmPasswordResetUseCaseImpl confirm;
@@ -63,7 +68,7 @@ class PasswordResetUseCaseTest {
     @BeforeEach
     void setUp() {
         request = new RequestPasswordResetUseCaseImpl(loadUserPort, resetTokenPort, notificationPort,
-                15, clockProvider, auditEventPort, new SecureRandom(new byte[]{1, 2, 3}));
+                15, clockProvider, auditEventPort, transactionBoundary, new SecureRandom(new byte[]{1, 2, 3}));
         confirm = new ConfirmPasswordResetUseCaseImpl(resetTokenPort, loadUserPort, saveUserPort,
                 passwordEncoderPort, passwordPolicy, clockProvider, auditEventPort);
         when(clockProvider.clock()).thenReturn(FIXED);
@@ -72,6 +77,14 @@ class PasswordResetUseCaseTest {
     @Nested
     @DisplayName("RequestPasswordResetUseCase")
     class Request {
+
+        @BeforeEach
+        void runAfterCommitImmediately() {
+            lenient().doAnswer(invocation -> {
+                invocation.<Runnable>getArgument(0).run();
+                return null;
+            }).when(transactionBoundary).runAfterCommit(any(Runnable.class));
+        }
 
         @Test
         @DisplayName("should issue exactly one live token and notify for a known user")
@@ -92,6 +105,22 @@ class PasswordResetUseCaseTest {
             // Only the digest is stored — the raw token must differ from it.
             assertThat(token.getValue()).isNotEqualTo(issued.getValue().tokenHash());
             assertThat(TokenDigest.sha256Hex(token.getValue())).isEqualTo(issued.getValue().tokenHash());
+        }
+
+        @Test
+        @DisplayName("should defer the notification until the transaction commits")
+        void shouldDeferNotificationUntilCommit() {
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(user));
+            doNothing().when(transactionBoundary).runAfterCommit(any());
+
+            request.execute("alice");
+
+            verify(notificationPort, never()).sendPasswordResetToken(any(), any(), any());
+            var deferred = ArgumentCaptor.forClass(Runnable.class);
+            verify(transactionBoundary).runAfterCommit(deferred.capture());
+            deferred.getValue().run();
+            verify(notificationPort).sendPasswordResetToken(eq("alice"), any(), any());
         }
 
         @Test

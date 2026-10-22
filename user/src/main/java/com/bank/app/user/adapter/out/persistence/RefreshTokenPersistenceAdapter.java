@@ -135,11 +135,25 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     public void revokeAllForUser(Long userId) {
         Objects.requireNonNull(userId, "User ID must not be null");
         try {
+            // Join an ambient transaction (password change / MFA disable):
+            // REQUIRES_NEW would commit the revoke even if the surrounding
+            // security change rolls back, and could deadlock on the user row
+            // the caller already holds. Logout-all has no ambient transaction
+            // and still gets a dedicated one.
+            if (transactionBoundary.isTransactionActive()) {
+                revokeAllLockingUser(userId);
+                return;
+            }
             transactionBoundary.executeRequiresNew(
-                    () -> repository.revokeAllForUserBulk(userId), BULK_TX_TIMEOUT_SECONDS);
+                    () -> revokeAllLockingUser(userId), BULK_TX_TIMEOUT_SECONDS);
         } catch (DataAccessException e) {
             throw new AuthenticationBackendUnavailableException(e);
         }
+    }
+
+    private int revokeAllLockingUser(Long userId) {
+        userRepository.findByIdForUpdate(userId);
+        return repository.revokeAllForUserBulk(userId);
     }
 
     @Override

@@ -30,6 +30,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_AUTHORIZATION = "Authorization";
+
+    private static boolean isBearer(String authHeader) {
+        // RFC 7235 auth schemes are case-insensitive: "bearer" is as valid as
+        // "Bearer", and a case-sensitive match would silently treat the header
+        // as unauthenticated instead of rejecting a bad token.
+        return authHeader != null
+                && authHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length());
+    }
     // Single generic message for revoked AND invalid tokens: distinct messages
     // let callers oracle whether a token was revoked (information disclosure).
     private static final String MSG_TOKEN_INVALID = "Invalid or expired token";
@@ -103,7 +111,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
+        final boolean bearerAuth = isBearer(authHeader);
         try {
             JwtRequestAuthenticator.Result result = authenticator.authenticate(
                     request, path, jwt, bearerAuth);
@@ -156,7 +164,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * or login/refresh endpoints, so an expired cookie cannot lock the login UI).
      */
     private String extractJwt(HttpServletRequest request, String path, String authHeader) {
-        final boolean bearerAuth = authHeader != null && authHeader.startsWith(BEARER_PREFIX);
+        final boolean bearerAuth = isBearer(authHeader);
         // The browser session cookie is for API calls. Browsers also send it
         // with / and static assets; an expired cookie must not prevent the
         // public application shell from loading so it can show the login UI.

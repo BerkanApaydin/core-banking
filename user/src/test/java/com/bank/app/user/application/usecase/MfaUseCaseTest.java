@@ -280,6 +280,7 @@ class MfaUseCaseTest {
             assertThat(user.getTokenVersion()).isEqualTo(2L);
             verify(saveUserPort).save(user);
             verify(mfaSecretPort).deleteSecret(7L);
+            verify(mfaSecretPort).recordAcceptedTotpCounter(eq(7L), anyLong());
             verify(refreshTokenPort).revokeAllForUser(7L);
         }
 

@@ -106,6 +106,26 @@ class PasswordPolicyTest {
         }
 
         @Test
+        @DisplayName("should fail when UTF-8 bytes exceed the BCrypt limit")
+        void shouldFailWhenUtf8BytesExceedBcryptLimit() {
+            String password = "Aa1" + "\u20ac".repeat(24);
+            assertThat(password).hasSize(27);
+
+            List<String> errors = defaultPolicy.validate(password);
+
+            assertThat(errors).hasSize(1);
+            assertThat(errors.get(0)).contains("72 bytes");
+        }
+
+        @Test
+        @DisplayName("should accept exactly 72 UTF-8 bytes")
+        void shouldAcceptExactly72Utf8Bytes() {
+            String password = "Aa1" + "\u20ac".repeat(23);
+
+            assertThat(defaultPolicy.validate(password)).isEmpty();
+        }
+
+        @Test
         @DisplayName("should fail when missing uppercase")
         void shouldFailWhenMissingUppercase() {
             List<String> errors = defaultPolicy.validate("testuser1234");

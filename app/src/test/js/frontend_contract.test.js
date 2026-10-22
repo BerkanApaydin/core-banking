@@ -607,7 +607,7 @@ test('concurrent 401s share one silent refresh (theft-safe coalescing)', async (
 
 test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () => {
     const functions = extractFunction(source, 'meetsPasswordPolicy');
-    const context = vm.createContext({});
+    const context = vm.createContext({ TextEncoder });
     vm.runInContext(functions, context);
 
     // Backend PasswordPolicy.DEFAULT is (12, upper, lower, digit) and
@@ -620,6 +620,10 @@ test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () =>
     assert.equal(vm.runInContext("meetsPasswordPolicy('ValidPass1234')", context), true);
     assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "x".repeat(69) + "')", context), true);
     assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "x".repeat(70) + "')", context), false);
+    // 20 three-byte characters = 60 bytes and pass; 25 = 75 bytes and fail
+    // even though the character count is far below the 72-char DTO cap.
+    assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "\u20ac".repeat(19) + "')", context), true);
+    assert.equal(vm.runInContext("meetsPasswordPolicy('Aa1" + "\u20ac".repeat(24) + "')", context), false);
 });
 
 test('failed silent refresh keeps the session logged out', async () => {

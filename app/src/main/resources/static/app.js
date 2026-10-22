@@ -477,10 +477,11 @@ function passwordScore(pw) {
 
 function meetsPasswordPolicy(pw) {
     // Client mirror of backend RegisterWebRequest: PasswordPolicy defaults
-    // (min 12, upper, lower, digit) plus @Size(max = 72) — the BCrypt
-    // 72-byte truncation guard. maxlength=72 covers typed input; this covers
-    // pasted/programmatic values so a doomed 400 round-trip never starts.
-    return !!pw && pw.length >= 12 && pw.length <= 72
+    // (min 12, upper, lower, digit) plus the BCrypt 72-byte truncation guard.
+    // The backend caps characters at 72; multi-byte UTF-8 input can still
+    // exceed 72 bytes, so check the encoded length here as well. maxlength=72
+    // covers typed input; this covers pasted/programmatic values.
+    return !!pw && pw.length >= 12 && new TextEncoder().encode(pw).length <= 72
         && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw);
 }
 
@@ -719,6 +720,7 @@ function initUxEnhancements() {
         const t = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
         try {
             return await fetch(url, {
+                cache: 'no-store',
                 headers: { 'Accept': 'application/json' },
                 ...(ctrl ? { signal: ctrl.signal } : {})
             });

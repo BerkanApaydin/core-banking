@@ -41,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -229,6 +230,27 @@ class TransferControllersTest {
                         .param("cursorId", "10"))
                 .andExpect(status().isOk()))
                 .hasStackTraceContaining("cursorCreatedAt and cursorId must both be set");
+    }
+
+    @Test
+    void shouldReturnNotModifiedForMatchingCombinedReportEtag() throws Exception {
+        TransferReportResponse combined = new TransferReportResponse(1L, 2,
+                new BigDecimal("300.00"), "TRY", List.of(), true, "2026-09-01T01:00:00", 11L, 2L,
+                new BigDecimal("300.00"));
+        when(generateTransferReportWithTotalsQuery.execute(any(ReportCriteria.class)))
+                .thenReturn(combined);
+        String etag = TransferReportEtag.etagFor(combined);
+
+        mockMvc.perform(get("/transfers/report/combined")
+                        .param("accountId", "1")
+                        .param("startDate", "2026-09-01T00:00:00")
+                        .param("endDate", "2026-09-02T00:00:00")
+                        .header("If-None-Match", etag))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string("ETag", etag))
+                .andExpect(header().string("Deprecation", "true"))
+                .andExpect(header().string("Sunset", TransferQueryController.COMBINED_SUNSET_HTTP_DATE))
+                .andExpect(content().string(""));
     }
 
     @Test

@@ -77,11 +77,11 @@ public class DisableMfaUseCaseImpl implements DisableMfaUseCase {
                     "Please try again in "
                             + mfaCodeVerification.getWindowMinutes() + " minutes.");
         }
-        // The code is verified but NOT consumed: removing the second factor
-        // does not mint a session, and consuming the step counter here would
-        // reject a legitimate removal right after a login in the same
-        // 30-second step.
-        if (!mfaCodeVerification.verify(userId, code)) {
+        // Consume the TOTP step: a code observed once must not authorize the
+        // same security-sensitive action a second time (replay). This also
+        // means a code just used for login cannot immediately be reused to
+        // disable MFA; the user waits for the next 30-second step.
+        if (!mfaCodeVerification.verifyAndConsume(userId, code)) {
             throw new InvalidMfaCodeException();
         }
         user.disableMfa();

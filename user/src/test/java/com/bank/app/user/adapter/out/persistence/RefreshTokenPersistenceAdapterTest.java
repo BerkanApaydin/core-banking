@@ -132,7 +132,21 @@ class RefreshTokenPersistenceAdapterTest {
 
         adapter.revokeAllForUser(7L);
 
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(userRepository, repository);
+        order.verify(userRepository).findByIdForUpdate(7L);
+        order.verify(repository).revokeAllForUserBulk(7L);
+    }
+
+    @Test
+    void shouldJoinExistingTransactionWhenRevokingAllSessions() {
+        when(transactionBoundary.isTransactionActive()).thenReturn(true);
+        when(repository.revokeAllForUserBulk(7L)).thenReturn(3);
+
+        adapter.revokeAllForUser(7L);
+
+        verify(userRepository).findByIdForUpdate(7L);
         verify(repository).revokeAllForUserBulk(7L);
+        verify(transactionBoundary, never()).executeRequiresNew(any(), anyInt());
     }
 
     @Test

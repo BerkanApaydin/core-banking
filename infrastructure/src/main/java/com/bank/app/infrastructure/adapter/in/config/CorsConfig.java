@@ -15,8 +15,8 @@ public class CorsConfig {
     // future PATCH endpoint must pass preflight instead of failing with 403.
     private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     private static final List<String> ALLOWED_HEADERS = List.of("Authorization", "Content-Type", "Idempotency-Key",
-            "X-Requested-With", "X-CSRF-Token");
-    private static final List<String> EXPOSED_HEADERS = List.of("X-Correlation-ID", "X-Trace-ID");
+            "X-Requested-With", "X-CSRF-Token", "If-None-Match", "If-Match", "Accept-Language");
+    private static final List<String> EXPOSED_HEADERS = List.of("X-Correlation-ID", "X-Trace-ID", "ETag");
 
     private final CorsProperties corsProperties;
 

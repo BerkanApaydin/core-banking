@@ -44,6 +44,7 @@ import com.bank.app.user.application.usecase.LogoutUseCaseImpl;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -194,9 +195,10 @@ public class UserBeanConfig {
     @Bean
     public RequestPasswordResetUseCase requestPasswordResetUseCase(LoadUserPort loadUserPort,
             PasswordResetTokenPort resetTokenPort, PasswordResetNotificationPort notificationPort,
-            MfaProperties mfaProperties, ClockProviderPort clockProvider, AuditEventPort auditEventPort) {
+            MfaProperties mfaProperties, ClockProviderPort clockProvider, AuditEventPort auditEventPort,
+            TransactionBoundaryPort transactionBoundary) {
         return new RequestPasswordResetUseCaseImpl(loadUserPort, resetTokenPort, notificationPort,
-                mfaProperties.resetTokenValidityMinutes(), clockProvider, auditEventPort);
+                mfaProperties.resetTokenValidityMinutes(), clockProvider, auditEventPort, transactionBoundary);
     }
 
     @Bean
