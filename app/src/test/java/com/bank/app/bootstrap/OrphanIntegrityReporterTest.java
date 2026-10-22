@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -264,5 +267,96 @@ class OrphanIntegrityReporterTest {
                 .filter(e -> e.getLevel() == level)
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * A replica that lost the advisory lock must not scan at all. When every
+     * replica scans, the three orphan queries run N times (N x DB load on the
+     * HPA-scaled 2-6 pods) and the PagerDuty-wired alarm counter is
+     * incremented N times for a single real condition.
+     */
+    @Test
+    void shouldNotScanOrAlarmWhenThisReplicaIsNotTheLeader() {
+        var registry = new SimpleMeterRegistry();
+        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(
+                jdbc, registry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0),
+                new LosingReplicaLock());
+
+        reporter.reportOrphans();
+
+        verify(jdbc, never()).queryForObject(anyString(), eq(Long.class));
+        assertEquals(0.0, gaugeValue(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(0.0, gaugeValue(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(0.0, gaugeValue(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+        assertEquals(0.0,
+                registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(0.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+    }
+
+    /**
+     * The alarm counter is bumped by the check that succeeded, even though
+     * the scan as a whole failed — so a failed scan still pages.
+     */
+    @Test
+    void shouldStillCountTheAlarmOfTheCheckThatSucceededBeforeTheFailure() {
+        var registry = new SimpleMeterRegistry();
+        when(jdbc.queryForObject(anyString(), eq(Long.class)))
+                .thenReturn(1L, 2L, 3L, 9L)
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, registry);
+
+        reporter.reportOrphans();
+        assertThrows(
+                DataAccessResourceFailureException.class, reporter::reportOrphans);
+
+        assertEquals(10.0, alarmCount(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(2.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(3.0, alarmCount(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+    }
+
+    @Test
+    void shouldKeepPreviousGaugesWhenAScanFailsHalfWay() {
+        var registry = new SimpleMeterRegistry();
+        when(jdbc.queryForObject(anyString(), eq(Long.class)))
+                .thenReturn(5L, 6L, 7L)
+                .thenReturn(9L)
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(jdbc, registry);
+
+        reporter.reportOrphans();
+        double lastSuccess =
+                registry.get("db.orphan.last_success_epoch_seconds").gauge().value();
+        assertThrows(
+                DataAccessResourceFailureException.class, reporter::reportOrphans);
+
+        // All-or-nothing: a fresh 9 next to stale 6/7 would look like a real
+        // account-orphan surge and would hide that the other reads failed.
+        assertEquals(5.0, gaugeValue(registry, OrphanIntegrityReporter.ACCOUNTS_WITHOUT_USER));
+        assertEquals(6.0, gaugeValue(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_SENDER));
+        assertEquals(7.0, gaugeValue(registry, OrphanIntegrityReporter.TRANSFERS_WITHOUT_RECEIVER));
+        assertEquals(lastSuccess,
+                registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
+    }
+
+    private static double gaugeValue(SimpleMeterRegistry registry, String type) {
+        return registry.get("db.orphan.current").tag("type", type).gauge().value();
+    }
+
+    /**
+     * Simulates a replica that lost the advisory lock: the guarded work must
+     * not run at all.
+     */
+    static class LosingReplicaLock extends AdvisorySchedulerLock {
+
+        LosingReplicaLock() {
+            super(mock(JdbcTemplate.class), mock(PlatformTransactionManager.class));
+        }
+
+        @Override
+        public boolean runIfLeader(String lockName, Runnable work) {
+            return false;
+        }
     }
 }

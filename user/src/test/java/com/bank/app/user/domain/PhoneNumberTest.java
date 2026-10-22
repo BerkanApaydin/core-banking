@@ -72,6 +72,53 @@ class PhoneNumberTest {
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Invalid phone number format");
         }
+
+        @Test
+        @DisplayName("should pin the six-digit boundary")
+        void shouldPinTheSixDigitBoundary() {
+            // The rule is ">= 6 digits", not ">= 6 characters": six digits are
+            // the shortest acceptable number.
+            assertThat(new PhoneNumber("123456").value()).isEqualTo("123456");
+
+            assertThatThrownBy(() -> new PhoneNumber("12345"))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid phone number format");
+        }
+
+        @Test
+        @DisplayName("should reject twenty-one characters")
+        void shouldRejectTwentyOneCharacters() {
+            // The column is VARCHAR(20): a 21-char value would be truncated
+            // or rejected by the database instead of at the boundary.
+            String tooLong = "123456789012345678901";
+
+            assertThatThrownBy(() -> new PhoneNumber(tooLong))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid phone number format");
+        }
+
+        @Test
+        @DisplayName("should reject a twenty-character value with only five digits")
+        void shouldRejectTwentyCharactersWithFiveDigits() {
+            // Length is fine, the digit count is not: the length check alone
+            // must not let a separator-only value through.
+            String fiveDigitsInTwentyChars = "12345" + "-".repeat(15);
+            assertThat(fiveDigitsInTwentyChars).hasSize(20);
+
+            assertThatThrownBy(() -> new PhoneNumber(fiveDigitsInTwentyChars))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid phone number format");
+        }
+
+        @Test
+        @DisplayName("should trim surrounding whitespace")
+        void shouldTrimSurroundingWhitespace() {
+            // A pasted phone number with padding must reach the notification
+            // channel without the spaces, or the SMS gateway rejects it.
+            PhoneNumber phone = new PhoneNumber("  +905551234567  ");
+
+            assertThat(phone.value()).isEqualTo("+905551234567");
+        }
     }
 
     @Nested

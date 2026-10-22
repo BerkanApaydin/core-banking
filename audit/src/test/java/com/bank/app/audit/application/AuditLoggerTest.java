@@ -92,4 +92,58 @@ class AuditLoggerTest {
 
         verify(saveAuditLogPort).save(any(AuditLog.class));
     }
+
+    @Test
+    void shouldRejectANullUsernameWithoutWritingAnUnattributedRow() {
+        // This use case runs REQUIRES_NEW inside the business transaction: an
+        // NPE escaping it aborts the caller's transaction, so a caller bug
+        // would refuse an otherwise valid transfer.
+        NullPointerException failure = assertThrows(NullPointerException.class,
+                () -> auditLogger.log(null, AuditAction.ACCOUNT_CREATED, "details"));
+
+        assertEquals("Username must not be null", failure.getMessage());
+        verify(saveAuditLogPort, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    void shouldRejectNullDetailsWithoutWritingAnUnattributedRow() {
+        NullPointerException failure = assertThrows(NullPointerException.class,
+                () -> auditLogger.log("user123", AuditAction.ACCOUNT_CREATED, null));
+
+        assertEquals("Details must not be null", failure.getMessage());
+        verify(saveAuditLogPort, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    void shouldRejectANullActionWithoutWritingAnUnattributedRow() {
+        NullPointerException failure = assertThrows(NullPointerException.class,
+                () -> auditLogger.log("user123", null, "details"));
+
+        assertEquals("Action must not be null", failure.getMessage());
+        verify(saveAuditLogPort, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    void shouldRecordTheActorIdentityFromTheSecurityContext() {
+        when(userContextService.getCurrentUserId()).thenReturn(java.util.Optional.of(42L));
+
+        auditLogger.log("user123", AuditAction.ACCOUNT_CREATED, "Account created details");
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(saveAuditLogPort).save(captor.capture());
+
+        assertEquals(42L, captor.getValue().getActorUserId());
+    }
+
+    @Test
+    void shouldLeaveTheActorIdentityNullForAnonymousAndBackgroundWrites() {
+        when(userContextService.getCurrentUserId()).thenReturn(java.util.Optional.empty());
+
+        auditLogger.log("system", AuditAction.ACCOUNT_CREATED, "Account created details");
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(saveAuditLogPort).save(captor.capture());
+
+        assertNull(captor.getValue().getActorUserId());
+    }
 }

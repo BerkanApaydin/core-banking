@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
@@ -64,6 +66,31 @@ class RedisRateLimiterEdgeCaseTest {
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> rateLimiter.tryAcquire("faulty-client"));
         assertEquals("Redis connection failed", ex.getMessage());
+    }
+
+    @Test
+    void shouldPropagateDataAccessFailuresToTheCallerInsteadOfDecidingLocally() {
+        // The limiter does not translate backend failures: it must not answer
+        // "allowed" (fail-open) nor invent a rate-limit decision. The caller
+        // (AbstractRateLimitingFilter) owns the fail-closed 503.
+        when(redisTemplate.execute(any(), any(List.class), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
+
+        assertThrows(DataAccessException.class,
+                () -> rateLimiter.tryAcquire("faulty-client"));
+    }
+
+    @Test
+    void shouldPropagateNonDataAccessFailuresUntranslated() {
+        // A client-side failure that is not a DataAccessException carries no
+        // rate-limit semantics at all; it must surface as-is instead of being
+        // silently downgraded to an allow/deny decision.
+        when(redisTemplate.execute(any(), any(List.class), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new IllegalStateException("redis client not initialized"));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> rateLimiter.tryAcquire("faulty-client"));
+        assertEquals("redis client not initialized", ex.getMessage());
     }
 
     @Test

@@ -27,6 +27,28 @@ class BusinessExceptionTest {
             BusinessException ex = new BusinessException("error.account_not_found_iban", new Object[]{}, "Test") {};
             assertThat(ex.getErrorCode()).isEqualTo("ACCOUNT_NOT_FOUND_IBAN");
         }
+
+        @Test
+        @DisplayName("should derive error code from a key without the error. prefix")
+        void shouldReturnErrorCodeFromKeyWithoutPrefix() {
+            BusinessException ex = new BusinessException("transfer_not_found", new Object[]{}, "Test") {};
+            assertThat(ex.getErrorCode()).isEqualTo("TRANSFER_NOT_FOUND");
+        }
+
+        @Test
+        @DisplayName("should keep the dot separators of a dotted multi-part key")
+        void shouldReturnErrorCodeFromDottedKey() {
+            BusinessException ex = new BusinessException("error.transfer.not.cancellable", new Object[]{}, "Test") {};
+            assertThat(ex.getErrorCode()).isEqualTo("TRANSFER.NOT.CANCELLABLE");
+        }
+
+        @Test
+        @DisplayName("should strip the prefix case-insensitively")
+        void shouldStripDifferentlyCasedPrefix() {
+            BusinessException ex = new BusinessException("ERROR.account_not_found", new Object[]{}, "Test") {};
+
+            assertThat(ex.getErrorCode()).isEqualTo("ACCOUNT_NOT_FOUND");
+        }
     }
 
     @Nested

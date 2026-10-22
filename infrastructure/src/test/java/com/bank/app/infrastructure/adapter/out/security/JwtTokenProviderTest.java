@@ -271,6 +271,56 @@ class JwtTokenProviderTest {
         assertNotNull(ex.getCause());
     }
 
+    // --- lazy initialisation (@PostConstruct never ran) ---
+
+    @Test
+    void shouldBuildTheParserLazilyWhenPostConstructNeverRan() {
+        // Outside Spring the parser is built on first use: a token minted by a
+        // sibling instance with the same secret must still verify (no NPE,
+        // no "cannot invoke" failure).
+        JwtTokenProvider issuer = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
+        String token = issuer.generateToken(1L, "testUser");
+
+        JwtTokenProvider fresh = new JwtTokenProvider(SECRET, 86400000L, 604800000L, true);
+
+        assertNotNull(fresh.verifyAndDecode(token));
+        assertEquals("testUser", fresh.verifyAndDecode(token).username());
+    }
+
+    @Test
+    void shouldFailWithAnActionableErrorWhenTheLazySecretIsNotBase64() {
+        // The lazy path must surface the same actionable message as the eager
+        // one, not a bare NPE from the half-initialised provider.
+        JwtTokenProvider invalid = new JwtTokenProvider(
+                "!!!!not-base64!!!!", 86400000L, 604800000L, true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> invalid.verifyAndDecode("any-token"));
+
+        assertTrue(ex.getMessage().contains("valid Base64"));
+    }
+
+    @Test
+    void shouldFailWithAnActionableErrorWhenTheLazySecretIsBlank() {
+        JwtTokenProvider blank = new JwtTokenProvider("   ", 86400000L, 604800000L, true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> blank.verifyAndDecode("any-token"));
+
+        assertTrue(ex.getMessage().contains("must not be blank"));
+    }
+
+    @Test
+    void shouldRefuseTheDefaultSecretOnFirstUseWhenNotExplicitlyAllowed() {
+        JwtTokenProvider refusing = new JwtTokenProvider(
+                JwtTokenProvider.DEFAULT_JWT_SECRET, 86400000L, 604800000L, false);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> refusing.verifyAndDecode("any-token"));
+
+        assertTrue(ex.getMessage().contains("Default JWT secret is not allowed"));
+    }
+
     @Test
     void shouldRejectBlankToken() {
         assertNull(jwtTokenProvider.verifyAndDecode("   "));

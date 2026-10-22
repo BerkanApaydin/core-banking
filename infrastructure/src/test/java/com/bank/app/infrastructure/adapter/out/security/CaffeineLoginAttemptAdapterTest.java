@@ -248,4 +248,57 @@ class CaffeineLoginAttemptAdapterTest {
         assertFalse(adapter.isIpBlocked(IP_A));
         assertFalse(adapter.isUsernameBlocked("user", IP_A));
     }
+
+    // --- the two public recorders (used by the login use case) ---
+
+    @Test
+    void shouldIgnoreAnIpFailureWithoutAnIpInsteadOfThrowing() {
+        // A null key would crash Caffeine; the failure recorder must stay a
+        // no-op so a missing IP cannot mask the authentication result.
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+
+        assertDoesNotThrow(() -> adapter.recordIpFailure(null));
+        assertFalse(adapter.isIpBlocked(null));
+    }
+
+    @Test
+    void shouldAdvanceOnlyTheIpBudgetWhenRecordingAnIpFailure() {
+        // Recording an IP failure must not consume any account budget: the
+        // account counters belong to a credential guess, not to a bad client.
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+
+        adapter.recordIpFailure(IP_A);
+        adapter.recordIpFailure(IP_A);
+        adapter.recordIpFailure(IP_A);
+
+        assertTrue(adapter.isIpBlocked(IP_A));
+        assertFalse(adapter.isUsernameBlocked("user", IP_A));
+        assertFalse(adapter.isUsernameBlocked("other-user", IP_B));
+    }
+
+    @Test
+    void shouldIgnoreAUsernameFailureWithoutAUsernameInsteadOfThrowing() {
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+
+        assertDoesNotThrow(() -> adapter.recordUsernameFailure(null, IP_A));
+        assertFalse(adapter.isUsernameBlocked(null, IP_A));
+    }
+
+    @Test
+    void shouldAdvanceTheAccountBudgetWhenTheClientIpCannotBeResolved() {
+        // A client whose IP cannot be resolved still consumes (and is bounded
+        // by) one account budget: otherwise an unresolvable client would get
+        // an unlimited per-account guess budget.
+        CaffeineLoginAttemptAdapter adapter = new CaffeineLoginAttemptAdapter(new LoginAttemptProperties(3, 15, 10000));
+
+        adapter.recordUsernameFailure("user", null);
+        adapter.recordUsernameFailure("user", null);
+        assertFalse(adapter.isUsernameBlocked("user", null));
+
+        adapter.recordUsernameFailure("user", null);
+
+        assertTrue(adapter.isUsernameBlocked("user", null));
+        // The account budget is separate from the IP budget.
+        assertFalse(adapter.isIpBlocked(null));
+    }
 }

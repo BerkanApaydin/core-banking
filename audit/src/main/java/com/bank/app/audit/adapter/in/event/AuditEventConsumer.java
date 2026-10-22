@@ -32,6 +32,14 @@ public class AuditEventConsumer {
     // instead of transactional.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onAuditEvent(AuditEvent event) {
+        if (event == null) {
+            // A producer bug must not escape an AFTER_COMMIT listener: the
+            // business transaction already committed, so a thrown exception
+            // turns a successful money movement into a 500 and the client
+            // retries it. Nothing to observe, so drop it.
+            log.error("Ignoring null audit event");
+            return;
+        }
         try {
             // The row was already persisted synchronously by the AuditEventPort
             // implementation inside the business transaction, so this listener
@@ -43,7 +51,13 @@ public class AuditEventConsumer {
         } catch (Exception e) {
             log.error("Failed to observe audit event: action={}, failureType={}",
                     event.action(), e.getClass().getSimpleName());
-            auditFailurePort.recordFailure(event.action(), e.getClass().getSimpleName());
+            try {
+                auditFailurePort.recordFailure(event.action(), e.getClass().getSimpleName());
+            } catch (Exception metricFailure) {
+                // The failure metric is best-effort: a broken metrics registry
+                // must not become an exception escaping the listener.
+                log.error("Failed to record audit failure metric: action={}", event.action(), metricFailure);
+            }
         }
     }
 }

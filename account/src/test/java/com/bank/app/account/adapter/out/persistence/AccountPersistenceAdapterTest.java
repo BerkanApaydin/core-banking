@@ -243,6 +243,45 @@ class AccountPersistenceAdapterTest {
     }
 
     @Nested
+    @DisplayName("null and invalid arguments")
+    class NullAndInvalidArguments {
+
+        @Test
+        @DisplayName("should reject a null IBAN on the info projection")
+        @SuppressWarnings("null")
+        void shouldRejectNullIbanOnInfoProjection() {
+            // A null IBAN must fail loudly instead of querying with a null
+            // parameter and returning an empty projection that reads as
+            // "no such account".
+            NullPointerException ex = assertThrows(NullPointerException.class,
+                    () -> repository.findInfoByIban(null));
+
+            assertEquals("IBAN must not be null", ex.getMessage());
+            verifyNoInteractions(springDataRepo);
+        }
+
+        @Test
+        @DisplayName("should reject a negative page on the paginated lookup")
+        void shouldRejectNegativePage() {
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> repository.findPageByUserId(100L, -1, 20));
+
+            assertEquals("Page index must not be less than zero", ex.getMessage());
+            verifyNoInteractions(springDataRepo);
+        }
+
+        @Test
+        @DisplayName("should reject a zero page size on the paginated lookup")
+        void shouldRejectZeroPageSize() {
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> repository.findPageByUserId(100L, 0, 0));
+
+            assertEquals("Page size must not be less than one", ex.getMessage());
+            verifyNoInteractions(springDataRepo);
+        }
+    }
+
+    @Nested
     @DisplayName("read-model projections")
     class Projections {
 

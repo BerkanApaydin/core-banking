@@ -130,8 +130,15 @@ public class AuthController {
             @Valid @RequestBody(required = false) RefreshTokenRequest body,
             HttpServletRequest httpRequest) {
         String refreshToken = body == null ? null : body.refreshToken();
-        if ((authHeader == null || authHeader.isBlank())
-                && (refreshToken == null || refreshToken.isBlank())) {
+        boolean hasAuthHeader = authHeader != null && !authHeader.isBlank();
+        if (hasAuthHeader && !isUsableBearerToken(authHeader)) {
+            // A foreign scheme ("Basic abc") or an empty bearer value is not a
+            // credential. Answering 204 claimed a logout that never happened,
+            // leaving the session usable while the client believed otherwise.
+            return ProblemResponses.unauthorized(
+                    "Authentication failed.", httpRequest.getRequestURI());
+        }
+        if (!hasAuthHeader && (refreshToken == null || refreshToken.isBlank())) {
             // Same 401 AUTHENTICATION_FAILED the required-header path produced
             // via MissingRequestHeaderException: anonymous logout is not a no-op.
             return ProblemResponses.unauthorized(
@@ -219,6 +226,19 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();
+    }
+
+    private static final String BEARER_PREFIX = "Bearer ";
+
+    /**
+     * Only a non-empty Bearer credential may reach the logout use case; the
+     * scheme check is case-insensitive per RFC 7235.
+     */
+    private static boolean isUsableBearerToken(String authHeader) {
+        if (!authHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
+            return false;
+        }
+        return !authHeader.substring(BEARER_PREFIX.length()).isBlank();
     }
 
     /**

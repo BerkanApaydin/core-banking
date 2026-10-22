@@ -30,6 +30,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -136,6 +137,37 @@ class PasswordResetUseCaseTest {
 
             verify(notificationPort).sendPasswordResetToken(eq("alice"), eq("alice@example.com"), any());
             verify(notificationPort).sendPasswordResetToken(eq("bob"), eq("555-0101"), any());
+        }
+
+        @Test
+        @DisplayName("should fall back to the username when neither email nor phone is on file")
+        void shouldFallBackToTheUsernameContact() {
+            // Third fallback: a user without any contact channel still has to
+            // receive the reset token, otherwise the account is unrecoverable.
+            User contactless = new User(new UserId(9L), "alice.ops",
+                    EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
+                    null, null, 1L, 0L);
+            when(loadUserPort.findByUsernameForUpdate("alice.ops"))
+                    .thenReturn(Optional.of(contactless));
+
+            request.execute("alice.ops");
+
+            verify(notificationPort).sendPasswordResetToken(eq("alice.ops"), eq("alice.ops"), any());
+        }
+
+        @Test
+        @DisplayName("should look up the trimmed identifier")
+        void shouldLookUpTheTrimmedIdentifier() {
+            // A pasted identifier must reach the store stripped, otherwise the
+            // lookup misses and the user never receives a reset link.
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(user));
+
+            request.execute("  alice  ");
+
+            verify(loadUserPort).findByUsernameForUpdate("alice");
+            verify(loadUserPort, never()).findByUsernameForUpdate("  alice  ");
+            verify(notificationPort).sendPasswordResetToken(eq("alice"), any(), any());
         }
 
         @Test
@@ -360,6 +392,120 @@ class PasswordResetUseCaseTest {
             assertThatThrownBy(() -> confirm.execute(RAW_TOKEN, "NewStr0ngPass!"))
                     .isInstanceOf(PasswordResetTokenInvalidException.class);
             verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a valid token whose user no longer exists like an invalid token")
+        void shouldRejectAValidTokenOfADeletedUser() {
+            // The token is valid, unexpired and unused, but the user row is
+            // gone. A distinguishable error would turn the public confirm
+            // endpoint into an account-existence oracle.
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            when(loadUserPort.findById(7L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> confirm.execute(RAW_TOKEN, "NewStr0ngPass!"))
+                    .isExactlyInstanceOf(PasswordResetTokenInvalidException.class);
+
+            verify(resetTokenPort, never()).tryMarkUsed(any(), any());
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a null new password as a weak password, not as a server error")
+        void shouldRejectANullNewPassword() {
+            // An omitted password must surface as a business failure the
+            // client can act on, never as a 500.
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(persistedUser(7L, "alice")));
+
+            assertThatThrownBy(() -> withRealPolicy().execute(RAW_TOKEN, null))
+                    .isInstanceOf(WeakPasswordException.class);
+
+            verify(resetTokenPort, never()).tryMarkUsed(any(), any());
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should accept a password exactly at the policy minimum")
+        void shouldAcceptAPasswordAtThePolicyMinimum() {
+            // The boundary must not be off by one: 12 characters with an
+            // upper, a lower and a digit is a legal password.
+            String atMinimum = "Banksecure1A";
+            assertThat(atMinimum).hasSize(12);
+
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(passwordEncoderPort.encode(atMinimum))
+                    .thenReturn("$2a$12$newhash000000000000000000000000000001");
+            when(resetTokenPort.tryMarkUsed(any(), any())).thenReturn(true);
+
+            withRealPolicy().execute(RAW_TOKEN, atMinimum);
+
+            verify(saveUserPort).save(user);
+            verify(resetTokenPort).tryMarkUsed(any(), any());
+        }
+
+        @Test
+        @DisplayName("should reject a password one character below the policy minimum")
+        void shouldRejectAPasswordBelowThePolicyMinimum() {
+            String belowMinimum = "Banksecur1A";
+            assertThat(belowMinimum).hasSize(11);
+
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(persistedUser(7L, "alice")));
+
+            assertThatThrownBy(() -> withRealPolicy().execute(RAW_TOKEN, belowMinimum))
+                    .isInstanceOf(WeakPasswordException.class);
+
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a password longer than the BCrypt byte budget")
+        void shouldRejectAPasswordOverTheByteBudget() {
+            // BCrypt truncates at 72 bytes: two different 73-character
+            // passwords would hash identically.
+            String tooLong = "Aa1" + "x".repeat(70);
+            assertThat(tooLong).hasSize(73);
+
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(persistedUser(7L, "alice")));
+
+            assertThatThrownBy(() -> withRealPolicy().execute(RAW_TOKEN, tooLong))
+                    .isInstanceOf(WeakPasswordException.class);
+
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a multi-byte password that fits in 72 characters but not in 72 bytes")
+        void shouldRejectAMultiBytePasswordOverTheByteBudget() {
+            // 30 characters of "€" are 90 UTF-8 bytes: the character count
+            // looks legal, the byte budget does not.
+            String multiByte = "€".repeat(30);
+            assertThat(multiByte).hasSize(30);
+            assertThat(multiByte.getBytes(StandardCharsets.UTF_8)).hasSize(90);
+
+            when(resetTokenPort.findByHash(TokenDigest.sha256Hex(RAW_TOKEN)))
+                    .thenReturn(Optional.of(liveToken()));
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(persistedUser(7L, "alice")));
+
+            assertThatThrownBy(() -> withRealPolicy().execute(RAW_TOKEN, multiByte))
+                    .isInstanceOf(WeakPasswordException.class);
+
+            verify(saveUserPort, never()).save(any());
+        }
+
+        /** A confirm use case wired to the real policy instead of a mock. */
+        private ConfirmPasswordResetUseCaseImpl withRealPolicy() {
+            return new ConfirmPasswordResetUseCaseImpl(resetTokenPort, loadUserPort, saveUserPort,
+                    passwordEncoderPort, PasswordPolicy.DEFAULT, clockProvider, auditEventPort);
         }
     }
 

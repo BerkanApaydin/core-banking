@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +54,10 @@ class IdempotentOutboxRelayTest {
 
         RecordingRelay(IdempotencyPort port, ClockProviderPort clockProvider) {
             super(port, clockProvider, PREFIX);
+        }
+
+        RecordingRelay(IdempotencyPort port, ClockProviderPort clockProvider, String prefix) {
+            super(port, clockProvider, prefix);
         }
 
         @Override
@@ -189,6 +194,22 @@ class IdempotentOutboxRelayTest {
     }
 
     @Test
+    @DisplayName("keeps the delivery failure primary when markFailed also fails")
+    void shouldNotMaskTheDeliveryFailureWhenMarkFailedFails() {
+        stubClaim(true);
+        relay.deliveryFailure = new IllegalStateException("handler exploded");
+        doThrow(new IllegalStateException("bookkeeping down"))
+                .when(idempotencyPort).markFailed(PREFIX + EVENT.id());
+
+        assertThatThrownBy(() -> relay.handle(EVENT))
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessageContaining("RecordingRelay failed")
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .satisfies(thrown -> assertThat(thrown.getCause().getSuppressed()[0])
+                        .hasMessage("bookkeeping down"));
+    }
+
+    @Test
     @DisplayName("default failure hook names the concrete relay")
     void shouldNameConcreteRelayInDefaultFailureHook() {
         when(idempotencyPort.tryCreateHandler(any(), any())).thenReturn(true);
@@ -241,5 +262,32 @@ class IdempotentOutboxRelayTest {
         ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(idempotencyPort).tryCreateHandler(eq(PREFIX + EVENT.id()), captor.capture());
         assertThat(captor.getValue()).isBetween(before, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    @Test
+    @DisplayName("rejects a null event before the claim store is touched")
+    void shouldRejectNullEvent() {
+        when(clockProvider.clock()).thenReturn(FIXED);
+
+        assertThatThrownBy(() -> relay.handle(null))
+                .isExactlyInstanceOf(NullPointerException.class);
+
+        // A null event must not consume a dedup key.
+        verify(idempotencyPort, never()).tryCreateHandler(any(), any());
+        verify(idempotencyPort, never()).markCompleted(any(), any(), eq(200));
+        verify(idempotencyPort, never()).markFailed(any());
+    }
+
+    @Test
+    @DisplayName("fails fast on a missing claim store or dedup prefix")
+    void shouldRejectNullConstructorArguments() {
+        // Without the guard the relay would only blow up mid-delivery, after
+        // the event was already locked and the failure looks like a handler bug.
+        assertThatThrownBy(() -> new RecordingRelay(null, clockProvider))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("IdempotencyPort must not be null");
+        assertThatThrownBy(() -> new RecordingRelay(idempotencyPort, clockProvider, null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("dedupKeyPrefix must not be null");
     }
 }

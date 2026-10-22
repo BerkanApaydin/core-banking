@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,53 @@ class RequestBodySizeLimitFilterTest {
 
         verify(response).setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
         assertThat(body.toString()).contains("REQUEST_BODY_TOO_LARGE");
+    }
+
+    @Test
+    @DisplayName("should read a body with no declared charset as UTF-8 instead of throwing")
+    void shouldFallBackToUtf8WhenNoCharsetIsDeclared() throws Exception {
+        // Content-Type may legally omit charset; passing null to
+        // InputStreamReader threw an NPE and turned a valid request into 500.
+        String json = "{\"name\":\"J\u00f6rg\"}";
+        byte[] payload = json.getBytes(StandardCharsets.UTF_8);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getContentLengthLong()).thenReturn((long) payload.length);
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(request.getCharacterEncoding()).thenReturn(null);
+        when(request.getInputStream()).thenReturn(new FixedServletInputStream(payload));
+        String[] read = new String[1];
+        doAnswer(invocation -> {
+            HttpServletRequest wrapped = invocation.getArgument(0);
+            read[0] = wrapped.getReader().readLine();
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(read[0]).isEqualTo(json);
+    }
+
+    @Test
+    @DisplayName("should read a body with an invalid charset token instead of throwing")
+    void shouldFallBackToUtf8WhenTheCharsetIsInvalid() throws Exception {
+        byte[] payload = "{\"name\":\"Jorg\"}".getBytes(StandardCharsets.UTF_8);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getContentLengthLong()).thenReturn((long) payload.length);
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(request.getCharacterEncoding()).thenReturn("not-a-charset");
+        when(request.getInputStream()).thenReturn(new FixedServletInputStream(payload));
+        String[] read = new String[1];
+        doAnswer(invocation -> {
+            HttpServletRequest wrapped = invocation.getArgument(0);
+            read[0] = wrapped.getReader().readLine();
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(read[0]).isEqualTo("{\"name\":\"Jorg\"}");
     }
 
     @Test

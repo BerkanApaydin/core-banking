@@ -1,9 +1,16 @@
 package com.bank.app.persistence;
 
+import jakarta.persistence.Column;
 import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,5 +100,64 @@ class AbstractTokenHashJpaEntityTest {
         entity.setTokenHash("   ");
         assertEquals("   ", entity.getId());
         assertTrue(entity.isNew());
+    }
+
+    @Test
+    void shouldPinTheTokenHashColumnShape() throws Exception {
+        // token_hash is varchar(64) NOT NULL: the column is the real contract,
+        // the setter is not.
+        Column column = AbstractTokenHashJpaEntity.class
+                .getDeclaredField("tokenHash")
+                .getAnnotation(Column.class);
+
+        assertNotNull(column);
+        assertEquals("token_hash", column.name());
+        assertFalse(column.nullable());
+        assertEquals(64, column.length());
+    }
+
+    @Test
+    void shouldRoundTripAFullLengthSha256HexDigest() {
+        String digest = sha256HexOf("a-raw-session-token");
+
+        TestTokenEntity entity = new TestTokenEntity();
+        entity.setTokenHash(digest);
+
+        assertEquals(64, digest.length());
+        assertEquals(digest, entity.getTokenHash());
+        assertEquals(digest, entity.getId());
+    }
+
+    @Test
+    void shouldAcceptAnOverlongTokenHashWithoutComplaining() {
+        // The setter has no length guard: an over-long digest is only rejected
+        // by Postgres at flush time ("value too long for type character
+        // varying(64)"), long after the failure is far from its cause.
+        TestTokenEntity entity = new TestTokenEntity();
+
+        entity.setTokenHash("a".repeat(65));
+
+        assertEquals(65, entity.getTokenHash().length());
+    }
+
+    @Test
+    void shouldAcceptAShortTokenHashWithoutComplaining() {
+        // A truncated digest is accepted silently and becomes the primary
+        // key of the token row — a corrupted hash then matches no token.
+        TestTokenEntity entity = new TestTokenEntity();
+
+        entity.setTokenHash("a".repeat(63));
+
+        assertEquals(63, entity.getTokenHash().length());
+    }
+
+    private static String sha256HexOf(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException unavailable) {
+            throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+        }
     }
 }

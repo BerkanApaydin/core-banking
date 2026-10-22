@@ -21,6 +21,27 @@ class EncodedPasswordTest {
     }
 
     @Test
+    @DisplayName("should reject a reversible secret wearing the BCrypt prefix")
+    void shouldRejectPrefixOnlyImpostors() {
+        // "$2a$" + raw password used to pass a startsWith() check, letting a
+        // plaintext secret be persisted as if it were a hash.
+        assertThatThrownBy(() -> EncodedPassword.of("$2a$mypassword"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> EncodedPassword.of("$2a$10$"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> EncodedPassword.of("$2a$10$not-a-bcrypt-hash!"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("should accept a full-length BCrypt hash")
+    void shouldAcceptFullLengthBcryptHash() {
+        String hash = "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
+
+        assertThat(EncodedPassword.of(hash).value()).isEqualTo(hash);
+    }
+
+    @Test
     @DisplayName("should reject raw input")
     void shouldRejectRawInput() {
         assertThatThrownBy(() -> EncodedPassword.of("hashedpassword"))

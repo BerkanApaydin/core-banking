@@ -1,12 +1,18 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class FilterRequestDecisionsTest {
 
@@ -170,6 +176,42 @@ class FilterRequestDecisionsTest {
         request.setCookies(new Cookie("other", "x"), new Cookie("refresh_token", "token-1"));
         assertEquals("token-1", FilterRequestDecisions.cookieValue(request, "refresh_token"));
         assertNull(FilterRequestDecisions.cookieValue(request, "missing"));
+    }
+
+    @Test
+    void requestPathShouldFallBackToTheRequestUriWhenPathResolutionFails() {
+        // A container that cannot resolve the path must not break
+        // authentication — and it must not silently drop the admin
+        // classification either, or the token-version re-check is skipped.
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getAttribute(anyString()))
+                .thenThrow(new IllegalStateException("container failure"));
+        when(request.getRequestURI()).thenReturn("/api/v1/admin/audit-logs");
+
+        String path = FilterRequestDecisions.requestPath(request);
+
+        assertEquals("/api/v1/admin/audit-logs", path);
+        assertTrue(FilterRequestDecisions.isAdminRequest(path));
+        verify(request, atLeastOnce()).getAttribute(anyString());
+    }
+
+    @Test
+    void requestPathShouldBeEmptyWhenNeitherUriNorServletPathIsAvailable() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI(null);
+        request.setServletPath(null);
+
+        assertEquals("", FilterRequestDecisions.requestPath(request));
+    }
+
+    @Test
+    void prefixGuardsShouldNotMatchAnEmptyPath() {
+        // An empty path matches no prefix: every prefix-based guard (admin
+        // re-check, logout/refresh exemptions, rate-limit tiers) silently
+        // stops matching instead of failing closed.
+        assertFalse(FilterRequestDecisions.isAdminRequest(""));
+        assertFalse(FilterRequestDecisions.isLogoutRequest(post(""), ""));
+        assertFalse(FilterRequestDecisions.isRefreshRequest(post(""), ""));
     }
 
     private static MockHttpServletRequest post(String path) {

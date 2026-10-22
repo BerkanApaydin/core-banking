@@ -11,6 +11,8 @@ import com.bank.app.common.application.service.UserContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDateTime;
+
 /**
  * AV-1: REQUIRES_NEW semantics are declared here via {@link RequiresNewUseCase}
  * (interpreted by infrastructure's UseCaseTransactionAspect), not hidden in a
@@ -39,7 +41,12 @@ public class AuditLoggerUseCaseImpl implements AuditLoggerUseCase {
 
     @Override
     public void log(String username, AuditAction action, String details) {
-        AuditLog auditLog = AuditLog.create(username, action, details, clockProvider.clock());
+        // The display username is a snapshot; actorUserId is the stable link
+        // back to users.id that findByActor queries. Leaving it null made
+        // every synchronously written row invisible to actor-based lookups.
+        Long actorUserId = userContextService.getCurrentUserId().orElse(null);
+        AuditLog auditLog = new AuditLog(null, username, action, details,
+                LocalDateTime.now(clockProvider.clock()), actorUserId);
         saveAuditLogPort.save(auditLog);
         log.info("Audit log persisted: action={}", action);
     }

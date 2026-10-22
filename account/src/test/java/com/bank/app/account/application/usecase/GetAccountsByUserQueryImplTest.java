@@ -138,6 +138,64 @@ class GetAccountsByUserQueryImplTest {
             PageResponse<AccountResponse> response = query.execute(0, Integer.MAX_VALUE);
 
             assertThat(response.size()).isEqualTo(100);
+            verify(loadAccountPort).findPageByUserId(100L, 0, 100);
+        }
+
+        @Test
+        @DisplayName("should pass a size of exactly 100 through unchanged")
+        void shouldPassMaximumLegalSizeThroughUnchanged() {
+            // 100 is the legal maximum: an off-by-one clamp would silently
+            // shrink the last legal page size to 99.
+            stubPage(0, 100);
+
+            PageResponse<AccountResponse> response = query.execute(0, 100);
+
+            assertThat(response.size()).isEqualTo(100);
+            verify(loadAccountPort).findPageByUserId(100L, 0, 100);
+        }
+
+        @Test
+        @DisplayName("should clamp a size of 101 down to the maximum of 100")
+        void shouldClampSizeAboveMaximum() {
+            stubPage(0, 100);
+
+            PageResponse<AccountResponse> response = query.execute(0, 101);
+
+            assertThat(response.size()).isEqualTo(100);
+            verify(loadAccountPort).findPageByUserId(100L, 0, 100);
+        }
+
+        @Test
+        @DisplayName("should clamp Integer.MIN_VALUE page to zero")
+        void shouldClampMinimumValuePage() {
+            stubPage(0, 20);
+
+            PageResponse<AccountResponse> response = query.execute(Integer.MIN_VALUE, 20);
+
+            assertThat(response.page()).isZero();
+            verify(loadAccountPort).findPageByUserId(100L, 0, 20);
+        }
+
+        @Test
+        @DisplayName("should not clamp Integer.MAX_VALUE page")
+        void shouldNotClampMaximumValuePage() {
+            stubPage(Integer.MAX_VALUE, 20);
+
+            PageResponse<AccountResponse> response = query.execute(Integer.MAX_VALUE, 20);
+
+            assertThat(response.page()).isEqualTo(Integer.MAX_VALUE);
+            verify(loadAccountPort).findPageByUserId(100L, Integer.MAX_VALUE, 20);
+        }
+
+        @Test
+        @DisplayName("should clamp Integer.MIN_VALUE size to one")
+        void shouldClampMinimumValueSize() {
+            stubPage(0, 1);
+
+            PageResponse<AccountResponse> response = query.execute(0, Integer.MIN_VALUE);
+
+            assertThat(response.size()).isEqualTo(1);
+            verify(loadAccountPort).findPageByUserId(100L, 0, 1);
         }
     }
 

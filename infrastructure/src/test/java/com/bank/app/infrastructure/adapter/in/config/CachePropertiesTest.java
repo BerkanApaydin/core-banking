@@ -35,4 +35,14 @@ class CachePropertiesTest {
 
         assertEquals("caffeine", cache.backend());
     }
+
+    @Test
+    void shouldFallBackToCaffeineOnNullBackend() {
+        // A null backend must not select an unintended backend (or reach the
+        // condition evaluation as null); it falls back to the documented default.
+        CacheProperties.AccountInfoCache cache =
+                new CacheProperties.AccountInfoCache(null, 5000, 120, 500);
+
+        assertEquals("caffeine", cache.backend());
+    }
 }

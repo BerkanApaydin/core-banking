@@ -241,6 +241,53 @@ class BacklogMetricsReporterTest {
                 eq(BacklogMetricsReporter.AUDIT_DEFAULT_PARTITION_SCAN_LIMIT));
     }
 
+    @Test
+    void runsOnEveryReplicaWithTheProductionTwoArgConstructor() {
+        // The 2-arg constructor wires AdvisorySchedulerLock.alwaysRun() and no
+        // clock provider: a leader-only default would freeze the gauges on
+        // followers, and a missing clock fallback would NPE the scan.
+        // Fresh registry: the setUp reporter already owns these meter ids.
+        registry = new SimpleMeterRegistry();
+        BacklogMetricsReporter alwaysRun = new BacklogMetricsReporter(jdbc, registry);
+        LocalDateTime oldest = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(2, oldest));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(1, oldest));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0);
+
+        alwaysRun.scan();
+
+        assertEquals(2, gauge("outbox.pending.current"));
+        assertEquals(1, gauge("idempotency.http.pending.current"));
+        assertTrue(gauge("outbox.oldest_pending.age_seconds") >= 60);
+        assertTrue(gauge("backlog.last_success_epoch_seconds") > 0);
+    }
+
+    @Test
+    void clampsFutureTimestampsToZeroInsteadOfANegativeAge() {
+        // Clock skew / rows written by a host ahead of ours: a negative age
+        // breaks Prometheus comparison expressions and hides the backlog.
+        LocalDateTime utcNow = LocalDateTime.of(2026, 5, 1, 12, 0);
+        LocalDateTime future = utcNow.plusMinutes(5);
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.OUTBOX_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(3, future));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.HTTP_PENDING_SQL), any(RowMapper.class)))
+                .thenReturn(new BacklogMetricsReporter.Backlog(2, future));
+        when(jdbc.queryForObject(eq(BacklogMetricsReporter.TABLE_EXISTS_SQL), eq(Integer.class),
+                eq("audit_logs_default")))
+                .thenReturn(0);
+
+        reporter.scan();
+
+        assertEquals(3, gauge("outbox.pending.current"));
+        assertEquals(0, gauge("outbox.oldest_pending.age_seconds"));
+        assertEquals(2, gauge("idempotency.http.pending.current"));
+        assertEquals(0, gauge("idempotency.http.oldest_pending.age_seconds"));
+    }
+
     private double gauge(String name) {
         return registry.get(name).gauge().value();
     }

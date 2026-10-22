@@ -147,6 +147,27 @@ class MfaCodeVerificationServiceTest {
     }
 
     @Test
+    @DisplayName("should count a null code as a failed attempt without touching the secret")
+    void shouldRejectNullCodeAsFailure() {
+        // An omitted totpCode field carries null. It must be a verification
+        // failure charged to the budget - never an NPE (500) and never a
+        // silent success that would bypass the second factor.
+        assertThat(service.verifyAndConsume(USER_ID, null)).isFalse();
+
+        verify(mfaAttemptPort).recordFailure(USER_ID);
+        verifyNoInteractions(mfaSecretPort);
+    }
+
+    @Test
+    @DisplayName("should count a null code as a failed attempt on the management path")
+    void shouldRejectNullCodeOnTheManagementPath() {
+        assertThat(service.verify(USER_ID, null)).isFalse();
+
+        verify(mfaAttemptPort).recordFailure(USER_ID);
+        verifyNoInteractions(mfaSecretPort);
+    }
+
+    @Test
     @DisplayName("should fail closed and count a missing secret as a failed attempt")
     void shouldRejectMissingSecretAsFailure() {
         when(mfaSecretPort.findSecret(USER_ID)).thenReturn(Optional.empty());

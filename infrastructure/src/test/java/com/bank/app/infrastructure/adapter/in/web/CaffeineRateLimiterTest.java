@@ -162,6 +162,25 @@ class CaffeineRateLimiterTest {
         assertTrue(limiter.tryAcquire("client")); // should be allowed because size is 1 (only t=1100 remains)
     }
 
+    @Test
+    void shouldStillCountARequestThatArrivesExactlyOneWindowLater() {
+        // The eviction drops entries STRICTLY older than the window start
+        // (peekFirst() < windowStart), so the request that lands exactly on
+        // the boundary still counts against the budget: the effective window
+        // is timeWindowMs + 1 ms. One millisecond of extra budget per window
+        // per client is harmless; a whole extra request would not be.
+        SettableClock testClock = new SettableClock(0);
+        CaffeineRateLimiter limiter = new CaffeineRateLimiter(1, 1000, 10000, testClock);
+
+        assertTrue(limiter.tryAcquire("client")); // t = 0
+
+        testClock.advance(1000);
+        assertFalse(limiter.tryAcquire("client")); // t = 1000 == window boundary, still counted
+
+        testClock.advance(1);
+        assertTrue(limiter.tryAcquire("client")); // t = 1001, the old entry is finally evicted
+    }
+
     static class SettableClock extends Clock {
         private long millis;
 

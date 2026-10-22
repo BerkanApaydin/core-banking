@@ -7,8 +7,10 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.LedgerDirection;
 import com.bank.app.account.domain.LedgerEntry;
+import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
+import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.accountapi.AccountAdjustmentResult;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -203,6 +205,18 @@ class AdjustAccountBalancesUseCaseImplTest {
             verifyNoInteractions(saveAccountPort, domainEventPublisherService, auditEventPort,
                     ledgerPort);
         }
+
+        @Test
+        void shouldRejectNullAmountBeforeTouchingAnyPort() {
+            // A null amount must fail fast at the boundary: loading and
+            // locking accounts for a movement that cannot happen would only
+            // hold row locks for nothing.
+            NullPointerException ex = assertThrows(NullPointerException.class,
+                    () -> useCase.debitAndCredit(1L, 2L, null));
+            assertEquals("Amount must not be null", ex.getMessage());
+            verifyNoInteractions(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort,
+                    ledgerPort);
+        }
     }
 
     @Nested
@@ -267,6 +281,56 @@ class AdjustAccountBalancesUseCaseImplTest {
                     () -> useCase.reverseForCancellation(2L, 2L, amount));
             verifyNoInteractions(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort,
                     ledgerPort);
+        }
+
+        @Test
+        void shouldRejectNullAmountBeforeTouchingAnyPort() {
+            NullPointerException ex = assertThrows(NullPointerException.class,
+                    () -> useCase.reverseForCancellation(1L, 2L, null));
+            assertEquals("Amount must not be null", ex.getMessage());
+            verifyNoInteractions(loadAccountPort, saveAccountPort, domainEventPublisherService, auditEventPort,
+                    ledgerPort);
+        }
+
+        @Test
+        void shouldFailWhenReceiverCannotCoverTheReversal() {
+            // The cancellation reversal debits the receiver. When the receiver
+            // no longer holds the money the compensation must fail loudly
+            // instead of reporting a successful reversal.
+            when(clockProvider.clock()).thenReturn(
+                    java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                            java.time.ZoneOffset.UTC));
+            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
+            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
+
+            InsufficientBalanceException ex = assertThrows(InsufficientBalanceException.class,
+                    () -> useCase.reverseForCancellation(1L, 2L, Money.of("600.00", Currency.TRY)));
+
+            assertEquals("INSUFFICIENT_BALANCE", ex.getErrorCode());
+            verify(saveAccountPort, never()).save(any(Account.class));
+            verify(ledgerPort, never()).save(any(LedgerEntry.class));
+            verify(auditEventPort, never()).publish(any(AuditEvent.class));
+            verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
+        }
+
+        @Test
+        void shouldFailWhenReceiverIsSuspended() {
+            Account suspendedReceiver = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),
+                    "Receiver", Money.of("500.00", Currency.TRY), AccountStatus.SUSPENDED);
+            when(clockProvider.clock()).thenReturn(
+                    java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
+                            java.time.ZoneOffset.UTC));
+            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
+            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(suspendedReceiver));
+
+            AccountNotActiveException ex = assertThrows(AccountNotActiveException.class,
+                    () -> useCase.reverseForCancellation(1L, 2L, Money.of("100.00", Currency.TRY)));
+
+            assertEquals("ACCOUNT_NOT_ACTIVE", ex.getErrorCode());
+            verify(saveAccountPort, never()).save(any(Account.class));
+            verify(ledgerPort, never()).save(any(LedgerEntry.class));
+            verify(auditEventPort, never()).publish(any(AuditEvent.class));
+            verify(domainEventPublisherService, never()).publishEvents(any(Account.class));
         }
     }
 }

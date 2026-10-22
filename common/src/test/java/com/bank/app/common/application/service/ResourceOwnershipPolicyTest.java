@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -57,6 +58,18 @@ class ResourceOwnershipPolicyTest {
                 new AuthorizationException("error.not_resource_owner", null, "denied");
 
         policy().requireParticipant(1L, 2L, unauthenticated, notParticipant);
+    }
+
+    @Test
+    void acceptsTheFirstParticipant() {
+        // The first disjunct of the participation check: dropping it would
+        // lock the first participant out of the very resource they are part
+        // of (e.g. the sender of a transfer).
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(1L));
+
+        assertDoesNotThrow(() -> policy().requireParticipant(1L, 2L,
+                new AuthorizationException("error.session_not_found", null, "login"),
+                new AuthorizationException("error.not_resource_owner", null, "denied")));
     }
 
     @Test

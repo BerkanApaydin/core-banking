@@ -59,4 +59,25 @@ class AccountSnapshotCacheDefaultsTest {
 
         assertEquals(0, cache.evictAllCalls);
     }
+
+    @Test
+    void shouldRejectANullIbanInsteadOfBuildingAKeyFromIt() {
+        assertThrows(NullPointerException.class, () -> AccountSnapshotCache.ibanKey(null));
+    }
+
+    @Test
+    void shouldNormalizeEveryBlankIbanOntoTheSameSharedKey() {
+        // All whitespace variants collapse to the empty key, so a caller with a
+        // garbage IBAN addresses the same cache entry as every other one.
+        assertEquals("", AccountSnapshotCache.ibanKey(""));
+        assertEquals(AccountSnapshotCache.ibanKey(""), AccountSnapshotCache.ibanKey("   "));
+        assertEquals(AccountSnapshotCache.ibanKey(""), AccountSnapshotCache.ibanKey("\t\n"));
+    }
+
+    @Test
+    void shouldStripAllWhitespaceAndUpperCaseTheIbanKey() {
+        assertEquals("TR1234", AccountSnapshotCache.ibanKey("tr 12 34"));
+        assertEquals("TR1234", AccountSnapshotCache.ibanKey("\ttr12\n34 "));
+        assertEquals("TR1234", AccountSnapshotCache.ibanKey("TR 12 34"));
+    }
 }

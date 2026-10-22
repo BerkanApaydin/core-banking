@@ -80,6 +80,35 @@ class ClientIpResolverTest {
             assertThat(resolver.resolveClientIp("unknown, UNKNOWN, Unknown", "10.0.0.1"))
                     .isEqualTo("10.0.0.1");
         }
+
+        @Test
+        @DisplayName("should skip an empty hop in the middle of the chain")
+        void shouldSkipEmptyHopsInTheChain() {
+            // A proxy that emits an empty hop must not become the resolved
+            // client IP (and must not break the resolution).
+            assertThat(resolver.resolveClientIp("203.0.113.1, , 10.0.0.2", "10.0.0.9"))
+                    .isEqualTo("10.0.0.2");
+        }
+
+        @Test
+        @DisplayName("should skip trailing empty hops instead of resolving an empty IP")
+        void shouldSkipTrailingEmptyHops() {
+            assertThat(resolver.resolveClientIp("203.0.113.1, ,", "10.0.0.9"))
+                    .isEqualTo("203.0.113.1");
+        }
+
+        @Test
+        @DisplayName("should fall back to the remote address when every hop is empty")
+        void shouldFallbackWhenEveryHopIsEmpty() {
+            assertThat(resolver.resolveClientIp(", ,", "10.0.0.9")).isEqualTo("10.0.0.9");
+        }
+
+        @Test
+        @DisplayName("should return null when neither the header nor the remote address is available")
+        void shouldReturnNullWhenNoAddressIsAvailable() {
+            // No client address at all: the resolver must not invent one.
+            assertThat(resolver.resolveClientIp(null, null)).isNull();
+        }
     }
 
     @Nested

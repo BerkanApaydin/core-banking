@@ -11,7 +11,10 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,5 +100,21 @@ class OutboxRetentionSchedulerTest {
         verify(outboxPort).deleteProcessedBefore(cutoffCaptor.capture());
         long daysAgo = ChronoUnit.DAYS.between(cutoffCaptor.getValue(), LocalDateTime.now());
         assertThat(daysAgo).isBetween(6L, 7L);
+    }
+
+    @Test
+    void shouldDeriveBothCutoffsFromTheInjectedClock() {
+        Clock fixed = Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
+        var scheduler = new OutboxRetentionScheduler(outboxPort, idempotencyPort,
+                new OutboxProperties(5, 50, 2, 2000, 30, 4, 12, 30),
+                AdvisorySchedulerLock.alwaysRun(), () -> fixed);
+
+        scheduler.retainProcessed();
+
+        // System-clock drift here would delete rows too early (or never); both
+        // sweeps must use the same injected instant and retention window.
+        LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
+        verify(outboxPort).deleteProcessedBefore(cutoff);
+        verify(idempotencyPort).deleteExpiredHandlerKeys(cutoff);
     }
 }

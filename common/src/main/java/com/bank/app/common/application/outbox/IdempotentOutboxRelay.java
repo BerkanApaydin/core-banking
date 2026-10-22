@@ -74,7 +74,14 @@ public abstract class IdempotentOutboxRelay implements OutboxEventPort {
             // The FAILED branch above still matters for non-transactional
             // callers and survives any future split of the key lifecycle into
             // its own transaction.
-            idempotencyPort.markFailed(dedupKey);
+            // A failing markFailed must not hide the delivery failure: keep the
+            // original as the primary cause (the retry/paging signal) and
+            // attach the bookkeeping failure as suppressed.
+            try {
+                idempotencyPort.markFailed(dedupKey);
+            } catch (Exception markFailure) {
+                e.addSuppressed(markFailure);
+            }
             onDeliveryFailed(event, e);
         }
     }

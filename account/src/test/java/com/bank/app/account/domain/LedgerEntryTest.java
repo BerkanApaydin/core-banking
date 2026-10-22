@@ -113,4 +113,57 @@ class LedgerEntryTest {
                 .contains("direction=DEBIT")
                 .contains("ref-9");
     }
+
+    @Test
+    @DisplayName("debitFromBefore rejects an amount larger than the balance before")
+    void shouldRejectDebitLargerThanBalanceBefore() {
+        // A silently negative balanceAfter would corrupt the ledger's running
+        // balance for every later leg of the same account.
+        assertThatThrownBy(() -> LedgerEntry.debitFromBefore(1L, Money.of("600.00", Currency.TRY),
+                Money.of("500.00", Currency.TRY), new TransactionRef("ref-1"), FIXED_CLOCK))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Amount must not be negative");
+    }
+
+    @Test
+    @DisplayName("debitFromBefore rejects a null balance before")
+    void shouldRejectNullBalanceBeforeOnDebit() {
+        assertThatThrownBy(() -> LedgerEntry.debitFromBefore(1L, AMOUNT, null,
+                new TransactionRef("ref-1"), FIXED_CLOCK))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("Balance before must not be null");
+    }
+
+    @Test
+    @DisplayName("creditFromBefore rejects a null balance before")
+    void shouldRejectNullBalanceBeforeOnCredit() {
+        assertThatThrownBy(() -> LedgerEntry.creditFromBefore(1L, AMOUNT, null,
+                new TransactionRef("ref-1"), FIXED_CLOCK))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("Balance before must not be null");
+    }
+
+    @Test
+    @DisplayName("a transaction ref of exactly 36 characters is accepted")
+    void shouldAcceptTransactionRefOfExactlyColumnWidth() {
+        String ref = "r".repeat(36);
+
+        assertThat(new TransactionRef(ref).value()).isEqualTo(ref);
+    }
+
+    @Test
+    @DisplayName("a transaction ref of 37 characters is rejected")
+    void shouldRejectTransactionRefAboveColumnWidth() {
+        assertThatThrownBy(() -> new TransactionRef("r".repeat(37)))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at most 36 characters");
+    }
+
+    @Test
+    @DisplayName("a transaction ref supplier that returns null is rejected")
+    void shouldRejectNullGeneratedRef() {
+        assertThatThrownBy(() -> LedgerEntry.newTransactionRef(() -> null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("Generated ref must not be null");
+    }
 }

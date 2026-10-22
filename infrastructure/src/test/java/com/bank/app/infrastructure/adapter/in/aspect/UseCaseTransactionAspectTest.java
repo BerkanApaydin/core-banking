@@ -188,6 +188,7 @@ class UseCaseTransactionAspectTest {
 
     private static final class CommittedResponseFailure extends RuntimeException
             implements CommitOnFailure {
+        private static final long serialVersionUID = 1L;
     }
 
     @Test

@@ -51,7 +51,13 @@ public abstract class BusinessException extends RuntimeException {
      */
     public String getErrorCode() {
         if (messageKey != null) {
-            return messageKey.replace("error.", "").toUpperCase(LOCALE);
+            String key = messageKey;
+            // Case-insensitive strip: message bundles use "error." but a
+            // producer writing "ERROR." must not leak the prefix onto the wire.
+            if (key.regionMatches(true, 0, "error.", 0, 6)) {
+                key = key.substring(6);
+            }
+            return key.toUpperCase(LOCALE);
         }
         String simpleName = getClass().getSimpleName();
         return simpleName

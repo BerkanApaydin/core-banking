@@ -49,10 +49,17 @@ public final class EncodedPassword {
         return new EncodedPassword(hash, true);
     }
 
+    /**
+     * Requires the full BCrypt shape, not just the version prefix: a bare
+     * {@code $2a$} followed by raw text (e.g. {@code "$2a$mypassword"}) used to
+     * pass, which let a reversible secret be persisted as if it were a hash.
+     * The cost segment and the BCrypt alphabet are mandatory.
+     */
+    private static final java.util.regex.Pattern BCRYPT = java.util.regex.Pattern.compile(
+            "^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]+$");
+
     private static boolean isBcryptHash(String value) {
-        return value.startsWith("$2a$")
-                || value.startsWith("$2b$")
-                || value.startsWith("$2y$");
+        return BCRYPT.matcher(value).matches();
     }
 
     public String value() {

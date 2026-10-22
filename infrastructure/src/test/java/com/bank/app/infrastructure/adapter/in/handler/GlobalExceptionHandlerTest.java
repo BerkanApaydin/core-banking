@@ -138,6 +138,8 @@ class GlobalExceptionHandlerTest {
     }
 
     private static final class SelfCausedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         @Override
         public Throwable getCause() {
             return this;

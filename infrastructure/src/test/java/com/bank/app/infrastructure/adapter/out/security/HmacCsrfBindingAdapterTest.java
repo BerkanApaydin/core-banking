@@ -1,6 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
+import io.jsonwebtoken.io.Decoders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -111,6 +112,59 @@ class HmacCsrfBindingAdapterTest {
         String token = first.issueCsrfToken("42");
 
         assertThat(second.verifyCsrfToken(token, token, "42")).isFalse();
+    }
+
+    @Test
+    @DisplayName("the production key must not be the raw JWT secret (key-purpose separation)")
+    void shouldNotUseTheRawJwtSecretAsMacKey() {
+        // If the MAC key were the decoded JWT secret itself, a leaked JWT
+        // signing key would immediately mint valid CSRF tokens (and the
+        // reverse). The derived key must be a separate secret.
+        HmacCsrfBindingAdapter production = new HmacCsrfBindingAdapter(properties());
+        HmacCsrfBindingAdapter rawSecretKey =
+                new HmacCsrfBindingAdapter(Decoders.BASE64.decode(SECRET));
+
+        String productionToken = production.issueCsrfToken("42");
+        String rawToken = rawSecretKey.issueCsrfToken("42");
+
+        assertThat(production.verifyCsrfToken(rawToken, rawToken, "42")).isFalse();
+        assertThat(rawSecretKey.verifyCsrfToken(productionToken, productionToken, "42")).isFalse();
+    }
+
+    @Test
+    @DisplayName("every instance built from the same secret derives the same MAC key")
+    void shouldDeriveTheSameKeyForEveryInstanceWithTheSameSecret() {
+        // The derivation must be deterministic: a restart must not invalidate
+        // every browser CSRF cookie in flight (that would 403 every session).
+        HmacCsrfBindingAdapter beforeRestart = new HmacCsrfBindingAdapter(properties());
+        HmacCsrfBindingAdapter afterRestart = new HmacCsrfBindingAdapter(properties());
+
+        String token = beforeRestart.issueCsrfToken("42");
+
+        assertThat(afterRestart.verifyCsrfToken(token, token, "42")).isTrue();
+    }
+
+    @Test
+    @DisplayName("a token bound to another subject must not verify under the production key")
+    void shouldRejectForeignSubjectUnderTheProductionKey() {
+        HmacCsrfBindingAdapter production = new HmacCsrfBindingAdapter(properties());
+
+        String token = production.issueCsrfToken("42");
+
+        assertThat(production.verifyCsrfToken(token, token, "43")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a tampered token must not verify under the production key")
+    void shouldRejectTamperedTokenUnderTheProductionKey() {
+        HmacCsrfBindingAdapter production = new HmacCsrfBindingAdapter(properties());
+
+        String token = production.issueCsrfToken("42");
+        char last = token.charAt(token.length() - 1);
+        String tampered = token.substring(0, token.length() - 1) + (last == 'A' ? 'B' : 'A');
+
+        assertThat(production.verifyCsrfToken(tampered, tampered, "42")).isFalse();
+        assertThat(production.verifyCsrfToken(token, token, "42")).isTrue();
     }
 
     private static JwtProperties properties() {

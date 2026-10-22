@@ -31,5 +31,18 @@ public record TransferProperties(
                 || cancellationWindow.isZero()) {
             throw new IllegalArgumentException("cancellationWindow must be positive: " + cancellationWindow);
         }
+        // Fail at bind time, not on the first money request: the retry aspect
+        // builds an ExponentialBackoffPolicy on EVERY invocation, and its
+        // constructor rejects maxDelayMs < initialDelayMs. Without this check
+        // an inverted pair boots cleanly and turns every place/cancel into a
+        // 500 before the use case runs.
+        if (initialDelayMs < 1) {
+            throw new IllegalArgumentException("initialDelayMs must be at least 1: " + initialDelayMs);
+        }
+        if (maxDelayMs < initialDelayMs) {
+            throw new IllegalArgumentException(
+                    "maxDelayMs must cover initialDelayMs: initialDelayMs=" + initialDelayMs
+                            + ", maxDelayMs=" + maxDelayMs);
+        }
     }
 }

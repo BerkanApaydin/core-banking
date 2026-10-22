@@ -6,6 +6,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
+import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
@@ -16,6 +17,7 @@ import com.bank.app.user.domain.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.CommandLineRunner;
@@ -262,5 +264,98 @@ class DataSeederTest {
                 () -> seeder.seedData().run());
 
         assertThat(failure).hasMessageContaining("app.demo.seed.ahmet-password");
+    }
+
+    /**
+     * Only {@link DuplicateIbanException} is absorbed. Any other failure
+     * aborts the whole run: the remaining accounts are never seeded (a
+     * half-seeded demo environment) and the CommandLineRunner failure aborts
+     * the application startup.
+     */
+    @Test
+    void shouldAbortTheWholeSeedRunWhenAnAccountFailsForANonDuplicateReason() {
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
+        doThrow(new InvalidIbanException("Invalid IBAN format"))
+                .when(createAccountPort).execute(any(CreateAccountRequest.class));
+
+        CommandLineRunner runner = dataSeeder.seedData();
+
+        assertThrows(InvalidIbanException.class, runner::run);
+
+        verify(createAccountPort, times(1)).execute(any(CreateAccountRequest.class));
+    }
+
+    /**
+     * The shipped default password is blank, so enabling the demo profile
+     * without the env var must fail loudly — naming the env var — BEFORE any
+     * user or account is written.
+     */
+    @Test
+    void shouldFailFastNamingTheEnvVarWhenTheBlankDefaultPasswordIsUsed() {
+        DataSeeder seeder = new DataSeeder(registerUserUseCase, createAccountPort, loadUserPort,
+                loadAccountPort, new DemoSeedProperties("", ""));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> seeder.seedData().run());
+
+        assertThat(failure).hasMessageContaining("app.demo.seed.ahmet-password");
+        assertThat(failure).hasMessageContaining("DEMO_SEED_AHMET_PASSWORD");
+        verify(registerUserUseCase, never()).execute(any());
+        verify(createAccountPort, never()).execute(any());
+    }
+
+    /**
+     * The "already seeded" guard only asks about the LEGACY IBAN, so an
+     * account that exists under the NEW IBAN is invisible to it.
+     */
+    @Test
+    void shouldProbeOnlyTheLegacyIbanWhenDecidingToSkipASeedAccount() throws Exception {
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
+
+        dataSeeder.seedData().run();
+
+        ArgumentCaptor<Iban> probed = ArgumentCaptor.forClass(Iban.class);
+        verify(loadAccountPort, atLeastOnce()).findByIban(probed.capture());
+        assertThat(probed.getAllValues()).extracting(Iban::value)
+                .containsExactlyInAnyOrder(
+                        "TR123456789012345678901234",
+                        "TR111111111111111111111111",
+                        "TR987654321098765432109876");
+    }
+
+    /**
+     * Because the guard only probes the LEGACY IBAN, the create is still
+     * attempted when the account already exists under the NEW IBAN: the
+     * second funded account is prevented only by the account module's
+     * duplicate-IBAN guard, not by the seeder.
+     */
+    @Test
+    void shouldStillAttemptTheCreateWhenOnlyTheNewIbanAlreadyExists() {
+        User ahmet = new User(new UserId(1L), "ahmet", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        User ayse = new User(new UserId(2L), "ayse", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        when(loadUserPort.findByUsername("ahmet")).thenReturn(Optional.of(ahmet));
+        when(loadUserPort.findByUsername("ayse")).thenReturn(Optional.of(ayse));
+        when(loadAccountPort.findByIban(any(Iban.class))).thenReturn(Optional.empty());
+        doThrow(new DuplicateIbanException("TR963456789012345678901234"))
+                .when(createAccountPort).execute(any(CreateAccountRequest.class));
+
+        CommandLineRunner runner = dataSeeder.seedData();
+
+        assertDoesNotThrow(() -> runner.run());
+
+        ArgumentCaptor<CreateAccountRequest> created = ArgumentCaptor.forClass(CreateAccountRequest.class);
+        verify(createAccountPort, times(3)).execute(created.capture());
+        assertThat(created.getAllValues()).extracting(CreateAccountRequest::iban)
+                .containsExactlyInAnyOrder(
+                        "TR963456789012345678901234",
+                        "TR721111111111111111111111",
+                        "TR137654321098765432109876");
     }
 }

@@ -57,6 +57,8 @@ class CreateAccountWebRequestTest {
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.owner.name.required}");
     }
 
     @Test
@@ -65,6 +67,8 @@ class CreateAccountWebRequestTest {
                 "Ahmet", null, Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.balance.required}");
     }
 
     @Test
@@ -74,6 +78,8 @@ class CreateAccountWebRequestTest {
                 new BigDecimal("1000.00"), null);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.currency.required}");
     }
 
     @Test
@@ -83,6 +89,19 @@ class CreateAccountWebRequestTest {
                 new BigDecimal("1000.00"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        // Exact bundle key: a renamed key would otherwise ship silently as a
+        // literal placeholder in the 400 response body.
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.owner.name.tooLong}");
+    }
+
+    @Test
+    void shouldAcceptOwnerNameOfExactlyMaximumLength() {
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                "A".repeat(255),
+                new BigDecimal("1000.00"), Currency.TRY);
+
+        assertThat(validator.validate(request)).isEmpty();
     }
 
     @Test
@@ -92,6 +111,8 @@ class CreateAccountWebRequestTest {
                 new BigDecimal("100.001"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.balance.scale}");
     }
 
     @Test
@@ -101,6 +122,34 @@ class CreateAccountWebRequestTest {
                 new BigDecimal("1000000000.01"), Currency.TRY);
         var violations = validator.validate(request);
         assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.balance.max}");
+    }
+
+    @Test
+    void shouldAcceptBalanceExactlyAtTheCeiling() {
+        // The ceiling moving with no test failing is the risk: the legal
+        // maximum must stay legal.
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                "Ahmet",
+                new BigDecimal(BalanceLimits.MAX_BALANCE), Currency.TRY);
+
+        assertThat(validator.validate(request)).isEmpty();
+    }
+
+    @Test
+    void shouldFailValidationWhenBalanceIsNegative() {
+        // The only field-level guard against a negative opening balance:
+        // without it the value reaches the domain, where Money.exact throws a
+        // generic IllegalArgumentException (INVALID_ARGUMENT) that names no
+        // field — the client is not told which input is wrong.
+        CreateAccountWebRequest request = new CreateAccountWebRequest(
+                "Ahmet",
+                new BigDecimal("-100.00"), Currency.TRY);
+        var violations = validator.validate(request);
+        assertThat(violations).isNotEmpty();
+        assertThat(violations).extracting(v -> v.getMessage())
+                .containsExactly("{validation.balance.negative}");
     }
 
     @Test

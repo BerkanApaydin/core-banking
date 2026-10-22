@@ -223,6 +223,39 @@ class PrincipalRateLimitingFilterTest {
     }
 
     @Test
+    void blankPrincipalNameGetsNoRateLimitBucket() throws Exception {
+        // A blank identity cannot be keyed per principal. It must not become
+        // one shared global bucket (which one client could exhaust for
+        // everyone) — the request passes through instead.
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("  ", null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyInt(), anyLong());
+    }
+
+    @Test
+    void nullPrincipalNameGetsNoRateLimitBucket() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(null, null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        MockHttpServletRequest request = resourceRequest("/api/v1/transfers/123", "GET", "10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter().doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(rateLimiter, never()).tryAcquire(anyString(), anyInt(), anyLong());
+    }
+
+    @Test
     void userIdPrincipalUsesIdBucket() throws Exception {
         AuthenticatedPrincipalPort port =
                 mock(AuthenticatedPrincipalPort.class);

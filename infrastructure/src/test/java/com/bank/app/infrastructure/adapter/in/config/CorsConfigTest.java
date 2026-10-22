@@ -42,4 +42,21 @@ class CorsConfigTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("must not contain '*'");
     }
+
+    @Test
+    void shouldFailClosedWithoutAnNpeWhenOriginsAreNull() {
+        // There is no startup validation for a null list: the config is built
+        // with null origins, so every cross-origin request is denied silently.
+        // Recording the actual behaviour guards against a future NPE-at-boot.
+        CorsConfig corsConfig = new CorsConfig(new CorsProperties(null));
+
+        CorsConfigurationSource source = corsConfig.corsConfigurationSource();
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getAttribute(UrlPathHelper.PATH_ATTRIBUTE)).thenReturn("/");
+        CorsConfiguration config = source.getCorsConfiguration(request);
+
+        assertThat(config).isNotNull();
+        assertThat(config.getAllowedOrigins()).isNull();
+        assertThat(config.getAllowCredentials()).isTrue();
+    }
 }

@@ -17,6 +17,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -126,9 +128,27 @@ public class RequestBodySizeLimitFilter implements Filter {
         @Override
         public BufferedReader getReader() throws IOException {
             if (reader == null) {
-                reader = new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding()));
+                // getCharacterEncoding() may legally be null (no charset on the
+                // Content-Type). Passing null to InputStreamReader throws an
+                // NPE, turning a legitimate body read into a 500; fall back to
+                // UTF-8 (the JSON default) instead.
+                reader = new BufferedReader(new InputStreamReader(getInputStream(), resolveCharset()));
             }
             return reader;
+        }
+
+        private Charset resolveCharset() {
+            String encoding = getCharacterEncoding();
+            if (encoding == null || encoding.isBlank()) {
+                return StandardCharsets.UTF_8;
+            }
+            try {
+                return Charset.forName(encoding);
+            } catch (IllegalArgumentException unsupported) {
+                // A bogus charset token is a client input problem, not a
+                // server fault: keep the body readable rather than 500.
+                return StandardCharsets.UTF_8;
+            }
         }
     }
 

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,6 +75,60 @@ class DomainEventPublisherServiceTest {
         assertThat(provider.cleared).isTrue();
     }
 
+    @Test
+    void publishEventsShouldNeverCallThePublisherForAnEmptyEventList() {
+        StubDomainEventProvider provider = new StubDomainEventProvider();
+
+        service.publishEvents(provider);
+
+        // The port must not be called at all - not even with a null event.
+        assertThat(eventPublisher.publishCalls).isZero();
+        assertThat(provider.cleared).isTrue();
+    }
+
+    @Test
+    void publishEventsShouldRejectANullProvider() {
+        assertThatThrownBy(() -> service.publishEvents(null))
+                .isInstanceOf(NullPointerException.class);
+
+        assertThat(eventPublisher.publishCalls).isZero();
+    }
+
+    @Test
+    void publishEventsShouldRejectANullEventElement() {
+        ListDomainEventProvider provider = new ListDomainEventProvider(
+                Arrays.asList(new TestEvent("event1"), null));
+
+        assertThatThrownBy(() -> service.publishEvents(provider))
+                .isInstanceOf(NullPointerException.class);
+
+        // A null element must not be published and must not clear the batch:
+        // clearing would drop the remaining events of the batch for good.
+        assertThat(eventPublisher.publishCalls).isZero();
+        assertThat(provider.cleared).isFalse();
+    }
+
+    @Test
+    void publishEventsShouldRejectANullEventList() {
+        ListDomainEventProvider provider = new ListDomainEventProvider(null);
+
+        assertThatThrownBy(() -> service.publishEvents(provider))
+                .isInstanceOf(NullPointerException.class);
+
+        assertThat(eventPublisher.publishCalls).isZero();
+        assertThat(provider.cleared).isFalse();
+    }
+
+    @Test
+    void publishShouldForwardTheEventToThePort() {
+        TestEvent event = new TestEvent("event1");
+
+        service.publish(event);
+
+        assertThat(eventPublisher.publishCalls).isEqualTo(1);
+        assertThat(eventPublisher.published).containsExactly(event);
+    }
+
     private record TestEvent(String data, LocalDateTime occurredAt) implements DomainEvent {
         TestEvent(String data) {
             this(data, LocalDateTime.now());
@@ -120,6 +175,26 @@ class DomainEventPublisherServiceTest {
                 throw new IllegalStateException("publish failed");
             }
             published.add(event);
+        }
+    }
+
+    /** Provider that can hand out a batch that contains a null element. */
+    private static class ListDomainEventProvider implements DomainEventProvider {
+        private final List<DomainEvent> events;
+        boolean cleared;
+
+        ListDomainEventProvider(List<DomainEvent> events) {
+            this.events = events;
+        }
+
+        @Override
+        public List<DomainEvent> getDomainEvents() {
+            return events;
+        }
+
+        @Override
+        public void clearDomainEvents() {
+            cleared = true;
         }
     }
 }

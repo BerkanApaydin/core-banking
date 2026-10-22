@@ -172,6 +172,22 @@ class RedisRateLimitConfigurationTest {
     }
 
     @Test
+    void shouldApplyClientName() {
+        RedisProperties properties = new RedisProperties();
+        properties.setHost("localhost");
+        properties.setPort(6379);
+        properties.setClientName("rate-limit-client");
+
+        LettuceConnectionFactory factory =
+                (LettuceConnectionFactory) new RedisRateLimitConfiguration().redisConnectionFactory(properties);
+
+        // The connection name is how Redis-side CLIENT LIST diagnostics tell
+        // this app's pooled connections apart from other tenants of the server.
+        assertThat(factory.getClientConfiguration().getClientName())
+                .contains("rate-limit-client");
+    }
+
+    @Test
     void shouldCreateRedisBeansWhenTokenBlacklistBackendIsHybrid() {
         contextRunner
                 .withPropertyValues(

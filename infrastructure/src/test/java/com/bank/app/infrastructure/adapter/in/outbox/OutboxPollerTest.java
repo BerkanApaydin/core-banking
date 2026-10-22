@@ -8,8 +8,10 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import javax.sql.DataSource;
 import java.lang.reflect.Method;
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +99,25 @@ class OutboxPollerTest {
         outboxPoller.pollAndProcessEvents();
 
         verify(outboxProcessor).recordFailure(eq(event), any(Throwable.class), eq(5));
+    }
+
+    @Test
+    void shouldClassifyFailureByRootCauseNotByTheProcessorWrapper() {
+        // OutboxProcessor wraps handler failures in a plain RuntimeException.
+        // Recording that wrapper would persist "java.lang.RuntimeException"
+        // and lose the retry/dead-letter classification of the real cause.
+        EventEntry event = event("wrapped");
+        when(outboxPort.findAndLockUnprocessed(50, -1)).thenReturn(List.of(event));
+        OptimisticLockingFailureException root =
+                new OptimisticLockingFailureException("version conflict");
+        doThrow(new RuntimeException("Outbox event processing failed", root))
+                .when(outboxProcessor).processEvent(event);
+
+        outboxPoller.pollAndProcessEvents();
+
+        ArgumentCaptor<Throwable> failure = ArgumentCaptor.forClass(Throwable.class);
+        verify(outboxProcessor).recordFailure(eq(event), failure.capture(), eq(5));
+        assertSame(root, failure.getValue());
     }
 
     @Test

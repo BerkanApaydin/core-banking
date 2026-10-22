@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -131,6 +132,44 @@ class CorrelationIdFilterEdgeCaseTest {
     void shouldRejectMaliciousTraceIdAndFallBackToCorrelationId() throws Exception {
         when(request.getHeader("X-Correlation-ID")).thenReturn("corr-1");
         when(request.getHeader("X-Trace-ID")).thenReturn("<script>alert(1)</script>");
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setHeader("X-Trace-ID", "corr-1");
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should trim whitespace around an otherwise valid correlation id")
+    void shouldTrimWhitespaceAroundAValidCorrelationId() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("  abc-123  ");
+
+        filter.doFilter(request, response, chain);
+
+        // The trimmed value is what reaches the MDC and the reflected header,
+        // so a padded id still joins the log lines with the client's id.
+        verify(response).setHeader("X-Correlation-ID", "abc-123");
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should use a valid trace id header instead of the correlation id")
+    void shouldUseAValidTraceIdHeaderInsteadOfTheCorrelationId() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("corr-1");
+        when(request.getHeader("X-Trace-ID")).thenReturn("trace-9");
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).setHeader("X-Correlation-ID", "corr-1");
+        verify(response).setHeader("X-Trace-ID", "trace-9");
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should fall back to the correlation id when the trace id is blank")
+    void shouldFallBackToTheCorrelationIdWhenTheTraceIdIsBlank() throws Exception {
+        when(request.getHeader("X-Correlation-ID")).thenReturn("corr-1");
+        when(request.getHeader("X-Trace-ID")).thenReturn("   ");
 
         filter.doFilter(request, response, chain);
 

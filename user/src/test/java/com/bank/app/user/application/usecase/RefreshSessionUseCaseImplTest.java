@@ -11,6 +11,7 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
+import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.JwtPort.VerifiedToken;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort.StoredRefresh;
@@ -28,6 +29,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -100,6 +102,64 @@ class RefreshSessionUseCaseImplTest {
         verify(refreshTokenPort).markRotated(eq(HASH), eq(TokenDigest.sha256Hex("new-refresh")));
         verify(refreshTokenPort).save(eq(TokenDigest.sha256Hex("new-refresh")), eq(7L),
                 eq("family-1"), any());
+    }
+
+    @Test
+    @DisplayName("should persist the successor with exactly the configured refresh lifetime")
+    void shouldPersistTheSuccessorWithTheConfiguredLifetime() {
+        stubClock();
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(freshUser()));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
+        when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+        when(jwtPort.getExpirationMs()).thenReturn(900000L);
+
+        useCase.execute(REFRESH);
+
+        // The successor must live exactly as long as the configured refresh
+        // lifetime: a shorter one silently logs the client out, a longer one
+        // keeps a rotated token alive past its intended window.
+        var expiry = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(refreshTokenPort).save(eq(TokenDigest.sha256Hex("new-refresh")), eq(7L),
+                eq("family-1"), expiry.capture());
+        assertThat(expiry.getValue())
+                .isEqualTo(LocalDateTime.now(FIXED).plus(604800000L, ChronoUnit.MILLIS));
+    }
+
+    @Test
+    @DisplayName("should surface a store outage while revoking a stolen family as a backend failure")
+    void shouldSurfaceABackendOutageWhileRevokingTheStolenFamily() {
+        stubClock();
+        StoredRefresh rotated = new StoredRefresh(HASH, 7L, "family-1",
+                LocalDateTime.now(FIXED).plusDays(7), true, "replacement-hash");
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(rotated));
+        AuthenticationBackendUnavailableException outage =
+                new AuthenticationBackendUnavailableException(new RuntimeException("store down"));
+        doThrow(outage).when(refreshTokenPort).revokeFamily("family-1", 7L);
+
+        // The revoke failed, so the stolen family is still alive: the caller
+        // must see the backend-unavailable error (503), never the generic
+        // "invalid token" (401) that would make the client believe the
+        // session was killed.
+        assertThatThrownBy(() -> useCase.execute(REFRESH)).isSameAs(outage);
+
+        verify(jwtPort, never()).generateToken(anyLong(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("should reject a null refresh token without touching the store")
+    void shouldRejectNullToken() {
+        assertThatThrownBy(() -> useCase.execute(null))
+                .isExactlyInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("required");
+
+        verify(refreshTokenPort, never()).findByTokenHash(anyString());
     }
 
     @Test

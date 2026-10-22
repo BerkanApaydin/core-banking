@@ -44,4 +44,25 @@ class TransferPropertiesTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cancellationWindow");
     }
+
+    @Test
+    void shouldRejectMaxDelayBelowInitialDelay() {
+        assertThatThrownBy(() -> new TransferProperties(Duration.ofHours(24), 3, 500L, 100L, 100))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxDelayMs");
+    }
+
+    @Test
+    void shouldRejectNonPositiveInitialDelay() {
+        assertThatThrownBy(() -> new TransferProperties(Duration.ofHours(24), 3, 0L, 2000L, 100))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("initialDelayMs");
+    }
+
+    @Test
+    void shouldAcceptEqualDelays() {
+        TransferProperties props = new TransferProperties(Duration.ofHours(24), 3, 500L, 500L, 100);
+
+        assertThat(props.maxDelayMs()).isEqualTo(500L);
+    }
 }

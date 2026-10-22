@@ -38,6 +38,25 @@ class EmailAddressTest {
         void shouldAcceptValidEmails(String email) {
             assertThat(new EmailAddress(email).value()).isEqualTo(email);
         }
+
+        @Test
+        @DisplayName("should trim surrounding whitespace")
+        void shouldTrimSurroundingWhitespace() {
+            // A pasted address keeps its padding otherwise: the reset
+            // notification would be sent to a padded address that the mail
+            // provider rejects, and the user never receives the link.
+            EmailAddress email = new EmailAddress(" alice@example.com ");
+
+            assertThat(email.value()).isEqualTo("alice@example.com");
+        }
+
+        @Test
+        @DisplayName("should trim and lowercase a padded address")
+        void shouldTrimAndLowercase() {
+            EmailAddress email = new EmailAddress("  Alice@Example.COM  ");
+
+            assertThat(email.value()).isEqualTo("alice@example.com");
+        }
     }
 
     @Nested

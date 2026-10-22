@@ -83,9 +83,15 @@ public class Transfer extends BaseAggregateRoot {
         if (this.status != TransferStatus.PENDING) {
             throw new TransferNotPendingException(this.status);
         }
+        // Build the event BEFORE mutating the aggregate: the event requires a
+        // non-null id, and a throw after the status flip would leave a
+        // COMPLETED transfer with no TransferCompletedEvent — money moved but
+        // no notification or audit row.
+        TransferCompletedEvent event = new TransferCompletedEvent(
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount,
+                TransferStatus.COMPLETED, LocalDateTime.now(clock));
         this.status = TransferStatus.COMPLETED;
-        registerEvent(new TransferCompletedEvent(
-                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, LocalDateTime.now(clock)));
+        registerEvent(event);
     }
 
     private static void requireNonZero(Money amount) {
@@ -154,9 +160,13 @@ public class Transfer extends BaseAggregateRoot {
         if (this.status != TransferStatus.PENDING) {
             throw new TransferNotPendingException(this.status, "marked as failed");
         }
+        // Same ordering rule as complete(): never flip the status before the
+        // event can be built.
+        TransferFailedEvent event = new TransferFailedEvent(
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount,
+                TransferStatus.FAILED, LocalDateTime.now(clock));
         this.status = TransferStatus.FAILED;
-        registerEvent(new TransferFailedEvent(
-                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, LocalDateTime.now(clock)));
+        registerEvent(event);
     }
 
     public void cancel(Clock clock, Duration cancellationWindow) {
@@ -185,8 +195,13 @@ public class Transfer extends BaseAggregateRoot {
                 "Transfer was created " + cancellationWindow.toHours() + " hours ago, cancellation window has passed. Created at: " + this.createdAt
             );
         }
+        // Same ordering rule as complete(): build first, then mutate, so a
+        // failure to build the event cannot leave a CANCELLED aggregate with
+        // no TransferCancelledEvent (the refund leg may already have run).
+        TransferCancelledEvent event = new TransferCancelledEvent(
+                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount,
+                TransferStatus.CANCELLED, now);
         this.status = TransferStatus.CANCELLED;
-        registerEvent(new TransferCancelledEvent(
-                this.id, this.senderAccountId.value(), this.receiverAccountId.value(), this.amount, this.status, now));
+        registerEvent(event);
     }
 }

@@ -12,6 +12,8 @@ package com.bank.app.audit.domain;
  */
 public class UnknownAuditActionException extends IllegalStateException {
 
+    private static final long serialVersionUID = 1L;
+
     public UnknownAuditActionException(String value) {
         super("Unknown audit action: " + value);
     }

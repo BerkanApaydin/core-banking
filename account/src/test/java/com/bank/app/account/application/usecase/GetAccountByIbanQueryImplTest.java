@@ -11,6 +11,7 @@ import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.UserId;
+import com.bank.app.common.domain.exception.InvalidIbanException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -94,6 +95,29 @@ class GetAccountByIbanQueryImplTest {
         void shouldThrowNullPointerExceptionWhenIbanIsNull() {
             assertThatThrownBy(() -> query.execute((String) null))
                     .isExactlyInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        @DisplayName("should reject a malformed IBAN as a client error, not as not-found")
+        void shouldRejectMalformedIbanAsInvalidIban() {
+            // A malformed IBAN is a client mistake (400-class), while a
+            // well-formed but unknown IBAN is a not-found. Collapsing the two
+            // hides the client's typo behind a "no such account" answer.
+            assertThatThrownBy(() -> query.execute("INVALID_IBAN"))
+                    .isExactlyInstanceOf(InvalidIbanException.class)
+                    .isNotInstanceOf(AccountNotFoundException.class)
+                    .satisfies(ex -> assertThat(((InvalidIbanException) ex).getErrorCode())
+                            .isEqualTo("INVALID_IBAN"));
+            verifyNoInteractions(loadAccountPort);
+        }
+
+        @Test
+        @DisplayName("should reject a truncated IBAN as a client error")
+        void shouldRejectTruncatedIbanAsInvalidIban() {
+            assertThatThrownBy(() -> query.execute("TR12"))
+                    .isExactlyInstanceOf(InvalidIbanException.class)
+                    .isNotInstanceOf(AccountNotFoundException.class);
+            verifyNoInteractions(loadAccountPort);
         }
     }
 }

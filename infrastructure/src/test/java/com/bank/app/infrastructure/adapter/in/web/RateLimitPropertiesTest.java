@@ -80,4 +80,15 @@ class RateLimitPropertiesTest {
 
         assertEquals(0, props.maxRequests());
     }
+
+    @Test
+    void shouldFallBackToTheLooseResourceTierForANullPrefix() {
+        // A null prefix must not blow up and must not be mistaken for the
+        // tight auth tier: an unknown path gets the resource budget.
+        RateLimitProperties props = new RateLimitProperties(null, null, 10, 10000, 120, 60000, 10000);
+
+        assertFalse(props.isAuthTier(null));
+        assertEquals(120, props.maxRequestsFor(null));
+        assertEquals(60000, props.timeWindowMsFor(null));
+    }
 }

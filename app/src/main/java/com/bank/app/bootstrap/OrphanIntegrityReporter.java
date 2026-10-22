@@ -106,17 +106,32 @@ public class OrphanIntegrityReporter {
         // by the replica count. Staleness alerts must aggregate with max()
         // across instances (see k8s/prometheus-rules.yaml).
         schedulerLock.runIfLeader("orphan-integrity-scan", () -> {
-            check(ACCOUNTS_WITHOUT_USER, ACCOUNTS_SQL, accountsWithoutUser);
-            check(TRANSFERS_WITHOUT_SENDER, SENDERS_SQL, transfersWithoutSender);
-            check(TRANSFERS_WITHOUT_RECEIVER, RECEIVERS_SQL, transfersWithoutReceiver);
+            // Read every count first, publish the gauges last: a scan that
+            // dies half-way must not leave a mix of fresh and previous-cycle
+            // values, where a stale 0 for an unreached type hides a real
+            // orphan count. Alarms/logs still fire per completed check, so a
+            // partial scan that found orphans above the threshold keeps
+            // paging.
+            long accounts = countOrphans(ACCOUNTS_SQL);
+            report(ACCOUNTS_WITHOUT_USER, accounts);
+            long senders = countOrphans(SENDERS_SQL);
+            report(TRANSFERS_WITHOUT_SENDER, senders);
+            long receivers = countOrphans(RECEIVERS_SQL);
+            report(TRANSFERS_WITHOUT_RECEIVER, receivers);
+
+            accountsWithoutUser.set(accounts);
+            transfersWithoutSender.set(senders);
+            transfersWithoutReceiver.set(receivers);
             lastSuccessfulScanEpochSeconds.set(Instant.now().getEpochSecond());
         });
     }
 
-    private void check(String type, String sql, AtomicLong gauge) {
+    private long countOrphans(String sql) {
         Long count = jdbc.queryForObject(sql, Long.class);
-        long orphans = count == null ? 0 : count;
-        gauge.set(orphans);
+        return count == null ? 0 : count;
+    }
+
+    private void report(String type, long orphans) {
         if (orphans > alarmThreshold) {
             Counter alarmCounter = alarmCounters.get(type);
             if (alarmCounter != null) {

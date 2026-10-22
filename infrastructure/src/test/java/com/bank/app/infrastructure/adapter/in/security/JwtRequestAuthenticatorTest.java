@@ -6,10 +6,13 @@ import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -19,6 +22,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -160,5 +167,143 @@ class JwtRequestAuthenticatorTest {
                 request("POST", path), path, "jwt", true);
 
         assertEquals(JwtRequestAuthenticator.Result.BACKEND_UNAVAILABLE, result);
+    }
+
+    // --- CSRF enforcement (browser-session requests only) ---
+
+    @ParameterizedTest(name = "{0} without a CSRF token is forbidden")
+    @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE"})
+    void shouldRejectBrowserSessionMutationWithoutCsrfToken(String method) {
+        // A cross-site form post carries the session cookie but no CSRF header:
+        // without this check such a request would move money.
+        String path = "/api/v1/transfers";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+        when(csrfBinding.verifyCsrfToken(any(), any(), eq("7"))).thenReturn(false);
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request(method, path), path, "jwt", false);
+
+        assertEquals(JwtRequestAuthenticator.Result.FORBIDDEN, result);
+    }
+
+    @Test
+    void shouldBindTheCsrfCheckToTheServerVerifiedUserId() {
+        // The binding subject is the server-verified user id, never a
+        // client-supplied one: a token minted for another user must not pass.
+        String path = "/api/v1/transfers";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+        when(csrfBinding.verifyCsrfToken(any(), any(), eq("7"))).thenReturn(false);
+
+        authenticator.authenticate(request("POST", path), path, "jwt", false);
+
+        verify(csrfBinding).verifyCsrfToken(null, null, "7");
+    }
+
+    @Test
+    void shouldAuthenticateBrowserSessionMutationWithAcceptedCsrfToken() {
+        String path = "/api/v1/transfers";
+        String csrf = "a".repeat(43);
+        MockHttpServletRequest request = request("POST", path);
+        request.addHeader(BrowserSessionCookies.CSRF_HEADER, csrf);
+        request.setCookies(new Cookie("BANK_CSRF", csrf));
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+        when(csrfBinding.verifyCsrfToken(csrf, csrf, "7")).thenReturn(true);
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request, path, "jwt", false);
+
+        assertEquals(JwtRequestAuthenticator.Result.AUTHENTICATED, result);
+    }
+
+    @Test
+    void shouldRejectBrowserSessionMutationWhenCsrfBindingRejectsThePair() {
+        String path = "/api/v1/transfers";
+        String csrf = "a".repeat(43);
+        MockHttpServletRequest request = request("POST", path);
+        request.addHeader(BrowserSessionCookies.CSRF_HEADER, csrf);
+        request.setCookies(new Cookie("BANK_CSRF", csrf));
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+        when(csrfBinding.verifyCsrfToken(csrf, csrf, "7")).thenReturn(false);
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request, path, "jwt", false);
+
+        assertEquals(JwtRequestAuthenticator.Result.FORBIDDEN, result);
+    }
+
+    @Test
+    void shouldNotCheckCsrfForBearerAuthenticatedRequests() {
+        // Bearer clients are not cookie-based, so they are immune to CSRF;
+        // consulting the binding port would only add a dependency (and a
+        // spurious 403) to the API path.
+        String path = "/api/v1/transfers";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request("POST", path), path, "jwt", true);
+
+        assertEquals(JwtRequestAuthenticator.Result.AUTHENTICATED, result);
+        verify(csrfBinding, never()).verifyCsrfToken(any(), any(), any());
+    }
+
+    @ParameterizedTest(name = "{0} does not require a CSRF token")
+    @ValueSource(strings = {"GET", "HEAD"})
+    void shouldNotRequireCsrfForSafeMethods(String method) {
+        String path = "/api/v1/transfers";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request(method, path), path, "jwt", false);
+
+        assertEquals(JwtRequestAuthenticator.Result.AUTHENTICATED, result);
+        verify(csrfBinding, never()).verifyCsrfToken(any(), any(), any());
+    }
+
+    // --- admin MFA gate ---
+
+    @Test
+    void shouldAuthenticateAdminWithCurrentTokenVersionAndEnrolledMfa() {
+        String path = "/api/v1/admin/accounts";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_ADMIN"));
+        when(jwtPort.extractTokenVersion("jwt")).thenReturn(3L);
+        when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+        when(loadUserPort.findMfaEnabledById(7L)).thenReturn(Optional.of(true));
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request("POST", path), path, "jwt", true);
+
+        assertEquals(JwtRequestAuthenticator.Result.AUTHENTICATED, result);
+    }
+
+    @Test
+    void shouldRequireMfaEnrollmentForAdminWithoutMfa() {
+        // An admin account without a second factor must not get a full admin
+        // session: every admin path stays refused until enrollment.
+        String path = "/api/v1/admin/accounts";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_ADMIN"));
+        when(jwtPort.extractTokenVersion("jwt")).thenReturn(3L);
+        when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+        when(loadUserPort.findMfaEnabledById(7L)).thenReturn(Optional.of(false));
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request("POST", path), path, "jwt", true);
+
+        assertEquals(JwtRequestAuthenticator.Result.MFA_REQUIRED, result);
+    }
+
+    @Test
+    void shouldRequireMfaWhenTheAdminMfaProjectionIsEmpty() {
+        // An unreadable/absent MFA flag must fail closed, never open: an
+        // unknown admin account is refused, not granted.
+        String path = "/api/v1/admin/accounts";
+        when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_ADMIN"));
+        when(jwtPort.extractTokenVersion("jwt")).thenReturn(3L);
+        when(loadUserPort.findTokenVersionById(7L)).thenReturn(Optional.of(3L));
+        when(loadUserPort.findMfaEnabledById(7L)).thenReturn(Optional.empty());
+
+        JwtRequestAuthenticator.Result result = authenticator.authenticate(
+                request("POST", path), path, "jwt", true);
+
+        assertEquals(JwtRequestAuthenticator.Result.MFA_REQUIRED, result);
     }
 }

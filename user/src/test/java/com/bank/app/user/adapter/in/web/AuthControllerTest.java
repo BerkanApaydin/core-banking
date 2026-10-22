@@ -12,6 +12,8 @@ import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.dto.MfaEnrollment;
 import com.bank.app.common.application.service.UserContextService;
+import com.bank.app.common.domain.exception.BusinessFailureKind;
+import com.bank.app.user.domain.exception.UserNotFoundException;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.MfaStatusUseCase;
 import com.bank.app.user.application.port.in.ConfirmMfaUseCase;
@@ -39,6 +41,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -146,6 +149,26 @@ class AuthControllerTest {
     }
 
     @Test
+    void shouldRejectANonBearerAuthorizationHeader() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .header("Authorization", "Basic dXNlcjpwdw==")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+
+        verify(logoutUseCase, never()).execute(any(), any());
+    }
+
+    @Test
+    void shouldRejectAnEmptyBearerCredential() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .header("Authorization", "Bearer    ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+
+        verify(logoutUseCase, never()).execute(any(), any());
+    }
+
+    @Test
     void shouldRejectBlankRefreshTokenBodyOnDirectInvocation() {
         ResponseEntity<?> result = controller.logout(null,
                 new RefreshTokenRequest("   "), new MockHttpServletRequest());
@@ -191,6 +214,19 @@ class AuthControllerTest {
 
         mockMvc.perform(get("/auth/mfa/status"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReportAMissingUserAsNotFoundOnMfaStatus() {
+        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
+        when(mfaStatusUseCase.isEnabled(7L)).thenThrow(new UserNotFoundException("User not found: 7"));
+
+        // NOT_FOUND maps to 404. It must not be masked as an authentication
+        // failure (401), which would be indistinguishable from "not logged in".
+        assertThatThrownBy(() -> controller.mfaStatus(new MockHttpServletRequest()))
+                .isInstanceOf(UserNotFoundException.class)
+                .satisfies(thrown -> assertThat(((UserNotFoundException) thrown).getFailureKind())
+                        .isEqualTo(BusinessFailureKind.NOT_FOUND));
     }
 
     @Test

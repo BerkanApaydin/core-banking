@@ -45,6 +45,21 @@ class ExponentialBackoffPolicyTest {
     }
 
     @Test
+    void shouldRejectInvalidConstructorArgumentsWithExplicitMessages() {
+        // A misconfigured delay silently disabled would turn the retry budget
+        // into a hot loop; each rejected bound must say which knob is wrong.
+        assertThatThrownBy(() -> new ExponentialBackoffPolicy(-1, 2000, 0))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("initialDelayMs must be positive");
+        assertThatThrownBy(() -> new ExponentialBackoffPolicy(500, 499, 0))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("maxDelayMs must cover initialDelayMs");
+        assertThatThrownBy(() -> new ExponentialBackoffPolicy(500, 2000, -1))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("jitterMs must not be negative");
+    }
+
+    @Test
     void shouldImplementValueEquality() {
         assertThat(new ExponentialBackoffPolicy(500, 2000, 100))
                 .isEqualTo(new ExponentialBackoffPolicy(500, 2000, 100))

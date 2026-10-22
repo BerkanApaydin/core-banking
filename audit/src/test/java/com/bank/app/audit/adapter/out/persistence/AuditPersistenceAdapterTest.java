@@ -180,4 +180,54 @@ class AuditPersistenceAdapterTest {
         verify(springDataRepo).findByActorUserIdOrderByTimestampDescIdDesc(eq(7L), pageCaptor.capture());
         assertEquals(1, pageCaptor.getValue().getPageSize());
     }
+
+    @Test
+    void shouldUseTheMaximumPageSizeForATimeRangeAtTheLimit() {
+        LocalDateTime from = LocalDateTime.now().minusDays(1);
+        LocalDateTime to = LocalDateTime.now();
+        when(springDataRepo.findByTimestampBetweenOrderByTimestampDescIdDesc(any(), any(), any()))
+                .thenReturn(List.of());
+
+        adapter.findByTimeRange(from, to, 500);
+
+        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(springDataRepo).findByTimestampBetweenOrderByTimestampDescIdDesc(
+                eq(from), eq(to), pageCaptor.capture());
+        assertEquals(500, pageCaptor.getValue().getPageSize());
+        assertEquals(0, pageCaptor.getValue().getPageNumber());
+    }
+
+    @Test
+    void shouldCapAnOversizedTimeRangePageAtTheAdapterBoundary() {
+        // The forensic time-window query has no production caller yet, so a
+        // wrong clamp would only surface when someone needs a window: an
+        // unbounded scan would lock the audit table.
+        LocalDateTime from = LocalDateTime.now().minusDays(1);
+        LocalDateTime to = LocalDateTime.now();
+        when(springDataRepo.findByTimestampBetweenOrderByTimestampDescIdDesc(any(), any(), any()))
+                .thenReturn(List.of());
+
+        adapter.findByTimeRange(from, to, 10_000);
+
+        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(springDataRepo).findByTimestampBetweenOrderByTimestampDescIdDesc(
+                eq(from), eq(to), pageCaptor.capture());
+        assertEquals(500, pageCaptor.getValue().getPageSize());
+    }
+
+    @Test
+    void shouldFloorANonPositiveTimeRangePageAtTheAdapterBoundary() {
+        LocalDateTime from = LocalDateTime.now().minusDays(1);
+        LocalDateTime to = LocalDateTime.now();
+        when(springDataRepo.findByTimestampBetweenOrderByTimestampDescIdDesc(any(), any(), any()))
+                .thenReturn(List.of());
+
+        adapter.findByTimeRange(from, to, 0);
+        adapter.findByTimeRange(from, to, -5);
+
+        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(springDataRepo, times(2)).findByTimestampBetweenOrderByTimestampDescIdDesc(
+                eq(from), eq(to), pageCaptor.capture());
+        assertEquals(1, pageCaptor.getValue().getPageSize());
+    }
 }

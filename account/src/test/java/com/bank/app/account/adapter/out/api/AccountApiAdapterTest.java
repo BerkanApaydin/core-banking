@@ -131,6 +131,26 @@ class AccountApiAdapterTest {
     }
 
     @Test
+    void shouldRejectNullAmountOnBalanceAdjustment() {
+        // This is the published Open Host Service boundary: a null amount must
+        // fail fast here instead of reaching the money-moving use case.
+        NullPointerException ex = assertThrows(NullPointerException.class,
+                () -> adapter.adjustBalances(1L, 2L, null));
+
+        assertEquals("Amount must not be null", ex.getMessage());
+        verifyNoInteractions(adjustAccountBalancesUseCase, snapshotCache);
+    }
+
+    @Test
+    void shouldRejectNullAmountOnCancellationReversal() {
+        NullPointerException ex = assertThrows(NullPointerException.class,
+                () -> adapter.reverseForCancellation(1L, 2L, null));
+
+        assertEquals("Amount must not be null", ex.getMessage());
+        verifyNoInteractions(adjustAccountBalancesUseCase, snapshotCache);
+    }
+
+    @Test
     void shouldEvictMutatedSnapshotsOnBalanceAdjustment() {
         Money amount = Money.of("50.00", Currency.TRY);
         AccountAdjustmentResult expected = new AccountAdjustmentResult(1L, 2L,

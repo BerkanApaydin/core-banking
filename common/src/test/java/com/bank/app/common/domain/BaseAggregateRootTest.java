@@ -89,5 +89,19 @@ class BaseAggregateRootTest {
             assertThatThrownBy(events::clear)
                     .isExactlyInstanceOf(UnsupportedOperationException.class);
         }
+
+        @Test
+        @DisplayName("should reject a null domain event and keep the event list unchanged")
+        void shouldRejectNullEvent() {
+            TestEvent existing = new TestEvent("existing", LocalDateTime.now());
+            aggregate.triggerEvent(existing);
+
+            assertThatThrownBy(() -> aggregate.triggerEvent(null))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Domain event must not be null");
+
+            // The failed registration must not add a hole to the batch.
+            assertThat(aggregate.getDomainEvents()).containsExactly(existing);
+        }
     }
 }

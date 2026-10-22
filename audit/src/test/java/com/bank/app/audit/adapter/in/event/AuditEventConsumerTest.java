@@ -11,8 +11,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -129,6 +133,18 @@ class AuditEventConsumerTest {
     }
 
     @Test
+    void shouldReportTheFailureMetricWithANullActionTag() {
+        // A null action is a producer defect; the failure must still be raised
+        // (a null tag is the port's problem, not the caller's).
+        AuditEvent event = new AuditEvent(null, "no action on the event", LocalDateTime.now());
+
+        eventListener.onAuditEvent(event);
+
+        verify(auditFailurePort).recordFailure(isNull(), eq("IllegalArgumentException"));
+        verifyNoInteractions(observationPort);
+    }
+
+    @Test
     void shouldPropagatePublishTimeUsernameWithoutUsingIt() {
         // Username travels on the event for the synchronous persistence path;
         // the observer ignores it — assert it never influences the observation.
@@ -138,5 +154,26 @@ class AuditEventConsumerTest {
 
         verify(observationPort).recordConsumed(eq("ACCOUNT_CREATED"));
         verifyNoInteractions(auditFailurePort);
+    }
+
+    @Test
+    void shouldIgnoreANullEventWithoutThrowing() {
+        // AFTER_COMMIT listener: an exception here would surface after the
+        // business transaction already committed, turning success into a 500.
+        assertDoesNotThrow(() -> eventListener.onAuditEvent(null));
+
+        verifyNoInteractions(observationPort, auditFailurePort);
+    }
+
+    @Test
+    void shouldNotEscapeWhenTheFailurePortItselfFails() {
+        AuditEvent event = new AuditEvent("TRANSFER_CANCELLED", "Transfer cancelled", LocalDateTime.now());
+        doThrow(new RuntimeException("metrics down")).when(observationPort).recordConsumed(eq("TRANSFER_CANCELLED"));
+        doThrow(new IllegalStateException("metrics still down"))
+                .when(auditFailurePort).recordFailure(anyString(), anyString());
+
+        assertDoesNotThrow(() -> eventListener.onAuditEvent(event));
+
+        verify(auditFailurePort).recordFailure(eq("TRANSFER_CANCELLED"), eq("RuntimeException"));
     }
 }

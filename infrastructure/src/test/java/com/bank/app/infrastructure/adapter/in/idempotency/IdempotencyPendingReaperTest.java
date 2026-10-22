@@ -152,6 +152,25 @@ class IdempotencyPendingReaperTest {
     }
 
     @Test
+    @DisplayName("silently skips the reaped counter when no meter registry is configured")
+    void shouldSkipCounterWhenMeterRegistryIsNull() {
+        when(clockProvider.clock()).thenReturn(fixedClock);
+        when(idempotencyPort.failStalePending(any(LocalDateTime.class))).thenReturn(4);
+        IdempotencyPendingReaper unmetered = new IdempotencyPendingReaper(
+                idempotencyPort,
+                new IdempotencyReaperProperties(true, Duration.ofMinutes(15)),
+                AdvisorySchedulerLock.alwaysRun(),
+                clockProvider,
+                null);
+
+        // A non-zero reap is the only path that touches the counter: an NPE
+        // here would abort the scheduled job after rows were already updated.
+        assertThatCode(unmetered::reapStalePending).doesNotThrowAnyException();
+
+        verify(idempotencyPort).failStalePending(LocalDateTime.of(2026, 6, 22, 9, 45));
+    }
+
+    @Test
     @DisplayName("updates the reaped counter exactly when at least one row changed")
     void shouldUpdateCounterOnlyForNonZeroRows() {
         when(clockProvider.clock()).thenReturn(fixedClock);

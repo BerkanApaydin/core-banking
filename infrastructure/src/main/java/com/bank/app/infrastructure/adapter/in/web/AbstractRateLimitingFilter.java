@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
@@ -98,8 +97,13 @@ abstract class AbstractRateLimitingFilter implements Filter {
         final boolean acquired;
         try {
             acquired = rateLimiter.tryAcquire(bucketKey, tierMaxRequests, tierWindowMs);
-        } catch (DataAccessException ex) {
-            log.warn("{} backend unavailable: {}", backendLabel(), ex.getClass().getSimpleName());
+        } catch (RuntimeException ex) {
+            // Any backend outage must fail CLOSED with a retryable 503, not
+            // leak as an unhandled 500: a Redis DataAccessException is the
+            // common case, but a not-yet-initialised client throws
+            // IllegalStateException and an AOP/proxy hiccup can throw others.
+            // The stack trace keeps genuine programming errors visible.
+            log.warn("{} backend unavailable: {}", backendLabel(), ex.getClass().getSimpleName(), ex);
             String message = messageSource.getMessage(MessageKeys.SECURITY_BACKEND_UNAVAILABLE, null,
                     "Security service temporarily unavailable. Please try again later.",
                     LocaleContextHolder.getLocale());

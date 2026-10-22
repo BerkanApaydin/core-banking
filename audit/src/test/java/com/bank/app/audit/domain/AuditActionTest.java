@@ -118,4 +118,42 @@ class AuditActionTest {
         assertTrue(failure instanceof IllegalStateException);
         assertTrue(failure.getMessage().contains("TRANSFER_EXECUTD"));
     }
+
+    @Test
+    void shouldRejectAnUnknownActionName() {
+        UnknownAuditActionException failure =
+                assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString("unknown_action"));
+
+        assertTrue(failure.getMessage().contains("unknown_action"));
+    }
+
+    @Test
+    void shouldRejectAnEmptyActionName() {
+        // An empty string is not a mapped action, so it takes the same
+        // server-side path as any other unmapped name.
+        assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString(""));
+    }
+
+    @Test
+    void shouldRejectABlankActionName() {
+        assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString("  "));
+    }
+
+    @Test
+    void shouldResolveOnlyTheExactUppercaseConstant() {
+        // The mapping is case sensitive: a producer that publishes a lowercase
+        // action would silently kill the audit row of that event.
+        assertEquals(AuditAction.ACCOUNT_CREATED, AuditAction.fromString("ACCOUNT_CREATED"));
+        assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString("account_created"));
+    }
+
+    @Test
+    void shouldRejectATransferCreatedActionBecauseNoSuchActionExists() {
+        // There is no TRANSFER_CREATED action in the ledger: the transfer
+        // lifecycle is TRANSFER_EXECUTED / TRANSFER_CANCELLED /
+        // TRANSFER_MARKED_FAILED. A producer publishing TRANSFER_CREATED
+        // would abort the business transaction instead of writing a row.
+        assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString("TRANSFER_CREATED"));
+        assertThrows(UnknownAuditActionException.class, () -> AuditAction.fromString("transfer_created"));
+    }
 }

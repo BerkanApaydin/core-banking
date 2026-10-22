@@ -31,9 +31,23 @@ class TotpEdgeCaseTest {
     private static final int PERIOD = 30;
     private static final int DIGITS = 6;
     private static final int SKEW = 1;
+    private static final int MAX_SKEW = 2;
+
+    /**
+     * A fixed base instant whose step is comfortably inside the epoch range.
+     * The codes of {@code step-3 .. step+3} are pairwise distinct for this
+     * secret, so a rejection can only come from the skew window and never
+     * from an accidental 6-digit collision.
+     */
+    private static final long BASE_EPOCH_SECOND = 1_700_000_000L;
+    private static final long BASE_STEP = BASE_EPOCH_SECOND / PERIOD;
 
     private static Clock at(long epochSecond) {
         return Clock.fixed(Instant.ofEpochSecond(epochSecond), ZoneOffset.UTC);
+    }
+
+    private static Clock atStep(long step) {
+        return at(step * PERIOD);
     }
 
     @Test
@@ -78,6 +92,142 @@ class TotpEdgeCaseTest {
 
         assertTrue(matched.isPresent());
         assertEquals(step - 1, matched.getAsLong());
+    }
+
+    @Test
+    void shouldAcceptTheForwardNeighbourStepAtSkewOne() {
+        // A phone clock running fast produces the NEXT step's code. Rejecting
+        // it would lock the legitimate user out of their own second factor.
+        String forwardCode = Totp.generateCode(SECRET, BASE_STEP + 1, DIGITS);
+
+        assertTrue(Totp.verify(SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, SKEW));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, SKEW);
+        assertTrue(matched.isPresent());
+        assertEquals(BASE_STEP + 1, matched.getAsLong());
+    }
+
+    @Test
+    void shouldRejectTheStepBeyondTheForwardSkewBoundary() {
+        // One step past the forward boundary must stay outside the window:
+        // the acceptance window is exactly 2 * skew + 1 steps.
+        String beyondCode = Totp.generateCode(SECRET, BASE_STEP + 2, DIGITS);
+
+        assertFalse(Totp.verify(SECRET, beyondCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, SKEW));
+        assertTrue(Totp.verifyWithCounter(
+                SECRET, beyondCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, SKEW).isEmpty());
+    }
+
+    @Test
+    void shouldRejectTheForwardNeighbourStepAtZeroSkew() {
+        String forwardCode = Totp.generateCode(SECRET, BASE_STEP + 1, DIGITS);
+
+        assertFalse(Totp.verify(SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, 0));
+        assertTrue(Totp.verifyWithCounter(
+                SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, 0).isEmpty());
+    }
+
+    @Test
+    void shouldAcceptTheForwardNeighbourAtMaxSkew() {
+        String forwardCode = Totp.generateCode(SECRET, BASE_STEP + MAX_SKEW, DIGITS);
+
+        assertTrue(Totp.verify(SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, forwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW);
+        assertTrue(matched.isPresent());
+        assertEquals(BASE_STEP + MAX_SKEW, matched.getAsLong());
+    }
+
+    @Test
+    void shouldRejectTheStepBeyondTheMaxSkewForwardBoundary() {
+        String beyondCode = Totp.generateCode(SECRET, BASE_STEP + MAX_SKEW + 1, DIGITS);
+
+        assertFalse(Totp.verify(SECRET, beyondCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW));
+    }
+
+    @Test
+    void shouldAcceptTheBackwardNeighbourAtMaxSkew() {
+        String backwardCode = Totp.generateCode(SECRET, BASE_STEP - MAX_SKEW, DIGITS);
+
+        assertTrue(Totp.verify(SECRET, backwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, backwardCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW);
+        assertTrue(matched.isPresent());
+        assertEquals(BASE_STEP - MAX_SKEW, matched.getAsLong());
+    }
+
+    @Test
+    void shouldRejectTheStepBeyondTheMaxSkewBackwardBoundary() {
+        String beyondCode = Totp.generateCode(SECRET, BASE_STEP - MAX_SKEW - 1, DIGITS);
+
+        assertFalse(Totp.verify(SECRET, beyondCode, at(BASE_EPOCH_SECOND), PERIOD, DIGITS, MAX_SKEW));
+    }
+
+    @Test
+    void shouldReturnTheHighestMatchingStepWhenTwoNeighboursShareACode() {
+        // Steps 910737 and 910738 produce the same 6-digit code ("911617")
+        // for this secret. The javadoc promises the HIGHEST matching step is
+        // returned, otherwise the next legitimate code would be rejected as
+        // a replay and the user would be locked out.
+        long lowerStep = 910_737L;
+        long higherStep = 910_738L;
+        String collidingCode = Totp.generateCode(SECRET, lowerStep, DIGITS);
+        assertEquals(collidingCode, Totp.generateCode(SECRET, higherStep, DIGITS));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, collidingCode, atStep(lowerStep), PERIOD, DIGITS, SKEW);
+
+        assertTrue(matched.isPresent());
+        assertEquals(higherStep, matched.getAsLong());
+    }
+
+    @Test
+    void shouldReturnTheHighestMatchingStepAcrossTwoStepsAtMaxSkew() {
+        // Steps 153567 and 153569 share a code ("468457"): the window at
+        // skew 2 spans both, and the newer one must win.
+        long lowerStep = 153_567L;
+        long higherStep = 153_569L;
+        String collidingCode = Totp.generateCode(SECRET, lowerStep, DIGITS);
+        assertEquals(collidingCode, Totp.generateCode(SECRET, higherStep, DIGITS));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, collidingCode, atStep(lowerStep), PERIOD, DIGITS, MAX_SKEW);
+
+        assertTrue(matched.isPresent());
+        assertEquals(higherStep, matched.getAsLong());
+    }
+
+    @Test
+    void shouldAcceptTheLowestPossibleCode() {
+        // "000000" is a legal code, not a canonical "wrong" one. A leading
+        // zero must not be read as "no code given".
+        long step = 349_495L;
+        assertEquals("000000", Totp.generateCode(SECRET, step, DIGITS));
+
+        assertTrue(Totp.verify(SECRET, "000000", atStep(step), PERIOD, DIGITS, 0));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, "000000", atStep(step), PERIOD, DIGITS, 0);
+        assertTrue(matched.isPresent());
+        assertEquals(step, matched.getAsLong());
+    }
+
+    @Test
+    void shouldAcceptTheHighestPossibleCode() {
+        // "999999" is the upper bound of the 6-digit range and must verify
+        // when it is the correct code for the step.
+        long step = 691L;
+        assertEquals("999999", Totp.generateCode(SECRET, step, DIGITS));
+
+        assertTrue(Totp.verify(SECRET, "999999", atStep(step), PERIOD, DIGITS, 0));
+
+        OptionalLong matched = Totp.verifyWithCounter(
+                SECRET, "999999", atStep(step), PERIOD, DIGITS, 0);
+        assertTrue(matched.isPresent());
+        assertEquals(step, matched.getAsLong());
     }
 
     @Test

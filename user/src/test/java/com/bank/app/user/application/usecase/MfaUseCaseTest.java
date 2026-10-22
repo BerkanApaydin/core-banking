@@ -35,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -56,6 +57,9 @@ import static org.mockito.Mockito.when;
 class MfaUseCaseTest {
 
     private static final Clock FIXED = Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"), ZoneOffset.UTC);
+
+    private static final byte[] FIXED_SECRET =
+            "12345678901234567890".getBytes(StandardCharsets.US_ASCII);
 
     @Mock private LoadUserPort loadUserPort;
     @Mock private SaveUserPort saveUserPort;
@@ -101,6 +105,19 @@ class MfaUseCaseTest {
     private String currentCode(byte[] secret) {
         long step = FIXED.millis() / 1000L / 30L;
         return Totp.generateCode(secret, step, 6);
+    }
+
+    /**
+     * A code that is provably outside the acceptance window: it is taken from
+     * a step far ahead and checked against every step the policy would try.
+     */
+    private String codeOutsideTheWindow(byte[] secret) {
+        long step = FIXED.millis() / 1000L / 30L;
+        String candidate = Totp.generateCode(secret, step + 1000L, 6);
+        for (long windowStep = step - 1; windowStep <= step + 1; windowStep++) {
+            assertThat(Totp.generateCode(secret, windowStep, 6)).isNotEqualTo(candidate);
+        }
+        return candidate;
     }
 
     @Nested
@@ -388,6 +405,51 @@ class MfaUseCaseTest {
             assertThatThrownBy(() -> confirm.execute(7L, "Secret123", "123456"))
                     .isInstanceOf(MfaNotEnrolledException.class);
         }
+
+        @Test
+        @DisplayName("should charge a wrong confirmation code to the MFA budget")
+        void shouldChargeAWrongConfirmationCodeToTheBudget() {
+            // A wrong code on the confirmation endpoint must count against the
+            // account-keyed budget, otherwise it is a free oracle for
+            // guessing the second factor.
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, false));
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(FIXED_SECRET)));
+
+            assertThatThrownBy(() -> confirm.execute(7L, "Secret123", codeOutsideTheWindow(FIXED_SECRET)))
+                    .isInstanceOf(InvalidMfaCodeException.class);
+
+            verify(mfaAttemptPort).recordFailure(7L);
+            verify(mfaAttemptPort, never()).reset(anyLong());
+            verify(saveUserPort, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should not consume the TOTP step counter on confirmation")
+        void shouldNotConsumeTheCounterOnConfirmation() {
+            // The confirmation does not mint a session. Consuming the step
+            // counter here would reject the very next legitimate use of the
+            // same code (confirm, then log in, inside one 30-second step) and
+            // lock the user out of their own account.
+            User user = persistedUser(7L, "alice");
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(authenticationPort.authenticate("alice", "Secret123"))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, false));
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(FIXED_SECRET)));
+
+            confirm.execute(7L, "Secret123", currentCode(FIXED_SECRET));
+
+            assertThat(user.isMfaEnabled()).isTrue();
+            verify(mfaSecretPort, never()).recordAcceptedTotpCounter(any(), anyLong());
+        }
     }
 
     @Nested
@@ -550,6 +612,55 @@ class MfaUseCaseTest {
             verify(saveUserPort, never()).save(any());
             verify(mfaSecretPort, never()).deleteSecret(any());
             verify(refreshTokenPort, never()).revokeAllForUser(anyLong());
+        }
+
+        @Test
+        @DisplayName("should charge a wrong disable code to the MFA budget")
+        void shouldChargeAWrongDisableCodeToTheBudget() {
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(FIXED_SECRET)));
+            when(authenticationPort.authenticate(eq("alice"), eq("Secret123")))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, true));
+
+            assertThatThrownBy(() -> disable.execute(7L, "Secret123", codeOutsideTheWindow(FIXED_SECRET)))
+                    .isInstanceOf(InvalidMfaCodeException.class);
+
+            verify(mfaAttemptPort).recordFailure(7L);
+            verify(mfaAttemptPort, never()).reset(anyLong());
+            verify(mfaSecretPort, never()).deleteSecret(any());
+        }
+
+        @Test
+        @DisplayName("should keep the secret when the disable code was already consumed")
+        void shouldKeepTheSecretOnAReplayedDisableCode() {
+            // A code already used on the login path is a replay: the removal
+            // must fail and the stored secret must survive, otherwise a
+            // captured code could strip the second factor.
+            User user = persistedUser(7L, "alice");
+            user.enableMfa();
+            when(loadUserPort.findById(7L)).thenReturn(Optional.of(user));
+            when(clockProvider.clock()).thenReturn(FIXED);
+            when(mfaSecretPort.findSecret(7L))
+                    .thenReturn(Optional.of(encryptor.encryptToBase64(FIXED_SECRET)));
+            when(authenticationPort.authenticate(eq("alice"), eq("Secret123")))
+                    .thenReturn(new AuthenticationPort.AuthenticatedUser(
+                            new UserId(7L), "alice", Role.ROLE_USER, 0L, true));
+            // The conditional counter update says "not older": this code was
+            // already used inside its validity window.
+            when(mfaSecretPort.recordAcceptedTotpCounter(eq(7L), anyLong())).thenReturn(false);
+
+            assertThatThrownBy(() -> disable.execute(7L, "Secret123", currentCode(FIXED_SECRET)))
+                    .isInstanceOf(InvalidMfaCodeException.class);
+
+            assertThat(user.isMfaEnabled()).isTrue();
+            verify(mfaSecretPort, never()).deleteSecret(any());
+            verify(saveUserPort, never()).save(any());
+            verify(mfaAttemptPort).recordFailure(7L);
         }
     }
 

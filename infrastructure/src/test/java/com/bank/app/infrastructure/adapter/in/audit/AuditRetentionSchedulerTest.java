@@ -9,6 +9,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -45,5 +50,20 @@ class AuditRetentionSchedulerTest {
         scheduler.retainHistory();
 
         verify(retentionPort, never()).deleteOlderThan(any());
+    }
+
+    @Test
+    @DisplayName("should derive the cutoff from the injected clock")
+    void shouldUseInjectedClockForCutoff() {
+        Clock fixed = Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
+        AuditRetentionScheduler scheduler = new AuditRetentionScheduler(
+                retentionPort, new AuditProperties(500, true, 365),
+                AdvisorySchedulerLock.alwaysRun(), () -> fixed);
+
+        scheduler.retainHistory();
+
+        // The wall clock would put this years later and delete the wrong tail;
+        // the exact cutoff also proves the configured retention window is used.
+        verify(retentionPort).deleteOlderThan(LocalDateTime.of(2025, 6, 22, 10, 0));
     }
 }

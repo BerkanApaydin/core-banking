@@ -171,6 +171,43 @@ class MoneyTest {
     }
 
     @Nested
+    @DisplayName("parsing boundary")
+    class ParsingBoundary {
+
+        @Test
+        @DisplayName("should reject an empty or blank amount string")
+        void shouldRejectEmptyAmountString() {
+            assertThatThrownBy(() -> Money.of("", Currency.TRY))
+                    .isExactlyInstanceOf(NumberFormatException.class);
+            assertThatThrownBy(() -> Money.of(" ", Currency.TRY))
+                    .isExactlyInstanceOf(NumberFormatException.class);
+        }
+
+        @Test
+        @DisplayName("should name the offending amount when the scale is too large")
+        void shouldReportOffendingAmountOnExcessScale() {
+            assertThatThrownBy(() -> Money.of("10.001", Currency.TRY))
+                    .isExactlyInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Amount can have at most 2 decimal places: 10.001");
+        }
+
+        @Test
+        @DisplayName("should reject a null amount string with the domain message")
+        void shouldRejectNullAmountStringWithDomainMessage() {
+            assertThatThrownBy(() -> Money.of((String) null, Currency.TRY))
+                    .isExactlyInstanceOf(NullPointerException.class)
+                    .hasMessage("Amount must not be null");
+        }
+
+        @Test
+        @DisplayName("should accept the transfer ceiling through the string factory")
+        void shouldAcceptCeilingThroughStringFactory() {
+            assertThat(Money.ofTransferAmount("1000000000.00", Currency.TRY).amount())
+                    .isEqualByComparingTo("1000000000.00");
+        }
+    }
+
+    @Nested
     @DisplayName("arithmetic")
     class Arithmetic {
 

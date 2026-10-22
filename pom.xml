@@ -71,6 +71,18 @@
         <tomcat.version>10.1.59</tomcat.version>
         <postgresql.version>42.7.12</postgresql.version>
         <netty.version>4.1.137.Final</netty.version>
+        <!-- Upper-bound alignment with springdoc/swagger 2.2.27:
+             jakarta.validation-api:3.1.0 is requested by swagger-core-jakarta
+             and snakeyaml:2.5 by the managed jackson-dataformat-yaml:2.21.7.
+             Keep the managed versions at those floors so RequireUpperBoundDeps
+             stays clean (see the enforcer comment below). -->
+        <snakeyaml.version>2.5</snakeyaml.version>
+        <jakarta-validation.version>3.1.0</jakarta-validation.version>
+        <!-- okhttp 5.3.2 (transitive of opentelemetry-exporter-otlp) is
+             compiled against Kotlin 2.2.x; Boot 3.5.16 still manages 1.9.25,
+             which trips RequireUpperBoundDeps below. No Kotlin sources are
+             compiled here, so aligning the stdlib floor is safe. -->
+        <kotlin.version>2.2.21</kotlin.version>
         <jacoco.line.coverage>0.90</jacoco.line.coverage>
         <jacoco.branch.coverage>0.80</jacoco.branch.coverage>
         <jacoco.version>0.8.15</jacoco.version>
@@ -314,16 +326,12 @@
                                          ban legacy logging bridges that split the log
                                          pipeline (log4j-over-slf4j/slf4j-log4j12 style
                                          loops and commons-logging duplicates).
-                                         requireUpperBoundDeps is WARN (not ERROR) until the
-                                         known springdoc/swagger vs managed-BOM drift is aligned
-                                         online: swagger-core-jakarta:2.2.27 requires
-                                         jackson-dataformat-yaml:2.16.2/snakeyaml:2.5 and
-                                         jakarta.validation-api:3.1.0 while the reactor
-                                         manages 2.21.7/2.4 and 3.0.2 (see F-10). Resolved
-                                         artifacts stay on the managed versions; WARN keeps the
-                                         drift visible without red-blocking offline builds. -->
+                                         The known springdoc/swagger drift is aligned in
+                                         properties above (snakeyaml 2.5 and
+                                         jakarta.validation-api 3.1.0, see F-10), so this
+                                         rule is enforced as ERROR again. -->
                                     <requireUpperBoundDeps>
-                                        <level>WARN</level>
+                                        <level>ERROR</level>
                                     </requireUpperBoundDeps>
                                     <bannedDependencies>
                                         <excludes>

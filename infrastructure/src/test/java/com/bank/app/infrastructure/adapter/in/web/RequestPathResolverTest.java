@@ -61,4 +61,20 @@ class RequestPathResolverTest {
         assertFalse(RequestPathResolver.matchesPrefix("/api/v1/health", "/api/v1/accounts"));
         assertFalse(RequestPathResolver.matchesPrefix("/other/v1/accounts", "/api/v1/accounts"));
     }
+
+    @Test
+    void matchesPrefixShouldMatchThePrefixWithATrailingSlash() {
+        // "/api/v1/accounts/" is the prefix plus an empty segment: it belongs
+        // to the guarded subtree, not to a sibling endpoint.
+        assertTrue(RequestPathResolver.matchesPrefix("/api/v1/accounts/", "/api/v1/accounts"));
+    }
+
+    @Test
+    void matchesPrefixShouldNotMatchASiblingSegmentWithTheSameCharacters() {
+        // The admin guard must not leak onto an unrelated endpoint that only
+        // shares the prefix characters ("/api/v1/administrator").
+        assertFalse(RequestPathResolver.matchesPrefix("/api/v1/administrator", "/api/v1/admin"));
+        assertFalse(RequestPathResolver.matchesPrefix("/api/v1/adminx", "/api/v1/admin"));
+        assertFalse(RequestPathResolver.matchesPrefix("/api/v1/admin.accounts", "/api/v1/admin"));
+    }
 }
