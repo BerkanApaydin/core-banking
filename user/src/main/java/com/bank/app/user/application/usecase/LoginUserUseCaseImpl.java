@@ -80,8 +80,12 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
         rejectIfBlocked(username, clientIp);
 
+        // Kept outside the try so the failure audit can attribute a bad MFA
+        // code to the already-authenticated account; a failed password check
+        // still leaves it null (the user was never resolved).
+        AuthenticationPort.AuthenticatedUser user = null;
         try {
-            AuthenticationPort.AuthenticatedUser user = authenticationPort.authenticate(username, request.password());
+            user = authenticationPort.authenticate(username, request.password());
             // Audit (MFA): enrolled users must additionally present a TOTP code.
             // Missing, malformed and mismatched codes all fail with the same
             // fixed message as a bad password — the code path must not oracle
@@ -123,7 +127,8 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
         } catch (AuthenticationFailedException e) {
             log.warn("Failed login attempt");
             if (clientIp != null) loginAttemptPort.recordFailure(clientIp, username);
-            auditLogin(AuditEvent.LOGIN_FAILED, username, null, "Failed login attempt.");
+            auditLogin(AuditEvent.LOGIN_FAILED, username,
+                    user != null ? user.id().value() : null, "Failed login attempt.");
             throw e;
         } catch (LoginAttemptStoreUnavailableException e) {
             // A successful credential check is not enough if the login guard

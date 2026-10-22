@@ -87,8 +87,8 @@ public interface TransferJpaRepository extends JpaRepository<TransferJpaEntity, 
      *
      * <p>P-1: UNION ALL instead of {@code sender = :id OR receiver = :id} so
      * each branch range-scans its own per-side index
-     * ({@code idx_transfers_sender_business_created} /
-     * {@code idx_transfers_receiver_business_created}, V28) instead of forcing
+     * ({@code idx_transfers_sender_business_created_id} /
+     * {@code idx_transfers_receiver_business_created_id}, V61) instead of forcing
      * a bitmap-or. Sound because {@code chk_transfers_no_self_transfer}
      * guarantees the branches are disjoint (no double-count).
      */

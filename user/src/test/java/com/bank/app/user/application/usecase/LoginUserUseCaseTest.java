@@ -481,6 +481,25 @@ class LoginUserUseCaseTest {
             verify(auditEventPort).publish(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
+            assertThat(captor.getValue().actorUserId()).isNull();
+        }
+
+        @Test
+        @DisplayName("should attribute an MFA failure audit to the authenticated user")
+        void shouldAttributeMfaFailureToAuthenticatedUser() {
+            AuthRequest request = new AuthRequest(USERNAME, PASSWORD, null, null, "123456");
+            AuthenticatedUser user = new AuthenticatedUser(
+                    new UserId(100L), USERNAME, Role.ROLE_USER, 0L, true);
+            when(authenticationPort.authenticate(USERNAME, PASSWORD)).thenReturn(user);
+            when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
+
+            assertThatThrownBy(() -> loginUserUseCase.execute(request, CLIENT_IP))
+                    .isExactlyInstanceOf(AuthenticationFailedException.class);
+
+            var captor = auditCaptor();
+            verify(auditEventPort).publish(captor.capture());
+            assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
+            assertThat(captor.getValue().actorUserId()).isEqualTo(100L);
         }
 
         @Test
