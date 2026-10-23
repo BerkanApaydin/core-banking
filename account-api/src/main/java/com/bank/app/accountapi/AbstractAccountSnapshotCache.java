@@ -212,13 +212,17 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
                 .distinct()
                 .sorted()
                 .toArray();
-        for (int stripe : stripes) {
-            accountLocks[stripe].lock();
-        }
+        int acquired = 0;
         try {
+            for (int stripe : stripes) {
+                accountLocks[stripe].lock();
+                acquired++;
+            }
             writes.forEach(this::writeIbanMapping);
         } finally {
-            for (int i = stripes.length - 1; i >= 0; i--) {
+            // Release only the stripes actually acquired: an acquisition that
+            // fails mid-loop must not leave the already-taken stripes locked.
+            for (int i = acquired - 1; i >= 0; i--) {
                 accountLocks[stripes[i]].unlock();
             }
         }

@@ -1,5 +1,6 @@
 package com.bank.app.common;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,16 @@ public abstract class AbstractSpringBootIntegrationTest {
                 }
             }
         });
+    }
+
+    /**
+     * Test-only audit cleanup: opts into the same transaction-local
+     * maintenance flag that the V62 retention function uses. Must be called
+     * inside the transaction that performs the delete.
+     */
+    protected void enableAuditMaintenance(EntityManager entityManager) {
+        entityManager.createNativeQuery("SELECT set_config('app.audit_maintenance', 'on', true)")
+                .getSingleResult();
     }
 
     static {

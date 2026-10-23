@@ -162,6 +162,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                         entityManager.createQuery("delete from OutboxJpaEntity").executeUpdate();
                         entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
                         idempotencyKeyRepo.deleteAll();
+                        enableAuditMaintenance(entityManager);
                         auditRepo.deleteAll();
                         // Ledger legs reference accounts (V29 FK): child-first,
                         // so cleanup never depends on test execution order.

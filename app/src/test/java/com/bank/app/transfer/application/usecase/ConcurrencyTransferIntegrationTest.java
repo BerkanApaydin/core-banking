@@ -114,6 +114,7 @@ class ConcurrencyTransferIntegrationTest extends AbstractSpringBootIntegrationTe
             // Child tables first: ledger_entries references accounts (V29 FK),
             // so accounts cannot be deleted before their journal legs.
             entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
+            enableAuditMaintenance(entityManager);
             entityManager.createNativeQuery("DELETE FROM audit_logs").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM users").executeUpdate();

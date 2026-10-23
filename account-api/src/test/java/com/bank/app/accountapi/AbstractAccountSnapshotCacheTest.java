@@ -411,6 +411,31 @@ class AbstractAccountSnapshotCacheTest {
         worker.join(200);
     }
 
+    /**
+     * A failed batch mapping write must still release every stripe it
+     * acquired; otherwise the next full reset would block forever.
+     */
+    @Test
+    void shouldReleaseEveryStripeWhenBatchWriteFails() throws Exception {
+        FailingMappingWriteCache failing = new FailingMappingWriteCache();
+
+        assertThatThrownBy(() -> failing.putIbans(Set.of(1L, 2L),
+                Map.of(1L, "TR1", 2L, "TR2")))
+                .isInstanceOf(IllegalStateException.class);
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            failing.evictAll();
+            done.countDown();
+        });
+        worker.start();
+
+        assertThat(done.await(1, TimeUnit.SECONDS))
+                .as("a failed batch write must release every stripe it acquired")
+                .isTrue();
+        worker.join(200);
+    }
+
     @Test
     void shouldReleaseAccountLocksAfterEvictAllAndEvictById() throws Exception {
         cache.evictById(1L);
@@ -574,6 +599,14 @@ class AbstractAccountSnapshotCacheTest {
         protected void clearStorage() {
             super.clearStorage();
             throw new IllegalStateException("storage clear failed");
+        }
+    }
+
+    /** Fails the first mapping write, as a backend error would. */
+    static class FailingMappingWriteCache extends TestCache {
+        @Override
+        protected void writeIbanMapping(Long accountId, String iban) {
+            throw new IllegalStateException("mapping write failed");
         }
     }
 
