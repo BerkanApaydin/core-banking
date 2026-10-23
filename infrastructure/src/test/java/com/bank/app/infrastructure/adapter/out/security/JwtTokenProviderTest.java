@@ -29,6 +29,7 @@ class JwtTokenProviderTest {
     // flags secret scanners. Tests needing the REAL dev default reference
     // JwtTokenProvider.DEFAULT_JWT_SECRET explicitly (see below).
     private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private static final String SECRET_OLD = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
 
     @BeforeEach
     void setUp() {
@@ -450,10 +451,65 @@ class JwtTokenProviderTest {
         assertTrue(refreshRemaining - accessRemaining > 600_000_000L);
     }
 
+    @Test
+    void shouldVerifyTokenSignedWithRetiredKey() {
+        JwtTokenProvider provider = providerWithRetiredKeys(
+                Map.of("test-key-old", SECRET_OLD));
+
+        var verified = provider.verifyAndDecode(tokenWithKeyId("test-key-old", SECRET_OLD));
+
+        assertNotNull(verified);
+        assertEquals(1L, verified.userId());
+        assertEquals("testUser", verified.username());
+    }
+
+    @Test
+    void shouldRejectTokenWithUnknownKeyId() {
+        JwtTokenProvider provider = providerWithRetiredKeys(
+                Map.of("test-key-old", SECRET_OLD));
+
+        assertNull(provider.verifyAndDecode(tokenWithKeyId("unknown-key", SECRET_OLD)));
+    }
+
+    @Test
+    void shouldStillSignNewTokensWithActiveKeyIdWhenRetiredKeysExist() {
+        JwtTokenProvider provider = providerWithRetiredKeys(
+                Map.of("test-key-old", SECRET_OLD));
+
+        var parsed = Jwts.parser()
+                .verifyWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .build()
+                .parseSignedClaims(provider.generateToken(1L, "testUser"));
+
+        assertEquals("test-key", parsed.getHeader().getKeyId());
+    }
+
     private static JwtTokenProvider provider(String issuer, String audience) {
         return new JwtTokenProvider(new JwtProperties(
                 SECRET, 86400000L, 604800000L, true,
-                issuer, audience, "test-key", 30L));
+                issuer, audience, "test-key", 30L, Map.of()));
+    }
+
+    private static JwtTokenProvider providerWithRetiredKeys(Map<String, String> retiredKeys) {
+        return new JwtTokenProvider(new JwtProperties(
+                SECRET, 86400000L, 604800000L, true,
+                "test-issuer", "test-audience", "test-key", 30L, retiredKeys));
+    }
+
+    private static String tokenWithKeyId(String keyId, String secret) {
+        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .issuer("test-issuer")
+                .audience().add("test-audience").and()
+                .header().keyId(keyId).and()
+                .subject("testUser")
+                .claim("userId", 1L)
+                .claim("role", "ROLE_USER")
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + 86_400_000L))
+                .signWith(key)
+                .compact();
     }
 
     private static String tokenWithClaims(String subject, Long userId, String role,

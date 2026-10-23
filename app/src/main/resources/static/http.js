@@ -165,7 +165,39 @@ function browserCsrfToken() {
 // Single in-flight rotation shared by concurrent 401s: the backend treats a
 // second presentation of the same refresh token as theft (whole family
 // revoked), so parallel refresh calls must be coalesced client-side.
+// `navigator.locks` extends that guarantee across same-origin tabs: without
+// it two tabs can present the same cookie before either response rotates it.
 let refreshInFlight = null;
+const REFRESH_LOCK_NAME = 'bank-auth-refresh';
+
+function refreshOnce() {
+    if (refreshInFlight) return refreshInFlight;
+    const pending = performSilentRefresh().finally(() => {
+        if (refreshInFlight === pending) refreshInFlight = null;
+    });
+    refreshInFlight = pending;
+    return pending;
+}
+
+async function performSilentRefresh() {
+    const csrf = browserCsrfToken();
+    const headers = { 'Accept-Language': getLanguage() };
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+    const response = await fetch(`${API_BASE}/auth/browser/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin'
+    });
+    if (!response.ok) throw new Error('refresh failed');
+    let result = null;
+    try { result = await response.json(); } catch (e) { /* empty body: still rotated */ }
+    if (result && result.userId) {
+        userId = result.userId;
+        username = result.username;
+    }
+    authenticated = true;
+    return true;
+}
 
 async function trySilentRefresh() {
     if (refreshInFlight) {
@@ -174,31 +206,19 @@ async function trySilentRefresh() {
             return authenticated;
         } catch (e) { return false; }
     }
-    refreshInFlight = (async () => {
-        const csrf = browserCsrfToken();
-        const headers = { 'Accept-Language': getLanguage() };
-        if (csrf) headers['X-CSRF-Token'] = csrf;
-        const response = await fetch(`${API_BASE}/auth/browser/refresh`, {
-            method: 'POST',
-            headers,
-            credentials: 'same-origin'
-        });
-        if (!response.ok) throw new Error('refresh failed');
-        let result = null;
-        try { result = await response.json(); } catch (e) { /* empty body: still rotated */ }
-        if (result && result.userId) {
-            userId = result.userId;
-            username = result.username;
+    if (typeof navigator !== 'undefined' && navigator.locks
+            && typeof navigator.locks.request === 'function') {
+        try {
+            return await navigator.locks.request(
+                REFRESH_LOCK_NAME, { mode: 'exclusive' }, refreshOnce);
+        } catch (e) {
+            return false;
         }
-        authenticated = true;
-        return true;
-    })();
+    }
     try {
-        return await refreshInFlight;
+        return await refreshOnce();
     } catch (e) {
         return false;
-    } finally {
-        refreshInFlight = null;
     }
 }
 

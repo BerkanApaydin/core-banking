@@ -578,7 +578,8 @@ test('opening-balance field follows the authenticated backend capability', async
 });
 
 test('concurrent 401s share one silent refresh (theft-safe coalescing)', async () => {
-    const functions = 'let refreshInFlight = null;\n' + extractFunction(httpSource, 'trySilentRefresh');
+    const functions = 'let refreshInFlight = null;\nconst REFRESH_LOCK_NAME = "bank-auth-refresh";\n'
+        + extractFunctions(httpSource, 'refreshOnce', 'performSilentRefresh', 'trySilentRefresh');
     let fetchCalls = 0;
     const context = vm.createContext({
         API_BASE: '',
@@ -605,6 +606,53 @@ test('concurrent 401s share one silent refresh (theft-safe coalescing)', async (
     assert.equal(vm.runInContext('userId', context), 7);
 });
 
+test('cross-tab Web Locks serialize refresh rotations', async () => {
+    const functions = 'let refreshInFlight = null;\nconst REFRESH_LOCK_NAME = "bank-auth-refresh";\n'
+        + extractFunctions(httpSource, 'refreshOnce', 'performSilentRefresh', 'trySilentRefresh');
+    let fetchCalls = 0;
+    let activeFetches = 0;
+    let maxActiveFetches = 0;
+    let lockChain = Promise.resolve();
+    const navigator = {
+        locks: {
+            request(name, options, callback) {
+                assert.equal(name, 'bank-auth-refresh');
+                assert.equal(options.mode, 'exclusive');
+                const run = lockChain.then(callback);
+                lockChain = run.catch(() => {});
+                return run;
+            }
+        }
+    };
+    const context = vm.createContext({
+        API_BASE: '',
+        authenticated: true,
+        userId: null,
+        username: null,
+        navigator,
+        document: { cookie: 'BANK_CSRF=' + 'x'.repeat(43) },
+        getLanguage: () => 'en',
+        browserCsrfToken: () => 'x'.repeat(43),
+        fetch: async () => {
+            fetchCalls++;
+            activeFetches++;
+            maxActiveFetches = Math.max(maxActiveFetches, activeFetches);
+            await new Promise(resolve => setTimeout(resolve, 10));
+            activeFetches--;
+            return { ok: true, json: async () => ({ userId: 7, username: 'alice' }) };
+        },
+        __: key => key
+    });
+    vm.runInContext(functions, context);
+
+    const [first, second] = await vm.runInContext(
+        'Promise.all([trySilentRefresh(), trySilentRefresh()])', context);
+    assert.equal(first, true);
+    assert.equal(second, true);
+    assert.equal(fetchCalls, 2, 'each tab rotates after acquiring the lock');
+    assert.equal(maxActiveFetches, 1, 'refreshes must never overlap across tabs');
+});
+
 test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () => {
     const functions = extractFunction(source, 'meetsPasswordPolicy');
     const context = vm.createContext({ TextEncoder });
@@ -627,7 +675,8 @@ test('password gate mirrors backend policy (12–72 + upper/lower/digit)', () =>
 });
 
 test('failed silent refresh keeps the session logged out', async () => {
-    const functions = 'let refreshInFlight = null;\n' + extractFunction(httpSource, 'trySilentRefresh');
+    const functions = 'let refreshInFlight = null;\nconst REFRESH_LOCK_NAME = "bank-auth-refresh";\n'
+        + extractFunctions(httpSource, 'refreshOnce', 'performSilentRefresh', 'trySilentRefresh');
     const context = vm.createContext({
         API_BASE: '',
         authenticated: true,

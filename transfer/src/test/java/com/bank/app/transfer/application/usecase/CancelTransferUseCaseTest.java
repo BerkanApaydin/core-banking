@@ -7,6 +7,7 @@ import com.bank.app.common.application.service.ResourceOwnershipPolicy;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
+import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.transfer.domain.exception.TransferNotFoundException;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -22,6 +23,7 @@ import com.bank.app.transfer.domain.exception.TransferNotCancellableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -98,7 +100,9 @@ class CancelTransferUseCaseTest {
         // Account publishes its own events; transfer publishes only its own.
         verify(domainEventPublisherService, never()).publish(any());
         verify(domainEventPublisherService).publishEvents(transfer);
-        verify(auditEventPort).publish(any());
+        ArgumentCaptor<AuditEvent> auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals(100L, auditCaptor.getValue().actorUserId());
         assertEquals(TransferStatus.CANCELLED, transfer.getStatus());
     }
 

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,6 +17,7 @@ class HmacCsrfBindingAdapterTest {
     // Zero-entropy placeholder: valid shape, never flags secret scanners.
     // The real dev default lives only in JwtTokenProvider + compose.
     private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private static final String SECRET_OLD = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
 
     @Test
     @DisplayName("should round-trip via JwtProperties-derived key (K7/D8)")
@@ -167,8 +169,27 @@ class HmacCsrfBindingAdapterTest {
         assertThat(production.verifyCsrfToken(token, token, "42")).isTrue();
     }
 
+    @Test
+    @DisplayName("JWT rotation keeps in-flight CSRF tokens valid via retired keys")
+    void shouldVerifyCsrfTokenSignedWithRetiredJwtSecret() {
+        JwtProperties oldProperties = new JwtProperties(SECRET_OLD, 900000L, 604800000L, true,
+                "test-issuer", "test-audience", "old-key", 30L, Map.of());
+        HmacCsrfBindingAdapter oldAdapter = new HmacCsrfBindingAdapter(oldProperties);
+        String oldToken = oldAdapter.issueCsrfToken("42");
+
+        JwtProperties rotatedProperties = new JwtProperties(SECRET, 900000L, 604800000L, true,
+                "test-issuer", "test-audience", "new-key", 30L,
+                Map.of("old-key", SECRET_OLD));
+        HmacCsrfBindingAdapter rotatedAdapter = new HmacCsrfBindingAdapter(rotatedProperties);
+
+        assertThat(rotatedAdapter.verifyCsrfToken(oldToken, oldToken, "42")).isTrue();
+        String newToken = rotatedAdapter.issueCsrfToken("42");
+        assertThat(rotatedAdapter.verifyCsrfToken(newToken, newToken, "42")).isTrue();
+        assertThat(oldAdapter.verifyCsrfToken(newToken, newToken, "42")).isFalse();
+    }
+
     private static JwtProperties properties() {
         return new JwtProperties(SECRET, 900000L, 604800000L, true,
-                "test-issuer", "test-audience", "test-key", 30L);
+                "test-issuer", "test-audience", "test-key", 30L, Map.of());
     }
 }

@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -38,6 +39,16 @@ class SecurityConfigTest {
     void setUp() {
         securityProperties = new SecurityProperties(null, 12, 31536000L);
         securityConfig = new SecurityConfig(jwtAuthFilter, userDetailsService, securityProperties, authenticationEntryPoint, accessDeniedHandler);
+    }
+
+    @Test
+    void shouldDisableServletContainerRegistrationForJwtFilter() {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration =
+                securityConfig.jwtFilterRegistration(jwtAuthFilter);
+
+        assertSame(jwtAuthFilter, registration.getFilter());
+        assertFalse(registration.isEnabled(),
+                "JwtAuthenticationFilter must run only inside the Spring Security chain");
     }
 
     @Test

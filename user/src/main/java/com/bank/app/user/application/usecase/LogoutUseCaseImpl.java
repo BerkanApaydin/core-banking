@@ -44,6 +44,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     public void execute(String authHeader, String refreshToken) {
         String username = "system";
         String accessToken = null;
+        JwtPort.VerifiedToken accessIdentity = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             accessToken = authHeader.substring(7);
             // M-4: already-revoked access tokens short-circuit to a pure no-op
@@ -55,17 +56,26 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
             // attempt the normal revocation path instead of dropping logout.
             if (isAlreadyRevoked(accessToken)) {
                 // Access already gone but a refresh session was also presented:
-                // revoke its whole family idempotently, then return without
+                // revoke its family when the access subject is trustworthy,
+                // otherwise revoke only the presented row. Then return without
                 // re-auditing.
                 if (hasRefreshToken(refreshToken)) {
-                    revokeRefreshFamily(refreshToken);
+                    Long accessUserId = verifiedUserId(accessToken);
+                    if (accessUserId == null) {
+                        revokeSingleRefreshToken(refreshToken);
+                    } else {
+                        revokeRefreshFamily(refreshToken, accessUserId);
+                    }
                 }
                 return;
             }
+            accessIdentity = verifyBestEffort(accessToken);
             username = bestEffortUsername(accessToken, refreshToken);
         } else if (hasRefreshToken(refreshToken)) {
             username = bestEffortUsername(refreshToken, null);
         }
+        Long accessUserId = accessIdentity == null ? null : accessIdentity.userId();
+        Long actorUserId = accessUserId;
         // R-U11: revoke the long-lived refresh family BEFORE blacklisting the
         // short-lived access token. If the database is unavailable, logout
         // fails here and the caller can retry; reversing the order would leave
@@ -73,7 +83,17 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         // burned. Rotating issues a new token in the same family, so a
         // single-row revoke would leave the replacement usable too.
         if (hasRefreshToken(refreshToken)) {
-            revokeRefreshFamily(refreshToken);
+            if (actorUserId == null) {
+                actorUserId = verifiedUserId(refreshToken);
+            }
+            if (accessToken != null && accessUserId == null) {
+                // The access token was presented but could not be verified
+                // (expired/forged): without a trusted subject, revoke only the
+                // presented refresh row instead of a whole family.
+                revokeSingleRefreshToken(refreshToken);
+            } else {
+                revokeRefreshFamily(refreshToken, accessUserId);
+            }
         }
         if (accessToken != null) {
             long remainingMs = jwtPort.getRemainingMs(accessToken);
@@ -81,7 +101,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
                 tokenBlacklistPort.blacklist(accessToken, remainingMs);
             }
         }
-        auditLogout(username);
+        auditLogout(username, actorUserId);
     }
 
     private static boolean hasRefreshToken(String refreshToken) {
@@ -92,15 +112,45 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
      * Logout ends the browser session, not just the one token presented:
      * revoking the family also retires the rotated successor. Unknown hashes
      * keep the idempotent single-row no-op path.
+     *
+     * <p>When the access token was verified, the refresh session must belong
+     * to the same user. Otherwise a caller holding any valid access token
+     * could terminate another user's whole refresh family (DoS) by presenting
+     * a stolen refresh token.
      */
-    private void revokeRefreshFamily(String refreshToken) {
+    private void revokeRefreshFamily(String refreshToken, Long expectedUserId) {
         String hash = TokenDigest.sha256Hex(refreshToken);
         StoredRefresh stored = refreshTokenPort.findByTokenHash(hash).orElse(null);
         if (stored != null) {
+            if (expectedUserId != null && !expectedUserId.equals(stored.userId())) {
+                log.warn("Logout refresh token subject mismatch; refresh family not revoked. "
+                                + "accessUserId={}, refreshUserId={}",
+                        expectedUserId, stored.userId());
+                return;
+            }
             refreshTokenPort.revokeFamily(stored.familyId(), stored.userId());
             return;
         }
-        refreshTokenPort.revoke(hash);
+        revokeSingleRefreshToken(refreshToken);
+    }
+
+    private void revokeSingleRefreshToken(String refreshToken) {
+        refreshTokenPort.revoke(TokenDigest.sha256Hex(refreshToken));
+    }
+
+    private Long verifiedUserId(String token) {
+        JwtPort.VerifiedToken identity = verifyBestEffort(token);
+        return identity == null ? null : identity.userId();
+    }
+
+    private JwtPort.VerifiedToken verifyBestEffort(String token) {
+        try {
+            return jwtPort.verifyAndDecode(token);
+        } catch (RuntimeException invalid) {
+            log.debug("Logout token identity unavailable: {}",
+                    invalid.getClass().getSimpleName());
+            return null;
+        }
     }
 
     private boolean isAlreadyRevoked(String token) {
@@ -137,10 +187,10 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
      * already happened above, so an audit-store outage must not turn logout
      * into a 500 — the client already dropped its cookies.
      */
-    private void auditLogout(String username) {
+    private void auditLogout(String username, Long actorUserId) {
         try {
             auditEventPort.publish(new AuditEvent(AuditEvent.LOGOUT, "User logged out; tokens revoked.",
-                    LocalDateTime.now(clockProvider.clock()), username));
+                    LocalDateTime.now(clockProvider.clock()), username, actorUserId));
         } catch (Exception auditFailure) {
             log.warn("Logout audit write failed: failureType={}",
                     auditFailure.getClass().getSimpleName());

@@ -23,6 +23,36 @@ jobs:
       with:
         fail-on-severity: high
 
+  codeql:
+    # SAST gate: the OSV/dependency-review jobs cover vulnerable libraries,
+    # but only CodeQL looks for injection, auth-bypass and crypto misuse in
+    # this repository's own Java. Findings are uploaded to code scanning;
+    # the build step is explicit (instead of autobuild) so the analysed
+    # classpath is the same multi-module Maven build used everywhere else.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+    - name: Set up JDK 21
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+      with:
+        languages: java-kotlin
+        queries: security-extended
+    - name: Build for CodeQL
+      run: mvn -B -ntp -DskipTests compile
+    - name: Analyze
+      uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+      with:
+        category: "/language:java-kotlin"
+
   secret-scan:
     # I-03: working-tree secret scan (rules in .gitleaks.toml). Allowlisted
     # values are documented non-secret placeholders and test-only fixtures

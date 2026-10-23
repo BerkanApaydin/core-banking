@@ -126,6 +126,8 @@ class LogoutUseCaseImplTest {
     void shouldRevokeRefreshTokenWhenSupplied() {
         stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
         when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
                 .thenReturn(java.util.Optional.of(new StoredRefresh(
                         TokenDigest.sha256Hex("valid-refresh-token"), 7L, "family-1",
@@ -143,6 +145,8 @@ class LogoutUseCaseImplTest {
     void shouldRevokeRefreshFamilyBeforeBlacklistingAccessToken() {
         stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
         when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
                 .thenReturn(java.util.Optional.of(new StoredRefresh(
                         TokenDigest.sha256Hex("valid-refresh-token"), 7L, "family-1",
@@ -158,6 +162,8 @@ class LogoutUseCaseImplTest {
     @Test
     @DisplayName("R-U11: a failed refresh revocation must not burn the access token")
     void shouldNotBlacklistAccessTokenWhenRefreshRevocationFails() {
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
         when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
                 .thenThrow(new IllegalStateException("db down"));
 
@@ -171,12 +177,10 @@ class LogoutUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("should revoke only the presented token when it is unknown")
-    void shouldFallBackToSingleRevokeForUnknownRefreshToken() {
+    @DisplayName("an unverified access token with an unknown refresh token revokes only the presented row")
+    void shouldRevokeOnlyPresentedRowForUnverifiedAccessAndUnknownRefresh() {
         stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
-        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("unknown")))
-                .thenReturn(java.util.Optional.empty());
 
         logoutUseCase.execute("Bearer valid-jwt-token", "unknown");
 
@@ -185,9 +189,25 @@ class LogoutUseCaseImplTest {
     }
 
     @Test
+    @DisplayName("an unverifiable access token revokes only the presented refresh row")
+    void shouldRevokeOnlyPresentedRefreshRowWhenAccessTokenCannotBeVerified() {
+        stubClock();
+        when(tokenBlacklistPort.isBlacklisted("expired-jwt-token")).thenReturn(false);
+        when(jwtPort.getRemainingMs("expired-jwt-token")).thenReturn(0L);
+
+        logoutUseCase.execute("Bearer expired-jwt-token", "valid-refresh-token");
+
+        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("valid-refresh-token"));
+        verify(refreshTokenPort, never()).findByTokenHash(anyString());
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
+    }
+
+    @Test
     @DisplayName("an already-revoked access token still revokes the presented refresh family")
     void shouldRevokeFamilyForAlreadyRevokedAccessToken() {
         when(tokenBlacklistPort.isBlacklisted("revoked-jwt-token")).thenReturn(true);
+        when(jwtPort.verifyAndDecode("revoked-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
         when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("refresh-9")))
                 .thenReturn(java.util.Optional.of(new StoredRefresh(
                         TokenDigest.sha256Hex("refresh-9"), 7L, "family-9",
@@ -196,6 +216,20 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute("Bearer revoked-jwt-token", "refresh-9");
 
         verify(refreshTokenPort).revokeFamily("family-9", 7L);
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
+        verifyNoInteractions(auditEventPort);
+    }
+
+    @Test
+    @DisplayName("an already-revoked, expired access token revokes only the presented refresh row")
+    void shouldRevokeOnlyPresentedRefreshRowForExpiredRevokedAccessToken() {
+        when(tokenBlacklistPort.isBlacklisted("revoked-jwt-token")).thenReturn(true);
+
+        logoutUseCase.execute("Bearer revoked-jwt-token", "refresh-9");
+
+        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("refresh-9"));
+        verify(refreshTokenPort, never()).findByTokenHash(anyString());
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
         verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
         verifyNoInteractions(auditEventPort);
     }
@@ -324,5 +358,68 @@ class LogoutUseCaseImplTest {
 
         // Revocation happened; the audit gap is only logged.
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
+    }
+
+    @Test
+    @DisplayName("binds the refresh family to the verified access-token subject")
+    void shouldBindRefreshFamilyToAccessTokenSubject() {
+        stubClock();
+        when(tokenBlacklistPort.isBlacklisted("valid-jwt-token")).thenReturn(false);
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("valid-refresh-token")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("valid-refresh-token"), 7L, "family-1",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
+
+        logoutUseCase.execute("Bearer valid-jwt-token", "valid-refresh-token");
+
+        verify(refreshTokenPort).revokeFamily("family-1", 7L);
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals(7L, auditCaptor.getValue().actorUserId());
+    }
+
+    @Test
+    @DisplayName("does not revoke a refresh family owned by another user")
+    void shouldNotRevokeRefreshFamilyOwnedByAnotherUser() {
+        stubClock();
+        when(tokenBlacklistPort.isBlacklisted("valid-jwt-token")).thenReturn(false);
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("victim-refresh")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("victim-refresh"), 9L, "family-victim",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
+
+        logoutUseCase.execute("Bearer valid-jwt-token", "victim-refresh");
+
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
+        verify(refreshTokenPort, never()).revoke(anyString());
+        verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
+        var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventPort).publish(auditCaptor.capture());
+        assertEquals(7L, auditCaptor.getValue().actorUserId());
+    }
+
+    @Test
+    @DisplayName("an already-revoked access token cannot revoke another user's refresh family")
+    void shouldNotRevokeAnotherUsersFamilyForAlreadyRevokedAccessToken() {
+        when(tokenBlacklistPort.isBlacklisted("revoked-jwt-token")).thenReturn(true);
+        when(jwtPort.verifyAndDecode("revoked-jwt-token")).thenReturn(new JwtPort.VerifiedToken(
+                "alice", 7L, "USER", "jti-1", 0L));
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("victim-refresh")))
+                .thenReturn(java.util.Optional.of(new StoredRefresh(
+                        TokenDigest.sha256Hex("victim-refresh"), 9L, "family-victim",
+                        java.time.LocalDateTime.now().plusDays(1), false, null)));
+
+        logoutUseCase.execute("Bearer revoked-jwt-token", "victim-refresh");
+
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
+        verify(refreshTokenPort, never()).revoke(anyString());
+        verify(tokenBlacklistPort, never()).blacklist(anyString(), anyLong());
+        verifyNoInteractions(auditEventPort);
     }
 }

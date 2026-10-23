@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -90,6 +91,22 @@ public class SecurityConfig {
                     .policy("camera=(), microphone=(), geolocation=(), payment=(), usb=()")));
 
         return http.build();
+    }
+
+    /**
+     * The filter is a {@code @Component} so the security chain can inject it,
+     * but Boot would also auto-register every Filter bean with the servlet
+     * container. That second registration runs it outside Spring Security
+     * (before the chain) and duplicates authentication work. Disable only the
+     * container registration; {@code addFilterBefore} still owns it.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(
+            JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration =
+                new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

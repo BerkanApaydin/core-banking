@@ -60,7 +60,8 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         AccountId senderAccountId = transfer.getSenderAccountId();
         AccountId receiverAccountId = transfer.getReceiverAccountId();
 
-        transferAuthorizationService.authorizeByAccountId(senderAccountId);
+        AccountAclPort.AccountInfo senderInfo =
+                transferAuthorizationService.authorizeByAccountId(senderAccountId);
 
         transfer.cancel(clockProvider.clock(), cancellationWindow);
 
@@ -81,7 +82,8 @@ public class CancelTransferUseCaseImpl implements CancelTransferUseCase {
         auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_CANCELLED,
             String.format("Transfer cancelled. Transfer ID: %d", transfer.getId()),
             LocalDateTime.now(clockProvider.clock()),
-            transferAuthorizationService.getCurrentUsername()));
+            transferAuthorizationService.getCurrentUsername(),
+            senderInfo.userId()));
     }
 
 }

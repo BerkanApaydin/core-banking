@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -19,7 +20,8 @@ public record JwtProperties(
         @DefaultValue("clean-architecture-bank") String issuer,
         @DefaultValue("clean-architecture-bank-api") String audience,
         @DefaultValue("primary") String keyId,
-        @DefaultValue("30") long clockSkewSeconds
+        @DefaultValue("30") long clockSkewSeconds,
+        Map<String, String> retiredKeys
 ) {
     public JwtProperties {
         if (secret == null || secret.isBlank()) {
@@ -45,6 +47,25 @@ public record JwtProperties(
         if (clockSkewSeconds < 0 || clockSkewSeconds > 300) {
             throw new IllegalArgumentException(
                 "JWT clock skew must be between 0 and 300 seconds");
+        }
+        if (retiredKeys == null || retiredKeys.isEmpty()) {
+            retiredKeys = Map.of();
+        } else {
+            retiredKeys.forEach((retiredKeyId, retiredSecret) -> {
+                if (retiredKeyId == null || retiredKeyId.isBlank()) {
+                    throw new IllegalArgumentException(
+                        "JWT retired key id must not be blank");
+                }
+                if (retiredSecret == null || retiredSecret.isBlank()) {
+                    throw new IllegalArgumentException(
+                        "JWT retired secret must not be blank for key id: " + retiredKeyId);
+                }
+            });
+            retiredKeys = Map.copyOf(retiredKeys);
+        }
+        if (retiredKeys.containsKey(keyId)) {
+            throw new IllegalArgumentException(
+                "JWT retired keys must not contain the active key id: " + keyId);
         }
     }
 }

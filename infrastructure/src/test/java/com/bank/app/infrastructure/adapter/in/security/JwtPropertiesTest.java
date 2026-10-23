@@ -1,8 +1,12 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,6 +17,9 @@ class JwtPropertiesTest {
     // Zero-entropy placeholder: valid shape, never flags secret scanners.
     // The real dev default lives only in JwtTokenProvider + compose.
     private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(TestConfig.class);
 
     @Test
     @DisplayName("should bind explicit values (D13/K14)")
@@ -30,6 +37,21 @@ class JwtPropertiesTest {
     }
 
     @Test
+    @DisplayName("should bind through Spring's constructor binding")
+    void shouldBindThroughSpringConstructorBinding() {
+        contextRunner
+                .withPropertyValues(
+                        "jwt.secret=" + SECRET,
+                        "jwt.key-id=test-key",
+                        "jwt.retired-keys.old-key=" + SECRET)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(JwtProperties.class).retiredKeys())
+                            .containsEntry("old-key", SECRET);
+                });
+    }
+
+    @Test
     @DisplayName("should fail fast on blank secret (D13/K14)")
     void shouldFailFastOnBlankSecret() {
         assertThatThrownBy(() -> properties("   ", "test-issuer", "test-audience", "test-key", 30L))
@@ -44,11 +66,11 @@ class JwtPropertiesTest {
     void shouldRejectNonPositiveExpirations() {
         assertThatThrownBy(() -> new JwtProperties(
                 SECRET, 0L, 604800000L, false,
-                "test-issuer", "test-audience", "test-key", 30L))
+                "test-issuer", "test-audience", "test-key", 30L, Map.of()))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new JwtProperties(
                 SECRET, 900000L, -1L, false,
-                "test-issuer", "test-audience", "test-key", 30L))
+                "test-issuer", "test-audience", "test-key", 30L, Map.of()))
                 .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 
@@ -88,6 +110,21 @@ class JwtPropertiesTest {
     }
 
     @Test
+    @DisplayName("should expose retired verification keys and reject active-key collision")
+    void shouldExposeRetiredKeys() {
+        JwtProperties props = new JwtProperties(SECRET, 900000L, 604800000L, false,
+                "test-issuer", "test-audience", "test-key", 30L,
+                Map.of("old-key", SECRET));
+
+        assertThat(props.retiredKeys()).containsEntry("old-key", SECRET);
+        assertThatThrownBy(() -> new JwtProperties(SECRET, 900000L, 604800000L, false,
+                "test-issuer", "test-audience", "test-key", 30L,
+                Map.of("test-key", SECRET)))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("active key id");
+    }
+
+    @Test
     @DisplayName("provider should accept typed properties (D13/K14)")
     void providerShouldAcceptTypedProperties() {
         JwtTokenProvider provider = new JwtTokenProvider(properties());
@@ -103,6 +140,11 @@ class JwtPropertiesTest {
     private static JwtProperties properties(String secret, String issuer, String audience,
                                             String keyId, long clockSkewSeconds) {
         return new JwtProperties(secret, 900000L, 604800000L, false,
-                issuer, audience, keyId, clockSkewSeconds);
+                issuer, audience, keyId, clockSkewSeconds, Map.of());
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(JwtProperties.class)
+    static class TestConfig {
     }
 }

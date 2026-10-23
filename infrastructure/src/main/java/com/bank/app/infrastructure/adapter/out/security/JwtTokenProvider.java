@@ -4,15 +4,19 @@ import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import com.bank.app.user.application.port.out.JwtPort;
 import org.springframework.beans.factory.annotation.Autowired;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.ProtectedHeader;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.io.Decoders;
+import java.security.Key;
 import java.util.Date;
 import java.time.Clock;
 import java.util.HashMap;
@@ -73,7 +77,9 @@ public class JwtTokenProvider implements JwtPort {
     private final String audience;
     private final String keyId;
     private final long clockSkewSeconds;
+    private final Map<String, String> retiredSecrets;
     private volatile SecretKey signingKey;
+    private volatile Map<String, SecretKey> retiredVerificationKeys = Map.of();
     private volatile JwtParser verifiedParser;
     // Time-strategy seam (docs/decisions/time-strategy.md): jjwt requires
     // java.util.Date, so the clock is adapted at the boundary via
@@ -92,7 +98,7 @@ public class JwtTokenProvider implements JwtPort {
         this(properties.secret(), properties.accessExpiration(),
                 properties.refreshExpiration(), properties.allowDefaultSecret(),
                 properties.issuer(), properties.audience(), properties.keyId(),
-                properties.clockSkewSeconds());
+                properties.clockSkewSeconds(), properties.retiredKeys());
     }
 
     // Legacy constructor kept for isolated unit tests (no Spring context).
@@ -100,13 +106,13 @@ public class JwtTokenProvider implements JwtPort {
                             long refreshExpiration, boolean allowDefaultSecret) {
         this(secretKey, accessExpiration, refreshExpiration, allowDefaultSecret,
                 "clean-architecture-bank", "clean-architecture-bank-api",
-                "primary", 30L);
+                "primary", 30L, Map.of());
     }
 
     private JwtTokenProvider(String secretKey, long accessExpiration,
                              long refreshExpiration, boolean allowDefaultSecret,
                              String issuer, String audience, String keyId,
-                             long clockSkewSeconds) {
+                             long clockSkewSeconds, Map<String, String> retiredSecrets) {
         this.secretKey = secretKey;
         this.accessExpiration = accessExpiration;
         this.refreshExpiration = refreshExpiration;
@@ -115,6 +121,7 @@ public class JwtTokenProvider implements JwtPort {
         this.audience = audience;
         this.keyId = keyId;
         this.clockSkewSeconds = clockSkewSeconds;
+        this.retiredSecrets = retiredSecrets == null ? Map.of() : Map.copyOf(retiredSecrets);
     }
 
     @PostConstruct
@@ -129,36 +136,75 @@ public class JwtTokenProvider implements JwtPort {
                 "Default JWT secret is not allowed (jwt.allow-default-secret=false). "
                 + "Set JWT_SECRET environment variable.");
         }
+        signingKey = decodeKey(secretKey, "JWT secret");
+        Map<String, SecretKey> retired = new HashMap<>();
+        retiredSecrets.forEach((retiredKeyId, retiredSecret) ->
+                retired.put(retiredKeyId, decodeKey(retiredSecret,
+                        "JWT retired secret for key id " + retiredKeyId)));
+        retiredVerificationKeys = Map.copyOf(retired);
+        // Issuer/audience pin the token to this service: a token minted by a
+        // sibling service sharing the HMAC key must not be accepted here.
+        // Clock skew absorbs small node clock drift; it widens the accepted
+        // lifetime by only the bounded grace configured here.
+        // The key locator is the rotation seam: new tokens always use the
+        // active key, while tokens signed by a retired key remain verifiable
+        // until they expire. An unknown kid fails closed.
+        verifiedParser = Jwts.parser()
+                .keyLocator(this::locateVerificationKey)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
+                .clock(() -> Date.from(clock.instant()))
+                .clockSkewSeconds(clockSkewSeconds)
+                .build();
+    }
+
+    private Key locateVerificationKey(Header header) {
+        String requestedKeyId = header instanceof ProtectedHeader protectedHeader
+                ? protectedHeader.getKeyId() : null;
+        if (requestedKeyId == null && header.get("kid") instanceof String legacyKeyId) {
+            requestedKeyId = legacyKeyId;
+        }
+        if (requestedKeyId == null || requestedKeyId.isBlank()
+                || keyId.equals(requestedKeyId)) {
+            return requireSigningKey();
+        }
+        SecretKey retiredKey = retiredVerificationKeys.get(requestedKeyId);
+        if (retiredKey == null) {
+            // Unknown kid: fail closed instead of trying every key.
+            throw new UnsupportedJwtException("Unknown JWT key id");
+        }
+        return retiredKey;
+    }
+
+    private static SecretKey decodeKey(String value, String label) {
         final byte[] keyBytes;
         try {
-            keyBytes = Decoders.BASE64.decode(secretKey);
+            keyBytes = Decoders.BASE64.decode(value);
         } catch (IllegalArgumentException | JwtException invalidBase64) {
             // jjwt's Decoders throw DecodingException (a JwtException, NOT an
             // IllegalArgumentException), so both must be caught: otherwise a
             // non-Base64 secret fails with a raw stack trace instead of the
             // actionable message below.
             throw new IllegalStateException(
-                "JWT secret must be valid Base64 (generate: openssl rand -base64 32).",
+                label + " must be valid Base64 (generate: openssl rand -base64 32).",
                 invalidBase64);
         }
         if (keyBytes.length < 32) {
             throw new IllegalStateException(
-                "JWT secret must be at least 256 bits (32 bytes) when base64-decoded. " +
+                label + " must be at least 256 bits (32 bytes) when base64-decoded. " +
                 "Current key length: " + (keyBytes.length * 8) + " bits. " +
                 "Generate a secure key with: openssl rand -base64 32");
         }
-        signingKey = Keys.hmacShaKeyFor(keyBytes);
-        // Issuer/audience pin the token to this service: a token minted by a
-        // sibling service sharing the HMAC key must not be accepted here.
-        // Clock skew absorbs small node clock drift; it widens the accepted
-        // lifetime by only the bounded grace configured here.
-        verifiedParser = Jwts.parser()
-                .verifyWith(signingKey)
-                .requireIssuer(issuer)
-                .requireAudience(audience)
-                .clock(() -> Date.from(clock.instant()))
-                .clockSkewSeconds(clockSkewSeconds)
-                .build();
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private SecretKey requireSigningKey() {
+        SecretKey key = signingKey;
+        if (key == null) {
+            validateSecret();
+            key = signingKey;
+        }
+        return key;
     }
 
     @Override

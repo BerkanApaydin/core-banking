@@ -4,9 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AuditLogJpaRepository extends JpaRepository<AuditLogJpaEntity, Long> {
 
@@ -18,16 +18,15 @@ public interface AuditLogJpaRepository extends JpaRepository<AuditLogJpaEntity, 
             LocalDateTime from, LocalDateTime to, Pageable pageable);
 
     /**
-     * Bounded retention batch: Postgres forbids LIMIT directly in DELETE, so
-     * the batch scopes through an IN-subquery over the retention index
-     * ({@code idx_audit_logs_timestamp_id}, V40). One unbounded DELETE would
-     * hold row locks for the whole 365-day tail in a single transaction; the
-     * adapter loops these batches with a per-run cap instead.
+     * Bounded retention batch. V62 installs an append-only trigger on
+     * audit_logs; the {@code delete_audit_logs_before} function is the only
+     * path allowed to mutate rows, and it scopes the batch through the
+     * retention index ({@code idx_audit_logs_timestamp_id}, V40). The
+     * transaction boundary is per batch, so the transaction-local maintenance
+     * flag cannot leak on a pooled connection.
      */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "DELETE FROM audit_logs WHERE id IN "
-            + "(SELECT id FROM audit_logs WHERE timestamp < :cutoff "
-            + "ORDER BY timestamp, id LIMIT :batch)",
+    @Transactional
+    @Query(value = "SELECT delete_audit_logs_before(:cutoff, :batch)",
             nativeQuery = true)
     int deleteBatchOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("batch") int batch);
 }

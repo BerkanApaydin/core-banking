@@ -87,7 +87,7 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
       keepalive-time: 60000
-      leak-detection-threshold: 10000
+      leak-detection-threshold: 35000
       read-only: false
   jackson:
     # F-3 (UTC contract, part 1): business timestamps are zoneless TIMESTAMP
@@ -138,9 +138,15 @@ jwt:
   # key must not be able to mint tokens accepted here.
   issuer: ${JWT_ISSUER:clean-architecture-bank}
   audience: ${JWT_AUDIENCE:clean-architecture-bank-api}
-  # Published in the JWT header so a future multi-key rotation can select the
-  # verification key without guessing.
+  # Published in the JWT header; new tokens are always signed with this key.
   key-id: ${JWT_KEY_ID:primary}
+  # Optional rotation ring: retired-key-id -> base64 secret. Tokens signed by
+  # a retired key remain verifiable until they expire, but nothing new is
+  # signed with it. Set entries in external YAML/ConfigMap, e.g.
+  #   retired-keys:
+  #     primary-2026-09: <base64 secret>
+  # Keep a retired key for at least the refresh-token lifetime (7 days).
+  retired-keys: {}
   # Bounded tolerance for node clock drift (0-300 seconds).
   clock-skew-seconds: ${JWT_CLOCK_SKEW_SECONDS:30}
 
