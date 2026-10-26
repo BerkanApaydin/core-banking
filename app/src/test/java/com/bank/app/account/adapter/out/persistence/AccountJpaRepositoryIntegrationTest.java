@@ -106,6 +106,18 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldLockBothAccountsWithSingleQuery() {
+        entityManager.createNativeQuery(
+                "INSERT INTO accounts (id, user_id, iban, owner_name, balance, currency, status, version, created_at) " +
+                "VALUES (3, 100, 'TR870006200000000000000222', 'Test User', 1000.00, 'TRY', 'ACTIVE', 0, NOW())")
+                .executeUpdate();
+
+        List<AccountJpaEntity> locked = repo.findByIdsForUpdate(List.of(3L, 2L));
+
+        assertEquals(List.of(2L, 3L), locked.stream().map(AccountJpaEntity::getId).toList());
+    }
+
+    @Test
     void shouldFindByUserId() {
         Page<AccountJpaEntity> results = repo.findByUserIdOrderByCreatedAtDescIdDesc(100L, Pageable.unpaged());
         assertEquals(1, results.getContent().size());

@@ -199,4 +199,37 @@ class AccountReadAdapterTest {
         assertTrue(result.isEmpty());
         verifyNoInteractions(springDataRepo);
     }
+
+    @Test
+    void shouldFindByIdsForUpdateSuccessfully() {
+        AccountJpaEntity entity1 = new AccountJpaEntity(1L, 100L, "TR770006200000000000000111", "Ahmet",
+                new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null);
+        AccountJpaEntity entity2 = new AccountJpaEntity(2L, 200L, "TR870006200000000000000222", "Mehmet",
+                new BigDecimal("500.00"), Currency.TRY, AccountStatus.ACTIVE, null);
+
+        when(springDataRepo.findByIdsForUpdate(List.of(1L, 2L))).thenReturn(List.of(entity1, entity2));
+
+        var result = adapter.findByIdsForUpdate(List.of(1L, 2L));
+
+        assertEquals(2, result.size());
+        assertEquals(1L, result.get(0).getId());
+        assertEquals(2L, result.get(1).getId());
+        verify(springDataRepo).findByIdsForUpdate(List.of(1L, 2L));
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindByIdsForUpdateIsNull() {
+        var result = adapter.findByIdsForUpdate(null);
+
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(springDataRepo);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenFindByIdsForUpdateIsEmpty() {
+        var result = adapter.findByIdsForUpdate(List.of());
+
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(springDataRepo);
+    }
 }

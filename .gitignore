@@ -70,3 +70,5 @@ __pycache__/
 hs_err*.log
 replay_pid*.log
 run.err
+
+/performance/

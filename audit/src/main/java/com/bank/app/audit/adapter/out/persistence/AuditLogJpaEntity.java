@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -18,7 +19,9 @@ import org.hibernate.type.SqlTypes;
 public class AuditLogJpaEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "audit_log_seq")
+    @SequenceGenerator(name = "audit_log_seq", sequenceName = "audit_log_ids",
+            allocationSize = 50)
     private Long id;
 
     @Column(nullable = false)

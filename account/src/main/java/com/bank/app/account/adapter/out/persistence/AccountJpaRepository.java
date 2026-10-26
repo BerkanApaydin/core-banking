@@ -26,6 +26,10 @@ public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, Lo
     @Query("SELECT a FROM AccountJpaEntity a WHERE a.id = :id")
     Optional<AccountJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM AccountJpaEntity a WHERE a.id IN :ids ORDER BY a.id")
+    List<AccountJpaEntity> findByIdsForUpdate(@Param("ids") Collection<Long> ids);
+
     Page<AccountJpaEntity> findByUserIdOrderByCreatedAtDescIdDesc(Long userId, Pageable pageable);
 
     List<AccountJpaEntity> findByIdIn(Collection<Long> ids);

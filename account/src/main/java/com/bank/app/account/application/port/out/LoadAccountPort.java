@@ -17,6 +17,8 @@ public interface LoadAccountPort {
 
     Optional<Account> findByIdForUpdate(Long id);
 
+    List<Account> findByIdsForUpdate(Collection<Long> ids);
+
     record AccountPage(List<Account> content, long total) {}
 
     /**

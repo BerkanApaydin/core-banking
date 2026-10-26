@@ -22,7 +22,10 @@ import com.bank.app.common.domain.event.AuditEvent;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @TransactionalUseCase
 public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUseCase {
@@ -156,11 +159,20 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         // T-13: this ordered lock is the PRIMARY guard; the versioned bulk UPDATE
         // in AccountPersistenceAdapter.save is the cross-check (see
         // docs/decisions/account-locking.md — drop neither side alone).
-        return OrderedPair.from(
-                id1, () -> loadAccountPort.findByIdForUpdate(id1)
-                        .orElseThrow(() -> new AccountNotFoundException(id1)),
-                id2, () -> loadAccountPort.findByIdForUpdate(id2)
-                        .orElseThrow(() -> new AccountNotFoundException(id2)));
+        Long lowerId = id1.compareTo(id2) < 0 ? id1 : id2;
+        Long higherId = id1.compareTo(id2) < 0 ? id2 : id1;
+        List<Account> loaded = loadAccountPort.findByIdsForUpdate(List.of(lowerId, higherId));
+        Map<Long, Account> byId = loaded.stream()
+                .collect(Collectors.toMap(Account::getId, account -> account));
+        Account lower = byId.get(lowerId);
+        if (lower == null) {
+            throw new AccountNotFoundException(lowerId);
+        }
+        Account higher = byId.get(higherId);
+        if (higher == null) {
+            throw new AccountNotFoundException(higherId);
+        }
+        return new OrderedPair<>(lower, higher);
     }
 
     private static Account resolveSender(OrderedPair<Account> pair, Long senderId) {

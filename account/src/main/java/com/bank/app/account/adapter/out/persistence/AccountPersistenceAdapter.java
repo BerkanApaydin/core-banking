@@ -59,6 +59,16 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
+    public List<Account> findByIdsForUpdate(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByIdsForUpdate(ids).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public AccountPage findPageByUserId(Long userId, int page, int size) {
         var result = repository.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(page, size));
         return new AccountPage(result.stream().map(mapper::toDomain).toList(), result.getTotalElements());

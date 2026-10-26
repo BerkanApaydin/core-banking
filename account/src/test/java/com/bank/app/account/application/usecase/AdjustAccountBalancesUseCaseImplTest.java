@@ -31,7 +31,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -107,8 +107,8 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldDebitSenderAndCreditReceiver() {
             stubClockAndSave();
             Money amount = Money.of("200.00", Currency.TRY);
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
-            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 2L)))
+                    .thenReturn(List.of(senderAccount, receiverAccount));
 
             AccountAdjustmentResult result = useCase.debitAndCredit(1L, 2L, amount);
 
@@ -161,7 +161,7 @@ class AdjustAccountBalancesUseCaseImplTest {
 
         @Test
         void shouldThrowWhenAccountNotFound() {
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.empty());
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 99L))).thenReturn(List.of());
 
             assertThrows(AccountNotFoundException.class,
                     () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
@@ -176,8 +176,8 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldThrowWhenSecondAccountNotFound() {
             // Kills the NullReturnVals mutant on the second lock supplier:
             // the receiver leg must also fail fast when its row is missing.
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
-            when(loadAccountPort.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 99L)))
+                    .thenReturn(List.of(senderAccount));
 
             assertThrows(AccountNotFoundException.class,
                     () -> useCase.debitAndCredit(1L, 99L, Money.of("10.00", Currency.TRY)));
@@ -226,8 +226,8 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldCreditSenderAndDebitReceiver() {
             stubClockAndSave();
             Money amount = Money.of("200.00", Currency.TRY);
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
-            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 2L)))
+                    .thenReturn(List.of(senderAccount, receiverAccount));
 
             AccountAdjustmentResult result = useCase.reverseForCancellation(1L, 2L, amount);
 
@@ -260,8 +260,8 @@ class AdjustAccountBalancesUseCaseImplTest {
         void shouldResolvePartiesWhenSenderIdIsGreaterThanReceiverId() {
             stubClockAndSave();
             Money amount = Money.of("200.00", Currency.TRY);
-            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 2L)))
+                    .thenReturn(List.of(senderAccount, receiverAccount));
 
             AccountAdjustmentResult result = useCase.debitAndCredit(2L, 1L, amount);
 
@@ -300,8 +300,8 @@ class AdjustAccountBalancesUseCaseImplTest {
             when(clockProvider.clock()).thenReturn(
                     java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
                             java.time.ZoneOffset.UTC));
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
-            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 2L)))
+                    .thenReturn(List.of(senderAccount, receiverAccount));
 
             InsufficientBalanceException ex = assertThrows(InsufficientBalanceException.class,
                     () -> useCase.reverseForCancellation(1L, 2L, Money.of("600.00", Currency.TRY)));
@@ -320,8 +320,8 @@ class AdjustAccountBalancesUseCaseImplTest {
             when(clockProvider.clock()).thenReturn(
                     java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),
                             java.time.ZoneOffset.UTC));
-            when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
-            when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(suspendedReceiver));
+            when(loadAccountPort.findByIdsForUpdate(List.of(1L, 2L)))
+                    .thenReturn(List.of(senderAccount, suspendedReceiver));
 
             AccountNotActiveException ex = assertThrows(AccountNotActiveException.class,
                     () -> useCase.reverseForCancellation(1L, 2L, Money.of("100.00", Currency.TRY)));

@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +22,9 @@ import org.hibernate.type.SqlTypes;
 public class LedgerEntryJpaEntity extends AuditableJpaEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ledger_entry_seq")
+    @SequenceGenerator(name = "ledger_entry_seq", sequenceName = "ledger_entry_ids",
+            allocationSize = 50)
     private Long id;
 
     @Column(name = "transaction_ref", nullable = false, length = 36)
