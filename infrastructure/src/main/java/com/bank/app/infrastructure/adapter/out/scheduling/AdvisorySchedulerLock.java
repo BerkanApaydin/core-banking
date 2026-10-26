@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.scheduling;
 
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

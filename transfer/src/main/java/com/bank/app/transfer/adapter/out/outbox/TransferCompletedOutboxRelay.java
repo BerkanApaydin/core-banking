@@ -3,7 +3,7 @@ package com.bank.app.transfer.adapter.out.outbox;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +33,7 @@ public class TransferCompletedOutboxRelay extends AbstractTransferOutboxRelay {
         TransferCompletedEvent completedEvent = objectMapper.readValue(
                 event.payload(), TransferCompletedEvent.class);
 
-        AsyncTransferCompletedEvent asyncEvent = new AsyncTransferCompletedEvent(
+        TransferCompletedNotificationEvent notificationEvent = new TransferCompletedNotificationEvent(
                 completedEvent.transferId(),
                 completedEvent.senderAccountId(),
                 completedEvent.receiverAccountId(),
@@ -41,6 +41,6 @@ public class TransferCompletedOutboxRelay extends AbstractTransferOutboxRelay {
                 completedEvent.status(),
                 completedEvent.occurredAt());
 
-        notificationConsumer.handleTransferCompleted(asyncEvent);
+        notificationConsumer.handleTransferCompleted(notificationEvent);
     }
 }

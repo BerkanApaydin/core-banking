@@ -1,5 +1,7 @@
 package com.bank.app.account.application.port.in;
 
+import com.bank.app.account.application.dto.AccountInfo;
+
 /**
  * Admin capability: suspends an account so it can neither send nor receive
  * money. Authorization (ROLE_ADMIN) is enforced inside the implementation,

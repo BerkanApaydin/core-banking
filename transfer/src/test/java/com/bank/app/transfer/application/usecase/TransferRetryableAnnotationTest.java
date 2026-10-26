@@ -1,7 +1,7 @@
 package com.bank.app.transfer.application.usecase;
 
 import com.bank.app.transfer.application.dto.TransferRequest;
-import com.bank.app.transfer.adapter.in.config.TransferUseCaseRetryAspect;
+import com.bank.app.transfer.adapter.in.aspect.TransferUseCaseRetryAspect;
 import com.bank.app.transfer.config.TransferProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.retry.annotation.Retryable;

@@ -55,7 +55,7 @@
             <artifactId>micrometer-core</artifactId>
         </dependency>
         <!-- spring-cache removed: transfer no longer uses @Cacheable/@CacheEvict directly.
-             Caching goes through AccountInfoCachePort; infrastructure owns the backend. -->
+             Caching goes through AccountSnapshotCache; infrastructure owns the backend. -->
         <!-- Test dependencies -->
         <!-- user test-dep removed: BCs must stay compile- and test-independent.
              Shared fixtures come from common test-jar only. -->

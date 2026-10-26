@@ -3,7 +3,7 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.messages.MessageKeys;
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.account.domain.exception.DuplicateIbanException;
-import com.bank.app.accountapi.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
@@ -87,7 +87,7 @@ class BusinessErrorHttpMapperTest {
                 Arguments.of(new AccountNotFoundException(42L), 404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new AccountNotFoundException("TR000"), 404, "ACCOUNT_NOT_FOUND_IBAN"),
                 // Fully qualified: simple-name collision with the published
-                // accountapi.AccountNotFoundException (imported above).
+                // account.api.AccountNotFoundException (imported above).
                 Arguments.of(new com.bank.app.account.domain.exception.AccountNotFoundException(42L),
                         404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new UserNotFoundException("Unknown user"), 404, "USER_NOT_FOUND"),

@@ -1,9 +1,9 @@
 package com.bank.app.transfer.adapter.out.notification;
 
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
-import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
+import com.bank.app.transfer.domain.TransferFailedNotificationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.retry.annotation.Backoff;
@@ -22,7 +22,7 @@ public abstract class AbstractLoggingNotificationAdapter implements SendNotifica
     protected abstract String channel();
 
     @Override
-    public void notifyTransferCompleted(AsyncTransferCompletedEvent event) {
+    public void notifyTransferCompleted(TransferCompletedNotificationEvent event) {
         if (event == null) {
             log.warn("{} notification received null event, skipping.", channel());
             return;
@@ -32,7 +32,7 @@ public abstract class AbstractLoggingNotificationAdapter implements SendNotifica
     }
 
     @Override
-    public void notifyTransferCancelled(AsyncTransferCancelledEvent event) {
+    public void notifyTransferCancelled(TransferCancelledNotificationEvent event) {
         if (event == null) {
             log.warn("{} cancellation notification received null event, skipping.", channel());
             return;
@@ -42,7 +42,7 @@ public abstract class AbstractLoggingNotificationAdapter implements SendNotifica
     }
 
     @Override
-    public void notifyTransferFailed(AsyncTransferFailedEvent event) {
+    public void notifyTransferFailed(TransferFailedNotificationEvent event) {
         if (event == null) {
             log.warn("{} failure notification received null event, skipping.", channel());
             return;

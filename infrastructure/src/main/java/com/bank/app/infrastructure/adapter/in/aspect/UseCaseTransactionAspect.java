@@ -14,7 +14,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.bank.app.common.domain.exception.CommitOnFailure;
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 
 @Aspect

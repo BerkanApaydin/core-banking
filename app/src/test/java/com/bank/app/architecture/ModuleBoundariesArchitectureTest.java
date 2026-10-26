@@ -54,7 +54,11 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
         // transfer consumes the account-api published language only, never the account module.
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer..")
-                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.bank.app.account.adapter..",
+                        "com.bank.app.account.application..",
+                        "com.bank.app.account.config..",
+                        "com.bank.app.account.domain..")
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);
@@ -87,16 +91,19 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
     void infrastructureShouldNotDependOnAccountModule() {
         // Compile scope for account was removed on purpose (test-scope only for
         // IT slices); cross-context reads go via the account-api published
-        // language. Pin it: any production import of com.bank.app.account..
-        // fails the build (ArchitectureTest imports production classes only,
-        // so the test-scope dependency is invisible here).
-        // NOTE: "com.bank.app.account.." does not match "com.bank.app.accountapi.."
-        // (ArchUnit matches package segments), so the legitimate account-api
-        // usage in infrastructure keeps passing — same as the transfer/account
-        // rules above coexisting with account-api consumption.
+        // language. Pin it: any production import of an account implementation
+        // package fails the build (ArchitectureTest imports production classes
+        // only, so the test-scope dependency is invisible here).
+        // NOTE: the pattern deliberately lists the implementation packages
+        // instead of the broad "com.bank.app.account.." so the legitimate
+        // published-language package (com.bank.app.account.api..) keeps passing.
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.infrastructure..")
-                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.bank.app.account.adapter..",
+                        "com.bank.app.account.application..",
+                        "com.bank.app.account.config..",
+                        "com.bank.app.account.domain..")
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);
@@ -106,9 +113,9 @@ class ModuleBoundariesArchitectureTest extends ArchitectureTest {
     void accountApiShouldOnlyDependOnSharedKernel() {
         // Published language: stable contract, framework-free, no BC dependencies.
         ArchRule rule = classes()
-                .that().resideInAnyPackage("com.bank.app.accountapi..")
+                .that().resideInAnyPackage("com.bank.app.account.api..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
-                        "com.bank.app.accountapi..",
+                        "com.bank.app.account.api..",
                         "com.bank.app.common..",
                         "java..")
                 .allowEmptyShould(false);

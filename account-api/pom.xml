@@ -35,7 +35,7 @@
                         <param>${pitest.targetClasses.accountApi}</param>
                     </targetClasses>
                     <targetTests>
-                        <param>com.bank.app.accountapi.*</param>
+                        <param>com.bank.app.account.api.*</param>
                     </targetTests>
                 </configuration>
             </plugin>

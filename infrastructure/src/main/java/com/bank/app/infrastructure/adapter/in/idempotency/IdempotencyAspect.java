@@ -16,8 +16,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
-import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.IdempotencyProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 

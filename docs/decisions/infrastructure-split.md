@@ -28,9 +28,8 @@ infrastructure-observability  (metrics, health, tracing, reconciliation job)
   only, for IT slices that need an `AccountApi` implementation at test
   runtime); production cross-context reads go via `account-api`. Pinned by
   `ModuleBoundariesArchitectureTest.infrastructureShouldNotDependOnAccountModule`
-  (`com.bank.app.account..` does not match `com.bank.app.accountapi..` —
-  ArchUnit matches package segments — so legitimate `account-api` usage keeps
-  passing).
+  (the rule lists the account implementation packages explicitly, so the
+  published-language package `com.bank.app.account.api..` keeps passing).
 - BC adapters → `infrastructure` is explicitly forbidden
   (`LayeringArchitectureTest.adaptersShouldNotDependOnInfrastructure`; the
   layered-architecture rule stays loose for the composition root). Verified

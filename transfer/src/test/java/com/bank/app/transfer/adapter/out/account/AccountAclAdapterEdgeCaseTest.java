@@ -1,6 +1,6 @@
 package com.bank.app.transfer.adapter.out.account;
 
-import com.bank.app.accountapi.AccountApi;
+import com.bank.app.account.api.AccountApi;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -40,7 +40,7 @@ class AccountAclAdapterEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountAclAdapter(accountApi, new InMemoryAccountInfoCacheAdapter());
+        adapter = new AccountAclAdapter(accountApi, new InMemoryAccountSnapshotCacheAdapter());
     }
 
     @Test

@@ -3,9 +3,9 @@ package com.bank.app.transfer.adapter.in.event;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
-import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
+import com.bank.app.transfer.domain.TransferFailedNotificationEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,8 +27,8 @@ class TransferEventConsumerTest {
     @Mock private SendNotificationPort email;
     @Mock private SendNotificationPort sms;
 
-    private AsyncTransferCompletedEvent completedEvent() {
-        return new AsyncTransferCompletedEvent(1L, 10L, 20L,
+    private TransferCompletedNotificationEvent completedEvent() {
+        return new TransferCompletedNotificationEvent(1L, 10L, 20L,
                 Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
     }
 
@@ -42,7 +42,7 @@ class TransferEventConsumerTest {
 
     @Test
     void shouldFanOutCancelledToEveryChannel() {
-        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(2L, 10L, 20L,
+        TransferCancelledNotificationEvent event = new TransferCancelledNotificationEvent(2L, 10L, 20L,
                 Money.of("50.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
 
         new TransferEventConsumer(List.of(email, sms)).handleTransferCancelled(event);
@@ -53,7 +53,7 @@ class TransferEventConsumerTest {
 
     @Test
     void shouldFanOutFailedToEveryChannel() {
-        AsyncTransferFailedEvent event = new AsyncTransferFailedEvent(4L, 10L, 20L,
+        TransferFailedNotificationEvent event = new TransferFailedNotificationEvent(4L, 10L, 20L,
                 Money.of("25.00", Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
 
         new TransferEventConsumer(List.of(email, sms)).handleTransferFailed(event);
@@ -79,7 +79,7 @@ class TransferEventConsumerTest {
         RuntimeException second = new RuntimeException("sms down");
         doThrow(first).when(email).notifyTransferCancelled(any());
         doThrow(second).when(sms).notifyTransferCancelled(any());
-        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(3L, 10L, 20L,
+        TransferCancelledNotificationEvent event = new TransferCancelledNotificationEvent(3L, 10L, 20L,
                 Money.of("10.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now());
 
         assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
@@ -110,7 +110,7 @@ class TransferEventConsumerTest {
         RuntimeException second = new RuntimeException("sms down");
         doThrow(first).when(email).notifyTransferFailed(any());
         doThrow(second).when(sms).notifyTransferFailed(any());
-        AsyncTransferFailedEvent event = new AsyncTransferFailedEvent(5L, 10L, 20L,
+        TransferFailedNotificationEvent event = new TransferFailedNotificationEvent(5L, 10L, 20L,
                 Money.of("25.00", Currency.TRY), TransferStatus.FAILED, LocalDateTime.now());
 
         assertThatThrownBy(() -> new TransferEventConsumer(List.of(email, sms))
@@ -125,7 +125,7 @@ class TransferEventConsumerTest {
     void shouldDeliverNothingWhenNoChannelsRegistered() {
         new TransferEventConsumer(List.of()).handleTransferCompleted(completedEvent());
         new TransferEventConsumer(List.of()).handleTransferCancelled(
-                new AsyncTransferCancelledEvent(4L, 10L, 20L,
+                new TransferCancelledNotificationEvent(4L, 10L, 20L,
                         Money.of("10.00", Currency.TRY), TransferStatus.CANCELLED, LocalDateTime.now()));
 
         verify(email, never()).notifyTransferCompleted(any());

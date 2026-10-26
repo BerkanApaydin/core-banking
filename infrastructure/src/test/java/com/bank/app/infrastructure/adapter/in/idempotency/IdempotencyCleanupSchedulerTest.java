@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
-import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
+import com.bank.app.infrastructure.config.IdempotencyProperties;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

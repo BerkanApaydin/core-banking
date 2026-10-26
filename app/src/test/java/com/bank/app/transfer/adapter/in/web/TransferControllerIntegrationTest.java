@@ -18,7 +18,7 @@ import com.bank.app.infrastructure.adapter.out.persistence.IdempotencyKeyJpaRepo
 import com.bank.app.infrastructure.adapter.in.idempotency.IdempotencyFingerprint;
 import com.bank.app.audit.adapter.out.persistence.AuditLogJpaRepository;
 import com.bank.app.audit.domain.AuditAction;
-import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
+import com.bank.app.transfer.adapter.in.web.dto.PlaceTransferWebRequest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.transfer.adapter.out.persistence.TransferJpaRepository;
 import com.bank.app.transfer.adapter.out.persistence.TransferJpaEntity;
@@ -528,7 +528,7 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 String.valueOf(userRepository.findByUsername("u1").orElseThrow().getId()),
                                 "POST", "/api/v1/transfers", "pending-key");
                 byte[] args = objectMapper.writeValueAsBytes(new Object[] {
-                                new TransferWebRequest(request.senderIban(), request.receiverIban(),
+                                new PlaceTransferWebRequest(request.senderIban(), request.receiverIban(),
                                                 request.amount(), request.currency()) });
                 String hash = IdempotencyFingerprint.requestHash("POST", "/api/v1/transfers", null, args);
                 var pending = new IdempotencyKeyJpaEntity(key, "PENDING", null, LocalDateTime.now());

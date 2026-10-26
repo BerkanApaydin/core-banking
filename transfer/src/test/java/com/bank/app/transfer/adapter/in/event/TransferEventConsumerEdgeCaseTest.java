@@ -3,7 +3,7 @@ package com.bank.app.transfer.adapter.in.event;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class TransferEventConsumerEdgeCaseTest {
         TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
 
         Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
+        TransferCompletedNotificationEvent event = TransferCompletedNotificationEvent.from(transfer);
 
         doThrow(new RuntimeException("Service unavailable"))
                 .when(notificationPort).notifyTransferCompleted(event);
@@ -46,7 +46,7 @@ class TransferEventConsumerEdgeCaseTest {
         TransferEventConsumer listener = new TransferEventConsumer(List.of(port1, port2));
 
         Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
-        AsyncTransferCompletedEvent event = AsyncTransferCompletedEvent.from(transfer);
+        TransferCompletedNotificationEvent event = TransferCompletedNotificationEvent.from(transfer);
 
         listener.handleTransferCompleted(event);
 

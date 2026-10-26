@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
-import com.bank.app.infrastructure.adapter.in.config.IdempotencyProperties;
+import com.bank.app.infrastructure.config.IdempotencyProperties;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.IdempotencyPort;

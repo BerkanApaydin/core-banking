@@ -1,12 +1,12 @@
 package com.bank.app.account.adapter.out.api;
 
-import com.bank.app.account.application.port.in.AccountInfo;
-import com.bank.app.account.application.port.in.AccountQueryUseCase;
+import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.port.in.GetAccountInfoQuery;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
-import com.bank.app.accountapi.AccountAdjustmentResult;
-import com.bank.app.accountapi.AccountNotFoundException;
-import com.bank.app.accountapi.AccountSnapshot;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountNotFoundException;
+import com.bank.app.account.api.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 class AccountApiAdapterTest {
 
     @Mock
-    private AccountQueryUseCase accountQueryUseCase;
+    private GetAccountInfoQuery getAccountInfoQuery;
 
     @Mock
     private AdjustAccountBalancesUseCase adjustAccountBalancesUseCase;
@@ -45,13 +45,13 @@ class AccountApiAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AccountApiAdapter(accountQueryUseCase, adjustAccountBalancesUseCase,
+        adapter = new AccountApiAdapter(getAccountInfoQuery, adjustAccountBalancesUseCase,
                 snapshotCache, transactionBoundary);
     }
 
     @Test
     void shouldTranslateAccountInfoToSnapshot() {
-        when(accountQueryUseCase.getAccountInfo(1L))
+        when(getAccountInfoQuery.getAccountInfo(1L))
                 .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
 
         AccountSnapshot snapshot = adapter.getSnapshotById(1L);
@@ -61,7 +61,7 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldTranslateIbanLookupToSnapshot() {
-        when(accountQueryUseCase.getAccountInfoForTransfer("TR450006100519786456841234"))
+        when(getAccountInfoQuery.getAccountInfoForTransfer("TR450006100519786456841234"))
                 .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
 
         AccountSnapshot snapshot = adapter.getSnapshotByIban("TR450006100519786456841234");
@@ -73,8 +73,8 @@ class AccountApiAdapterTest {
     @Test
     void shouldTranslateDomainNotFoundToPublishedLanguageById() {
         // Fully qualified: simple-name collision with the published
-        // accountapi.AccountNotFoundException (imported); Java cannot import both.
-        when(accountQueryUseCase.getAccountInfo(999L))
+        // account.api.AccountNotFoundException (imported); Java cannot import both.
+        when(getAccountInfoQuery.getAccountInfo(999L))
                 .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException(999L));
 
         AccountNotFoundException ex = assertThrows(
@@ -89,7 +89,7 @@ class AccountApiAdapterTest {
     @Test
     void shouldTranslateDomainNotFoundToPublishedLanguageByIban() {
         // Fully qualified: same simple-name collision as above.
-        when(accountQueryUseCase.getAccountInfoForTransfer("TR000"))
+        when(getAccountInfoQuery.getAccountInfoForTransfer("TR000"))
                 .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException("TR000"));
 
         AccountNotFoundException ex = assertThrows(
@@ -103,7 +103,7 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldDelegateIbanBatchLookup() {
-        when(accountQueryUseCase.getIbansForAccounts(Set.of(1L)))
+        when(getAccountInfoQuery.getIbansForAccounts(Set.of(1L)))
                 .thenReturn(Map.of(1L, "TR450006100519786456841234"));
 
         assertEquals("TR450006100519786456841234",
@@ -221,7 +221,7 @@ class AccountApiAdapterTest {
 
     @Test
     void shouldNotEvictOnReadPaths() {
-        when(accountQueryUseCase.getAccountInfo(1L))
+        when(getAccountInfoQuery.getAccountInfo(1L))
                 .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
 
         adapter.getSnapshotById(1L);

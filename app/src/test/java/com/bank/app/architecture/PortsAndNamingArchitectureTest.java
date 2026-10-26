@@ -2,6 +2,7 @@ package com.bank.app.architecture;
 
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.bind.annotation.RestController;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -56,7 +57,7 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         ArchRule rule = classes()
                 .that().resideInAnyPackage("..adapter.out..")
                 .and().haveSimpleNameEndingWith("Adapter")
-                .should().dependOnClassesThat().resideInAnyPackage("..port.out..", "com.bank.app.accountapi..")
+                .should().dependOnClassesThat().resideInAnyPackage("..port.out..", "com.bank.app.account.api..")
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);
@@ -91,7 +92,44 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         // ACL port owns its own MutationResult; only the adapter may depend on account-api.
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app.transfer.application.port..")
-                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.accountapi..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.bank.app.account.api..")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void adaptersShouldResideInAdapterPackages() {
+        ArchRule rule = classes()
+                .that().haveSimpleNameEndingWith("Adapter")
+                .should().resideInAPackage("..adapter..")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void restControllersShouldLiveInWebAdapterPackagesAndEndWithController() {
+        ArchRule packageRule = classes()
+                .that().areAnnotatedWith(RestController.class)
+                .should().resideInAPackage("..adapter.in.web..")
+                .allowEmptyShould(false);
+
+        ArchRule namingRule = classes()
+                .that().areAnnotatedWith(RestController.class)
+                .should().haveSimpleNameEndingWith("Controller")
+                .allowEmptyShould(false);
+
+        packageRule.check(importedClasses);
+        namingRule.check(importedClasses);
+    }
+
+    @Test
+    void applicationImplementationsShouldResideInUseCasePackage() {
+        ArchRule rule = classes()
+                .that().resideInAnyPackage("..application..")
+                .and().haveSimpleNameEndingWith("Impl")
+                .should().resideInAPackage("..application.usecase..")
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);

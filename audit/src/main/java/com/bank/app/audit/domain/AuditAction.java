@@ -1,5 +1,7 @@
 package com.bank.app.audit.domain;
 
+import com.bank.app.audit.domain.exception.UnknownAuditActionException;
+
 public enum AuditAction {
     ACCOUNT_CREATED,
     ACCOUNT_DEBITED,

@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 
 @SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
-class UserJpaAdapterTest {
+class UserPersistenceAdapterTest {
 
     @Mock
     private UserJpaRepository userJpaRepository;

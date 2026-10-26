@@ -1,9 +1,9 @@
 package com.bank.app.transfer.adapter.out.account;
 
-import com.bank.app.accountapi.AccountAdjustmentResult;
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshot;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;

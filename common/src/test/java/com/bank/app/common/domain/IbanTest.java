@@ -35,7 +35,8 @@ class IbanTest {
     @Test
     void shouldThrowWhenInvalidFormat() {
         assertThatThrownBy(() -> new Iban("INVALID"))
-                .isExactlyInstanceOf(InvalidIbanException.class);
+                .isExactlyInstanceOf(InvalidIbanException.class)
+                .hasMessage("Invalid IBAN format");
     }
 
     @Test
@@ -126,5 +127,33 @@ class IbanTest {
     void shouldNormalizeTabsAndMixedCase() {
         Iban iban = new Iban("tr44\t0006 2000\n0000 0000 0001 23");
         assertThat(iban.value()).isEqualTo("TR440006200000000000000123");
+    }
+
+    @Test
+    void shouldRejectNonDigitCharactersAtFullLength() {
+        assertThatThrownBy(() -> new Iban("TR2900062000000000000001AB"))
+                .isExactlyInstanceOf(InvalidIbanException.class)
+                .hasMessage("Invalid IBAN format");
+    }
+
+    @Test
+    void shouldRejectNonTurkishCountryCode() {
+        assertThatThrownBy(() -> new Iban("US290006200000000000000111"))
+                .isExactlyInstanceOf(InvalidIbanException.class)
+                .hasMessage("Invalid IBAN format");
+    }
+
+    @Test
+    void shouldRejectWhitespaceOnlyIban() {
+        assertThatThrownBy(() -> new Iban("   "))
+                .isExactlyInstanceOf(InvalidIbanException.class)
+                .hasMessage("Invalid IBAN format");
+    }
+
+    @Test
+    void shouldRejectEmptyIban() {
+        assertThatThrownBy(() -> new Iban(""))
+                .isExactlyInstanceOf(InvalidIbanException.class)
+                .hasMessage("Invalid IBAN format");
     }
 }

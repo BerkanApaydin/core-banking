@@ -109,7 +109,7 @@ spec:
             # property unset (never an empty string — an empty password would
             # make Lettuce send AUTH against a no-AUTH broker and fail).
             # The manual Lettuce factory reads spring.data.redis.password via
-            # Boot relaxed binding (see RedisRateLimitConfiguration).
+            # Boot relaxed binding (see RedisRateLimitConfig).
             - name: SPRING_DATA_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

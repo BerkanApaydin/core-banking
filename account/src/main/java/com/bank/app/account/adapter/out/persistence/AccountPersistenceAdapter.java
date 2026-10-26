@@ -1,6 +1,6 @@
 package com.bank.app.account.adapter.out.persistence;
 
-import com.bank.app.account.application.port.in.AccountInfo;
+import com.bank.app.account.application.dto.AccountInfo;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;

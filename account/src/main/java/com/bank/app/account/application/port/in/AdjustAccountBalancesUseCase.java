@@ -1,6 +1,6 @@
 package com.bank.app.account.application.port.in;
 
-import com.bank.app.accountapi.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountAdjustmentResult;
 import com.bank.app.common.domain.Money;
 
 /**

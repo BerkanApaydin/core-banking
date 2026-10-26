@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.common.domain.TokenDigest;
-import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
+import com.bank.app.infrastructure.config.TokenBlacklistProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

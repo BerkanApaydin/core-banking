@@ -6,7 +6,7 @@ import com.bank.app.infrastructure.adapter.out.security.TokenBlacklistAdapter;
 import com.bank.app.infrastructure.adapter.in.security.SecurityConfig;
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.infrastructure.adapter.in.security.JwtAuthenticationFilter;
-import com.bank.app.infrastructure.adapter.in.config.JpaAuditingConfig;
+import com.bank.app.infrastructure.config.JpaAuditingConfig;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;

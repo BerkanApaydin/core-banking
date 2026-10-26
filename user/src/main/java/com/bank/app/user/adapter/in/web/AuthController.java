@@ -13,7 +13,7 @@ import com.bank.app.user.adapter.in.web.dto.MfaEnableWebRequest;
 import com.bank.app.user.adapter.in.web.dto.MfaStatusResponse;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetConfirmWebRequest;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetRequestWebRequest;
-import com.bank.app.user.adapter.in.web.dto.RefreshTokenRequest;
+import com.bank.app.user.adapter.in.web.dto.RefreshTokenWebRequest;
 import com.bank.app.user.adapter.in.web.dto.RegisterWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -115,7 +115,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     @Operation(summary = "Rotates a refresh token", description = "Exchanges a valid refresh token for a fresh access + refresh pair. Re-presenting a rotated token revokes its whole family.")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest webRequest) {
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenWebRequest webRequest) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(refreshSessionUseCase.execute(webRequest.refreshToken()));
@@ -127,7 +127,7 @@ public class AuthController {
             + "at least one credential (header or refresh body) is required.")
     public ResponseEntity<?> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @Valid @RequestBody(required = false) RefreshTokenRequest body,
+            @Valid @RequestBody(required = false) RefreshTokenWebRequest body,
             HttpServletRequest httpRequest) {
         String refreshToken = body == null ? null : body.refreshToken();
         boolean hasAuthHeader = authHeader != null && !authHeader.isBlank();

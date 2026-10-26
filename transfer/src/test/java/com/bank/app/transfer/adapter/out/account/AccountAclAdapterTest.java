@@ -1,9 +1,9 @@
 package com.bank.app.transfer.adapter.out.account;
 
-import com.bank.app.accountapi.AccountAdjustmentResult;
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountNotFoundException;
-import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.account.api.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountNotFoundException;
+import com.bank.app.account.api.AccountSnapshot;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
@@ -34,13 +34,13 @@ class AccountAclAdapterTest {
     @Mock
     private AccountApi accountApi;
 
-    private InMemoryAccountInfoCacheAdapter cache;
+    private InMemoryAccountSnapshotCacheAdapter cache;
 
     private AccountAclAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        cache = new InMemoryAccountInfoCacheAdapter();
+        cache = new InMemoryAccountSnapshotCacheAdapter();
         adapter = new AccountAclAdapter(accountApi, cache);
     }
 
@@ -556,7 +556,7 @@ class AccountAclAdapterTest {
         }
 
         /** Counts the cache lookups so a test can tell when a waiter joined the flight. */
-        static class CountingLookupCache extends InMemoryAccountInfoCacheAdapter {
+        static class CountingLookupCache extends InMemoryAccountSnapshotCacheAdapter {
             final CountDownLatch lookups = new CountDownLatch(3);
 
             @Override

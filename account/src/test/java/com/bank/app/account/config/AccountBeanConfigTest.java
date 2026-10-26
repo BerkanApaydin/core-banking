@@ -4,7 +4,7 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.port.out.SaveLedgerPort;
 import com.bank.app.account.application.port.out.IbanGeneratorPort;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -91,9 +91,9 @@ class AccountBeanConfigTest {
     }
 
     @Test
-    void shouldCreateAccountQueryUseCaseBean() {
+    void shouldCreateGetAccountInfoQueryBean() {
         AccountBeanConfig config = new AccountBeanConfig();
-        assertNotNull(config.accountQueryUseCase(loadAccountPort));
+        assertNotNull(config.getAccountInfoQuery(loadAccountPort));
     }
 
     @Test

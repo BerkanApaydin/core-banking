@@ -6,7 +6,7 @@ import com.bank.app.user.adapter.in.web.dto.MfaDisableWebRequest;
 import com.bank.app.user.adapter.in.web.dto.MfaEnableWebRequest;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetConfirmWebRequest;
 import com.bank.app.user.adapter.in.web.dto.PasswordResetRequestWebRequest;
-import com.bank.app.user.adapter.in.web.dto.RefreshTokenRequest;
+import com.bank.app.user.adapter.in.web.dto.RefreshTokenWebRequest;
 import com.bank.app.user.adapter.in.web.dto.RegisterWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
 import com.bank.app.user.application.dto.AuthResponse;
@@ -124,7 +124,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest("rt-1"))))
+                        .content(objectMapper.writeValueAsString(new RefreshTokenWebRequest("rt-1"))))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.token").value("a2"));
@@ -171,7 +171,7 @@ class AuthControllerTest {
     @Test
     void shouldRejectBlankRefreshTokenBodyOnDirectInvocation() {
         ResponseEntity<?> result = controller.logout(null,
-                new RefreshTokenRequest("   "), new MockHttpServletRequest());
+                new RefreshTokenWebRequest("   "), new MockHttpServletRequest());
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(logoutUseCase, never()).execute(any(), any());
@@ -191,7 +191,7 @@ class AuthControllerTest {
     void shouldLogoutWithRefreshBody() throws Exception {
         mockMvc.perform(post("/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest("rt-9"))))
+                        .content(objectMapper.writeValueAsString(new RefreshTokenWebRequest("rt-9"))))
                 .andExpect(status().isNoContent());
 
         verify(logoutUseCase).execute(eq(null), eq("rt-9"));

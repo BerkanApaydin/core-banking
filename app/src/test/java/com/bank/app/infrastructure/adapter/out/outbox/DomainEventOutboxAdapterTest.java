@@ -11,7 +11,7 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.UserId;
-import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.config.OutboxProperties;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;

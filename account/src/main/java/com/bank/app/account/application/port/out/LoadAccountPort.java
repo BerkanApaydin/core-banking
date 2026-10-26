@@ -1,6 +1,6 @@
 package com.bank.app.account.application.port.out;
 
-import com.bank.app.account.application.port.in.AccountInfo;
+import com.bank.app.account.application.dto.AccountInfo;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
 import java.util.Collection;

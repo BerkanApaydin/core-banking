@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

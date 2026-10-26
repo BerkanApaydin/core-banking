@@ -1,13 +1,13 @@
 package com.bank.app.account.adapter.out.api;
 
-import com.bank.app.account.application.port.in.AccountInfo;
-import com.bank.app.account.application.port.in.AccountQueryUseCase;
+import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.port.in.GetAccountInfoQuery;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
-import com.bank.app.accountapi.AccountNotFoundException;
-import com.bank.app.accountapi.AccountAdjustmentResult;
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshot;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountNotFoundException;
+import com.bank.app.account.api.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.Money;
 import org.springframework.stereotype.Component;
@@ -33,16 +33,16 @@ import java.util.Objects;
 @Component
 public class AccountApiAdapter implements AccountApi {
 
-    private final AccountQueryUseCase accountQueryUseCase;
+    private final GetAccountInfoQuery getAccountInfoQuery;
     private final AdjustAccountBalancesUseCase adjustAccountBalancesUseCase;
     private final AccountSnapshotCache snapshotCache;
     private final TransactionBoundaryPort transactionBoundary;
 
-    public AccountApiAdapter(AccountQueryUseCase accountQueryUseCase,
+    public AccountApiAdapter(GetAccountInfoQuery getAccountInfoQuery,
             AdjustAccountBalancesUseCase adjustAccountBalancesUseCase,
             AccountSnapshotCache snapshotCache,
             TransactionBoundaryPort transactionBoundary) {
-        this.accountQueryUseCase = accountQueryUseCase;
+        this.getAccountInfoQuery = getAccountInfoQuery;
         this.adjustAccountBalancesUseCase = adjustAccountBalancesUseCase;
         this.snapshotCache = Objects.requireNonNull(snapshotCache, "AccountSnapshotCache must not be null");
         this.transactionBoundary = Objects.requireNonNull(transactionBoundary, "TransactionBoundaryPort must not be null");
@@ -51,9 +51,9 @@ public class AccountApiAdapter implements AccountApi {
     @Override
     public AccountSnapshot getSnapshotById(Long accountId) {
         try {
-            return toSnapshot(accountQueryUseCase.getAccountInfo(accountId));
+            return toSnapshot(getAccountInfoQuery.getAccountInfo(accountId));
         // Fully qualified: simple-name collision with the published
-        // accountapi.AccountNotFoundException (imported above) — Java cannot
+        // account.api.AccountNotFoundException (imported above) — Java cannot
         // import both, so the domain side stays qualified here.
         } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
             // Translate to the published language: downstream contexts must
@@ -65,7 +65,7 @@ public class AccountApiAdapter implements AccountApi {
     @Override
     public AccountSnapshot getSnapshotByIban(String ibanValue) {
         try {
-            return toSnapshot(accountQueryUseCase.getAccountInfoForTransfer(ibanValue));
+            return toSnapshot(getAccountInfoQuery.getAccountInfoForTransfer(ibanValue));
         // Fully qualified: same simple-name collision as above.
         } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
             throw new AccountNotFoundException(ibanValue);
@@ -74,7 +74,7 @@ public class AccountApiAdapter implements AccountApi {
 
     @Override
     public Map<Long, String> getIbansForAccounts(Collection<Long> accountIds) {
-        return accountQueryUseCase.getIbansForAccounts(accountIds);
+        return getAccountInfoQuery.getIbansForAccounts(accountIds);
     }
 
     @Override

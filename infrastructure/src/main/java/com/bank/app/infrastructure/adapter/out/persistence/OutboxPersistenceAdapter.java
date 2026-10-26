@@ -2,8 +2,8 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort;
-import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.OutboxProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;

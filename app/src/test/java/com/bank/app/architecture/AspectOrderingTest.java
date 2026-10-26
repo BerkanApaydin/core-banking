@@ -27,7 +27,7 @@ class AspectOrderingTest {
     @DisplayName("aspects use the shared order constants")
     void aspectsUseSharedConstants() throws Exception {
         Order retryOrder = AnnotationUtils.findAnnotation(
-                Class.forName("com.bank.app.transfer.adapter.in.config.TransferUseCaseRetryAspect"),
+                Class.forName("com.bank.app.transfer.adapter.in.aspect.TransferUseCaseRetryAspect"),
                 Order.class);
         Order txOrder = AnnotationUtils.findAnnotation(
                 Class.forName(

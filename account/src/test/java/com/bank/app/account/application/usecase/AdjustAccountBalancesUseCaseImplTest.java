@@ -11,7 +11,7 @@ import com.bank.app.account.domain.exception.AccountNotActiveException;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
-import com.bank.app.accountapi.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountAdjustmentResult;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.IdGeneratorPort;

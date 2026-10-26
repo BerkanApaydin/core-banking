@@ -1,7 +1,7 @@
 package com.bank.app.transfer.adapter.out.account;
 
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.transfer.application.port.out.AccountAclPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * package free of {@code adapter.out} imports.
  *
  * <p><b>There is deliberately no fallback bean here.</b> An earlier version
- * provided a single-JVM {@code InMemoryAccountInfoCacheAdapter} under
+ * provided a single-JVM {@code InMemoryAccountSnapshotCacheAdapter} under
  * {@code @ConditionalOnMissingBean(AccountSnapshotCache.class)}, so a
  * deployment that wired no shared backend would silently serve per-pod
  * snapshots — stale account status and currency across the cluster, with

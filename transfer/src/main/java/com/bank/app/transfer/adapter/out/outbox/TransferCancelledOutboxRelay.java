@@ -3,7 +3,7 @@ package com.bank.app.transfer.adapter.out.outbox;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.adapter.in.event.TransferEventConsumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +33,7 @@ public class TransferCancelledOutboxRelay extends AbstractTransferOutboxRelay {
         TransferCancelledEvent cancelledEvent = objectMapper.readValue(
                 event.payload(), TransferCancelledEvent.class);
 
-        AsyncTransferCancelledEvent asyncEvent = new AsyncTransferCancelledEvent(
+        TransferCancelledNotificationEvent notificationEvent = new TransferCancelledNotificationEvent(
                 cancelledEvent.transferId(),
                 cancelledEvent.senderAccountId(),
                 cancelledEvent.receiverAccountId(),
@@ -41,6 +41,6 @@ public class TransferCancelledOutboxRelay extends AbstractTransferOutboxRelay {
                 cancelledEvent.status(),
                 cancelledEvent.occurredAt());
 
-        notificationConsumer.handleTransferCancelled(asyncEvent);
+        notificationConsumer.handleTransferCancelled(notificationEvent);
     }
 }

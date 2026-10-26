@@ -10,7 +10,7 @@ import com.bank.app.account.domain.MovementDirection;
 import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
-import com.bank.app.accountapi.AccountAdjustmentResult;
+import com.bank.app.account.api.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;

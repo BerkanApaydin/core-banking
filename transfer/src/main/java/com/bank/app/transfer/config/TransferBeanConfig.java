@@ -44,9 +44,9 @@ public class TransferBeanConfig {
         return new TransferDomainService();
     }
 
-    // AV: adapter beans (AccountAclPort, AccountSnapshotCache fallback) live in
+    // AV: the AccountAclPort adapter bean lives in
     // transfer.adapter.out.account.TransferAccountAclConfiguration, next to the
-    // adapters they construct. This config wires only application beans.
+    // adapter it constructs. This config wires only application beans.
 
     @Bean
     public TransferAuthorizationService transferAuthorizationService(AccountAclPort accountAclPort,

@@ -40,7 +40,7 @@ removing all three, which is the actual cost:
 - `Transfer.cancel()` keeps rejecting FAILED transfers explicitly
   (`TransferNotCancellableException`), so the retained state cannot be
   misused as cancellable.
-- `TransferFailedOutboxRelay` and `AsyncTransferFailedEvent` remain wired, but
+- `TransferFailedOutboxRelay` and `TransferFailedNotificationEvent` remain wired, but
   are dormant until an async placement/reconciliation flow starts invoking
   `markFailed()`; they then deliver the FAILED transition with the same
   at-least-once + persistent-dedup contract as COMPLETED/CANCELLED.

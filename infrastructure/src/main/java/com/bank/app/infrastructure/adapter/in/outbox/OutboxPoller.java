@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.in.outbox;
 
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
-import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.config.OutboxProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;

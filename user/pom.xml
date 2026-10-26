@@ -12,7 +12,7 @@
 
     <artifactId>user</artifactId>
     <name>user</name>
-    <description>[BC] User bounded context: identity, authentication, token lifecycle ports (JwtPort, TokenBlacklistPort).</description>
+    <description>[BC] User bounded context (hexagonal slice): identity, authentication, token lifecycle ports (JwtPort, TokenBlacklistPort).</description>
 
     <dependencies>
         <dependency>

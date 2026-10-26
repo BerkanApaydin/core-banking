@@ -2,8 +2,8 @@ package com.bank.app.transfer.adapter.out.notification;
 
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
 import com.bank.app.transfer.domain.Transfer;
 import com.bank.app.transfer.domain.TransferStatus;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ class SmsNotificationAdapterTest {
                 Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
-        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer)));
+        assertDoesNotThrow(() -> adapter.notifyTransferCompleted(TransferCompletedNotificationEvent.from(transfer)));
     }
 
     @Test
@@ -40,7 +40,7 @@ class SmsNotificationAdapterTest {
 
     @Test
     void shouldLogSuccessfullyOnCancelNotify() {
-        AsyncTransferCancelledEvent event = new AsyncTransferCancelledEvent(
+        TransferCancelledNotificationEvent event = new TransferCancelledNotificationEvent(
                 1L, 10L, 20L, Money.of("100.00", Currency.TRY),
                 TransferStatus.CANCELLED, LocalDateTime.now());
 
@@ -69,7 +69,7 @@ class SmsNotificationAdapterTest {
             Transfer transfer = new Transfer(7L, new AccountId(10L), new AccountId(20L),
                     Money.of("100.00", Currency.TRY),
                     TransferStatus.COMPLETED, LocalDateTime.now());
-            adapter.notifyTransferCompleted(AsyncTransferCompletedEvent.from(transfer));
+            adapter.notifyTransferCompleted(TransferCompletedNotificationEvent.from(transfer));
         } finally {
             logger.detachAppender(appender);
         }
@@ -86,7 +86,7 @@ class SmsNotificationAdapterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            adapter.notifyTransferCancelled(new AsyncTransferCancelledEvent(
+            adapter.notifyTransferCancelled(new TransferCancelledNotificationEvent(
                     9L, 10L, 20L, Money.of("50.00", Currency.TRY),
                     TransferStatus.CANCELLED, LocalDateTime.now()));
         } finally {

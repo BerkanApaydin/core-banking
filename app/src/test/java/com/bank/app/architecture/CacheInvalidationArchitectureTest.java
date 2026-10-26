@@ -2,8 +2,8 @@ package com.bank.app.architecture;
 
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.account.domain.Account;
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -153,10 +153,10 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
         // so the invariant is structural: the only module allowed to
         // provide a CONCRETE cache is the one that owns the shared backends.
         //
-        // The abstract base (accountapi.AbstractAccountSnapshotCache) stays
+        // The abstract base (account.api.AbstractAccountSnapshotCache) stays
         // in the published-language module on purpose: it carries the
         // shared invalidation semantics, not a storage backend. The
-        // per-JVM implementation (InMemoryAccountInfoCacheAdapter) now lives
+        // per-JVM implementation (InMemoryAccountSnapshotCacheAdapter) now lives
         // in the transfer module's TEST sources, so it is not among the
         // imported production classes at all.
         ArchRule rule = classes()

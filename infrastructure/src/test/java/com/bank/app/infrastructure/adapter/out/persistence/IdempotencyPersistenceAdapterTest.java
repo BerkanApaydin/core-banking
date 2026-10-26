@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.out.persistence;
 
 import com.bank.app.common.application.port.out.IdempotencyPort.Entry;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
-import com.bank.app.infrastructure.adapter.in.config.TransactionProperties;
+import com.bank.app.infrastructure.config.TransactionProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

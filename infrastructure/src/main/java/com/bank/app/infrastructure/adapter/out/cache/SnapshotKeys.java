@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountSnapshotCache;
 
 /**
  * Redis key namespace for account snapshots (S4 split: naming lives here, not

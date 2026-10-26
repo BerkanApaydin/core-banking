@@ -1,12 +1,12 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.application.port.in.AccountInfo;
+import com.bank.app.account.application.dto.AccountInfo;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.exception.AccountNotFoundException;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;

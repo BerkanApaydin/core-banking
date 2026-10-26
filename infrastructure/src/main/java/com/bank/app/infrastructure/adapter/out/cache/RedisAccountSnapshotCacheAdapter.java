@@ -1,9 +1,9 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.accountapi.AccountSnapshot;
-import com.bank.app.accountapi.AccountSnapshotCache;
-import com.bank.app.infrastructure.adapter.in.config.CacheProperties;
-import com.bank.app.infrastructure.adapter.in.config.SnapshotCacheRedisCondition;
+import com.bank.app.account.api.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshotCache;
+import com.bank.app.infrastructure.config.CacheProperties;
+import com.bank.app.infrastructure.config.SnapshotCacheRedisCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Conditional;
@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  * <p>Active when the resolved snapshot-cache backend is {@code redis}
  * (canonical {@code app.cache.account-info.backend}, legacy
  * {@code app.cache.caffeine.account-info.backend} as fallback — see
- * {@link com.bank.app.infrastructure.adapter.in.config.CacheBackendResolution}).
+ * {@link com.bank.app.infrastructure.config.CacheBackendResolution}).
  * Unlike the Caffeine backend, the {@code id ↔ IBAN} reverse
  * index lives in Redis as well (sets + reverse keys), so an
  * {@code evictById} issued on one pod also drops the IBAN entries written

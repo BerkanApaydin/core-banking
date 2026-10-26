@@ -1,7 +1,7 @@
 package com.bank.app.transfer.adapter.in.web;
 
 import com.bank.app.common.adapter.in.api.ApiVersion;
-import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
+import com.bank.app.transfer.adapter.in.web.dto.PlaceTransferWebRequest;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.application.port.in.CancelTransferUseCase;
@@ -50,7 +50,7 @@ public class TransferCommandController {
     @Operation(summary = "Executes a money transfer", description = "Initiates and records a money transfer with sender and receiver IBAN information. Idempotency-Key header is required.")
     @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
             description = "Required de-duplication key; missing header is rejected with 409.")
-    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferWebRequest webRequest) {
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody PlaceTransferWebRequest webRequest) {
         TransferRequest request = new TransferRequest(
                 webRequest.senderIban(), webRequest.receiverIban(),
                 webRequest.amount(), webRequest.currency());

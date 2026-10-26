@@ -16,7 +16,7 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>clean-architecture-bank</name>
-    <description>Clean Architecture Transfer System with Spring Boot</description>
+    <description>DDD modular monolith with hexagonal bounded contexts on Spring Boot</description>
 
     <modules>
         <!-- Schema ownership: resources-only module (classpath:db/migration) -->
@@ -111,7 +111,7 @@
              Domain-free modules resolve to patterns that match nothing; the
              profile also sets failWhenNoMutations=false so they pass. -->
         <pitest.targetClasses.account>com.bank.app.account.*</pitest.targetClasses.account>
-        <pitest.targetClasses.accountApi>com.bank.app.accountapi.*</pitest.targetClasses.accountApi>
+        <pitest.targetClasses.accountApi>com.bank.app.account.api.*</pitest.targetClasses.accountApi>
         <pitest.targetClasses.app>com.bank.app.*</pitest.targetClasses.app>
         <pitest.targetClasses.audit>com.bank.app.audit.*</pitest.targetClasses.audit>
         <pitest.targetClasses.common>com.bank.app.common.*</pitest.targetClasses.common>
@@ -446,7 +446,7 @@
             <id>pitest-domain</id>
             <properties>
                 <pitest.targetClasses.account>com.bank.app.account.domain.*</pitest.targetClasses.account>
-                <pitest.targetClasses.accountApi>com.bank.app.accountapi.domain.*</pitest.targetClasses.accountApi>
+                <pitest.targetClasses.accountApi>com.bank.app.account.api.domain.*</pitest.targetClasses.accountApi>
                 <pitest.targetClasses.app>com.bank.app.app.domain.*</pitest.targetClasses.app>
                 <pitest.targetClasses.audit>com.bank.app.audit.domain.*</pitest.targetClasses.audit>
                 <pitest.targetClasses.common>com.bank.app.common.domain.*</pitest.targetClasses.common>

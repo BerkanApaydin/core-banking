@@ -1,7 +1,7 @@
 package com.bank.app.transfer.config;
 
-import com.bank.app.accountapi.AccountApi;
-import com.bank.app.accountapi.AccountSnapshotCache;
+import com.bank.app.account.api.AccountApi;
+import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.service.DomainEventPublisherService;

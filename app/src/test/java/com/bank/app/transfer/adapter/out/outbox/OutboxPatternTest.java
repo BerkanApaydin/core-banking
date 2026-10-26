@@ -1,13 +1,13 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
 import com.bank.app.common.application.port.out.IdempotencyPort;
-import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.config.OutboxProperties;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxPoller;
 import com.bank.app.infrastructure.adapter.in.outbox.OutboxProcessor;
 import com.bank.app.common.application.port.out.OutboxEventPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.domain.Currency;
@@ -129,14 +129,14 @@ class OutboxPatternTest {
 
         outboxPoller.pollAndProcessEvents();
 
-        ArgumentCaptor<AsyncTransferCompletedEvent> eventCaptor = ArgumentCaptor
-                .forClass(AsyncTransferCompletedEvent.class);
+        ArgumentCaptor<TransferCompletedNotificationEvent> eventCaptor = ArgumentCaptor
+                .forClass(TransferCompletedNotificationEvent.class);
         verify(notificationConsumer).handleTransferCompleted(eventCaptor.capture());
 
-        AsyncTransferCompletedEvent asyncEvent = eventCaptor.getValue();
-        assertEquals(123L, asyncEvent.transferId());
-        assertEquals(1L, asyncEvent.senderAccountId());
-        assertEquals(2L, asyncEvent.receiverAccountId());
+        TransferCompletedNotificationEvent notificationEvent = eventCaptor.getValue();
+        assertEquals(123L, notificationEvent.transferId());
+        assertEquals(1L, notificationEvent.senderAccountId());
+        assertEquals(2L, notificationEvent.receiverAccountId());
 
         verify(outboxPort).markProcessed("event-uuid");
     }
@@ -197,10 +197,10 @@ class OutboxPatternTest {
 
         handler.handle(entity);
 
-        ArgumentCaptor<AsyncTransferCompletedEvent> captor = ArgumentCaptor.forClass(AsyncTransferCompletedEvent.class);
+        ArgumentCaptor<TransferCompletedNotificationEvent> captor = ArgumentCaptor.forClass(TransferCompletedNotificationEvent.class);
         verify(notificationConsumer).handleTransferCompleted(captor.capture());
 
-        AsyncTransferCompletedEvent published = captor.getValue();
+        TransferCompletedNotificationEvent published = captor.getValue();
         assertEquals(456L, published.transferId());
         assertEquals(Currency.USD, published.amount().currency());
     }

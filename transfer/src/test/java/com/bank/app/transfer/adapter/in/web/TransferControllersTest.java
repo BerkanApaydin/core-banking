@@ -2,7 +2,7 @@ package com.bank.app.transfer.adapter.in.web;
 
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.transfer.adapter.in.web.dto.TransferWebRequest;
+import com.bank.app.transfer.adapter.in.web.dto.PlaceTransferWebRequest;
 import com.bank.app.transfer.application.dto.ReportCriteria;
 import com.bank.app.transfer.application.dto.TransferDetailResponse;
 import com.bank.app.transfer.application.dto.TransferReportResponse;
@@ -86,7 +86,7 @@ class TransferControllersTest {
 
         mockMvc.perform(post("/transfers")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new TransferWebRequest(
+                        .content(objectMapper.writeValueAsString(new PlaceTransferWebRequest(
                                 "TR770006200000000000000111", "TR870006200000000000000222",
                                 new BigDecimal("200.00"), Currency.TRY))))
                 .andExpect(status().isCreated())

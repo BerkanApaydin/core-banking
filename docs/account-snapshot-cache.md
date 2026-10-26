@@ -135,8 +135,8 @@ conflict; see `CacheBackendResolution`):
 
 | Value | Bean | Where |
 |---|---|---|
-| `redis` (production) | `RedisAccountSnapshotCacheAdapter` | `SnapshotCacheRedisCondition` (+ `RedisRateLimitConfiguration.SnapshotCacheRedis` for the connection factory) |
-| `caffeine` (dev/test, single JVM) | `CaffeineAccountInfoCacheAdapter` | `SnapshotCacheCaffeineCondition` |
+| `redis` (production) | `RedisAccountSnapshotCacheAdapter` | `SnapshotCacheRedisCondition` (+ `RedisRateLimitConfig.SnapshotCacheRedis` for the connection factory) |
+| `caffeine` (dev/test, single JVM) | `CaffeineAccountSnapshotCacheAdapter` | `SnapshotCacheCaffeineCondition` |
 | anything else | **nothing registers** — startup fails | `ApplicationStartupValidator` rejects the unknown value |
 
 `application-prod.yml` sets both keys to the **literal** `redis` (not

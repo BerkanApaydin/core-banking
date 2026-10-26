@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.cache;
 
-import com.bank.app.accountapi.AccountSnapshot;
+import com.bank.app.account.api.AccountSnapshot;
 
 /**
  * Wire format for cached snapshots (S4 split): {@code id|userId|currency|status}.

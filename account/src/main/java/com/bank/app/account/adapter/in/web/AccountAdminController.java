@@ -1,7 +1,7 @@
 package com.bank.app.account.adapter.in.web;
 
 import com.bank.app.account.adapter.in.web.dto.AccountStatusResponse;
-import com.bank.app.account.application.port.in.AccountInfo;
+import com.bank.app.account.application.dto.AccountInfo;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import com.bank.app.common.adapter.in.api.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;

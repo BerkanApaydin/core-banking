@@ -1,9 +1,9 @@
 package com.bank.app.transfer.adapter.in.event;
 
 import com.bank.app.transfer.application.port.out.SendNotificationPort;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
-import com.bank.app.transfer.domain.AsyncTransferFailedEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
+import com.bank.app.transfer.domain.TransferFailedNotificationEvent;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,7 +19,7 @@ public class TransferEventConsumer {
 
     // Called by the outbox worker. A failed channel leaves the source event
     // retryable instead of acknowledging it before delivery has run.
-    public void handleTransferCompleted(AsyncTransferCompletedEvent event) {
+    public void handleTransferCompleted(TransferCompletedNotificationEvent event) {
         RuntimeException failure = null;
         for (SendNotificationPort port : notificationPorts) {
             try {
@@ -32,7 +32,7 @@ public class TransferEventConsumer {
         if (failure != null) throw failure;
     }
 
-    public void handleTransferCancelled(AsyncTransferCancelledEvent event) {
+    public void handleTransferCancelled(TransferCancelledNotificationEvent event) {
         RuntimeException failure = null;
         for (SendNotificationPort port : notificationPorts) {
             try {
@@ -47,7 +47,7 @@ public class TransferEventConsumer {
 
     // Called by TransferFailedOutboxRelay. A failed channel leaves the source
     // event retryable instead of acknowledging it before delivery has run.
-    public void handleTransferFailed(AsyncTransferFailedEvent event) {
+    public void handleTransferFailed(TransferFailedNotificationEvent event) {
         RuntimeException failure = null;
         for (SendNotificationPort port : notificationPorts) {
             try {

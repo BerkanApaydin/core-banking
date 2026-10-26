@@ -16,7 +16,7 @@ class LayeringArchitectureTest extends ArchitectureTest {
                 .consideringAllDependencies()
                 .layer("Domain").definedBy("..domain..")
                 // account-api is the published language (application-level contract of the Account context)
-                .layer("Application").definedBy("..application..", "..accountapi..")
+                .layer("Application").definedBy("..application..", "..account.api..")
                 .layer("Adapter").definedBy("..adapter..")
                 .layer("Infrastructure").definedBy("..infrastructure..", "..bootstrap..", "..config..")
                 .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "Infrastructure")

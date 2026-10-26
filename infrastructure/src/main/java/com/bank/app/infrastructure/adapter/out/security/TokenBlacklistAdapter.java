@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.out.security;
 
 import com.bank.app.common.domain.TokenDigest;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
-import com.bank.app.infrastructure.adapter.in.config.TokenBlacklistProperties;
+import com.bank.app.infrastructure.config.TokenBlacklistProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Component;

@@ -4,7 +4,7 @@ import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.domain.AsyncTransferCompletedEvent;
+import com.bank.app.transfer.domain.TransferCompletedNotificationEvent;
 import com.bank.app.transfer.domain.TransferCompletedEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -43,7 +43,7 @@ class TransferCompletedOutboxRelayTest {
     private TransferCompletedOutboxRelay handler;
 
     @Captor
-    private ArgumentCaptor<AsyncTransferCompletedEvent> eventCaptor;
+    private ArgumentCaptor<TransferCompletedNotificationEvent> eventCaptor;
 
     @BeforeEach
     void setUp() {
@@ -99,7 +99,7 @@ class TransferCompletedOutboxRelayTest {
         }
 
         @Test
-        @DisplayName("should publish AsyncTransferCompletedEvent on success")
+        @DisplayName("should publish TransferCompletedNotificationEvent on success")
         void shouldPublishEventSuccessfully() throws Exception {
             String json = objectMapper.writeValueAsString(new TransferCompletedEvent(
                     42L, 1L, 2L,
@@ -112,7 +112,7 @@ class TransferCompletedOutboxRelayTest {
             handler.handle(event);
 
             verify(notificationConsumer).handleTransferCompleted(eventCaptor.capture());
-            AsyncTransferCompletedEvent captured = eventCaptor.getValue();
+            TransferCompletedNotificationEvent captured = eventCaptor.getValue();
             assertEquals(42L, captured.transferId());
             assertEquals(1L, captured.senderAccountId());
             assertEquals(2L, captured.receiverAccountId());

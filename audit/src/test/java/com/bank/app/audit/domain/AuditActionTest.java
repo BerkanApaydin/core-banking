@@ -1,5 +1,6 @@
 package com.bank.app.audit.domain;
 
+import com.bank.app.audit.domain.exception.UnknownAuditActionException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

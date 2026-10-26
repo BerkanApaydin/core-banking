@@ -58,7 +58,7 @@ them.
   unknown/expired/used tokens; consumption is a conditional UPDATE (C-1
   pattern) so concurrent confirms cannot double-apply; the password change
   bumps `tokenVersion`, retiring stolen sessions.
-- **Delivery is simulated**: `LoggingPasswordResetNotifier` logs only a
+- **Delivery is simulated**: `LoggingPasswordResetNotificationAdapter` logs only a
   SHA-256 digest prefix for correlation (never the raw token — raw tokens
   are password-equivalent and must never reach logs), like the transfer
   simulation adapters. A production deployment MUST replace this bean

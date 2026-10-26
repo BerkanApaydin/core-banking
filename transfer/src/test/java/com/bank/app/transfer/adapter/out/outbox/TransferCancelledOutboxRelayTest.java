@@ -4,7 +4,7 @@ import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.domain.AsyncTransferCancelledEvent;
+import com.bank.app.transfer.domain.TransferCancelledNotificationEvent;
 import com.bank.app.transfer.domain.TransferCancelledEvent;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -43,7 +43,7 @@ class TransferCancelledOutboxRelayTest {
     private TransferCancelledOutboxRelay handler;
 
     @Captor
-    private ArgumentCaptor<AsyncTransferCancelledEvent> eventCaptor;
+    private ArgumentCaptor<TransferCancelledNotificationEvent> eventCaptor;
 
     @BeforeEach
     void setUp() {
@@ -85,7 +85,7 @@ class TransferCancelledOutboxRelayTest {
         }
 
         @Test
-        @DisplayName("should publish AsyncTransferCancelledEvent on success")
+        @DisplayName("should publish TransferCancelledNotificationEvent on success")
         void shouldPublishEventSuccessfully() throws Exception {
             String json = objectMapper.writeValueAsString(new TransferCancelledEvent(
                     42L, 1L, 2L,
@@ -98,7 +98,7 @@ class TransferCancelledOutboxRelayTest {
             handler.handle(event);
 
             verify(notificationConsumer).handleTransferCancelled(eventCaptor.capture());
-            AsyncTransferCancelledEvent captured = eventCaptor.getValue();
+            TransferCancelledNotificationEvent captured = eventCaptor.getValue();
             assertEquals(42L, captured.transferId());
             assertEquals(1L, captured.senderAccountId());
             assertEquals(2L, captured.receiverAccountId());

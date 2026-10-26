@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.out.outbox;
 
 import com.bank.app.common.application.port.out.OutboxPort;
 import com.bank.app.common.domain.event.DomainEvent;
-import com.bank.app.infrastructure.adapter.in.config.OutboxProperties;
+import com.bank.app.infrastructure.config.OutboxProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
