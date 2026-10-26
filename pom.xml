@@ -122,6 +122,7 @@
         <pitest.targetClasses.persistence>com.bank.app.persistence.*</pitest.targetClasses.persistence>
         <pitest.targetClasses.transfer>com.bank.app.transfer.*</pitest.targetClasses.transfer>
         <pitest.targetClasses.user>com.bank.app.user.*</pitest.targetClasses.user>
+        <pitest.targetClasses.webSupport>com.bank.app.websupport.*</pitest.targetClasses.webSupport>
         <jacoco.argLine/>
     </properties>
 
@@ -457,6 +458,7 @@
                 <pitest.targetClasses.persistence>com.bank.app.persistence.domain.*</pitest.targetClasses.persistence>
                 <pitest.targetClasses.transfer>com.bank.app.transfer.domain.*</pitest.targetClasses.transfer>
                 <pitest.targetClasses.user>com.bank.app.user.domain.*</pitest.targetClasses.user>
+                <pitest.targetClasses.webSupport>com.bank.app.websupport.domain.*</pitest.targetClasses.webSupport>
             </properties>
             <build>
                 <pluginManagement>

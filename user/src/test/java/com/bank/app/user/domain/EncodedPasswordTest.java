@@ -54,6 +54,7 @@ class EncodedPasswordTest {
 
     @Test
     @DisplayName("ofTrusted should wrap legacy values without validation")
+    @SuppressWarnings("deprecation")
     void ofTrustedShouldWrapLegacy() {
         assertThat(EncodedPassword.ofTrusted("hashedpassword").value()).isEqualTo("hashedpassword");
     }

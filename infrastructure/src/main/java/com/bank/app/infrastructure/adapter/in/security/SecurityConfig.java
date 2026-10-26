@@ -87,7 +87,7 @@ public class SecurityConfig {
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                             + "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"))
-                .permissionsPolicy(permissions -> permissions
+                .permissionsPolicyHeader(permissions -> permissions
                     .policy("camera=(), microphone=(), geolocation=(), payment=(), usb=()")));
 
         return http.build();

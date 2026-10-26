@@ -25,4 +25,22 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <configuration>
+                    <argLine/>
+                    <targetClasses>
+                        <param>${pitest.targetClasses.webSupport}</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.bank.app.websupport.*</param>
+                    </targetTests>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

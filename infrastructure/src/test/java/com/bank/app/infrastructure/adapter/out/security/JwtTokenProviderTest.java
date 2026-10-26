@@ -20,7 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SuppressWarnings("null")
+@SuppressWarnings({"null", "deprecation"})
 @ExtendWith(MockitoExtension.class)
 class JwtTokenProviderTest {
 

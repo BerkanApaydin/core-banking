@@ -307,7 +307,7 @@ class AccountAclAdapterTest {
                 Thread caller = new Thread(() -> {
                     try {
                         start.await();
-                        results.put(Thread.currentThread().getId(),
+                        results.put(Thread.currentThread().threadId(),
                                 adapter.getAccountInfo(new AccountId(1L)));
                     } catch (InterruptedException interrupted) {
                         Thread.currentThread().interrupt();

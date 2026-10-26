@@ -61,6 +61,7 @@ class TransferUseCaseRetryAspectTest {
 
         @Test
         @DisplayName("should retry on deadlock-loser failures via the pessimistic predicate")
+        @SuppressWarnings("deprecation")
         void shouldRetryOnDeadlockLoser() throws Throwable {
             // DeadlockLoserDataAccessException extends PessimisticLockingFailureException,
             // so the existing catch clause already retries the most likely

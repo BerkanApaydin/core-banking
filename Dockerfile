@@ -13,6 +13,7 @@ WORKDIR /build
 COPY pom.xml ./
 COPY migrations/pom.xml ./migrations/
 COPY common/pom.xml ./common/
+COPY web-support/pom.xml ./web-support/
 COPY persistence/pom.xml ./persistence/
 COPY account-api/pom.xml ./account-api/
 COPY infrastructure/pom.xml ./infrastructure/
@@ -28,6 +29,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B -pl app -am
 # Copy source code of all modules
 COPY migrations/src ./migrations/src
 COPY common/src ./common/src
+COPY web-support/src ./web-support/src
 COPY persistence/src ./persistence/src
 COPY account-api/src ./account-api/src
 COPY infrastructure/src ./infrastructure/src

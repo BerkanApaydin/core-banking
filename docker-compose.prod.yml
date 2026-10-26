@@ -1,6 +1,7 @@
 # docker-compose.prod.yml — production-shaped local validation (NOT for real prod data).
 #
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+# Requires Docker Compose >= 2.24.4 for the !override / !reset merge tags.
 #
 # Differences from the dev file (deliberate):
 #  - SPRING_PROFILES_ACTIVE is pinned to prod (no dev fallback, no insecure secret).
@@ -78,6 +79,8 @@ services:
   # TRACING_ENABLED=false until a real collector endpoint is configured
   # (D22), so the service is removed from the merged stack here — the
   # overlay previously only mentioned it in a comment, and the merged
-  # `docker compose config --services` still listed it.
-  otel-collector: !reset null
+  # `docker compose config --services` still listed it. The reset value is
+  # `{}` (not `null`) so the editor's compose-spec schema still sees a valid
+  # service mapping; Compose ignores the value and removes the service.
+  otel-collector: !reset {}
 

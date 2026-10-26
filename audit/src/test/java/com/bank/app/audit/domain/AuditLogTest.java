@@ -41,7 +41,8 @@ class AuditLogTest {
     @Test
     @DisplayName("should create with factory method and auto-generate timestamp")
     void shouldCreateAuditLogWithFactoryMethod() {
-        AuditLog log = AuditLog.create("testuser", AuditAction.TRANSFER_CANCELLED, "Transfer 10 cancelled");
+        AuditLog log = AuditLog.create("testuser", AuditAction.TRANSFER_CANCELLED,
+                "Transfer 10 cancelled", Clock.systemUTC());
 
         assertNull(log.getId());
         assertEquals("testuser", log.getUsername());

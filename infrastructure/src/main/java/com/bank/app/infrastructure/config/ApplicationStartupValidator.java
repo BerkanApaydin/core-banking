@@ -15,6 +15,7 @@ public class ApplicationStartupValidator {
     private static final Logger log = LoggerFactory.getLogger(ApplicationStartupValidator.class);
 
     // Single-sourced from JwtTokenProvider: one literal, no silent divergence.
+    @SuppressWarnings("deprecation")
     private static final String DEFAULT_JWT_SECRET = JwtTokenProvider.DEFAULT_JWT_SECRET;
 
     private final Environment environment;

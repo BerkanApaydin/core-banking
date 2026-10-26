@@ -13,6 +13,7 @@ import java.lang.reflect.InvocationTargetException;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@SuppressWarnings("deprecation")
 class ApplicationStartupValidatorTest {
 
     private MockEnvironment validProductionEnvironment() {

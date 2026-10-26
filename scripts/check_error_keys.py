@@ -28,7 +28,7 @@ MESSAGE_KEYS = (
     ROOT / "common" / "src" / "main" / "java" / "com" / "bank" / "app"
     / "common" / "messages" / "MessageKeys.java"
 )
-MODULES = ["account", "user", "transfer", "audit", "common", "infrastructure", "persistence", "app", "account-api"]
+MODULES = ["account", "user", "transfer", "audit", "common", "web-support", "infrastructure", "persistence", "app", "account-api"]
 
 
 def bundle_keys(path: Path) -> set:

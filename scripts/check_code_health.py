@@ -25,8 +25,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MODULES = ["account", "user", "transfer", "audit", "common", "infrastructure",
-           "persistence", "app", "account-api"]
+MODULES = ["account", "user", "transfer", "audit", "common", "web-support",
+           "infrastructure", "persistence", "app", "account-api"]
 
 # Bodies above this fail the gate. Measured 2026-10: the longest production
 # methods are validateProductionConfig (~88, a sequential require* checklist),

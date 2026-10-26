@@ -318,6 +318,27 @@ def problems_for_tool_only_sources() -> list[str]:
     return problems
 
 
+def problems_for_dockerfile_modules() -> list[str]:
+    problems: list[str] = []
+    modules = re.findall(
+        r"<module>\s*([^<\s]+)\s*</module>", read("pom.xml")
+    )
+    if not modules:
+        return ["root pom declares no modules"]
+    dockerfile = read("Dockerfile")
+    for module in modules:
+        if f"COPY {module}/pom.xml ./{module}/" not in dockerfile:
+            problems.append(
+                f"Dockerfile does not copy {module}/pom.xml before "
+                f"dependency resolution"
+            )
+        if f"COPY {module}/src ./{module}/src" not in dockerfile:
+            problems.append(
+                f"Dockerfile does not copy {module}/src for the package step"
+            )
+    return problems
+
+
 CHECKS = (
     ("mutable image tag", problems_for_mutable_image_tag),
     ("image-pin encoding", problems_for_image_pin_encoding),
@@ -327,6 +348,7 @@ CHECKS = (
     ("deployment contracts", problems_for_deployment_contracts),
     ("local parity", problems_for_local_parity),
     ("tool-only sources", problems_for_tool_only_sources),
+    ("dockerfile modules", problems_for_dockerfile_modules),
 )
 
 
@@ -350,7 +372,7 @@ def main() -> int:
     print(
         "CI contracts OK: image tag, image-pin encoding, migration "
         "soak/content, supply chain (incl. SHA-pinned actions), deployment "
-        "presence, local parity, tool-only sources"
+        "presence, local parity, tool-only sources, dockerfile modules"
     )
     return 0
 

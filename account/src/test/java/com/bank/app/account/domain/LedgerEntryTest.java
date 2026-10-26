@@ -27,7 +27,7 @@ class LedgerEntryTest {
     @Test
     @DisplayName("debit and credit factories assign direction and timestamp")
     void shouldBuildLegs() {
-        TransactionRef ref = LedgerEntry.newTransactionRef();
+        TransactionRef ref = LedgerEntry.newTransactionRef(() -> UUID.randomUUID().toString());
         Clock clock = FIXED_CLOCK;
 
         LedgerEntry debit = LedgerEntry.debit(1L, AMOUNT, BALANCE, ref, clock);
@@ -44,8 +44,11 @@ class LedgerEntryTest {
     @Test
     @DisplayName("transaction refs are unique per operation")
     void shouldGenerateUniqueRefs() {
-        assertThat(LedgerEntry.newTransactionRef()).isNotEqualTo(LedgerEntry.newTransactionRef());
-        assertThatCode(() -> UUID.fromString(LedgerEntry.newTransactionRef().value())).doesNotThrowAnyException();
+        assertThat(LedgerEntry.newTransactionRef(() -> UUID.randomUUID().toString()))
+                .isNotEqualTo(LedgerEntry.newTransactionRef(() -> UUID.randomUUID().toString()));
+        assertThatCode(() -> UUID.fromString(
+                LedgerEntry.newTransactionRef(() -> UUID.randomUUID().toString()).value()))
+                .doesNotThrowAnyException();
     }
 
     @Test
