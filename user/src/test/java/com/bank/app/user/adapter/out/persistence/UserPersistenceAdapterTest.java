@@ -20,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-import java.time.Clock;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,7 +59,8 @@ class UserPersistenceAdapterTest {
         existingEntity.setRole(Role.ROLE_USER);
         when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-        User user = new User(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 0L);
+        User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001",
+                Role.ROLE_USER, null, null, 0L);
         // Kills the NullReturnVals mutant: the saved aggregate must come back.
         var result = adapter.save(user);
 
@@ -137,7 +137,8 @@ class UserPersistenceAdapterTest {
         @DisplayName("should create new entity when id is null")
         void shouldCreateNewEntityWhenIdIsNull() {
             stubSaveEcho();
-            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001",
+                    Role.ROLE_USER);
 
             adapter.save(user);
 
@@ -153,7 +154,8 @@ class UserPersistenceAdapterTest {
         @DisplayName("should map email and phone when present")
         void shouldMapEmailAndPhoneWhenPresent() {
             stubSaveEcho();
-            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER,
+            User user = User.rehydrate(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001",
+                    Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"));
 
             adapter.save(user);
@@ -168,7 +170,8 @@ class UserPersistenceAdapterTest {
         @DisplayName("should leave email and phone null when not present")
         void shouldLeaveEmailAndPhoneNullWhenNotPresent() {
             stubSaveEcho();
-            User user = new User(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(null, "newuser", "$2a$12$testhashedhash0000000000000000000000001",
+                    Role.ROLE_USER);
 
             adapter.save(user);
 
@@ -222,7 +225,8 @@ class UserPersistenceAdapterTest {
             existingEntity.setRole(Role.ROLE_USER);
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testnewpasswordhash000000000000000000001", Role.ROLE_USER,
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testnewpasswordhash000000000000000000001",
+                    Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("+905551234567"), 0L);
             adapter.save(user);
 
@@ -240,7 +244,8 @@ class UserPersistenceAdapterTest {
         void shouldThrowWhenNotFound() {
             when(userJpaRepository.findById(99L)).thenReturn(Optional.empty());
 
-            User user = new User(new UserId(99L), "nonexistent", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(99L), "nonexistent", "$2a$12$testpasswordhash00000000000000000000001",
+                    Role.ROLE_USER);
             assertThrows(IllegalArgumentException.class, () -> adapter.save(user));
         }
 
@@ -252,7 +257,7 @@ class UserPersistenceAdapterTest {
             existingEntity.setVersion(2L);
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User stale = new User(new UserId(1L), "testuser",
+            User stale = User.rehydrate(new UserId(1L), "testuser",
                     "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 1L);
 
             // AV: a concurrent update (for example a token-version bump) must
@@ -269,7 +274,7 @@ class UserPersistenceAdapterTest {
             existingEntity.setVersion(0L);
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User unversioned = new User(new UserId(1L), "testuser",
+            User unversioned = User.rehydrate(new UserId(1L), "testuser",
                     "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
 
             assertThrows(ObjectOptimisticLockingFailureException.class, () -> adapter.save(unversioned));
@@ -287,7 +292,8 @@ class UserPersistenceAdapterTest {
             existingEntity.setPhone("+901234567890");
             when(userJpaRepository.findById(1L)).thenReturn(Optional.of(existingEntity));
 
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER, null, null, 0L);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasswordhash00000000000000000000001",
+                    Role.ROLE_USER, null, null, 0L);
             adapter.save(user);
 
             ArgumentCaptor<UserJpaEntity> captor = ArgumentCaptor.forClass(UserJpaEntity.class);
@@ -306,7 +312,8 @@ class UserPersistenceAdapterTest {
         void shouldMapConcurrentDuplicateToConflict() {
             User user = User.create("newuser",
                     EncodedPassword.of("$2a$12$testpasswordhash00000000000000000000001"),
-                    null, null, java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
+                    null, null,
+                    java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"), java.time.ZoneOffset.UTC));
             when(userJpaRepository.save(any(UserJpaEntity.class)))
                     .thenThrow(new DataIntegrityViolationException("duplicate key"));
 

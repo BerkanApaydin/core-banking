@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.infrastructure.adapter.out.security.HmacCsrfBindingAdapter;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
@@ -7,6 +8,7 @@ import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
+import com.bank.app.user.config.BrowserSessionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,6 +56,21 @@ class JwtAuthenticationFilterTest {
     @Mock
     private FilterChain filterChain;
 
+    private static final byte[] TEST_CSRF_KEY =
+            "test-only-csrf-mac-key-32bytes!!".getBytes(StandardCharsets.UTF_8);
+
+    private static final CsrfBindingPort PLAIN_DOUBLE_SUBMIT = new CsrfBindingPort() {
+        @Override
+        public String issueCsrfToken(String bindingSubject) {
+            throw new UnsupportedOperationException("plain test binding cannot mint tokens");
+        }
+
+        @Override
+        public boolean verifyCsrfToken(String header, String cookie, String bindingSubject) {
+            return BrowserSessionCookies.validCsrfPair(header, cookie);
+        }
+    };
+
     private JwtAuthenticationFilter filter;
     private SecurityContext originalContext;
 
@@ -64,7 +81,8 @@ class JwtAuthenticationFilterTest {
     @BeforeEach
     void setUp() {
         filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
-                new ObjectMapper());
+                new ObjectMapper(), PLAIN_DOUBLE_SUBMIT,
+                new BrowserSessionProperties(false));
         originalContext = SecurityContextHolder.getContext();
         SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());
     }
@@ -455,9 +473,8 @@ class JwtAuthenticationFilterTest {
     @Test
     void secureBrowserModeIgnoresDevelopmentCookieName() throws Exception {
         filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
-                new ObjectMapper(),
-                new JwtAuthenticationFilter.PlainDoubleSubmitCsrfBinding(),
-                new BrowserSessionCookieProperties(true));
+                new ObjectMapper(), new HmacCsrfBindingAdapter(TEST_CSRF_KEY),
+                new BrowserSessionProperties(true));
         when(request.getHeader("Authorization")).thenReturn(null);
         when(request.getServletPath()).thenReturn("/api/v1/accounts");
         when(request.getCookies()).thenReturn(new Cookie[] { new Cookie("BANK_SESSION", "old-token") });
@@ -566,7 +583,7 @@ class JwtAuthenticationFilterTest {
             binding = new HmacCsrfBindingAdapter(
                     "test-only-csrf-mac-key-32bytes!!".getBytes(StandardCharsets.UTF_8));
             filter = new JwtAuthenticationFilter(JwtTokenProvider, tokenBlacklistPort, loadUserPort,
-                    new ObjectMapper(), binding, new BrowserSessionCookieProperties(false));
+                    new ObjectMapper(), binding, new BrowserSessionProperties(false));
             // validToken() carries userId 42: mint the cookie for that identity.
             String bound = binding.issueCsrfToken("42");
             csrfCookie = new Cookie("BANK_CSRF", bound);

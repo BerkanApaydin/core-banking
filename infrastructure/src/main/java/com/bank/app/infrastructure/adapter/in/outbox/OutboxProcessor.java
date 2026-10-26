@@ -67,12 +67,19 @@ public class OutboxProcessor {
         }
 
         try {
-            OutboxEventPort handler = handlers.stream()
+            List<OutboxEventPort> matchingHandlers = handlers.stream()
                     .filter(h -> h.supports(event.eventType()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("No handler for event type: " + event.eventType()));
+                    .toList();
+            if (matchingHandlers.isEmpty()) {
+                throw new IllegalStateException("No handler for event type: " + event.eventType());
+            }
 
-            handler.handle(event);
+            // Every consumer runs: each relay owns its dedup key, so a retry
+            // after one consumer failed skips the successful ones. Taking only
+            // the first match silently dropped the rest of a fan-out.
+            for (OutboxEventPort handler : matchingHandlers) {
+                handler.handle(event);
+            }
 
             outboxPort.markProcessed(event.id());
             afterCommit(() -> {

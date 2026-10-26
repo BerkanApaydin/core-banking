@@ -21,7 +21,7 @@ class AccountJpaMapperTest {
     @Test
     void shouldMapDomainToJpaEntity() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domain = new Account(1L, new UserId(100L), iban, "Ahmet",
+        Account domain = Account.rehydrate(1L, new UserId(100L), iban, "Ahmet",
                 Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE, 3L);
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
@@ -71,7 +71,7 @@ class AccountJpaMapperTest {
     @Test
     void shouldMapDomainWithoutVersion() {
         Iban iban = new Iban("TR970006200000000000000333");
-        Account domain = new Account(3L, new UserId(300L), iban, "Ali",
+        Account domain = Account.rehydrate(3L, new UserId(300L), iban, "Ali",
                 Money.of("750.00", Currency.TRY), AccountStatus.ACTIVE);
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
@@ -92,7 +92,7 @@ class AccountJpaMapperTest {
     @Test
     void shouldMapDomainToJpaEntityWithEurCurrency() {
         Iban iban = new Iban("TR200006200000000000000555");
-        Account domain = new Account(5L, new UserId(500L), iban, "Ayse",
+        Account domain = Account.rehydrate(5L, new UserId(500L), iban, "Ayse",
                 Money.of("2000.00", Currency.EUR), AccountStatus.ACTIVE);
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);
@@ -124,7 +124,7 @@ class AccountJpaMapperTest {
     @Test
     void shouldMapDomainWithClosedStatusToJpaEntity() {
         Iban iban = new Iban("TR500006200000000000000888");
-        Account domain = new Account(8L, new UserId(800L), iban, "Bora",
+        Account domain = Account.rehydrate(8L, new UserId(800L), iban, "Bora",
                 Money.of("0.00", Currency.TRY), AccountStatus.CLOSED);
 
         AccountJpaEntity entity = mapper.toJpaEntity(domain);

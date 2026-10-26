@@ -56,6 +56,7 @@ class UserEventOutboxRelayTest {
         @DisplayName("should return true for UserRegisteredEvent")
         void shouldReturnTrueForUserRegisteredEvent() {
             assertTrue(handler.supports("UserRegisteredEvent"));
+            assertTrue(handler.supports(UserRegisteredEvent.class.getName()));
         }
 
         @Test

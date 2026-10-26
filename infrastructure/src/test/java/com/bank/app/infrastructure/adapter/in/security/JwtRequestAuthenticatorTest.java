@@ -1,7 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
-import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -102,7 +101,7 @@ class JwtRequestAuthenticatorTest {
     @Test
     void shouldRejectRefreshTokenOutsideRefreshEndpoint() {
         when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
-        when(jwtPort.extractTokenType("jwt")).thenReturn(JwtTokenProvider.TOKEN_TYPE_REFRESH);
+        when(jwtPort.extractTokenType("jwt")).thenReturn(JwtPort.TOKEN_TYPE_REFRESH);
 
         JwtRequestAuthenticator.Result result = authenticator.authenticate(
                 request("GET", "/api/v1/transfers"), "/api/v1/transfers", "jwt", true);
@@ -116,7 +115,7 @@ class JwtRequestAuthenticatorTest {
         // the type check must not turn a legitimate rotation into a 401.
         String path = "/api/v1/auth/refresh";
         when(jwtPort.verifyAndDecode("jwt")).thenReturn(token(7L, "ROLE_USER"));
-        when(jwtPort.extractTokenType("jwt")).thenReturn(JwtTokenProvider.TOKEN_TYPE_REFRESH);
+        when(jwtPort.extractTokenType("jwt")).thenReturn(JwtPort.TOKEN_TYPE_REFRESH);
 
         JwtRequestAuthenticator.Result result = authenticator.authenticate(
                 request("POST", path), path, "jwt", true);

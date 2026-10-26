@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.in.handler;
+package com.bank.app.websupport;
 
 import com.bank.app.common.adapter.in.api.ProblemBody;
 import com.bank.app.common.domain.exception.ErrorCode;
@@ -21,6 +21,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Single RFC 7807 renderer shared by controllers, exception handlers and
+ * servlet filters. All entry points render the same {@link ProblemBody}, so
+ * field names, timestamp shape and problem type cannot drift between web
+ * layers.
+ */
 public final class ProblemDetailFactory {
 
     private static final Logger log = LoggerFactory.getLogger(ProblemDetailFactory.class);
@@ -53,10 +59,10 @@ public final class ProblemDetailFactory {
      * Field names and timestamp shape are owned by the record; this method
      * only adapts them to the transport type.
      */
-    static void renderOnto(ProblemDetail problemDetail, ProblemBody body) {
+    private static void renderOnto(ProblemDetail problemDetail, ProblemBody body) {
         // No explicit setTitle: forStatusAndDetail already carries the reason phrase.
         // Semantic type (audit: previously about:blank): derived from the wire
-        // code via ProblemBody so both renderers stay identical.
+        // code via ProblemBody.
         problemDetail.setType(URI.create(body.problemType()));
         if (body.instance() != null) {
             try {
@@ -68,8 +74,7 @@ public final class ProblemDetailFactory {
         problemDetail.setProperty("code", body.code());
         problemDetail.setProperty("message", body.message());
         // ISO-8601 string (not LocalDateTime) so every writer works with any
-        // ObjectMapper, including ones without the JSR-310 module. Same shape
-        // Spring Boot renders by default; matches ProblemResponses.
+        // ObjectMapper, including ones without the JSR-310 module.
         problemDetail.setProperty("timestamp", body.timestamp());
         // CorrelationIdFilter puts the id into MDC before every other filter
         // and echoes it as a response header. Mirroring it in the body lets
@@ -95,11 +100,33 @@ public final class ProblemDetailFactory {
 
     public static ResponseEntity<ProblemDetail> create(ErrorCode code, String message, WebRequest request) {
         HttpStatus status = BusinessErrorHttpMapper.toStatus(code);
-        return createResponse(status, code.code(), message, request);
+        return createResponse(status, code.code(), message, instanceFromRequest(request));
     }
 
     public static ResponseEntity<ProblemDetail> create(HttpStatus status, String errorCode, String message, WebRequest request) {
-        return createResponse(status, errorCode, message, request);
+        return createResponse(status, errorCode, message, instanceFromRequest(request));
+    }
+
+    public static ResponseEntity<ProblemDetail> create(HttpStatus status, String errorCode, String message,
+            @Nullable String path) {
+        return createResponse(status, errorCode, message, path);
+    }
+
+    public static ResponseEntity<ProblemDetail> unauthorized(String message, @Nullable String path) {
+        return create(HttpStatus.UNAUTHORIZED, ErrorCode.AUTHENTICATION_FAILED.code(), message, path);
+    }
+
+    public static ResponseEntity<ProblemDetail> forbidden(String message, @Nullable String path) {
+        return create(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED.code(), message, path);
+    }
+
+    /**
+     * R-U10/R-U11: a security backend (database, revocation store) failed.
+     * 503 tells the client to retry; unlike a 401 it must not destroy the
+     * browser session cookies, because the session was never proven invalid.
+     */
+    public static ResponseEntity<ProblemDetail> serviceUnavailable(String message, @Nullable String path) {
+        return create(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.SECURITY_BACKEND_UNAVAILABLE.code(), message, path);
     }
 
     public static ResponseEntity<ProblemDetail> createValidationError(Map<String, String> fieldErrors, WebRequest request) {
@@ -132,13 +159,14 @@ public final class ProblemDetailFactory {
         objectMapper.writeValue(response.getWriter(), problemDetail);
     }
 
-    private static ResponseEntity<ProblemDetail> createResponse(HttpStatus status, String code, String message, WebRequest request) {
+    private static ResponseEntity<ProblemDetail> createResponse(HttpStatus status, String code, String message,
+            @Nullable String path) {
         if (status == null) {
             throw new IllegalArgumentException("HttpStatus must not be null");
         }
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, message);
         renderOnto(problemDetail, ProblemBody.of(status.value(), code, message,
-                currentClock(), MDC.get("correlationId"), instanceFromRequest(request)));
+                currentClock(), MDC.get("correlationId"), path));
         return ResponseEntity.status(status)
                 .contentType(Objects.requireNonNull(MediaType.APPLICATION_PROBLEM_JSON))
                 .body(problemDetail);

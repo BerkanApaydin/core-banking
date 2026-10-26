@@ -1,7 +1,7 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIdQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
@@ -53,7 +53,7 @@ class GetAccountByIdQueryImplTest {
         @Test
         @DisplayName("should get account by ID successfully")
         void shouldGetAccountByIdSuccessfully() {
-            Account account = new Account(ACCOUNT_ID, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
+            Account account = Account.rehydrate(ACCOUNT_ID, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             when(loadAccountPort.findById(ACCOUNT_ID)).thenReturn(Optional.of(account));
             when(accountAuthorizationService.isCurrentUserOwner(account)).thenReturn(true);
@@ -82,7 +82,7 @@ class GetAccountByIdQueryImplTest {
         @Test
         @DisplayName("should hide another user's account with not found")
         void shouldHideAnotherUsersAccount() {
-            Account account = new Account(ACCOUNT_ID, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
+            Account account = Account.rehydrate(ACCOUNT_ID, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             when(loadAccountPort.findById(ACCOUNT_ID)).thenReturn(Optional.of(account));
             when(accountAuthorizationService.isCurrentUserOwner(account)).thenReturn(false);

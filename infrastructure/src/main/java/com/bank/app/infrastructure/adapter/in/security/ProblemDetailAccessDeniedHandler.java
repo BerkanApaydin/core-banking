@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.common.messages.MessageKeys;
-import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

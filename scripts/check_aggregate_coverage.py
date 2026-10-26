@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 
 EXPECTED = {
-    "app", "common", "persistence", "account-api", "account",
+    "app", "common", "web-support", "persistence", "account-api", "account",
     "transfer", "user", "audit", "infrastructure",
 }
 # HIGH-3: single source of truth with the root pom

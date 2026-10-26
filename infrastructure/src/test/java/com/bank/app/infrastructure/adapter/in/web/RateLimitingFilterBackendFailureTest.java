@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -19,13 +18,12 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
+
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,11 +32,12 @@ import static org.mockito.Mockito.when;
 /**
  * Backend-failure and client-keying behaviour of the pre-auth rate limiter.
  *
- * <p>The limiter must never fail OPEN (a broken backend must not become an
+ * <p>
+ * The limiter must never fail OPEN (a broken backend must not become an
  * unlimited budget) and a client without a resolvable IP must not silently
  * share an unlimited budget with nobody.
  */
-@SuppressWarnings({"null", "unchecked"})
+@SuppressWarnings({ "null", "unchecked" })
 @ExtendWith(MockitoExtension.class)
 class RateLimitingFilterBackendFailureTest {
 
@@ -48,8 +47,7 @@ class RateLimitingFilterBackendFailureTest {
     private MessageSource messageSource;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RateLimitProperties props =
-            new RateLimitProperties(null, null, 10, 10_000, 120, 60_000, 10000);
+    private final RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 120, 60_000, 10000);
     private final ClientIpResolver clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
 
     @BeforeEach

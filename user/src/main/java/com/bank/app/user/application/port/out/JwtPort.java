@@ -5,6 +5,11 @@ package com.bank.app.user.application.port.out;
  * Implemented by infrastructure adapters (e.g. JWT provider).
  */
 public interface JwtPort {
+
+    /** Token type used to distinguish access tokens from refresh tokens. */
+    String TOKEN_TYPE_ACCESS = "access";
+    String TOKEN_TYPE_REFRESH = "refresh";
+
     record VerifiedToken(String username, Long userId, String role, String tokenId, long expiresAtMs) {}
 
     /** Returns null for an invalid, expired or incomplete signed token. */

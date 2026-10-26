@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import com.bank.app.user.application.port.out.JwtPort;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,6 @@ import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.ProtectedHeader;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
@@ -63,42 +63,33 @@ public class JwtTokenProvider implements JwtPort {
             "ZGV2LW9ubHktTk9ULUZPUi1QUk9ELTAwMDAwMDAwMDA=";
 
     /** Token type claim distinguishing access from refresh tokens. */
-    public static final String TOKEN_TYPE_CLAIM = "typ";
-    public static final String TOKEN_TYPE_ACCESS = "access";
-    public static final String TOKEN_TYPE_REFRESH = "refresh";
+    private static final String TOKEN_TYPE_CLAIM = "typ";
     /** Token generation claim (V39): bumped on role/password changes. */
-    public static final String TOKEN_VERSION_CLAIM = "ver";
+    private static final String TOKEN_VERSION_CLAIM = "ver";
 
-    private String secretKey;
-    private long accessExpiration;
-    private long refreshExpiration;
+    private final String secretKey;
+    private final long accessExpiration;
+    private final long refreshExpiration;
     private final boolean allowDefaultSecret;
     private final String issuer;
     private final String audience;
     private final String keyId;
     private final long clockSkewSeconds;
     private final Map<String, String> retiredSecrets;
+    private final ClockProviderPort clockProvider;
     private volatile SecretKey signingKey;
     private volatile Map<String, SecretKey> retiredVerificationKeys = Map.of();
     private volatile JwtParser verifiedParser;
-    // Time-strategy seam (docs/decisions/time-strategy.md): jjwt requires
-    // java.util.Date, so the clock is adapted at the boundary via
-    // Date.from(clock.instant()). Production keeps systemUTC; tests pin a
-    // fixed clock for deterministic expiry assertions.
-    private volatile Clock clock = Clock.systemUTC();
-
-    /** Test/simulation clock injection. */
-    public void setClockForTests(Clock testClock) {
-        this.clock = testClock != null ? testClock : Clock.systemUTC();
-    }
 
     // Primary constructor: typed properties (D13/K14) — no @Value scatter.
+    // Time comes from the application ClockProviderPort (docs/decisions/time-strategy.md);
+    // jjwt requires java.util.Date, so the clock is adapted at the boundary.
     @Autowired
-    public JwtTokenProvider(JwtProperties properties) {
+    public JwtTokenProvider(JwtProperties properties, ClockProviderPort clockProvider) {
         this(properties.secret(), properties.accessExpiration(),
                 properties.refreshExpiration(), properties.allowDefaultSecret(),
                 properties.issuer(), properties.audience(), properties.keyId(),
-                properties.clockSkewSeconds(), properties.retiredKeys());
+                properties.clockSkewSeconds(), properties.retiredKeys(), clockProvider);
     }
 
     // Legacy constructor kept for isolated unit tests (no Spring context).
@@ -106,13 +97,22 @@ public class JwtTokenProvider implements JwtPort {
                             long refreshExpiration, boolean allowDefaultSecret) {
         this(secretKey, accessExpiration, refreshExpiration, allowDefaultSecret,
                 "clean-architecture-bank", "clean-architecture-bank-api",
-                "primary", 30L, Map.of());
+                "primary", 30L, Map.of(), Clock::systemUTC);
+    }
+
+    JwtTokenProvider(String secretKey, long accessExpiration,
+                     long refreshExpiration, boolean allowDefaultSecret,
+                     ClockProviderPort clockProvider) {
+        this(secretKey, accessExpiration, refreshExpiration, allowDefaultSecret,
+                "clean-architecture-bank", "clean-architecture-bank-api",
+                "primary", 30L, Map.of(), clockProvider);
     }
 
     private JwtTokenProvider(String secretKey, long accessExpiration,
                              long refreshExpiration, boolean allowDefaultSecret,
                              String issuer, String audience, String keyId,
-                             long clockSkewSeconds, Map<String, String> retiredSecrets) {
+                             long clockSkewSeconds, Map<String, String> retiredSecrets,
+                             ClockProviderPort clockProvider) {
         this.secretKey = secretKey;
         this.accessExpiration = accessExpiration;
         this.refreshExpiration = refreshExpiration;
@@ -122,6 +122,12 @@ public class JwtTokenProvider implements JwtPort {
         this.keyId = keyId;
         this.clockSkewSeconds = clockSkewSeconds;
         this.retiredSecrets = retiredSecrets == null ? Map.of() : Map.copyOf(retiredSecrets);
+        this.clockProvider = clockProvider != null ? clockProvider : Clock::systemUTC;
+    }
+
+    private Clock clock() {
+        Clock clock = clockProvider.clock();
+        return clock != null ? clock : Clock.systemUTC();
     }
 
     @PostConstruct
@@ -153,20 +159,17 @@ public class JwtTokenProvider implements JwtPort {
                 .keyLocator(this::locateVerificationKey)
                 .requireIssuer(issuer)
                 .requireAudience(audience)
-                .clock(() -> Date.from(clock.instant()))
+                .clock(() -> Date.from(clock().instant()))
                 .clockSkewSeconds(clockSkewSeconds)
                 .build();
     }
 
     private Key locateVerificationKey(Header header) {
-        String requestedKeyId = header instanceof ProtectedHeader protectedHeader
-                ? protectedHeader.getKeyId() : null;
-        if (requestedKeyId == null && header.get("kid") instanceof String legacyKeyId) {
-            requestedKeyId = legacyKeyId;
-        }
+        Object rawKeyId = header.get("kid");
+        String requestedKeyId = rawKeyId instanceof String value ? value : null;
         if (requestedKeyId == null || requestedKeyId.isBlank()
                 || keyId.equals(requestedKeyId)) {
-            return requireSigningKey();
+            return getSignInKey();
         }
         SecretKey retiredKey = retiredVerificationKeys.get(requestedKeyId);
         if (retiredKey == null) {
@@ -196,15 +199,6 @@ public class JwtTokenProvider implements JwtPort {
                 "Generate a secure key with: openssl rand -base64 32");
         }
         return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    private SecretKey requireSigningKey() {
-        SecretKey key = signingKey;
-        if (key == null) {
-            validateSecret();
-            key = signingKey;
-        }
-        return key;
     }
 
     @Override
@@ -237,7 +231,7 @@ public class JwtTokenProvider implements JwtPort {
         return extractClaim(token, Claims::getSubject);
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
@@ -273,14 +267,11 @@ public class JwtTokenProvider implements JwtPort {
         return generateToken(extraClaims, userId, username, TOKEN_TYPE_REFRESH, refreshExpiration);
     }
 
-    public String generateToken(Map<String, Object> extraClaims, Long userId, String username) {
-        return generateToken(extraClaims, userId, username, TOKEN_TYPE_ACCESS, accessExpiration);
-    }
-
     private String generateToken(Map<String, Object> extraClaims, Long userId, String username,
                                  String tokenType, long ttlMs) {
         extraClaims.put("userId", userId);
         extraClaims.put(TOKEN_TYPE_CLAIM, tokenType);
+        Clock clock = clock();
         return Jwts.builder()
                 .claims(extraClaims)
                 .issuer(issuer)
@@ -339,7 +330,7 @@ public class JwtTokenProvider implements JwtPort {
             }
             // A token remains accepted for clockSkewSeconds after its exp, so
             // a blacklist entry must outlive that grace period too.
-            long remaining = expiration.getTime() + clockSkewSeconds * 1000L - clock.millis();
+            long remaining = expiration.getTime() + clockSkewSeconds * 1000L - clock().millis();
             return Math.max(remaining, 0);
         } catch (JwtException | IllegalArgumentException e) {
             return 0;

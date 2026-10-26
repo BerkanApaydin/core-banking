@@ -3,7 +3,6 @@ package com.bank.app.user.adapter.in.web;
 import com.bank.app.BankApplication;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
-import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
@@ -60,7 +59,6 @@ class BrowserSessionClockExpiryIntegrationTest extends AbstractSpringBootIntegra
     private final UserJpaRepository users;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
-    private final JwtTokenProvider jwtTokenProvider;
     private final MutableClock clock;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
@@ -70,15 +68,14 @@ class BrowserSessionClockExpiryIntegrationTest extends AbstractSpringBootIntegra
     @Autowired
     BrowserSessionClockExpiryIntegrationTest(MockMvc mockMvc, UserJpaRepository users,
             PasswordEncoder passwordEncoder, ObjectMapper objectMapper,
-            JwtTokenProvider jwtTokenProvider, MutableClock clock,
-            EntityManager entityManager, PlatformTransactionManager transactionManager,
+            MutableClock clock, EntityManager entityManager,
+            PlatformTransactionManager transactionManager,
             ObjectProvider<CacheManager> cacheManagers) {
         super(cacheManagers);
         this.mockMvc = mockMvc;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
-        this.jwtTokenProvider = jwtTokenProvider;
         this.clock = clock;
         this.entityManager = entityManager;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -87,7 +84,6 @@ class BrowserSessionClockExpiryIntegrationTest extends AbstractSpringBootIntegra
     @BeforeEach
     void setUp() {
         clock.reset(Instant.now());
-        jwtTokenProvider.setClockForTests(clock);
         username = "clock_" + UUID.randomUUID().toString().replace("-", "");
         UserJpaEntity user = new UserJpaEntity();
         user.setUsername(username);
@@ -98,7 +94,6 @@ class BrowserSessionClockExpiryIntegrationTest extends AbstractSpringBootIntegra
 
     @AfterEach
     void tearDown() {
-        jwtTokenProvider.setClockForTests(null);
         transactionTemplate.executeWithoutResult(status -> {
             entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
                             + "(SELECT id FROM users WHERE username = :username)")

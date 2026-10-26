@@ -47,7 +47,7 @@ class GetTransferHistoryQueryImplTest {
     @Test
     void shouldReturnTransferHistorySuccessfully() {
         AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
-        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t1 = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);
@@ -115,9 +115,9 @@ class GetTransferHistoryQueryImplTest {
     @Test
     void shouldServePageAndTotalFromASinglePortCall() {
         AccountInfo account = new AccountInfo(new AccountId(1L), 100L, "TRY", "ACTIVE");
-        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t1 = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
-        Transfer t2 = new Transfer(11L, new AccountId(1L), new AccountId(2L), Money.of("50.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer t2 = Transfer.rehydrate(11L, new AccountId(1L), new AccountId(2L), Money.of("50.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
 
         when(transferAuthorizationService.authorizeAccountAccess(eq(new AccountId(1L)), anyString())).thenReturn(account);

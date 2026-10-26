@@ -25,7 +25,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -87,7 +86,7 @@ class RefreshTokenConcurrencyIT extends AbstractSpringBootIntegrationTest {
         transactionTemplate.executeWithoutResult(status -> {
             for (String username : createdUsernames) {
                 entityManager.createNativeQuery("DELETE FROM refresh_tokens WHERE user_id IN "
-                                + "(SELECT id FROM users WHERE username = :username)")
+                        + "(SELECT id FROM users WHERE username = :username)")
                         .setParameter("username", username)
                         .executeUpdate();
                 entityManager.createNativeQuery("DELETE FROM users WHERE username = :username")
@@ -174,14 +173,14 @@ class RefreshTokenConcurrencyIT extends AbstractSpringBootIntegrationTest {
 
     private JsonNode login(String username) throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new AuthRequest(username, PASSWORD))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new AuthRequest(username, PASSWORD))))
                 .andExpect(status().isCreated());
         String body = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new AuthRequest(username, PASSWORD))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new AuthRequest(username, PASSWORD))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(body);

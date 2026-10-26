@@ -1,5 +1,7 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.common.application.exception.AuthenticationRequiredException;
+import com.bank.app.common.application.exception.CsrfViolationException;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.user.adapter.in.web.dto.AuthWebRequest;
 import com.bank.app.user.application.dto.AuthRequest;
@@ -10,8 +12,6 @@ import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
-import com.bank.app.user.application.port.out.JwtPort;
-import com.bank.app.user.application.port.out.JwtPort.VerifiedToken;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
@@ -55,7 +55,6 @@ class BrowserAuthControllerTest {
     @Mock private RefreshSessionUseCase refreshSessionUseCase;
     @Mock private ClientIpResolverPort clientIpResolver;
     @Mock private CsrfBindingPort csrfBinding;
-    @Mock private JwtPort jwtPort;
     @Mock private UserContextService userContextService;
 
     private BrowserAuthController controller;
@@ -64,7 +63,7 @@ class BrowserAuthControllerTest {
     @BeforeEach
     void setUp() {
         controller = new BrowserAuthController(loginUserUseCase, logoutUseCase,
-                refreshSessionUseCase, clientIpResolver, csrfBinding, jwtPort,
+                refreshSessionUseCase, clientIpResolver, csrfBinding,
                 userContextService, new BrowserSessionProperties(false),
                 new SessionTokenLifetimeProperties(900000L, 604800000L));
         response = new MockHttpServletResponse();
@@ -78,7 +77,7 @@ class BrowserAuthControllerTest {
 
     private BrowserAuthController secureController() {
         return new BrowserAuthController(loginUserUseCase, logoutUseCase,
-                refreshSessionUseCase, clientIpResolver, csrfBinding, jwtPort,
+                refreshSessionUseCase, clientIpResolver, csrfBinding,
                 userContextService, new BrowserSessionProperties(true),
                 new SessionTokenLifetimeProperties(900000L, 604800000L));
     }
@@ -145,11 +144,8 @@ class BrowserAuthControllerTest {
                 new Cookie("__Host-BANK_CSRF", "old-csrf"),
                 new Cookie("__Secure-BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "old-csrf");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("old-csrf", "old-csrf", "7")).thenReturn(true);
         when(csrfBinding.issueCsrfToken("7")).thenReturn("new-csrf");
-        when(refreshSessionUseCase.execute("rt"))
+        when(refreshSessionUseCase.executeWithCsrf("rt", "old-csrf", "old-csrf"))
                 .thenReturn(new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
         MockHttpServletResponse secureResponse = new MockHttpServletResponse();
 
@@ -193,7 +189,7 @@ class BrowserAuthControllerTest {
         ResponseEntity<?> result = controller.refresh(request, response);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        verify(jwtPort, never()).verifyAndDecode(anyString());
+        verify(refreshSessionUseCase, never()).executeWithCsrf(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -205,7 +201,7 @@ class BrowserAuthControllerTest {
         ResponseEntity<?> result = controller.refresh(request, response);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        verify(jwtPort, never()).verifyAndDecode(anyString());
+        verify(refreshSessionUseCase, never()).executeWithCsrf(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -213,14 +209,13 @@ class BrowserAuthControllerTest {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", null, "ROLE_USER", "jti", 999L));
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
+                .thenThrow(new AuthenticationFailedException("Invalid refresh token."));
 
         ResponseEntity<?> result = controller.refresh(request, response);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getHeaderValues("Set-Cookie")).hasSize(3);
-        verify(csrfBinding, never()).verifyCsrfToken(any(), any(), any());
     }
 
     @Test
@@ -228,7 +223,8 @@ class BrowserAuthControllerTest {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "stale"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("stale")).thenReturn(null);
+        when(refreshSessionUseCase.executeWithCsrf("stale", "c", "c"))
+                .thenThrow(new AuthenticationFailedException("Invalid refresh token."));
 
         ResponseEntity<?> result = controller.refresh(request, response);
 
@@ -237,17 +233,16 @@ class BrowserAuthControllerTest {
     }
 
     @Test
-    void refreshRejectsCsrfMismatch() {
+    void refreshPropagatesCsrfViolationWithoutClearingCookies() {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "other"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("c", "other", "7")).thenReturn(false);
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "other"))
+                .thenThrow(new CsrfViolationException());
 
-        ResponseEntity<?> result = controller.refresh(request, response);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThatThrownBy(() -> controller.refresh(request, response))
+                .isInstanceOf(CsrfViolationException.class);
+        assertThat(response.getHeader("Set-Cookie")).isNull();
     }
 
     @Test
@@ -255,10 +250,7 @@ class BrowserAuthControllerTest {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
-        when(refreshSessionUseCase.execute("rt"))
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
                 .thenThrow(new AuthenticationFailedException("expired"));
 
         ResponseEntity<?> result = controller.refresh(request, response);
@@ -272,10 +264,7 @@ class BrowserAuthControllerTest {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
-        when(refreshSessionUseCase.execute("rt"))
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
                 .thenThrow(new AuthenticationBackendUnavailableException(
                         new IllegalStateException("db down")));
 
@@ -293,10 +282,7 @@ class BrowserAuthControllerTest {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
-        when(refreshSessionUseCase.execute("rt"))
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
                 .thenThrow(new RefreshTokenReuseException());
 
         assertThat(controller.refresh(request, response).getStatusCode())
@@ -304,15 +290,26 @@ class BrowserAuthControllerTest {
     }
 
     @Test
+    void refreshDoesNotClearCookiesOnUnexpectedFailure() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
+        request.addHeader("X-CSRF-Token", "c");
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
+                .thenThrow(new IllegalStateException("boom"));
+
+        assertThatThrownBy(() -> controller.refresh(request, response))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("boom");
+        assertThat(response.getHeader("Set-Cookie")).isNull();
+    }
+
+    @Test
     void refreshRotatesCookiesOnSuccess() {
         MockHttpServletRequest request = requestWithCookies(
                 new Cookie("BANK_CSRF", "c"), new Cookie("BANK_REFRESH", "rt"));
         request.addHeader("X-CSRF-Token", "c");
-        when(jwtPort.verifyAndDecode("rt"))
-                .thenReturn(new VerifiedToken("alice", 7L, "ROLE_USER", "jti", 999L));
-        when(csrfBinding.verifyCsrfToken("c", "c", "7")).thenReturn(true);
         when(csrfBinding.issueCsrfToken("7")).thenReturn("csrf-1");
-        when(refreshSessionUseCase.execute("rt"))
+        when(refreshSessionUseCase.executeWithCsrf("rt", "c", "c"))
                 .thenReturn(new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
 
         ResponseEntity<?> result = controller.refresh(request, response);
@@ -329,9 +326,8 @@ class BrowserAuthControllerTest {
     void sessionRejectsMissingPrincipal() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
 
-        ResponseEntity<?> result = controller.session(new MockHttpServletRequest());
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThatThrownBy(() -> controller.session())
+                .isInstanceOf(AuthenticationRequiredException.class);
     }
 
     @Test
@@ -339,9 +335,8 @@ class BrowserAuthControllerTest {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
         when(userContextService.getCurrentUsername()).thenReturn(Optional.empty());
 
-        ResponseEntity<?> result = controller.session(new MockHttpServletRequest());
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThatThrownBy(() -> controller.session())
+                .isInstanceOf(AuthenticationRequiredException.class);
     }
 
     @Test
@@ -349,7 +344,7 @@ class BrowserAuthControllerTest {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(7L));
         when(userContextService.getCurrentUsername()).thenReturn(Optional.of("alice"));
 
-        ResponseEntity<?> result = controller.session(new MockHttpServletRequest());
+        ResponseEntity<?> result = controller.session();
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody())

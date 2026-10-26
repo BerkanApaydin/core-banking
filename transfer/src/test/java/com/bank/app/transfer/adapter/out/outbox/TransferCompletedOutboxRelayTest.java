@@ -62,6 +62,7 @@ class TransferCompletedOutboxRelayTest {
         @DisplayName("should return true for TransferCompletedEvent")
         void shouldReturnTrueForTransferCompletedEvent() {
             assertTrue(handler.supports("TransferCompletedEvent"));
+            assertTrue(handler.supports(TransferCompletedEvent.class.getName()));
         }
 
         @Test

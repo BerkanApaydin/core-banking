@@ -51,7 +51,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,
@@ -83,7 +83,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,
@@ -115,7 +115,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,
@@ -156,7 +156,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,
@@ -179,7 +179,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,
@@ -205,7 +205,7 @@ class GetTransferDetailQueryImplTest {
         AccountId senderAccountId = new AccountId(10L);
         AccountId receiverAccountId = new AccountId(20L);
 
-        Transfer transfer = new Transfer(
+        Transfer transfer = Transfer.rehydrate(
                 transferId,
                 senderAccountId,
                 receiverAccountId,

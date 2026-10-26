@@ -4,7 +4,6 @@ import com.bank.app.account.api.AccountApi;
 import com.bank.app.common.domain.AccountId;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
-import com.bank.app.transfer.application.port.out.AccountAclPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +23,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 /**
  * Null / empty input handling of the Account anti-corruption adapter.
  *
- * <p>The adapter is the only place where the Account published language is
- * translated, so a null slipping through here surfaces as a NullPointerException
+ * <p>
+ * The adapter is the only place where the Account published language is
+ * translated, so a null slipping through here surfaces as a
+ * NullPointerException
  * deep inside the money-movement path instead of a clean domain failure.
  */
 @SuppressWarnings("null")

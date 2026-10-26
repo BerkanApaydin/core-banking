@@ -36,6 +36,21 @@ class OutboxProcessorTest {
         outboxProcessor = new OutboxProcessor(outboxPort, List.of(handler));
     }
 
+    @Test
+    void shouldInvokeEveryMatchingHandler() throws Exception {
+        EventEntry event = event("evt-multi", "TransferCompletedEvent");
+        when(outboxPort.findByIdForUpdateSkipLocked("evt-multi")).thenReturn(Optional.of(event));
+        OutboxEventPort secondHandler = mock(OutboxEventPort.class);
+        when(handler.supports("TransferCompletedEvent")).thenReturn(true);
+        when(secondHandler.supports("TransferCompletedEvent")).thenReturn(true);
+
+        new OutboxProcessor(outboxPort, List.of(handler, secondHandler)).processEvent(event);
+
+        verify(handler).handle(event);
+        verify(secondHandler).handle(event);
+        verify(outboxPort).markProcessed("evt-multi");
+    }
+
     private EventEntry event(String id, String eventType) {
         return new EventEntry(id, "transfer", "agg-1", eventType,
                 "{\"key\":\"value\"}", 0, false, false, null, 0, LocalDateTime.now());

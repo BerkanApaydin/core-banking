@@ -299,7 +299,7 @@ def problems_for_tool_only_sources() -> list[str]:
             )
 
     main_roots = (
-        "account", "user", "transfer", "audit", "common",
+        "account", "user", "transfer", "audit", "common", "web-support",
         "infrastructure", "persistence", "app", "account-api",
     )
     for module in main_roots:

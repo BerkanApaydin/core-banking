@@ -233,40 +233,4 @@ class UseCaseTransactionAspectTest {
         assertEquals("original commit failure", failure.getMessage());
     }
 
-    @Test
-    void shouldProceedOnAroundAudit() throws Throwable {
-        stubTransaction();
-        when(joinPoint.proceed()).thenReturn("result");
-
-        Object result = aspect.aroundAudit(joinPoint);
-
-        assertEquals("result", result);
-        verify(joinPoint).proceed();
-        verify(transactionManager).getTransaction(definitionCaptor.capture());
-        DefaultTransactionDefinition def = definitionCaptor.getValue();
-        assertEquals("testSignature", def.getName());
-        assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
-        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
-        assertEquals(30, def.getTimeout());
-        verify(transactionManager).commit(transactionStatus);
-    }
-
-    @Test
-    void shouldProceedOnAroundAuditReadOnly() throws Throwable {
-        stubTransaction();
-        when(joinPoint.proceed()).thenReturn("result");
-
-        Object result = aspect.aroundAuditReadOnly(joinPoint);
-
-        assertEquals("result", result);
-        verify(joinPoint).proceed();
-        verify(transactionManager).getTransaction(definitionCaptor.capture());
-        DefaultTransactionDefinition def = definitionCaptor.getValue();
-        assertEquals("testSignature", def.getName());
-        assertEquals(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW, def.getPropagationBehavior());
-        assertEquals(true, def.isReadOnly());
-        assertEquals(TransactionDefinition.ISOLATION_READ_COMMITTED, def.getIsolationLevel());
-        assertEquals(30, def.getTimeout());
-        verify(transactionManager).commit(transactionStatus);
-    }
 }

@@ -17,14 +17,9 @@ class AccountResponseTest {
 
     @Test
     void shouldMapFromActiveAccount() {
-        Account account = Account.builder()
-                .id(1L)
-                .userId(new UserId(10L))
-                .iban(new Iban("TR963456789012345678901234"))
-                .ownerName("Ahmet")
-                .balance(new Money(new BigDecimal("1000.00"), Currency.TRY))
-                .status(AccountStatus.ACTIVE)
-                .build();
+        Account account = Account.rehydrate(1L, new UserId(10L),
+                new Iban("TR963456789012345678901234"), "Ahmet",
+                new Money(new BigDecimal("1000.00"), Currency.TRY), AccountStatus.ACTIVE);
 
         AccountResponse response = AccountResponse.from(account);
 
@@ -40,14 +35,9 @@ class AccountResponseTest {
 
     @Test
     void shouldMapFromInactiveAccount() {
-        Account account = Account.builder()
-                .id(2L)
-                .userId(new UserId(20L))
-                .iban(new Iban("TR137654321098765432109876"))
-                .ownerName("Mehmet")
-                .balance(new Money(new BigDecimal("0.00"), Currency.USD))
-                .status(AccountStatus.CLOSED)
-                .build();
+        Account account = Account.rehydrate(2L, new UserId(20L),
+                new Iban("TR137654321098765432109876"), "Mehmet",
+                new Money(new BigDecimal("0.00"), Currency.USD), AccountStatus.CLOSED);
 
         AccountResponse response = AccountResponse.from(account);
 

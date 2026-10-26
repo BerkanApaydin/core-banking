@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import com.bank.app.common.domain.exception.AuthorizationException;
+import com.bank.app.infrastructure.adapter.in.security.SimpleAuthenticatedPrincipal;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;

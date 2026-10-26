@@ -33,7 +33,7 @@ class TransferDetailResponseTest {
 
     @Test
     void shouldCreateFromTransfer() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferDetailResponse resp = TransferDetailResponse.from(transfer);
         assertEquals(1L, resp.id());
         assertEquals(TransferStatus.COMPLETED, resp.status());
@@ -43,7 +43,7 @@ class TransferDetailResponseTest {
 
     @Test
     void shouldCarryVersionFromTransfer() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now(), 7L);
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now(), 7L);
         TransferDetailResponse resp = TransferDetailResponse.from(transfer);
         assertEquals(7L, resp.version());
     }

@@ -8,7 +8,7 @@ import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.LedgerDirection;
 import com.bank.app.account.domain.LedgerEntry;
 import com.bank.app.account.domain.exception.AccountNotActiveException;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.account.domain.exception.InsufficientBalanceException;
 import com.bank.app.account.api.AccountAdjustmentResult;
@@ -82,9 +82,9 @@ class AdjustAccountBalancesUseCaseImplTest {
     void setUp() {
         useCase = new AdjustAccountBalancesUseCaseImpl(loadAccountPort, saveAccountPort, clockProvider, idGenerator,
                 domainEventPublisherService, auditEventPort, ledgerPort);
-        senderAccount = new Account(1L, new UserId(10L), new Iban(TEST_IBAN_1),
+        senderAccount = Account.rehydrate(1L, new UserId(10L), new Iban(TEST_IBAN_1),
                 "Sender", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
-        receiverAccount = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),
+        receiverAccount = Account.rehydrate(2L, new UserId(20L), new Iban(TEST_IBAN_2),
                 "Receiver", Money.of("500.00", Currency.TRY), AccountStatus.ACTIVE);
     }
 
@@ -315,7 +315,7 @@ class AdjustAccountBalancesUseCaseImplTest {
 
         @Test
         void shouldFailWhenReceiverIsSuspended() {
-            Account suspendedReceiver = new Account(2L, new UserId(20L), new Iban(TEST_IBAN_2),
+            Account suspendedReceiver = Account.rehydrate(2L, new UserId(20L), new Iban(TEST_IBAN_2),
                     "Receiver", Money.of("500.00", Currency.TRY), AccountStatus.SUSPENDED);
             when(clockProvider.clock()).thenReturn(
                     java.time.Clock.fixed(java.time.Instant.parse("2026-06-22T10:00:00Z"),

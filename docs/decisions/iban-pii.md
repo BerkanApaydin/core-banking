@@ -8,11 +8,13 @@ or API error responses. Every raw-String IBAN passes through
 **Scope:**
 
 - `Iban.toString()` was already masked; the leak was the raw-`String` paths:
-  `AccountNotFoundException` (both the `account` domain and the `account-api`
-  published variants), `DuplicateIbanException`, `AccountNotActiveException`,
-  `AccountClosedException` and `SameAccountTransferException` embedded the
-  full IBAN in both `args` (rendered via `messages.properties` `{0}`) and
-  `defaultMessage`. All six now mask both.
+  `AccountNotFoundException` (`account-api`), `DuplicateIbanException`,
+  `AccountNotActiveException`, `AccountClosedException` (`account`) and
+  `SameAccountTransferException` (`transfer`) embedded the full IBAN in both
+  `args` (rendered via `messages.properties` `{0}`) and `defaultMessage`. All
+  five now mask both. (The duplicate `account`-domain
+  `AccountNotFoundException` was removed in the 2026-10 module-boundary
+  refactor.)
 - `InvalidIbanException` sites were audited: none embed raw values
   (`Iban` ctor messages are value-free; the checksum message uses the masked
   `this`).
@@ -23,5 +25,5 @@ or API error responses. Every raw-String IBAN passes through
   reverse proxy).
 
 **Rule:** new exceptions carrying identifiers must mask PII-bearing values at
-construction (like the six above), never at the logging site — a forgotten
+construction (like the five above), never at the logging site — a forgotten
 log statement must still be safe.

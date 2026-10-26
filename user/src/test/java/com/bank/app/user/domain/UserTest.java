@@ -19,7 +19,7 @@ class UserTest {
         @Test
         @DisplayName("should create with all fields")
         void shouldCreateSuccessfully() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testhashedpasswordhash000000000000000001", Role.ROLE_ADMIN);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testhashedpasswordhash000000000000000001", Role.ROLE_ADMIN);
             assertThat(user.getId().value()).isEqualTo(1L);
             assertThat(user.getUsername()).isEqualTo("testuser");
             assertThat(user.getPassword()).isEqualTo("$2a$12$testhashedpasswordhash000000000000000001");
@@ -29,14 +29,14 @@ class UserTest {
         @Test
         @DisplayName("should assign default role when null")
         void shouldAssignDefaultRoleWhenNull() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testhashedpasswordhash000000000000000001", null);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testhashedpasswordhash000000000000000001", null);
             assertThat(user.getRole()).isEqualTo(Role.ROLE_USER);
         }
 
         @Test
         @DisplayName("should assign default role when null in full constructor")
         void shouldAssignDefaultRoleInFullConstructor() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", null, null, null);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", null, null, null);
             assertThat(user.getRole()).isEqualTo(Role.ROLE_USER);
         }
 
@@ -52,7 +52,7 @@ class UserTest {
             assertThatThrownBy(() -> user.recordRegistration(UserTestFactory.FIXED_CLOCK))
                     .isInstanceOf(IllegalStateException.class);
 
-            User persisted = new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole());
+            User persisted = User.rehydrate(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole());
             persisted.recordRegistration(UserTestFactory.FIXED_CLOCK);
             assertThat(persisted.getDomainEvents()).hasSize(1);
             assertThat(((UserRegisteredEvent) persisted.getDomainEvents().get(0)).userId()).isEqualTo("42");
@@ -61,7 +61,7 @@ class UserTest {
         @Test
         @DisplayName("should create with email and phone via constructor")
         void shouldCreateWithEmailAndPhone() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                     new EmailAddress("test@example.com"), new PhoneNumber("555-0100"));
             assertThat(user.getEmail().value()).isEqualTo("test@example.com");
             assertThat(user.getPhone().value()).isEqualTo("555-0100");
@@ -86,16 +86,16 @@ class UserTest {
         @Test
         @DisplayName("should reject null constructor arguments")
         void shouldRejectNullArgs() {
-            assertThatThrownBy(() -> new User(new UserId(1L), null, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), null, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
                     .isExactlyInstanceOf(NullPointerException.class);
-            assertThatThrownBy(() -> new User(new UserId(1L), "testuser", null, Role.ROLE_USER))
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), "testuser", null, Role.ROLE_USER))
                     .isExactlyInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("should reject a negative persisted token version")
         void shouldRejectNegativeTokenVersion() {
-            assertThatThrownBy(() -> new User(new UserId(1L), "testuser",
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), "testuser",
                     "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER,
                     null, null, 0L, -1L))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
@@ -105,7 +105,7 @@ class UserTest {
         @Test
         @DisplayName("should reject blank username")
         void shouldRejectBlankUsername() {
-            assertThatThrownBy(() -> new User(new UserId(1L), "   ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), "   ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Username must not be empty");
         }
@@ -113,7 +113,7 @@ class UserTest {
         @Test
         @DisplayName("should reject empty username")
         void shouldRejectEmptyUsername() {
-            assertThatThrownBy(() -> new User(new UserId(1L), "", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), "", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Username must not be empty");
         }
@@ -122,7 +122,7 @@ class UserTest {
         @DisplayName("should reject username longer than 255 characters")
         void shouldRejectLongUsername() {
             String longUsername = "a".repeat(256);
-            assertThatThrownBy(() -> new User(new UserId(1L), longUsername, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
+            assertThatThrownBy(() -> User.rehydrate(new UserId(1L), longUsername, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Username can be at most 255 characters");
         }
@@ -131,14 +131,14 @@ class UserTest {
         @DisplayName("should allow username exactly 255 characters")
         void shouldAllow255CharUsername() {
             String username = "a".repeat(255);
-            User user = new User(new UserId(1L), username, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(1L), username, "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
             assertThat(user.getUsername()).isEqualTo(username);
         }
 
         @Test
         @DisplayName("should trim username on creation")
         void shouldTrimUsername() {
-            User user = new User(new UserId(1L), "  spaceduser  ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(1L), "  spaceduser  ", "$2a$12$testpasswordhash00000000000000000000001", Role.ROLE_USER);
             assertThat(user.getUsername()).isEqualTo("spaceduser");
         }
 
@@ -293,14 +293,14 @@ class UserTest {
         @Test
         @DisplayName("hasRole should return true when role matches")
         void hasRoleTrueWhenMatches() {
-            User user = new User(new UserId(1L), "admin", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_ADMIN);
+            User user = User.rehydrate(new UserId(1L), "admin", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_ADMIN);
             assertThat(user.hasRole(Role.ROLE_ADMIN)).isTrue();
         }
 
         @Test
         @DisplayName("hasRole should return false when role does not match")
         void hasRoleFalseWhenNotMatch() {
-            User user = new User(new UserId(1L), "user", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(1L), "user", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user.hasRole(Role.ROLE_ADMIN)).isFalse();
         }
     }
@@ -312,38 +312,38 @@ class UserTest {
         @Test
         @DisplayName("equals should return true for same id")
         void equalsSameId() {
-            User user1 = new User(new UserId(1L), "TestUser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
-            User user2 = new User(new UserId(1L), "testuser", "$2a$12$testpass2hash00000000000000000000000001", Role.ROLE_USER);
+            User user1 = User.rehydrate(new UserId(1L), "TestUser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user2 = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpass2hash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user1).isEqualTo(user2);
         }
 
         @Test
         @DisplayName("equals should return false for different ids")
         void notEqualsWhenDifferentId() {
-            User user1 = new User(new UserId(1L), "user1", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
-            User user2 = new User(new UserId(2L), "user1", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user1 = User.rehydrate(new UserId(1L), "user1", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user2 = User.rehydrate(new UserId(2L), "user1", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user1).isNotEqualTo(user2);
         }
 
         @Test
         @DisplayName("equals should return true for same reference")
         void equalsSameReference() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user).isEqualTo(user);
         }
 
         @Test
         @DisplayName("equals should return false for different type")
         void notEqualsForDifferentType() {
-            User user = new User(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user).isNotEqualTo("not-a-user");
         }
 
         @Test
         @DisplayName("hashCode should be consistent with equals")
         void hashCodeConsistentWithEquals() {
-            User user1 = new User(new UserId(1L), "TestUser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
-            User user2 = new User(new UserId(1L), "testuser", "$2a$12$testpass2hash00000000000000000000000001", Role.ROLE_USER);
+            User user1 = User.rehydrate(new UserId(1L), "TestUser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER);
+            User user2 = User.rehydrate(new UserId(1L), "testuser", "$2a$12$testpass2hash00000000000000000000000001", Role.ROLE_USER);
             assertThat(user1).hasSameHashCodeAs(user2);
         }
 
@@ -370,7 +370,7 @@ class UserTest {
         @Test
         @DisplayName("should include id, username and role")
         void shouldIncludeKeyFields() {
-            User user = new User(new UserId(5L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_ADMIN);
+            User user = User.rehydrate(new UserId(5L), "testuser", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_ADMIN);
             assertThat(user).hasToString("User{id=5, username='testuser', role='ROLE_ADMIN'}");
         }
     }

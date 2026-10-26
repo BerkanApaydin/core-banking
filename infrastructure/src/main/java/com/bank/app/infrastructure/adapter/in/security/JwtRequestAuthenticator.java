@@ -1,7 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
-import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
@@ -121,7 +120,7 @@ final class JwtRequestAuthenticator {
      * long-lived token must never pass as API authorization.
      */
     private boolean isRefreshTokenMisused(HttpServletRequest request, String path, String jwt) {
-        return JwtTokenProvider.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
+        return JwtPort.TOKEN_TYPE_REFRESH.equals(jwtPort.extractTokenType(jwt))
                 && !FilterRequestDecisions.isRefreshRequest(request, path);
     }
 

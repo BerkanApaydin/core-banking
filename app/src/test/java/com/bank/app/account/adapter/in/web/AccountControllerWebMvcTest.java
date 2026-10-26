@@ -9,7 +9,7 @@ import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.in.GetAccountsByUserQuery;
 import com.bank.app.account.application.service.AccountAuthorizationService;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.common.application.dto.PageResponse;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.common.domain.Currency;

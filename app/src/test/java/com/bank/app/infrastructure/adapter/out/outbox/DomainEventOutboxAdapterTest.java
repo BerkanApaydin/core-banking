@@ -23,7 +23,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -65,7 +64,7 @@ class DomainEventOutboxAdapterTest {
         OutboxPort.EventEntry entry = captor.getValue();
         assertThat(entry.aggregateType()).isEqualTo("Account");
         assertThat(entry.aggregateId()).isEqualTo("1");
-        assertThat(entry.eventType()).isEqualTo("AccountCreatedEvent");
+        assertThat(entry.eventType()).isEqualTo(AccountCreatedEvent.class.getName());
     }
 
     @Test
@@ -82,7 +81,7 @@ class DomainEventOutboxAdapterTest {
         OutboxPort.EventEntry entry = captor.getValue();
         assertThat(entry.aggregateType()).isEqualTo("Transfer");
         assertThat(entry.aggregateId()).isEqualTo("99");
-        assertThat(entry.eventType()).isEqualTo("TransferCompletedEvent");
+        assertThat(entry.eventType()).isEqualTo(TransferCompletedEvent.class.getName());
     }
 
     @Test

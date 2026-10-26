@@ -1,22 +1,23 @@
 package com.bank.app.bootstrap;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -45,6 +46,7 @@ public class OrphanIntegrityReporter {
 
     private final JdbcTemplate jdbc;
     private final AdvisorySchedulerLock schedulerLock;
+    private final ClockProviderPort clockProvider;
     private final long alarmThreshold;
     private final AtomicLong accountsWithoutUser = new AtomicLong();
     private final AtomicLong transfersWithoutSender = new AtomicLong();
@@ -52,17 +54,19 @@ public class OrphanIntegrityReporter {
     private final AtomicLong lastSuccessfulScanEpochSeconds = new AtomicLong();
     private final Map<String, Counter> alarmCounters;
 
-    // Single canonical constructor for Spring: the scheduler lock and the
-    // bound OrphanIntegrityProperties always come from the container, so
-    // production can never run on a hidden default cron/threshold. Tests use
-    // the named forTests factories below instead of ambiguous overloads.
-    @Autowired
+    // Single canonical constructor for Spring: the scheduler lock, the UTC
+    // clock and the bound OrphanIntegrityProperties always come from the
+    // container, so production can never run on a hidden default cron,
+    // threshold or clock. Tests use the named forTests factories below instead
+    // of ambiguous overloads.
     public OrphanIntegrityReporter(JdbcTemplate jdbc,
-            @Autowired(required = false) @Nullable MeterRegistry meterRegistry,
+            @Nullable MeterRegistry meterRegistry,
             OrphanIntegrityProperties properties,
-            AdvisorySchedulerLock schedulerLock) {
+            AdvisorySchedulerLock schedulerLock,
+            ClockProviderPort clockProvider) {
         this.jdbc = jdbc;
         this.schedulerLock = schedulerLock;
+        this.clockProvider = Objects.requireNonNull(clockProvider, "clockProvider must not be null");
         this.alarmThreshold = properties != null ? properties.orphanAlarmThreshold() : 0;
         Map<String, Counter> counters = new HashMap<>();
         if (meterRegistry != null) {
@@ -95,8 +99,23 @@ public class OrphanIntegrityReporter {
     static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
             @Nullable MeterRegistry meterRegistry,
             OrphanIntegrityProperties properties) {
+        return forTests(jdbc, meterRegistry, properties, AdvisorySchedulerLock.alwaysRun());
+    }
+
+    static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
+            @Nullable MeterRegistry meterRegistry,
+            OrphanIntegrityProperties properties,
+            AdvisorySchedulerLock schedulerLock) {
+        return forTests(jdbc, meterRegistry, properties, schedulerLock, Clock::systemUTC);
+    }
+
+    static OrphanIntegrityReporter forTests(JdbcTemplate jdbc,
+            @Nullable MeterRegistry meterRegistry,
+            OrphanIntegrityProperties properties,
+            AdvisorySchedulerLock schedulerLock,
+            ClockProviderPort clockProvider) {
         return new OrphanIntegrityReporter(jdbc, meterRegistry, properties,
-                AdvisorySchedulerLock.alwaysRun());
+                schedulerLock, clockProvider);
     }
 
     @Scheduled(cron = "${app.integrity.orphan-check-cron:0 0 3 * * *}")
@@ -122,7 +141,7 @@ public class OrphanIntegrityReporter {
             accountsWithoutUser.set(accounts);
             transfersWithoutSender.set(senders);
             transfersWithoutReceiver.set(receivers);
-            lastSuccessfulScanEpochSeconds.set(Instant.now().getEpochSecond());
+            lastSuccessfulScanEpochSeconds.set(clockProvider.clock().instant().getEpochSecond());
         });
     }
 

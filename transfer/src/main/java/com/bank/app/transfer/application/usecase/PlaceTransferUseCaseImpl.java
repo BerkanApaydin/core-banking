@@ -79,9 +79,9 @@ public class PlaceTransferUseCaseImpl implements PlaceTransferUseCase {
         // Perf-1 note: the bulk UPDATE path returns a fresh aggregate without
         // domain events (BaseAggregateRoot.registerEvent is protected), so the
         // COMPLETED event is published from pendingTransfer — which carries the
-        // event with the assigned ID — not from the reloaded copy. Publish
-        // AFTER the second save so a publish failure still leaves both writes
-        // behind (existing failure-handling contract: no compensation).
+        // event with the assigned ID — not from the reloaded copy. The outbox
+        // write joins this transaction: a publish failure still rolls back the
+        // transfer saves, so no committed transfer lacks its event.
         Transfer savedTransfer = saveTransferPort.save(pendingTransfer);
         domainEventPublisherService.publishEvents(pendingTransfer);
         auditEventPort.publish(new AuditEvent(AuditEvent.TRANSFER_EXECUTED,

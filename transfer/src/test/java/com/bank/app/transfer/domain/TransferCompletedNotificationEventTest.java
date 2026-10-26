@@ -35,7 +35,7 @@ class TransferCompletedNotificationEventTest {
 
     @Test
     void shouldCreateFromTransfer() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("500.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L), Money.of("500.00", Currency.TRY), TransferStatus.COMPLETED,
                 LocalDateTime.now());
         TransferCompletedNotificationEvent event = TransferCompletedNotificationEvent.from(transfer);
 

@@ -3,6 +3,7 @@ package com.bank.app.common;
 import org.flywaydb.core.Flyway;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+@SuppressWarnings("resource")
 public final class TestDatabaseContainer {
 
     private static final PostgreSQLContainer<?> POSTGRES;

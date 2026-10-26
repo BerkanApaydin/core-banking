@@ -1,5 +1,6 @@
 package com.bank.app.user.adapter.in.web;
 
+import com.bank.app.common.application.exception.CsrfViolationException;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
@@ -12,11 +13,11 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
-import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.ClientIpResolverPort;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -88,6 +90,14 @@ class BrowserAuthControllerWebMvcTest {
         this.mockMvc = mockMvc;
     }
 
+    // Nested test classes share the outer Mockito beans; reset explicitly so a
+    // thenThrow/verify from one scenario cannot bleed into the next one.
+    @BeforeEach
+    void resetMocks() {
+        reset(loginUserPort, logoutUseCase, refreshSessionUseCase, clientIpResolver,
+                csrfBinding, userContextService);
+    }
+
     @MockitoBean
     private LoginUserUseCase loginUserPort;
 
@@ -102,9 +112,6 @@ class BrowserAuthControllerWebMvcTest {
 
     @MockitoBean
     private CsrfBindingPort csrfBinding;
-
-    @MockitoBean
-    private JwtPort jwtPort;
 
     @MockitoBean
     private UserContextService userContextService;
@@ -148,12 +155,8 @@ class BrowserAuthControllerWebMvcTest {
         @DisplayName("should rotate cookies on valid refresh token")
         void shouldRotateOnValidRefresh() throws Exception {
             // K7/D8: refresh CSRF is bound to the verified user id.
-            when(jwtPort.verifyAndDecode("old-refresh")).thenReturn(
-                    new JwtPort.VerifiedToken(
-                            "alice", 7L, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
-            when(csrfBinding.verifyCsrfToken(CSRF, CSRF, "7")).thenReturn(true);
             when(csrfBinding.issueCsrfToken("7")).thenReturn("new-csrf");
-            when(refreshSessionUseCase.execute("old-refresh")).thenReturn(
+            when(refreshSessionUseCase.executeWithCsrf("old-refresh", CSRF, CSRF)).thenReturn(
                     new AuthResponse("new-access", "new-refresh", 7L, "alice", 900000L));
 
             mockMvc.perform(post("/api/v1/auth/browser/refresh")
@@ -167,7 +170,7 @@ class BrowserAuthControllerWebMvcTest {
                             hasItem(startsWith("BANK_REFRESH=")),
                             hasItem(startsWith("BANK_CSRF=new-csrf")))));
 
-            verify(refreshSessionUseCase).execute("old-refresh");
+            verify(refreshSessionUseCase).executeWithCsrf("old-refresh", CSRF, CSRF);
         }
 
         @Test
@@ -178,16 +181,14 @@ class BrowserAuthControllerWebMvcTest {
                                     new Cookie("BANK_CSRF", CSRF)))
                     .andExpect(status().isForbidden());
 
-            verify(refreshSessionUseCase, never()).execute(anyString());
+            verify(refreshSessionUseCase, never()).executeWithCsrf(anyString(), anyString(), anyString());
         }
 
         @Test
         @DisplayName("should return 403 when CSRF is not bound to the token identity (K7/D8)")
         void shouldRejectUnboundCsrf() throws Exception {
-            when(jwtPort.verifyAndDecode("old-refresh")).thenReturn(
-                    new JwtPort.VerifiedToken(
-                            "alice", 7L, "ROLE_USER", "jti", System.currentTimeMillis() + 60_000));
-            when(csrfBinding.verifyCsrfToken(CSRF, CSRF, "7")).thenReturn(false);
+            when(refreshSessionUseCase.executeWithCsrf("old-refresh", CSRF, CSRF))
+                    .thenThrow(new CsrfViolationException());
 
             mockMvc.perform(post("/api/v1/auth/browser/refresh")
                             .cookie(new Cookie("BANK_REFRESH", "old-refresh"),

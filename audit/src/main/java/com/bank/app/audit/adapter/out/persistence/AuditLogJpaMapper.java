@@ -24,7 +24,7 @@ public class AuditLogJpaMapper {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
-        return new AuditLog(
+        return AuditLog.rehydrate(
                 entity.getId(),
                 entity.getUsername(),
                 entity.getAction(),

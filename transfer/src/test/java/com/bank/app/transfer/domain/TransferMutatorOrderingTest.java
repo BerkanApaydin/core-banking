@@ -32,7 +32,7 @@ class TransferMutatorOrderingTest {
     @Test
     @DisplayName("should register the completion event when the aggregate carries an identifier")
     void shouldRegisterCompletionEventWhenAggregateHasIdentifier() {
-        Transfer transfer = new Transfer(7L, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(7L, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.PENDING, now());
 
         transfer.complete(FIXED_CLOCK);
@@ -46,7 +46,7 @@ class TransferMutatorOrderingTest {
     @Test
     @DisplayName("should register the cancellation event when the aggregate carries an identifier")
     void shouldRegisterCancellationEventWhenAggregateHasIdentifier() {
-        Transfer transfer = new Transfer(7L, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(7L, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.COMPLETED, now().minusHours(1));
 
         transfer.cancel(FIXED_CLOCK, Duration.ofHours(24));
@@ -60,7 +60,7 @@ class TransferMutatorOrderingTest {
     @Test
     @DisplayName("should register the failure event when the aggregate carries an identifier")
     void shouldRegisterFailureEventWhenAggregateHasIdentifier() {
-        Transfer transfer = new Transfer(7L, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(7L, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.PENDING, now());
 
         transfer.markFailed(FIXED_CLOCK);
@@ -77,7 +77,7 @@ class TransferMutatorOrderingTest {
         // Transient aggregate (no id yet): the event constructor rejects it.
         // Flipping the status first left a COMPLETED row with no
         // TransferCompletedEvent, so no notification and no audit row.
-        Transfer transfer = new Transfer(null, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(null, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.PENDING, now());
 
         assertThatThrownBy(() -> transfer.complete(FIXED_CLOCK))
@@ -89,7 +89,7 @@ class TransferMutatorOrderingTest {
     @Test
     @DisplayName("should not mark a transfer FAILED when the failure event cannot be built")
     void shouldNotFlipStatusWhenFailureEventCannotBeBuilt() {
-        Transfer transfer = new Transfer(null, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(null, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.PENDING, now());
 
         assertThatThrownBy(() -> transfer.markFailed(FIXED_CLOCK))
@@ -101,7 +101,7 @@ class TransferMutatorOrderingTest {
     @Test
     @DisplayName("should not mark a transfer CANCELLED when the cancellation event cannot be built")
     void shouldNotFlipStatusWhenCancellationEventCannotBeBuilt() {
-        Transfer transfer = new Transfer(null, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(null, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.COMPLETED, now().minusHours(1));
 
         assertThatThrownBy(() -> transfer.cancel(FIXED_CLOCK, Duration.ofHours(24)))

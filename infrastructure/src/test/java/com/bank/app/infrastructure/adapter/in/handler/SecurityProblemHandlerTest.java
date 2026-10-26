@@ -18,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 
+import com.bank.app.common.application.exception.AuthenticationRequiredException;
+import com.bank.app.common.application.exception.CsrfViolationException;
 import com.bank.app.infrastructure.testsupport.LogCapture;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
@@ -195,5 +197,31 @@ class SecurityProblemHandlerTest {
         assertEquals("SECURITY_BACKEND_UNAVAILABLE", response.getBody().getProperties().get("code"));
         assertEquals("Security service temporarily unavailable.", response.getBody().getDetail());
         assertFalse(response.getBody().getDetail().contains("secret Redis detail"));
+    }
+
+    @Test
+    void shouldHandleAuthenticationRequiredAsUnauthorized() {
+        when(messageSource.getMessage(eq("error.authentication_failed"), any(), any(Locale.class)))
+                .thenReturn("Authentication failed.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleAuthenticationRequired(
+                new AuthenticationRequiredException(), null);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("AUTHENTICATION_FAILED", response.getBody().getProperties().get("code"));
+    }
+
+    @Test
+    void shouldHandleCsrfViolationAsAccessDenied() {
+        when(messageSource.getMessage(eq("error.access_denied"), any(), any(Locale.class)))
+                .thenReturn("Access denied.");
+
+        ResponseEntity<ProblemDetail> response = handler.handleCsrfViolation(
+                new CsrfViolationException(), null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("ACCESS_DENIED", response.getBody().getProperties().get("code"));
     }
 }

@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HybridBlacklistContextIT extends AbstractSpringBootIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     private static final GenericContainer<?> redis =
             new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 

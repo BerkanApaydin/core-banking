@@ -14,7 +14,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +25,7 @@ class PasswordPolicyValidatorTest {
 
     @Mock private ConstraintValidatorContext context;
     @Mock private ConstraintValidatorContext.ConstraintViolationBuilder builder;
+    @Mock private ObjectProvider<PasswordPolicy> empty;
 
     @Test
     void shouldAcceptNullAndBlankWithoutTouchingContext() {
@@ -47,9 +47,8 @@ class PasswordPolicyValidatorTest {
     void shouldFallBackToDefaultWhenNoPolicyBeanAvailable() {
         // Kills the NullReturnVals mutant on the getIfAvailable fallback
         // lambda: with no bean available the DEFAULT policy must apply.
-        ObjectProvider<PasswordPolicy> empty = mock(ObjectProvider.class);
         when(empty.getIfAvailable(any()))
-                .thenAnswer(inv -> ((Supplier<PasswordPolicy>) inv.getArgument(0)).get());
+                .thenAnswer(inv -> inv.<Supplier<PasswordPolicy>>getArgument(0).get());
         var fallback = new PasswordPolicyValidator(empty);
         assertThat(fallback.isValid("Str0ngPassw0rd!", context)).isTrue();
     }

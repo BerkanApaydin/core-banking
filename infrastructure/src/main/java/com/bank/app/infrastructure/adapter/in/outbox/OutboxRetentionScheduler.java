@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * Retention hygiene for the transactional outbox and its handler dedup keys.
@@ -43,18 +44,19 @@ public class OutboxRetentionScheduler {
             OutboxPort outboxPort,
             IdempotencyPort idempotencyPort,
             OutboxProperties outboxProperties) {
-        this(outboxPort, idempotencyPort, outboxProperties, AdvisorySchedulerLock.alwaysRun());
+        this(outboxPort, idempotencyPort, outboxProperties,
+                AdvisorySchedulerLock.alwaysRun(), Clock::systemUTC);
     }
 
-    @Autowired
     public OutboxRetentionScheduler(
             OutboxPort outboxPort,
             IdempotencyPort idempotencyPort,
             OutboxProperties outboxProperties,
             AdvisorySchedulerLock schedulerLock) {
-        this(outboxPort, idempotencyPort, outboxProperties, schedulerLock, null);
+        this(outboxPort, idempotencyPort, outboxProperties, schedulerLock, Clock::systemUTC);
     }
 
+    @Autowired
     public OutboxRetentionScheduler(
             OutboxPort outboxPort,
             IdempotencyPort idempotencyPort,
@@ -65,7 +67,7 @@ public class OutboxRetentionScheduler {
         this.idempotencyPort = idempotencyPort;
         this.outboxProperties = outboxProperties;
         this.schedulerLock = schedulerLock;
-        this.clockProvider = clockProvider;
+        this.clockProvider = Objects.requireNonNull(clockProvider, "clockProvider must not be null");
     }
 
     @Scheduled(cron = "${app.outbox.retention-cron:0 0 5 * * 0}")
@@ -75,7 +77,7 @@ public class OutboxRetentionScheduler {
         // its own REQUIRES_NEW transaction (R-I05). A slow/failed handler-key
         // sweep therefore cannot roll back the outbox deletions that already
         // committed.
-        Clock clock = clockProvider != null ? clockProvider.clock() : Clock.systemUTC();
+        Clock clock = clockProvider.clock();
         LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(outboxProperties.retentionDays());
 
         // Order matters: outbox rows first, then their handler dedup keys, so a

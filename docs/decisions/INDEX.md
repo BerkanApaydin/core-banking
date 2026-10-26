@@ -10,7 +10,7 @@ is the single map: ID → file → one-sentence decision.
 | K5/D15 | `IdempotencyAspect`, `IdempotentRetryExecutor` | Claim → decide → execute split; single backoff policy. |
 | K7/D8 | `JwtAuthenticationFilter` (bound-CSRF comment) | CSRF token is HMAC-bound to the server-verified user id. |
 | K9/D7 | `k8s/bank-app.yaml` (`image:` pin block) | Image `:latest` forbidden; digest pin (`pin-image-digest.sh` + CI guard). |
-| K12/D5 | Schedulers (`IdempotencyCleanup`, `OutboxRetention`, `AuditRetention`, `BacklogMetrics`) | Advisory-lock single-flight; no tx, the lock guard owns the transaction. |
+| K12/D5 | Schedulers (`IdempotencyCleanupScheduler`, `OutboxRetentionScheduler`, `AuditRetentionScheduler`, `BacklogMetricsReporter`) | Advisory-lock single-flight; no tx, the lock guard owns the transaction. |
 | S6 | `AdjustAccountBalancesUseCaseImpl.auditMovement` | Audit row travels as one object (no loose id+balance primitives). |
 | D13/K14 | `JwtTokenProvider` | Typed properties; no `@Value` scatter. |
 | D14/S12 | `AccountApiAdapter` | Published language is implemented in `adapter.out`. |
@@ -36,6 +36,7 @@ is the single map: ID → file → one-sentence decision.
 | REV-1 (2026-10) | `docs/token-revocation-migration.md` | Hybrid revocation: short-lived NEGATIVE cache for the durable lookup (the revocation check no longer competes with the money path for DB connections); the Redis lookup is one Lua round trip. |
 | LOCK-1 (2026-10) | `application.yml` (`DB_CONNECTION_TIMEOUT_MS`) | The connection wait must not be shorter than the use-case transaction budget: pool saturation becomes a 500 burst otherwise. |
 | MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
+| I-09 | `docs/decisions/migration-ownership.md` | Focused follow-up to R-C07: Flyway resources live in the resources-only `migrations` module; owner headers and heavy-statement rules keep the future per-BC split safe. |
 
 ## Newly added decisions (this improvement round)
 
@@ -47,9 +48,14 @@ is the single map: ID → file → one-sentence decision.
 - `keyset-pagination.md` (DB-2: cursor contract)
 - `kafka-readiness.md` (long term: OutboxPort → broker migration)
 - `time-strategy.md` (UTC-only timestamps: no bare now()/systemDefaultZone in main)
-- `shared-kernel-web-contracts.md` (R-C07: framework-free web contracts stay in `common`; moving them to `infrastructure` would invert the dependency arrow)
+- `shared-kernel-web-contracts.md` (R-C07: framework-free web contracts stay in `common`; a separate `web-support` module now hosts Spring-dependent RFC 7807 rendering, keeping the dependency arrow inward)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
+
+## Operational decisions
+
+| ID | File | Decision (one sentence) |
+|---|---|---|
 | O-1 | `docs/decisions/secret-management.md` (2026-10 rotation) | Leaked dev-default JWT secret rotated; history still counts as compromised. |
 | JWT-1 (2026-10) | `docs/decisions/secret-management.md` (token identity claims) | Access/refresh tokens require the configured issuer/audience and carry a `kid` header; verification allows a bounded 30-second clock skew. |
 | O-3 | `docs/decisions/token-version.md` (2026-10 acceptance) | 15-min window accepted on money paths too; no per-request tokenVersion lookup in transfer. |
@@ -61,4 +67,4 @@ is the single map: ID → file → one-sentence decision.
 | R-C04 | `UtcDateTimeProvider`, `JpaAuditingConfig` | JPA auditing uses a UTC `DateTimeProvider`; the clock zone cannot leak into `created_at`/`updated_at`. |
 | R-C05 | `OrphanIntegrityProperties` | Orphan cron and threshold fail fast at binding instead of accepting silently invalid values. |
 | R-C06 | `DemoSeedProperties`, `application-demo.yml` | Demo seed passwords come from config/env; the demo profile requires explicit values and refuses blanks. |
-| R-C07 | `migrations/pom.xml`, `docs/decisions/shared-kernel-web-contracts.md` | Flyway resources live in a dedicated `migrations` module; framework-free web contracts stay in the shared kernel. |
+| R-C07 | `migrations/pom.xml`, `docs/decisions/shared-kernel-web-contracts.md` | Flyway resources live in a dedicated `migrations` module; framework-free web contracts stay in the shared kernel, while Spring-dependent rendering lives in `web-support`. |

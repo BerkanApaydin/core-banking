@@ -43,7 +43,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -123,10 +122,10 @@ class PasswordResetUseCaseTest {
         @Test
         @DisplayName("should prefer the email contact and fall back to the phone")
         void shouldChooseNotificationContact() {
-            User withEmail = new User(new UserId(7L), "alice",
+            User withEmail = User.rehydrate(new UserId(7L), "alice",
                     EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
                     new EmailAddress("alice@example.com"), new PhoneNumber("555-0100"), 1L, 0L);
-            User withPhone = new User(new UserId(8L), "bob",
+            User withPhone = User.rehydrate(new UserId(8L), "bob",
                     EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
                     null, new PhoneNumber("555-0101"), 1L, 0L);
             when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(withEmail));
@@ -144,7 +143,7 @@ class PasswordResetUseCaseTest {
         void shouldFallBackToTheUsernameContact() {
             // Third fallback: a user without any contact channel still has to
             // receive the reset token, otherwise the account is unrecoverable.
-            User contactless = new User(new UserId(9L), "alice.ops",
+            User contactless = User.rehydrate(new UserId(9L), "alice.ops",
                     EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
                     null, null, 1L, 0L);
             when(loadUserPort.findByUsernameForUpdate("alice.ops"))
@@ -227,7 +226,7 @@ class PasswordResetUseCaseTest {
         @Test
         @DisplayName("should not issue a token for a user without a persisted id")
         void shouldNotIssueForTransientUser() {
-            User transientUser = new User(null, "alice",
+            User transientUser = User.rehydrate(null, "alice",
                     EncodedPassword.of(UserTestFactory.FIXTURE_HASH), Role.ROLE_USER,
                     null, null, null, 0L);
             when(loadUserPort.findByUsernameForUpdate("alice"))
@@ -510,7 +509,7 @@ class PasswordResetUseCaseTest {
     }
 
     private static User persistedUser(Long id, String username) {
-        return new User(new UserId(id), username,
+        return User.rehydrate(new UserId(id), username,
                 EncodedPassword.of(UserTestFactory.FIXTURE_HASH),
                 Role.ROLE_USER, null, null, 1L, 0L);
     }

@@ -127,7 +127,7 @@ class JwtPropertiesTest {
     @Test
     @DisplayName("provider should accept typed properties (D13/K14)")
     void providerShouldAcceptTypedProperties() {
-        JwtTokenProvider provider = new JwtTokenProvider(properties());
+        JwtTokenProvider provider = new JwtTokenProvider(properties(), java.time.Clock::systemUTC);
 
         assertThat(provider.getExpirationMs()).isEqualTo(900000L);
         assertThat(provider.getRefreshExpirationMs()).isEqualTo(604800000L);

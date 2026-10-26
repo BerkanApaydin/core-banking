@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -46,14 +45,18 @@ class MfaCodeVerificationServiceTest {
     private static final Long USER_ID = 100L;
     private static final String CODE = "123456";
     private static final String CIPHERTEXT = "encrypted-secret";
-    private static final Clock FIXED =
-            Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"), ZoneOffset.UTC);
+    private static final Clock FIXED = Clock.fixed(Instant.parse("2026-06-01T12:00:00Z"), ZoneOffset.UTC);
 
-    @Mock private MfaSecretPort mfaSecretPort;
-    @Mock private MfaSecretEncryptorPort encryptor;
-    @Mock private TotpPolicy totpPolicy;
-    @Mock private MfaAttemptPort mfaAttemptPort;
-    @Mock private ClockProviderPort clockProvider;
+    @Mock
+    private MfaSecretPort mfaSecretPort;
+    @Mock
+    private MfaSecretEncryptorPort encryptor;
+    @Mock
+    private TotpPolicy totpPolicy;
+    @Mock
+    private MfaAttemptPort mfaAttemptPort;
+    @Mock
+    private ClockProviderPort clockProvider;
 
     private MfaCodeVerificationService service;
 
@@ -65,7 +68,7 @@ class MfaCodeVerificationServiceTest {
 
     private void stubVerifiableCode() {
         when(mfaSecretPort.findSecret(USER_ID)).thenReturn(Optional.of(CIPHERTEXT));
-        when(encryptor.decrypt(CIPHERTEXT)).thenReturn(new byte[]{1, 2, 3});
+        when(encryptor.decrypt(CIPHERTEXT)).thenReturn(new byte[] { 1, 2, 3 });
         when(clockProvider.clock()).thenReturn(FIXED);
         when(totpPolicy.verifyCounter(any(), eq(CODE), eq(FIXED)))
                 .thenReturn(OptionalLong.of(42L));
@@ -187,8 +190,8 @@ class MfaCodeVerificationServiceTest {
         assertThat(service.verifyAndConsume(USER_ID, CODE)).isFalse();
         verify(mfaAttemptPort).recordFailure(USER_ID);
 
-        AuthenticationBackendUnavailableException outage =
-                new AuthenticationBackendUnavailableException(new RuntimeException("KMS down"));
+        AuthenticationBackendUnavailableException outage = new AuthenticationBackendUnavailableException(
+                new RuntimeException("KMS down"));
         // doThrow: encryptor.decrypt already throws, so a when(...) re-stub
         // would surface the previous exception while recording the new one.
         doThrow(outage).when(encryptor).decrypt(CIPHERTEXT);

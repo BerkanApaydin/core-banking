@@ -6,10 +6,12 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,9 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -44,7 +49,7 @@ class OrphanIntegrityReporterTest {
     private MeterRegistry meterRegistry;
 
     private void stubGauges() {
-        when(meterRegistry.gauge(anyString(), any(Iterable.class), any(AtomicLong.class)))
+        when(meterRegistry.gauge(anyString(), ArgumentMatchers.<Iterable<Tag>>any(), any(AtomicLong.class)))
                 .thenAnswer(invocation -> invocation.getArgument(2));
     }
 
@@ -78,7 +83,7 @@ class OrphanIntegrityReporterTest {
 
         OrphanIntegrityReporter.forTests(jdbc, meterRegistry).reportOrphans();
 
-        verify(meterRegistry, times(3)).gauge(anyString(), any(Iterable.class), gaugeCaptor.capture());
+        verify(meterRegistry, times(3)).gauge(anyString(), ArgumentMatchers.<Iterable<Tag>>any(), gaugeCaptor.capture());
         assertThatCapturedGaugesAre(gaugeCaptor, 2L);
     }
 
@@ -188,7 +193,7 @@ class OrphanIntegrityReporterTest {
         // rather than silently disabling alerting.
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
         var registry = new SimpleMeterRegistry();
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(
                 jdbc, registry, null, AdvisorySchedulerLock.alwaysRun());
 
         reporter.reportOrphans();
@@ -225,6 +230,22 @@ class OrphanIntegrityReporterTest {
         verify(jdbc, times(3)).queryForObject(anyString(), eq(Long.class));
         assertTrue(
                 registry.get("db.orphan.last_success_epoch_seconds").gauge().value() > 0);
+    }
+
+    @Test
+    void shouldUseInjectedClockForLastSuccessfulScan() {
+        var registry = new SimpleMeterRegistry();
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+        Instant fixedInstant = Instant.parse("2026-06-22T10:00:00Z");
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(
+                jdbc, registry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0),
+                AdvisorySchedulerLock.alwaysRun(),
+                () -> Clock.fixed(fixedInstant, ZoneOffset.UTC));
+
+        reporter.reportOrphans();
+
+        assertEquals(fixedInstant.getEpochSecond(),
+                registry.get("db.orphan.last_success_epoch_seconds").gauge().value());
     }
 
     @Test
@@ -278,7 +299,7 @@ class OrphanIntegrityReporterTest {
     @Test
     void shouldNotScanOrAlarmWhenThisReplicaIsNotTheLeader() {
         var registry = new SimpleMeterRegistry();
-        OrphanIntegrityReporter reporter = new OrphanIntegrityReporter(
+        OrphanIntegrityReporter reporter = OrphanIntegrityReporter.forTests(
                 jdbc, registry, new OrphanIntegrityProperties(true, "0 0 3 * * *", 0),
                 new LosingReplicaLock());
 

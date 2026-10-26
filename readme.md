@@ -35,7 +35,7 @@ A modular simulation of selected core banking workflows—account management and
 - **JUnit 5 & Mockito:** Standard test suites and mocking.
 - **Testcontainers:** Integration testing with a single shared PostgreSQL container (plus test-class-scoped Redis containers where needed).
 - **ArchUnit:** Architecture verification to enforce Hexagonal boundary rules.
-- **JaCoCo:** Quality gates enforcing $\ge 90\%$ Line and $\ge 80\%$ Branch coverage, enforced **per module** across all nine Java modules by `scripts/check_aggregate_coverage.py` (the resources-only `migrations` module has no bytecode) — the single source of truth, with thresholds mirrored from the root-pom `jacoco.line.coverage` / `jacoco.branch.coverage` properties. The `app`-module `jacoco:check` execution only validates that module's own classes, so the aggregate script is what actually gates a build.
+- **JaCoCo:** Quality gates enforcing $\ge 90\%$ Line and $\ge 80\%$ Branch coverage, enforced **per module** across all ten Java modules by `scripts/check_aggregate_coverage.py` (the resources-only `migrations` module has no bytecode) — the single source of truth, with thresholds mirrored from the root-pom `jacoco.line.coverage` / `jacoco.branch.coverage` properties. The `app`-module `jacoco:check` execution only validates that module's own classes, so the aggregate script is what actually gates a build.
 - **Pitest:** A separate CI mutation-testing step is configured with a $\ge 80\%$ mutation threshold; it is not part of `test-all` or Maven `clean verify`.
 
 ### DevOps & Prerequisites
@@ -59,11 +59,12 @@ Modules fall into three categories: **platform** (stable, shared, no BC dependen
 plus one supporting module (`audit`).
 
 - **`app`** [Bootstrap]: Bootstraps the application (`BankApplication`) and wires all modules together. Houses most integration and WebMvc tests, plus the `OrphanIntegrityReporter` scheduled integrity observer.
-- **`migrations`** [Platform]: Versioned Flyway SQL for the single PostgreSQL schema. Resources stay at the unchanged `classpath:db/migration` location, so Flyway history and checksums are untouched; the module owns schema packaging, not JPA entities. No Java. `app` depends on it at compile scope and integration-test modules add it at test scope. Per-BC migration splitting remains a documented roadmap.
-- **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdGeneratorPort`, `IdempotencyPort`, `EventPublisherPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
+- **`migrations`** [Platform]: Versioned Flyway SQL for the single PostgreSQL schema. Resources stay at the unchanged `classpath:db/migration` location, so Flyway history and checksums are untouched; the module owns schema packaging, not JPA entities. No Java. `app` depends on it at compile scope, and the `infrastructure` module adds it at test scope. Per-BC migration splitting remains a documented roadmap.
+- **`common`** [Platform — shared kernel]: Framework-independent shared domain models, value objects, exceptions, and generic cross-cutting ports (`ClockProviderPort`, `IdGeneratorPort`, `IdempotencyPort`, `EventPublisherPort`, `AuditEventPort`, `OutboxEventPort`, `OutboxPort`, `SecurityContextPort`, `AuthenticatedPrincipalPort`, `TransactionBoundaryPort`). Security-token ports (`JwtPort`, `TokenBlacklistPort`) live in `user`, not here.
+- **`web-support`** [Platform]: Shared RFC 7807 rendering (`ProblemDetailFactory`, `BusinessErrorHttpMapper`) used by `infrastructure` filters/handlers and `user` web adapters; depends only on `common`.
 - **`persistence`** [Platform]: Shared JPA base types (`AuditableJpaEntity` with Spring Data auditing). Kept as a separate module so `common` stays framework-free; `account`, `transfer` and `user` entities extend it without depending on `infrastructure`.
 - **`account-api`** [Platform — published language]: Open Host Service of the Account context (`AccountApi`, `AccountSnapshot`, `AccountAdjustmentResult`) plus the shared snapshot-cache contract (`AccountSnapshotCache` + framework-free base). The only account-related contract downstream contexts may depend on; implemented by `account` via `AccountApiAdapter`.
-- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports; production revocations are stored durably in PostgreSQL and checked alongside legacy Redis records), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production), and global exception handling. Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
+- **`infrastructure`** [Platform]: Security filter chain, JWT/token-blacklist backends (implementing `user`-owned ports; production revocations are stored durably in PostgreSQL and checked alongside legacy Redis records), outbox poller/processor, Redis/Caffeine adapters (incl. the backend-selected `account-api` snapshot cache: Caffeine single-JVM for dev/test, Redis shared for production), and global exception handling (RFC 7807 rendering shared via `web-support`). Depends on BC port abstractions — never on BC adapter (concrete) classes, never on `account` internals.
 - **`user`** [BC]: User registration, authentication, token lifecycle, TOTP-based MFA (opt-in enrollment/confirmation/removal + code-enforced login) and enumeration-safe password reset. Owns `JwtPort`, `TokenBlacklistPort`, `ClientIpResolverPort` and `LoginAttemptPort` — their implementations live in `infrastructure` (token/backends) or colocated adapters. Login uses short read-only transactions for credential/user lookup; login-attempt state is handled outside those DB transactions (Redis in production, Caffeine locally).
 - **`account`** [BC]: Bank account lifecycle, balance mutations, and details. Implements `account-api`. Publishes its own domain events; callers only see the opaque `AccountAdjustmentResult`.
 - New account creation derives the owning user from the authenticated principal and generates a checksum-valid, simulation-only Turkish IBAN. Earlier format-only records remain readable; see [IBAN rollout](docs/iban-checksum-rollout.md) before using an existing database.
@@ -99,6 +100,7 @@ graph LR
         direction TB
         api[account-api]:::plat
         migs[migrations<br/>Flyway SQL]:::plat
+        ws[web-support]:::plat
         infra[infrastructure<br/>adapters]:::infraC
     end
 
@@ -109,16 +111,18 @@ graph LR
     end
 
     app --> transfer & account & user & audit
-    app --> common & persistence
+    app --> common & persistence & ws
     app --> api
     app -- schema resources --> migs
     app -. wires .-> infra
     transfer -- published language --> api
     account -. implements .-> api
     transfer & account & user --> common & persistence
+    user --> ws
     audit -- common only --> common
     api -- common only --> common
-    infra -- compile: common + api --> common & api
+    ws -- common only --> common
+    infra -- compile: common + web-support + api --> common & ws & api
     infra -. implements ports of .-> user & audit
 ```
 
@@ -129,10 +133,11 @@ Test-scope edges (for example `infrastructure` → `account`/`migrations`) are i
 | `transfer` → `account` **forbidden**        | Transfer must never touch the account module at compile time — `account-api` only                                                                            |
 | `infrastructure` → BC adapter **forbidden** | Infra implements ports owned by the contexts, never uses concrete adapter classes                                                                            |
 | `infrastructure` → `user`/`audit` compile edge | Deliberate and port-only (no BC adapter/internals); `user-api`/`audit-api` published languages would remove even this edge — tracked follow-up, not a violation |
+| `web-support` → `common` **only**           | Shared Spring-dependent RFC 7807 rendering must not depend on a BC or `infrastructure`; framework-free web contracts stay in `common`.                        |
 | Scalar IDs with DB FKs                    | Java modules use scalar references; V24 restores PostgreSQL foreign keys for user/account/transfer integrity. `OrphanIntegrityReporter` remains an observer. |
 | Flyway resource ownership                 | Only `migrations` packages `db/migration`; BCs own their JPA entities, not the schema files. |
 
-> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the five rules above cover what you need to know.
+> The full dependency matrix is enforced at build time by the architecture test suite (`app/.../architecture/`: domain-purity, layering, module-boundary, naming, authorization-invocation, cache-invalidation and coding-invariant rules, plus a no-cycle rule over module slices); the six rules above cover what you need to know.
 
 > [!NOTE]
 > `transfer` never depends on the `account` module — only on its published language (`AccountApi`). Balance mutations return transfer-owned results, account events never cross the boundary, and account mutations invalidate affected cached snapshots.
@@ -244,7 +249,7 @@ Open the bundled UI at `http://localhost:8080/`. Compose creates the `bank_db` d
 
 Compose and the development scripts explicitly select `dev`, which permits **simulated** opening balances. A standalone application now defaults to `prod`; select `dev` explicitly for local use. To host the simulation with production security settings, use `prod,simulation` and supply deployment-managed secrets and TLS; see [simulation mode](docs/simulation-mode.md) and [operations](docs/operations.md). A plain `prod` profile permits only zero opening balance.
 
-Running a standalone application with the default `prod` profile fails fast at startup unless deployment-shaped configuration is supplied: a non-default `JWT_SECRET`, a `DB_PASSWORD` that is non-empty and not `bank_password`, `MFA_ENCRYPTION_KEY` (Base64, 32 bytes), and a `CORS_ALLOWED_ORIGINS` value without localhost origins. Prod defaults also require a reachable Redis for rate limiting, the failed-login store and the snapshot cache, with token revocation in hybrid DB+Redis mode; Actuator moves to the private management port `8081`.
+Running a standalone application with the default `prod` profile fails fast at startup unless deployment-shaped configuration is supplied: a non-default `JWT_SECRET`, a `DB_PASSWORD` that is non-empty and not `bank_password`, `MFA_ENCRYPTION_KEY` (Base64, 32 bytes), and a `CORS_ALLOWED_ORIGINS` value without localhost origins. Prod defaults also require Redis for rate limiting, the failed-login store and the snapshot cache, with token revocation in hybrid DB+Redis mode; the startup validator checks these backend settings, while Redis connectivity is a runtime/health concern. Actuator moves to the private management port `8081`.
 
 ### Path 2: Develop with Java on Your Computer
 
@@ -264,7 +269,7 @@ bash start-app-dev.sh
 
 The launcher stops the Compose app container if it is running, waits for PostgreSQL and Redis, builds the app with tests skipped, then serves the UI at `http://localhost:8080/`. It supplies the Compose database credentials and host Redis port (`6389`) and generates a fresh JWT secret automatically. No `.env` file or manual environment setup is needed. A fresh secret logs out existing browser sessions on each restart. Press Ctrl+C to stop Java; `docker compose down` stops the dependency containers. Run `test-all.cmd` (Windows) or `bash test-all.sh` (macOS/Linux) separately for the standard test suites and coverage checks.
 
-The `dev`/`demo` seed creates `ahmet` and `ayse` as `ROLE_USER`; their passwords come from `DEMO_SEED_AHMET_PASSWORD` / `DEMO_SEED_AYSE_PASSWORD` or the defaults in `application-dev.yml`.
+The `dev`/`demo` seed creates `ahmet` and `ayse` as `ROLE_USER`; their passwords come from `DEMO_SEED_AHMET_PASSWORD` / `DEMO_SEED_AYSE_PASSWORD`. The `dev` profile falls back to the defaults in `application-dev.yml`; `demo` requires both variables.
 
 - **Swagger UI (local profiles):** `http://localhost:8080/swagger-ui/index.html` (disabled in `prod`)
 - **Actuator Health (local dev):** `http://localhost:8080/actuator/health`; in `prod` it is on the private management port at `http://localhost:8081/actuator/health` by default (`MANAGEMENT_SERVER_PORT`).
@@ -273,11 +278,11 @@ The `dev`/`demo` seed creates `ahmet` and `ayse` as `ROLE_USER`; their passwords
 
 ## Testing & Quality Gates
 
-- **Run standard local checks:** `test-all.cmd` on Windows or `bash test-all.sh` on macOS/Linux. The launchers run the static CI/deployment/migration contracts, then Maven `clean install`, enforce aggregate JaCoCo coverage, generate the aggregate CycloneDX SBOM at `app/target/bom.json` and run the OSV dependency gate, followed by Python/JavaScript syntax checks and browser contract tests. Java 21, a running Docker daemon (for Testcontainers), Python 3.10+, Node.js, and (for the PowerShell image-pin self-test) PowerShell 7 or Windows PowerShell 5.1 are required. The command stops at the first failure and returns a nonzero exit code. If OSV is unreachable the dependency gate warns and skips; every other failure is fatal. PIT mutation testing, live health smoke, and data-writing load tests are separate checks.
+- **Run standard local checks:** `test-all.cmd` on Windows or `bash test-all.sh` on macOS/Linux. The launchers run the static CI/deployment/migration contracts, then Maven `clean install`, enforce aggregate JaCoCo coverage, generate the aggregate CycloneDX SBOM at `app/target/bom.json` and run the OSV dependency gate, followed by Python/JavaScript syntax checks and browser contract tests. Java 21, a running Docker daemon (for Testcontainers), Python 3.10+ and Node.js are required. The image-pin self-test uses PowerShell 7 or Windows PowerShell 5.1 when available; on macOS/Linux it is skipped if neither is installed. The command stops at the first failure and returns a nonzero exit code. If OSV is unreachable the dependency gate warns and skips; every other failure is fatal. PIT mutation testing, live health smoke, and data-writing load tests are separate checks.
 - **Test Suite:** Unit tests reside in their respective modules; integration (Testcontainers) and WebMvc tests live mostly in `app`, with adapter-level integration tests also in `infrastructure`.
 - **Verify Architecture Boundaries (ArchUnit):** Boundary rules from the table above, verified automatically on every build.
 - **Integration Testing with Testcontainers & Flyway:** Integration tests run against a real PostgreSQL via Testcontainers with Flyway migrations and `ddl-auto=validate` for schema consistency.
-- **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the nine-Java-module aggregate report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
+- **Generate Coverage Report (JaCoCo):** `./mvnw clean verify` (or `.\mvnw.cmd clean verify` on Windows) runs unit and Testcontainers integration tests, then writes the ten-Java-module aggregate report to `app/target/site/jacoco-aggregate/index.html`. The VS Code task **JaCoCo: Run All Tests + Aggregate Coverage** uses this lifecycle and prints each module directly from the aggregate XML. VS Code's **Run Tests with Coverage** button uses the Java Test Runner's separate, project-by-project coverage view; its intermediate percentages are not the Maven aggregate quality gate.
 - **Browser contract checks:** the `app/src/test/js/*.test.js` suite (`idempotency`, `frontend_contract`, `mfa-security`, `storage`) exercises session/idempotency, report pagination (offset page 0, keyset cursors past it, ETag cache rules), MFA login payload handling, safe storage fallbacks and funding-capability behavior. CI runs the whole suite; a real browser/TLS acceptance test is not yet included.
 - **CI dependency checks:** CI is configured to reject newly introduced high/critical dependency advisories on pull requests and to publish an aggregate CycloneDX SBOM. These checks do not replace a review of vulnerabilities already present in the dependency baseline.
 - **Dockerfile build & gated releases:** Every build compiles the `Dockerfile`; image scanning is delegated to the dependency gates above. Releases are manual-only and refuse to ship without a successful CI run on the exact SHA (`verify-green-ci`, plus a `production` environment for approval); the app and Flyway manifests ship digest-pinned (see [release automation](docs/release.md)).

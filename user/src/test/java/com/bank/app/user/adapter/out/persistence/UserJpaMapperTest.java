@@ -32,7 +32,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map full user with all fields")
         void shouldMapFullUser() {
-            User user = new User(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_ADMIN,
+            User user = User.rehydrate(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_ADMIN,
                     new EmailAddress("john@example.com"), new PhoneNumber("555-0100"), 1L);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
@@ -50,7 +50,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should round-trip a bumped token version")
         void shouldRoundTripTokenVersion() {
-            User user = new User(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
+            User user = User.rehydrate(new UserId(42L), "johndoe", "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
                     null, null, 3L, 9L);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
@@ -62,7 +62,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should map user with null email and phone")
         void shouldMapUserWithNullEmailAndPhone() {
-            User user = new User(new UserId(1L), "janedoe", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
+            User user = User.rehydrate(new UserId(1L), "janedoe", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
 
             UserJpaEntity entity = mapper.toJpaEntity(user);
 
@@ -85,7 +85,7 @@ class UserJpaMapperTest {
         @Test
         @DisplayName("should round-trip the MFA enabled flag")
         void shouldRoundTripMfaEnabled() {
-            User user = new User(new UserId(42L), "johndoe",
+            User user = User.rehydrate(new UserId(42L), "johndoe",
                     "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
                     null, null, 1L);
             user.enableMfa();
@@ -96,7 +96,7 @@ class UserJpaMapperTest {
 
             UserJpaEntity disabled = new UserJpaEntity();
             disabled.setMfaEnabled(true);
-            User plain = new User(new UserId(42L), "johndoe",
+            User plain = User.rehydrate(new UserId(42L), "johndoe",
                     "$2a$12$testsecrethash0000000000000000000000001", Role.ROLE_USER,
                     null, null, 1L);
             mapper.updateJpaEntity(disabled, plain);
@@ -163,7 +163,7 @@ class UserJpaMapperTest {
         void shouldUpdateEntity() {
             UserJpaEntity entity = new UserJpaEntity(1L, "oldname", "oldpass", Role.ROLE_USER,
                     "old@example.com", "555-0000", 0L);
-            User user = new User(new UserId(1L), "newname", "$2a$12$testnewpasshash000000000000000000000001", Role.ROLE_ADMIN,
+            User user = User.rehydrate(new UserId(1L), "newname", "$2a$12$testnewpasshash000000000000000000000001", Role.ROLE_ADMIN,
                     new EmailAddress("new@example.com"), new PhoneNumber("555-9999"), 2L, 7L);
 
             mapper.updateJpaEntity(entity, user);
@@ -183,7 +183,7 @@ class UserJpaMapperTest {
         void shouldUpdateEntityWithNullEmailAndPhone() {
             UserJpaEntity entity = new UserJpaEntity(1L, "name", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                     "old@example.com", "555-0000", null);
-            User user = new User(new UserId(1L), "name", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
+            User user = User.rehydrate(new UserId(1L), "name", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER, null, null);
 
             mapper.updateJpaEntity(entity, user);
 

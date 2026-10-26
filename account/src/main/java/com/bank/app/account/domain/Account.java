@@ -33,11 +33,7 @@ public class Account extends BaseAggregateRoot {
     private final Long version;
 
 
-    public Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status) {
-        this(id, userId, iban, ownerName, balance, status, null);
-    }
-
-    public Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status, Long version) {
+    private Account(Long id, UserId userId, Iban iban, String ownerName, Money balance, AccountStatus status, Long version) {
         this.id = id;
         this.userId = Objects.requireNonNull(userId, "UserId must not be null");
         this.iban = Objects.requireNonNull(iban, "IBAN must not be null");
@@ -66,43 +62,26 @@ public class Account extends BaseAggregateRoot {
         this.version = version;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /**
+     * Creates a new, not-yet-persisted account. New accounts always start
+     * ACTIVE with no identity or version; persistence assigns those.
+     */
+    public static Account create(UserId userId, Iban iban, String ownerName, Money balance) {
+        return new Account(null, userId, iban, ownerName, balance, AccountStatus.ACTIVE, null);
     }
 
     /**
-     * L4: persistence rehydration entry point. The public constructors stay for
-     * backward compatibility (tests, mappers), but production rehydration should
-     * flow through here so construction sites are greppable and a future
-     * architecture test can pin them to persistence adapters. Behavior is
-     * identical to the all-state constructor: invariants are re-validated so a
-     * corrupt row can never materialize an illegal aggregate.
+     * The only entry point for materializing persisted state. Invariants are
+     * re-validated so a corrupt row can never produce an illegal aggregate.
      */
+    public static Account rehydrate(Long id, UserId userId, Iban iban, String ownerName,
+            Money balance, AccountStatus status) {
+        return rehydrate(id, userId, iban, ownerName, balance, status, null);
+    }
+
     public static Account rehydrate(Long id, UserId userId, Iban iban, String ownerName,
             Money balance, AccountStatus status, Long version) {
         return new Account(id, userId, iban, ownerName, balance, status, version);
-    }
-
-    public static class Builder {
-        private Long id;
-        private UserId userId;
-        private Iban iban;
-        private String ownerName;
-        private Money balance;
-        private AccountStatus status;
-        private Long version;
-
-        public Builder id(Long id) { this.id = id; return this; }
-        public Builder userId(UserId userId) { this.userId = userId; return this; }
-        public Builder iban(Iban iban) { this.iban = iban; return this; }
-        public Builder ownerName(String ownerName) { this.ownerName = ownerName; return this; }
-        public Builder balance(Money balance) { this.balance = balance; return this; }
-        public Builder status(AccountStatus status) { this.status = status; return this; }
-        public Builder version(Long version) { this.version = version; return this; }
-
-        public Account build() {
-            return new Account(id, userId, iban, ownerName, balance, status, version);
-        }
     }
 
     public UserId getUserId() {

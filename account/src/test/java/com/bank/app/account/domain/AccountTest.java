@@ -36,7 +36,7 @@ class AccountTest {
             Clock.fixed(Instant.parse("2026-06-22T10:00:00Z"), ZoneOffset.UTC);
 
     private Account activeAccount(long balance) {
-        return new Account(1L, new UserId(1L), IBAN, OWNER, Money.of(String.valueOf(balance), Currency.TRY),
+        return Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of(String.valueOf(balance), Currency.TRY),
                 AccountStatus.ACTIVE);
     }
 
@@ -47,18 +47,18 @@ class AccountTest {
         @Test
         @DisplayName("should reject null constructor arguments")
         void shouldRejectNullArgs() {
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), null, OWNER, Money.of("1000", Currency.TRY),
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), null, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(NullPointerException.class);
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, null, Money.of("1000", Currency.TRY),
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, null, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(NullPointerException.class);
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER, null, AccountStatus.ACTIVE))
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, null, AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(NullPointerException.class);
             assertThatThrownBy(
-                    () -> new Account(1L, null, IBAN, OWNER, Money.of("1000", Currency.TRY), AccountStatus.ACTIVE))
+                    () -> Account.rehydrate(1L, null, IBAN, OWNER, Money.of("1000", Currency.TRY), AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(NullPointerException.class);
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY), null))
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY), null))
                     .isExactlyInstanceOf(NullPointerException.class);
         }
 
@@ -66,7 +66,7 @@ class AccountTest {
         @ValueSource(strings = { "", "   " })
         @DisplayName("should reject blank owner names")
         void shouldRejectBlankOwnerName(String name) {
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(IllegalArgumentException.class);
         }
@@ -77,7 +77,7 @@ class AccountTest {
             // The trimmed value is what is persisted and echoed on the wire;
             // a padded name would otherwise reach the account row and the API
             // response as "  Ahmet  ".
-            Account account = new Account(1L, new UserId(1L), IBAN, "  Ahmet  ", Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, "  Ahmet  ", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
 
             assertThat(account.getOwnerName()).isEqualTo("Ahmet");
@@ -86,7 +86,7 @@ class AccountTest {
         @Test
         @DisplayName("should reject balance above the domain ceiling")
         void shouldRejectExcessiveBalance() {
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER,
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("1000000000.01", Currency.TRY), AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must not exceed");
@@ -95,7 +95,7 @@ class AccountTest {
         @Test
         @DisplayName("should accept balance exactly at the domain ceiling")
         void shouldAcceptCeilingBalance() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("1000000000.00", Currency.TRY), AccountStatus.ACTIVE);
 
             assertThat(account.getBalance()).isEqualTo(Money.of("1000000000.00", Currency.TRY));
@@ -104,7 +104,7 @@ class AccountTest {
         @Test
         @DisplayName("should create account with null ID")
         void shouldCreateWithNullId() {
-            Account account = new Account(null, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(null, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account.getId()).isNull();
         }
@@ -112,7 +112,7 @@ class AccountTest {
         @Test
         @DisplayName("should create account with version")
         void shouldCreateWithVersion() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE, 5L);
             assertThat(account.getVersion()).isEqualTo(5L);
         }
@@ -128,7 +128,7 @@ class AccountTest {
         @DisplayName("should reject owner name longer than 255 characters")
         void shouldRejectLongOwnerName() {
             String longName = "a".repeat(256);
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, longName, Money.of("1000", Currency.TRY),
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, longName, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Owner name can be at most 255 characters");
@@ -138,7 +138,7 @@ class AccountTest {
         @DisplayName("should allow owner name exactly 255 characters")
         void shouldAllow255CharOwnerName() {
             String name = "a".repeat(255);
-            Account account = new Account(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, name, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account.getOwnerName()).isEqualTo(name);
         }
@@ -146,7 +146,7 @@ class AccountTest {
         @Test
         @DisplayName("should create account with version constructor and reject null userId")
         void shouldRejectNullUserIdInVersionConstructor() {
-            assertThatThrownBy(() -> new Account(1L, (UserId) null, IBAN, OWNER, Money.of("1000", Currency.TRY),
+            assertThatThrownBy(() -> Account.rehydrate(1L, (UserId) null, IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE, 1L))
                     .isExactlyInstanceOf(NullPointerException.class);
         }
@@ -154,7 +154,7 @@ class AccountTest {
         @Test
         @DisplayName("should return correct userId")
         void shouldReturnCorrectUserId() {
-            Account account = new Account(1L, new UserId(42L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(42L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account.getUserId().value()).isEqualTo(42L);
         }
@@ -215,7 +215,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on suspended account")
         void shouldThrowOnSuspendedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
             assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -226,7 +226,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on closed account")
         void shouldThrowOnClosedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.debit(Money.of("100.00", Currency.TRY), FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -315,7 +315,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on suspended account")
         void shouldThrowOnSuspendedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
             assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -326,7 +326,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountNotActiveException on closed account")
         void shouldThrowOnClosedAccount() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.credit(Money.of("100.00", Currency.TRY), FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountNotActiveException.class);
@@ -366,7 +366,7 @@ class AccountTest {
         @Test
         @DisplayName("should reject credit that would exceed MAX_BALANCE (K3/D3)")
         void shouldRejectCreditAboveMaxBalance() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
             assertThatThrownBy(() -> account.credit(Money.of("2.00", Currency.TRY), FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountBalanceLimitExceededException.class)
@@ -379,7 +379,7 @@ class AccountTest {
         @Test
         @DisplayName("should allow credit landing exactly on MAX_BALANCE (K3/D3)")
         void shouldAllowCreditLandingExactlyOnMaxBalance() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER,
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("999999999.00", Currency.TRY), AccountStatus.ACTIVE);
             account.credit(Money.of("1.00", Currency.TRY), FIXED_CLOCK);
             assertThat(account.getBalance().amount()).isEqualByComparingTo("1000000000.00");
@@ -415,7 +415,7 @@ class AccountTest {
         @Test
         @DisplayName("isActive should return false for SUSPENDED")
         void isActiveFalseForSuspended() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
             assertThat(account.isActive()).isFalse();
         }
@@ -423,7 +423,7 @@ class AccountTest {
         @Test
         @DisplayName("isActive should return false for CLOSED")
         void isActiveFalseForClosed() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThat(account.isActive()).isFalse();
         }
@@ -451,7 +451,7 @@ class AccountTest {
         @Test
         @DisplayName("should be idempotent when already suspended")
         void shouldBeIdempotentWhenSuspended() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
             Clock clock = Clock.fixed(LocalDateTime.of(2026, 6, 24, 12, 0).atZone(ZoneId.systemDefault()).toInstant(),
                     ZoneId.systemDefault());
@@ -463,7 +463,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountClosedException when closed")
         void shouldThrowWhenClosed() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.suspend(FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountClosedException.class);
@@ -488,7 +488,7 @@ class AccountTest {
         @Test
         @DisplayName("should close active account with zero balance")
         void shouldCloseWithZeroBalance() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
                     AccountStatus.ACTIVE);
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
@@ -504,7 +504,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw AccountClosedException when already closed")
         void shouldThrowWhenAlreadyClosed() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
             assertThatThrownBy(() -> account.close(FIXED_CLOCK))
                     .isExactlyInstanceOf(AccountClosedException.class);
@@ -513,7 +513,7 @@ class AccountTest {
         @Test
         @DisplayName("should throw InsufficientBalanceException when balance is not zero")
         void shouldThrowWhenBalanceNotZero() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("100.00", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("100.00", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThatThrownBy(() -> account.close(FIXED_CLOCK))
                     .isExactlyInstanceOf(InsufficientBalanceException.class);
@@ -522,7 +522,7 @@ class AccountTest {
         @Test
         @DisplayName("should reject direct construction of CLOSED account with non-zero balance")
         void shouldRejectClosedWithNonZeroBalanceAtConstruction() {
-            assertThatThrownBy(() -> new Account(1L, new UserId(1L), IBAN, OWNER,
+            assertThatThrownBy(() -> Account.rehydrate(1L, new UserId(1L), IBAN, OWNER,
                     Money.of("100.00", Currency.TRY), AccountStatus.CLOSED))
                     .isExactlyInstanceOf(InsufficientBalanceException.class);
         }
@@ -532,7 +532,7 @@ class AccountTest {
         void shouldCloseSuspendedAccount() {
             LocalDateTime fixedNow = LocalDateTime.of(2026, 6, 24, 12, 0);
             Clock clock = Clock.fixed(fixedNow.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
                     AccountStatus.SUSPENDED);
             account.close(clock);
             assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
@@ -546,7 +546,7 @@ class AccountTest {
         @Test
         @DisplayName("should close active account with zero balance using default clock")
         void shouldCloseWithDefaultClock() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0.00", Currency.TRY),
                     AccountStatus.ACTIVE);
             account.close(FIXED_CLOCK);
             assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
@@ -563,9 +563,9 @@ class AccountTest {
         @Test
         @DisplayName("equals should return true when same ID")
         void equalsWhenSameId() {
-            Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
+            Account a2 = Account.rehydrate(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
                     Money.of("500", Currency.TRY), AccountStatus.SUSPENDED);
             assertThat(a1).isEqualTo(a2);
         }
@@ -573,9 +573,9 @@ class AccountTest {
         @Test
         @DisplayName("equals should return false when different ID")
         void notEqualsWhenDifferentId() {
-            Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(2L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a2 = Account.rehydrate(2L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(a1).isNotEqualTo(a2);
         }
@@ -583,9 +583,9 @@ class AccountTest {
         @Test
         @DisplayName("equals should return false when both IDs are null")
         void notEqualsWhenBothNullIds() {
-            Account a1 = new Account(null, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(null, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(null, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a2 = Account.rehydrate(null, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(a1).isNotEqualTo(a2);
         }
@@ -593,7 +593,7 @@ class AccountTest {
         @Test
         @DisplayName("equals should return false for different type")
         void notEqualsForDifferentType() {
-            Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(a1).isNotEqualTo("some-string");
         }
@@ -601,9 +601,9 @@ class AccountTest {
         @Test
         @DisplayName("hashCode should be consistent with equals")
         void hashCodeConsistentWithEquals() {
-            Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
+            Account a2 = Account.rehydrate(1L, new UserId(2L), new Iban("TR870006200000000000000222"), "Mehmet",
                     Money.of("500", Currency.TRY), AccountStatus.SUSPENDED);
             assertThat(a1).hasSameHashCodeAs(a2);
         }
@@ -611,11 +611,11 @@ class AccountTest {
         @Test
         @DisplayName("hashCode should be based on id")
         void hashCodeShouldBeBasedOnId() {
-            Account a1 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a1 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a2 = new Account(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a2 = Account.rehydrate(1L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
-            Account a3 = new Account(2L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
+            Account a3 = Account.rehydrate(2L, new UserId(1L), IBAN, "Ahmet", Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(a1.hashCode()).isEqualTo(a2.hashCode());
             assertThat(a1.hashCode()).isNotEqualTo(a3.hashCode());
@@ -624,7 +624,7 @@ class AccountTest {
         @Test
         @DisplayName("equals should return true for same reference")
         void equalsWhenSameReference() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account).isEqualTo(account);
         }
@@ -632,7 +632,7 @@ class AccountTest {
         @Test
         @DisplayName("hashCode should return 0 when id is null")
         void hashCodeWhenNullId() {
-            Account account = new Account(null, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(null, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account.hashCode()).isZero();
         }
@@ -640,7 +640,7 @@ class AccountTest {
         @Test
         @DisplayName("toString should contain account fields")
         void toStringShouldContainFields() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.ACTIVE);
             assertThat(account.toString()).contains("id=1", "iban=", "status=ACTIVE", "balance=");
         }
@@ -656,7 +656,7 @@ class AccountTest {
             // The zero-amount guard runs before the status guard: the client
             // gets INVALID_AMOUNT, not ACCOUNT_NOT_ACTIVE. Swapping the two
             // guards silently changes the error code the client receives.
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
 
             assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY), FIXED_CLOCK))
@@ -669,7 +669,7 @@ class AccountTest {
         @Test
         @DisplayName("should reject a zero credit on a suspended account as an invalid amount")
         void shouldRejectZeroCreditBeforeCheckingAccountStatus() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("1000", Currency.TRY),
                     AccountStatus.SUSPENDED);
 
             assertThatThrownBy(() -> account.credit(Money.of("0.00", Currency.TRY), FIXED_CLOCK))
@@ -682,7 +682,7 @@ class AccountTest {
         @Test
         @DisplayName("should reject a zero debit on a closed account as an invalid amount")
         void shouldRejectZeroDebitOnClosedAccountBeforeCheckingAccountStatus() {
-            Account account = new Account(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
+            Account account = Account.rehydrate(1L, new UserId(1L), IBAN, OWNER, Money.of("0", Currency.TRY),
                     AccountStatus.CLOSED);
 
             assertThatThrownBy(() -> account.debit(Money.of("0.00", Currency.TRY), FIXED_CLOCK))
@@ -741,55 +741,29 @@ class AccountTest {
     }
 
     @Nested
-    @DisplayName("builder")
-    class Builder {
+    @DisplayName("create")
+    class Create {
 
         @Test
-        @DisplayName("should build with all fields")
-        void shouldBuildWithAllFields() {
-            Account account = Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .version(3L)
-                    .build();
+        @DisplayName("should create an ACTIVE transient account with no identity or version")
+        void shouldCreateTransientAccount() {
+            Account account = Account.create(new UserId(100L), IBAN, "Ahmet",
+                    Money.of("1000.00", Currency.TRY));
 
-            assertThat(account.getId()).isEqualTo(1L);
+            assertThat(account.getId()).isNull();
             assertThat(account.getUserId().value()).isEqualTo(100L);
+            assertThat(account.getIban()).isEqualTo(IBAN);
             assertThat(account.getOwnerName()).isEqualTo("Ahmet");
             assertThat(account.getStatus()).isEqualTo(AccountStatus.ACTIVE);
-            assertThat(account.getVersion()).isEqualTo(3L);
-        }
-
-        @Test
-        @DisplayName("should build with null version")
-        void shouldBuildWithNullVersion() {
-            Account account = Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build();
-
             assertThat(account.getVersion()).isNull();
+            assertThat(account.getDomainEvents()).isEmpty();
         }
 
         @Test
         @DisplayName("should trim the owner name")
         void shouldTrimOwnerName() {
-            Account account = Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("  Ahmet  ")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build();
+            Account account = Account.create(new UserId(100L), IBAN, "  Ahmet  ",
+                    Money.of("1000.00", Currency.TRY));
 
             assertThat(account.getOwnerName()).isEqualTo("Ahmet");
         }
@@ -797,14 +771,8 @@ class AccountTest {
         @Test
         @DisplayName("should reject a blank owner name")
         void shouldRejectBlankOwnerName() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("   ")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(new UserId(100L), IBAN, "   ",
+                    Money.of("1000.00", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Owner name must not be empty");
         }
@@ -812,14 +780,8 @@ class AccountTest {
         @Test
         @DisplayName("should reject a balance above the ceiling")
         void shouldRejectBalanceAboveCeiling() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000000000.01", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(new UserId(100L), IBAN, "Ahmet",
+                    Money.of("1000000000.01", Currency.TRY)))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must not exceed");
         }
@@ -827,13 +789,8 @@ class AccountTest {
         @Test
         @DisplayName("should reject a missing user id with a named failure")
         void shouldRejectMissingUserId() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(null, IBAN, "Ahmet",
+                    Money.of("1000.00", Currency.TRY)))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("UserId must not be null");
         }
@@ -841,13 +798,8 @@ class AccountTest {
         @Test
         @DisplayName("should reject a missing IBAN with a named failure")
         void shouldRejectMissingIban() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(new UserId(100L), null, "Ahmet",
+                    Money.of("1000.00", Currency.TRY)))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("IBAN must not be null");
         }
@@ -855,13 +807,8 @@ class AccountTest {
         @Test
         @DisplayName("should reject a missing owner name with a named failure")
         void shouldRejectMissingOwnerName() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(new UserId(100L), IBAN, null,
+                    Money.of("1000.00", Currency.TRY)))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Owner name must not be null");
         }
@@ -869,31 +816,9 @@ class AccountTest {
         @Test
         @DisplayName("should reject a missing balance with a named failure")
         void shouldRejectMissingBalance() {
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .status(AccountStatus.ACTIVE)
-                    .build())
+            assertThatThrownBy(() -> Account.create(new UserId(100L), IBAN, "Ahmet", null))
                     .isExactlyInstanceOf(NullPointerException.class)
                     .hasMessage("Balance must not be null");
-        }
-
-        @Test
-        @DisplayName("should reject a missing status with a named failure")
-        void shouldRejectMissingStatus() {
-            // A caller who forgets .status(...) must get a named failure, not a
-            // bare NPE from deep inside the aggregate.
-            assertThatThrownBy(() -> Account.builder()
-                    .id(1L)
-                    .userId(new UserId(100L))
-                    .iban(IBAN)
-                    .ownerName("Ahmet")
-                    .balance(Money.of("1000.00", Currency.TRY))
-                    .build())
-                    .isExactlyInstanceOf(NullPointerException.class)
-                    .hasMessage("Account status must not be null");
         }
     }
 }

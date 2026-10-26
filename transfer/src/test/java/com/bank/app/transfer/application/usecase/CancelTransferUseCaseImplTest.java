@@ -170,7 +170,7 @@ class CancelTransferUseCaseImplTest {
         stubClock();
         Long transferId = 1L;
         Money amount = new Money(new BigDecimal("100.00"), Currency.TRY);
-        Transfer transfer = new Transfer(transferId, new AccountId(10L), new AccountId(20L), amount,
+        Transfer transfer = Transfer.rehydrate(transferId, new AccountId(10L), new AccountId(20L), amount,
                 TransferStatus.FAILED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600), ZoneOffset.UTC));
 
         when(loadTransferPort.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
@@ -243,7 +243,7 @@ class CancelTransferUseCaseImplTest {
     }
 
     private static Transfer createCompletedTransfer(Long id, AccountId senderId, AccountId receiverId, Money amount) {
-        Transfer transfer = new Transfer(id, senderId, receiverId, amount,
+        Transfer transfer = Transfer.rehydrate(id, senderId, receiverId, amount,
                 TransferStatus.COMPLETED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600), ZoneOffset.UTC));
         return transfer;
     }

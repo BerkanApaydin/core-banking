@@ -4,6 +4,7 @@ import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.config.BrowserSessionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,8 +80,8 @@ class SecurityAuthorizationMatrixTest {
         }
 
         @Bean
-        BrowserSessionCookieProperties browserSessionCookieProperties() {
-            return new BrowserSessionCookieProperties(false);
+        BrowserSessionProperties browserSessionProperties() {
+            return new BrowserSessionProperties(false);
         }
 
         @Bean

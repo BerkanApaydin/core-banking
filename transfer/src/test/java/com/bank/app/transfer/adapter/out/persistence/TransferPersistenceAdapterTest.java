@@ -85,7 +85,7 @@ class TransferPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveSuccessfully() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer domainTransfer = Transfer.rehydrate(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 now);
         TransferJpaEntity savedEntity = createEntity(10L, 1L, 2L, new BigDecimal("200.00"), Currency.TRY, TransferStatus.COMPLETED, null, now);
 
@@ -106,7 +106,7 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowExceptionWhenSaveReturnsNull() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
+        Transfer domainTransfer = Transfer.rehydrate(null, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED,
                 now);
 
         when(springDataRepo.save(any(TransferJpaEntity.class))).thenReturn(null);
@@ -125,7 +125,7 @@ class TransferPersistenceAdapterTest {
         LocalDateTime now = LocalDateTime.now();
         // The domain carries the version it read; the bulk path issues a single
         // versioned UPDATE (no SELECT) and returns the bumped version.
-        Transfer domainTransfer = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
+        Transfer domainTransfer = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, 1L);
 
         when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED)).thenReturn(1);
 
@@ -143,14 +143,14 @@ class TransferPersistenceAdapterTest {
     @Test
     void shouldThrowWhenUpdatingNonExistentTransfer() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer domainTransfer = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00",
+        Transfer domainTransfer = Transfer.rehydrate(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00",
 Currency.TRY), TransferStatus.COMPLETED, now);
 
         when(springDataRepo.countById(999L)).thenReturn(0L);
 
         // Domain NOT_FOUND (404 like the account sibling), never bare
         // IllegalArgumentException (500).
-        TransferNotFoundException ex = assertThrows(TransferNotFoundException.class,
+        assertThrows(TransferNotFoundException.class,
                 () -> repository.save(domainTransfer));
         verify(springDataRepo).countById(999L);
         verify(springDataRepo, never()).save(any());
@@ -406,7 +406,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
     @Test
     void shouldRejectBlindWriteWhenVersionIsMissing() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer blind = new Transfer(10L, new AccountId(1L), new AccountId(2L),
+        Transfer blind = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L),
                 Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, null);
         when(springDataRepo.countById(10L)).thenReturn(1L);
 
@@ -417,7 +417,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
     @Test
     void shouldThrowNotFoundWhenVersionIsMissingAndRowIsGone() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer blind = new Transfer(999L, new AccountId(1L), new AccountId(2L),
+        Transfer blind = Transfer.rehydrate(999L, new AccountId(1L), new AccountId(2L),
                 Money.of("200.00", Currency.TRY), TransferStatus.COMPLETED, now, null);
         when(springDataRepo.countById(999L)).thenReturn(0L);
 
@@ -442,7 +442,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
         // Kills the NullReturnVals mutant on lambda$save$1: the 0-row bulk path
         // must distinguish "row gone" (TransferNotFoundException/404) from conflict.
         LocalDateTime now = LocalDateTime.now();
-        Transfer missing = new Transfer(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
+        Transfer missing = Transfer.rehydrate(999L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(999L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);
@@ -455,7 +455,7 @@ Currency.TRY), TransferStatus.COMPLETED, now);
     @Test
     void shouldRejectStaleVersionOnBulkUpdate() {
         LocalDateTime now = LocalDateTime.now();
-        Transfer stale = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
+        Transfer stale = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("200.00", Currency.TRY),
                 TransferStatus.COMPLETED, now, 1L);
         when(springDataRepo.updateStatusIfVersionMatch(10L, 1L, TransferStatus.COMPLETED))
                 .thenReturn(0);

@@ -84,7 +84,8 @@ class IdempotencyGuardTest {
             Entry failed = new Entry("key-1", "FAILED", null, null, LocalDateTime.now());
             Entry pending = new Entry("key-1", "PENDING", null, null, LocalDateTime.now());
             when(idempotencyPort.findById("key-1"))
-                    .thenReturn(Optional.of(failed), Optional.of(pending));
+                    .thenReturn(Optional.of(failed))
+                    .thenReturn(Optional.of(pending));
             when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class))).thenReturn(false);
 
             assertEquals(IdempotencyResult.Status.PENDING, guard.startRequest("key-1").status());
@@ -213,7 +214,8 @@ class IdempotencyGuardTest {
             Entry completed = new Entry("key-1", "COMPLETED", "winner", 200,
                     LocalDateTime.now(), null, true);
             when(idempotencyPort.findById("key-1"))
-                    .thenReturn(Optional.of(failed), Optional.of(completed));
+                    .thenReturn(Optional.of(failed))
+                    .thenReturn(Optional.of(completed));
             when(idempotencyPort.tryResetFailed(eq("key-1"), any(LocalDateTime.class)))
                     .thenReturn(false);
 

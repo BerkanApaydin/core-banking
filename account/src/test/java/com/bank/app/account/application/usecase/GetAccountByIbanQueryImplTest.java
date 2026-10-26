@@ -1,7 +1,7 @@
 package com.bank.app.account.application.usecase;
 
 import com.bank.app.account.application.dto.AccountResponse;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.application.port.in.GetAccountByIbanQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.service.AccountAuthorizationService;
@@ -53,7 +53,7 @@ class GetAccountByIbanQueryImplTest {
         @Test
         @DisplayName("should get account by IBAN successfully")
         void shouldGetAccountByIbanSuccessfully() {
-            Account account = new Account(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
+            Account account = Account.rehydrate(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             Iban iban = new Iban(VALID_IBAN);
             when(loadAccountPort.findByIban(iban)).thenReturn(Optional.of(account));
@@ -81,7 +81,7 @@ class GetAccountByIbanQueryImplTest {
         @Test
         @DisplayName("should hide another user's IBAN with not found")
         void shouldHideAnotherUsersIban() {
-            Account account = new Account(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
+            Account account = Account.rehydrate(1L, new UserId(100L), new Iban(VALID_IBAN), "Ali Veli",
                     Money.of(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
             when(loadAccountPort.findByIban(any())).thenReturn(Optional.of(account));
             when(accountAuthorizationService.isCurrentUserOwner(account)).thenReturn(false);

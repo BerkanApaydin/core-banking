@@ -15,6 +15,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -185,7 +186,7 @@ class OutboxPersistenceAdapterTest {
         var status = new SimpleTransactionStatus();
         when(txManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
         var transactionalAdapter = new OutboxPersistenceAdapter(repository,
-                new OutboxProperties(5, 50, 2, 2000L, 30, 4, 12, 30L), null,
+                new OutboxProperties(5, 50, 2, 2000L, 30, 4, 12, 30L), Clock::systemUTC,
                 txManager, new TransactionProperties(17));
         LocalDateTime cutoff = LocalDateTime.of(2026, 5, 23, 10, 0);
         when(repository.deleteProcessedBatchBefore(cutoff, 1000)).thenReturn(3);

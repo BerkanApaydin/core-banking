@@ -1,6 +1,7 @@
 package com.bank.app.user.adapter.out.outbox;
 
 import com.bank.app.common.application.outbox.IdempotentOutboxRelay;
+import com.bank.app.common.application.outbox.OutboxEventTypes;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
@@ -42,7 +43,7 @@ public class UserEventOutboxRelay extends IdempotentOutboxRelay {
 
     @Override
     public boolean supports(String eventType) {
-        return "UserRegisteredEvent".equals(eventType);
+        return OutboxEventTypes.matches("UserRegisteredEvent", eventType);
     }
 
     @Override

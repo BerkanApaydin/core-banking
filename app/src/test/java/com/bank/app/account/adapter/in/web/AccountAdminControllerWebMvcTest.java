@@ -1,8 +1,8 @@
 package com.bank.app.account.adapter.in.web;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
 import com.bank.app.infrastructure.adapter.in.handler.GlobalExceptionHandler;
@@ -49,7 +49,7 @@ class AccountAdminControllerWebMvcTest {
         @Test
         @DisplayName("should return 200 with the suspended status")
         void shouldReturn200() throws Exception {
-            when(suspendAccountUseCase.suspend(1L)).thenReturn(new AccountInfo(1L, 10L, "TRY", "SUSPENDED"));
+            when(suspendAccountUseCase.suspend(1L)).thenReturn(new AccountView(1L, 10L, "TRY", "SUSPENDED"));
 
             mockMvc.perform(post("/api/v1/admin/accounts/1/suspend"))
                     .andExpect(status().isOk())

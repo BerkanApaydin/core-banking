@@ -15,7 +15,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 public abstract class AbstractIntegrationTest {
 
     static {
-        var pg = TestDatabaseContainer.getInstance();
+        TestDatabaseContainer.getInstance();
     }
 
     @DynamicPropertySource

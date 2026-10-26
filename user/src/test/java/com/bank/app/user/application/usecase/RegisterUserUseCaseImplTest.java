@@ -57,7 +57,7 @@ class RegisterUserUseCaseImplTest {
         stubClock();
         when(saveUserPort.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
-            return new User(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole(),
+            return User.rehydrate(new UserId(42L), user.getUsername(), user.getPassword(), user.getRole(),
                     user.getEmail(), user.getPhone());
         });
     }
@@ -149,7 +149,7 @@ class RegisterUserUseCaseImplTest {
         @DisplayName("should throw when username already exists")
         void shouldThrowOnDuplicateUsername() {
             AuthRequest request = new AuthRequest("existinguser", "$2a$12$testpasswordhash00000000000000000000001");
-            User existingUser = new User(new UserId(1L), "existinguser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
+            User existingUser = User.rehydrate(new UserId(1L), "existinguser", "$2a$12$testhashedhash0000000000000000000000001", Role.ROLE_USER);
 
             when(loadUserPort.findByUsername("existinguser")).thenReturn(Optional.of(existingUser));
 

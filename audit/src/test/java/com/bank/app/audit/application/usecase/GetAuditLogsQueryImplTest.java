@@ -44,7 +44,7 @@ class GetAuditLogsQueryImplTest {
     void shouldReturnLogsForAdmin() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
         when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
-        var log = new AuditLog(1L, "alice", AuditAction.TRANSFER_EXECUTED,
+        var log = AuditLog.rehydrate(1L, "alice", AuditAction.TRANSFER_EXECUTED,
                 "Transfer completed. Transfer ID: 7", LocalDateTime.now());
         when(loadAuditLogPort.findRecent(50)).thenReturn(List.of(log));
 
@@ -103,7 +103,7 @@ class GetAuditLogsQueryImplTest {
     void shouldReturnActorLogsForAdmin() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
         when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
-        var log = new AuditLog(1L, "alice", AuditAction.TRANSFER_EXECUTED,
+        var log = AuditLog.rehydrate(1L, "alice", AuditAction.TRANSFER_EXECUTED,
                 "Transfer completed. Transfer ID: 7", LocalDateTime.now(), 7L);
         when(loadAuditLogPort.findByActor(7L, 50)).thenReturn(List.of(log));
 
@@ -118,7 +118,7 @@ class GetAuditLogsQueryImplTest {
     void shouldFallBackToRecentWhenActorIsNull() {
         when(userContextService.getCurrentUserId()).thenReturn(Optional.of(99L));
         when(userContextService.hasRole("ROLE_ADMIN")).thenReturn(true);
-        var log = new AuditLog(2L, "bob", AuditAction.LOGIN_SUCCEEDED,
+        var log = AuditLog.rehydrate(2L, "bob", AuditAction.LOGIN_SUCCEEDED,
                 "Login succeeded.", LocalDateTime.now());
         when(loadAuditLogPort.findRecent(50)).thenReturn(List.of(log));
 

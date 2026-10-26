@@ -1,9 +1,8 @@
 package com.bank.app.account.adapter.out.api;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.GetAccountInfoQuery;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
-import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.api.AccountAdjustmentResult;
 import com.bank.app.account.api.AccountApi;
 import com.bank.app.account.api.AccountSnapshot;
@@ -50,26 +49,12 @@ public class AccountApiAdapter implements AccountApi {
 
     @Override
     public AccountSnapshot getSnapshotById(Long accountId) {
-        try {
-            return toSnapshot(getAccountInfoQuery.getAccountInfo(accountId));
-        // Fully qualified: simple-name collision with the published
-        // account.api.AccountNotFoundException (imported above) — Java cannot
-        // import both, so the domain side stays qualified here.
-        } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
-            // Translate to the published language: downstream contexts must
-            // never observe account domain types, not even as exceptions.
-            throw new AccountNotFoundException(accountId);
-        }
+        return toSnapshot(getAccountInfoQuery.getAccountInfo(accountId));
     }
 
     @Override
     public AccountSnapshot getSnapshotByIban(String ibanValue) {
-        try {
-            return toSnapshot(getAccountInfoQuery.getAccountInfoForTransfer(ibanValue));
-        // Fully qualified: same simple-name collision as above.
-        } catch (com.bank.app.account.domain.exception.AccountNotFoundException e) {
-            throw new AccountNotFoundException(ibanValue);
-        }
+        return toSnapshot(getAccountInfoQuery.getAccountInfoForTransfer(ibanValue));
     }
 
     @Override
@@ -120,7 +105,7 @@ public class AccountApiAdapter implements AccountApi {
         }
     }
 
-    private static AccountSnapshot toSnapshot(AccountInfo info) {
+    private static AccountSnapshot toSnapshot(AccountView info) {
         return new AccountSnapshot(info.id(), info.userId(), info.currency(), info.status());
     }
 }

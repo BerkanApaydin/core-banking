@@ -7,7 +7,6 @@ import com.bank.app.common.domain.Currency;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,7 +15,6 @@ class TransferJpaEntityTest {
 
     @Test
     void shouldCreateTransferJpaEntity() {
-        LocalDateTime now = LocalDateTime.now();
         TransferJpaEntity entity = new TransferJpaEntity(1L, 2L, 3L, BigDecimal.TEN, Currency.TRY, TransferStatus.PENDING, null);
 
         assertEquals(1L, entity.getId());

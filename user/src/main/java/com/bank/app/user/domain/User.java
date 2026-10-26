@@ -33,14 +33,6 @@ public class User extends BaseAggregateRoot {
      */
     private boolean mfaEnabled;
 
-    public User(UserId id, String username, String password, Role role) {
-        this(id, username, password, role, null, null);
-    }
-
-    public User(UserId id, String username, String password, Role role, EmailAddress email, PhoneNumber phone) {
-        this(id, username, password, role, email, phone, null);
-    }
-
     /**
      * @param encodedPassword BCrypt-hashed password, NEVER raw input. Raw passwords
      *                        must pass {@code PasswordPolicy.validate} BEFORE encoding
@@ -49,18 +41,8 @@ public class User extends BaseAggregateRoot {
      *                        enforced via {@link EncodedPassword#of(String)} — raw input
      *                        fails fast instead of being persisted.
      */
-    public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email, PhoneNumber phone, Long version) {
-        this(id, username, encodedPassword, role, email, phone, version, 0L);
-    }
-
-    /**
-     * Full constructor. {@code encodedPassword} must be a BCrypt hash: validated
-     * via {@link EncodedPassword#of(String)} (NOT {@code ofTrusted}), so any
-     * non-BCrypt value fails fast. Kept for backward compatibility; new code
-     * should prefer the {@link EncodedPassword} overload.
-     */
-    public User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
-                PhoneNumber phone, Long version, long tokenVersion) {
+    private User(UserId id, String username, String encodedPassword, Role role, EmailAddress email,
+                 PhoneNumber phone, Long version, long tokenVersion) {
         Objects.requireNonNull(encodedPassword, "Password must not be null");
         // BCrypt shape check: rejects raw input, never stores it.
         EncodedPassword.of(encodedPassword);
@@ -78,29 +60,46 @@ public class User extends BaseAggregateRoot {
     }
 
     /**
-     * Preferred constructor: takes an already-validated {@link EncodedPassword}.
-     * No re-validation needed — {@code EncodedPassword.of} enforced the BCrypt
-     * shape at creation time.
-     */
-    public User(UserId id, String username, EncodedPassword encodedPassword, Role role, EmailAddress email,
-                PhoneNumber phone, Long version, long tokenVersion) {
-        this(id, username,
-                Objects.requireNonNull(encodedPassword, "Encoded password must not be null").value(),
-                role, email, phone, version, tokenVersion);
-    }
-
-    /**
-     * Preferred factory: the hash is already validated by
-     * {@link EncodedPassword#of(String)}, so raw input cannot reach the
-     * aggregate through this path. Tests use {@code UserTestFactory} in test
-     * sources for transient (unpersisted) users.
+     * Creates a new, not-yet-persisted user. New users always have the default
+     * role, no identity/version and a zero token generation.
      */
     public static User create(String username, EncodedPassword encodedPassword, EmailAddress email,
                               PhoneNumber phone, Clock clock) {
         Objects.requireNonNull(clock, "Clock must not be null");
         Objects.requireNonNull(encodedPassword, "Encoded password must not be null");
         String validatedUsername = validateNewUsername(username);
-        return new User(null, validatedUsername, encodedPassword.value(), Role.ROLE_USER, email, phone);
+        return new User(null, validatedUsername, encodedPassword.value(), Role.ROLE_USER,
+                email, phone, null, 0L);
+    }
+
+    /**
+     * The only entry point for materializing persisted state. The hash is
+     * re-validated so a corrupt row cannot materialize an illegal user.
+     */
+    public static User rehydrate(UserId id, String username, String encodedPassword, Role role) {
+        return rehydrate(id, username, encodedPassword, role, null, null, null, 0L);
+    }
+
+    public static User rehydrate(UserId id, String username, String encodedPassword, Role role,
+                                 EmailAddress email, PhoneNumber phone) {
+        return rehydrate(id, username, encodedPassword, role, email, phone, null, 0L);
+    }
+
+    public static User rehydrate(UserId id, String username, String encodedPassword, Role role,
+                                 EmailAddress email, PhoneNumber phone, Long version) {
+        return rehydrate(id, username, encodedPassword, role, email, phone, version, 0L);
+    }
+
+    public static User rehydrate(UserId id, String username, String encodedPassword, Role role,
+                                 EmailAddress email, PhoneNumber phone, Long version, long tokenVersion) {
+        return new User(id, username, encodedPassword, role, email, phone, version, tokenVersion);
+    }
+
+    public static User rehydrate(UserId id, String username, EncodedPassword encodedPassword, Role role,
+                                 EmailAddress email, PhoneNumber phone, Long version, long tokenVersion) {
+        return rehydrate(id, username,
+                Objects.requireNonNull(encodedPassword, "Encoded password must not be null").value(),
+                role, email, phone, version, tokenVersion);
     }
 
     public void recordRegistration(Clock clock) {

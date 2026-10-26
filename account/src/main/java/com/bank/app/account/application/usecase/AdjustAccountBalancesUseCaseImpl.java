@@ -8,7 +8,7 @@ import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.LedgerEntry;
 import com.bank.app.account.domain.MovementDirection;
 import com.bank.app.account.domain.TransactionRef;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DistinctAccountsRequiredException;
 import com.bank.app.account.api.AccountAdjustmentResult;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
@@ -159,8 +159,8 @@ public class AdjustAccountBalancesUseCaseImpl implements AdjustAccountBalancesUs
         // T-13: this ordered lock is the PRIMARY guard; the versioned bulk UPDATE
         // in AccountPersistenceAdapter.save is the cross-check (see
         // docs/decisions/account-locking.md — drop neither side alone).
-        Long lowerId = id1.compareTo(id2) < 0 ? id1 : id2;
-        Long higherId = id1.compareTo(id2) < 0 ? id2 : id1;
+        Long lowerId = Math.min(id1, id2);
+        Long higherId = Math.max(id1, id2);
         List<Account> loaded = loadAccountPort.findByIdsForUpdate(List.of(lowerId, higherId));
         Map<Long, Account> byId = loaded.stream()
                 .collect(Collectors.toMap(Account::getId, account -> account));

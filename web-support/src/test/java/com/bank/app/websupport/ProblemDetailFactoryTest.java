@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.in.handler;
+package com.bank.app.websupport;
 
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,6 +67,18 @@ class ProblemDetailFactoryTest {
         }
 
         @Test
+        @DisplayName("should omit the instance when the request description cannot be read")
+        void shouldOmitInstanceWhenRequestDescriptionFails() {
+            WebRequest request = mock(WebRequest.class);
+            when(request.getDescription(false)).thenThrow(new IllegalStateException("request unavailable"));
+
+            ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
+                    ErrorCode.RESOURCE_NOT_FOUND, "Not found", request);
+
+            assertThat(response.getBody().getInstance()).isNull();
+        }
+
+        @Test
         @DisplayName("should handle null request gracefully")
         void shouldHandleNullRequest() {
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
@@ -124,7 +136,7 @@ class ProblemDetailFactoryTest {
         @DisplayName("should create problem detail with explicit HttpStatus")
         void shouldCreateWithExplicitStatus() {
             ResponseEntity<ProblemDetail> response = ProblemDetailFactory.create(
-                    HttpStatus.CONFLICT, "CONCURRENT", "Concurrent request", null);
+                    HttpStatus.CONFLICT, "CONCURRENT", "Concurrent request", (WebRequest) null);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
             assertThat(response.getBody().getProperties())
@@ -272,7 +284,7 @@ class ProblemDetailFactoryTest {
         @DisplayName("should reject null status")
         void shouldRejectNullStatus() {
             assertThrows(IllegalArgumentException.class,
-                    () -> ProblemDetailFactory.create((HttpStatus) null, "CODE", "message", null));
+                    () -> ProblemDetailFactory.create((HttpStatus) null, "CODE", "message", (WebRequest) null));
         }
     }
 }

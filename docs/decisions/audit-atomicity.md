@@ -34,14 +34,14 @@ logs); it is not silent.
 deadlock the commit (documented on the listener). The row is already durable
 via mode 1 before this listener ever runs.
 
-## Standalone audit use cases
+## Historical: standalone audit use cases
 
-`AuditLoggerUseCaseImpl` declares `@RequiresNewUseCase` in its own module;
-`UseCaseTransactionAspect` interprets the marker as `REQUIRES_NEW` (the legacy
-`audit.application.usecase` package pointcut remains as a fail-safe OR).
-`GetAuditLogsQueryImpl` is read-only. Audit writes therefore never join a
-business transaction when invoked outside the money path (see
-`docs/decisions/transaction-strategy.md`).
+The former `AuditLoggerUseCaseImpl`/`@RequiresNewUseCase` path was removed in
+the 2026-10 module-boundary refactor. `AuditEventPublisherAdapter` is now the
+single audit writer: it joins the caller's transaction when one is active
+(mode 1) and is invoked best-effort from authentication flows (mode 2).
+`GetAuditLogsQueryImpl` remains read-only; no audit use case opens its own
+`REQUIRES_NEW` transaction (see `docs/decisions/transaction-strategy.md`).
 
 ## Rule of thumb
 

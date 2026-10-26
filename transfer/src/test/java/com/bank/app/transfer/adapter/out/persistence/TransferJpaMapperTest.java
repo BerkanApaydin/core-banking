@@ -61,7 +61,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should map Transfer to TransferJpaEntity")
         void shouldMapToJpaEntity() {
-            Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT, STATUS, CREATED_AT, VERSION);
+            Transfer transfer = Transfer.rehydrate(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT, STATUS, CREATED_AT, VERSION);
 
             TransferJpaEntity entity = mapper.toJpaEntity(transfer);
 
@@ -144,7 +144,7 @@ class TransferJpaMapperTest {
         @Test
         @DisplayName("should round-trip every domain field")
         void shouldRoundTripEveryField() {
-            Transfer transfer = new Transfer(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
+            Transfer transfer = Transfer.rehydrate(ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, AMOUNT,
                     TransferStatus.COMPLETED, CREATED_AT, VERSION);
 
             Transfer reloaded = mapper.toDomain(mapper.toJpaEntity(transfer));

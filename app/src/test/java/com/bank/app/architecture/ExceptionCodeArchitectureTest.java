@@ -25,7 +25,6 @@ class ExceptionCodeArchitectureTest extends ArchitectureTest {
 
     private static final Set<String> INSTANCE_VARIANT_CODES = Set.of(
             "com.bank.app.transfer.domain.exception.TransferNotCancellableException",
-            "com.bank.app.account.domain.exception.AccountNotFoundException",
             "com.bank.app.account.api.AccountNotFoundException",
             "com.bank.app.common.domain.exception.ConcurrentRequestException");
 

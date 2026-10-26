@@ -45,11 +45,11 @@ class TransferReportPageAssemblerTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end, 0, 2);
         TransferViewEnricher enricher = new TransferViewEnricher(accountAclPort);
 
-        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
+        Transfer t1 = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusDays(1));
-        Transfer t2 = new Transfer(11L, new AccountId(1L), new AccountId(3L), Money.of("250.00", Currency.TRY),
+        Transfer t2 = Transfer.rehydrate(11L, new AccountId(1L), new AccountId(3L), Money.of("250.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusDays(2));
-        Transfer extra = new Transfer(12L, new AccountId(1L), new AccountId(2L), Money.of("50.00", Currency.TRY),
+        Transfer extra = Transfer.rehydrate(12L, new AccountId(1L), new AccountId(2L), Money.of("50.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusDays(3));
 
         when(loadTransferPort.findHistoryBetween(1L, start, end, 0, 2))
@@ -78,7 +78,7 @@ class TransferReportPageAssemblerTest {
         ReportCriteria criteria = new ReportCriteria(1L, start, end);
         TransferViewEnricher enricher = new TransferViewEnricher(accountAclPort);
 
-        Transfer t1 = new Transfer(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
+        Transfer t1 = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, start.plusDays(1));
 
         when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))

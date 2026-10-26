@@ -15,7 +15,7 @@ class GetAuditLogsQueryDefaultTest {
     @Test
     void defaultActorOverloadShouldDelegateToLimitOverload() {
         AuditLogResponse response = AuditLogResponse.from(
-                new AuditLog(1L, "alice", AuditAction.TRANSFER_EXECUTED,
+                AuditLog.rehydrate(1L, "alice", AuditAction.TRANSFER_EXECUTED,
                         "Transfer completed. Transfer ID: 7", LocalDateTime.now()));
         GetAuditLogsQuery query = new GetAuditLogsQuery() {
             @Override

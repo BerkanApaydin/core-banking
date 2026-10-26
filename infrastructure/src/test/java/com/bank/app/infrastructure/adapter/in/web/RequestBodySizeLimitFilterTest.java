@@ -205,6 +205,28 @@ class RequestBodySizeLimitFilterTest {
     }
 
     @Test
+    @DisplayName("should honor a declared non-UTF-8 charset when reading the body")
+    void shouldHonorADeclaredCharset() throws Exception {
+        byte[] payload = new byte[] {(byte) 0xE9};
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getContentLengthLong()).thenReturn((long) payload.length);
+        when(request.getRequestURI()).thenReturn("/api/v1/transfers");
+        when(request.getContextPath()).thenReturn("");
+        when(request.getCharacterEncoding()).thenReturn("ISO-8859-1");
+        when(request.getInputStream()).thenReturn(new FixedServletInputStream(payload));
+        String[] read = new String[1];
+        doAnswer(invocation -> {
+            HttpServletRequest wrapped = invocation.getArgument(0);
+            read[0] = wrapped.getReader().readLine();
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(read[0]).isEqualTo("\u00e9");
+    }
+
+    @Test
     @DisplayName("should accept a declared body exactly at the cap")
     void shouldAcceptDeclaredBodyExactlyAtTheCap() throws Exception {
         when(request.getMethod()).thenReturn("POST");
@@ -279,16 +301,17 @@ class RequestBodySizeLimitFilterTest {
         when(response.getWriter()).thenReturn(new PrintWriter(body));
         doAnswer(invocation -> {
             HttpServletRequest wrapped = invocation.getArgument(0);
-            ServletInputStream stream = wrapped.getInputStream();
-            int reads = 0;
-            int b;
-            while ((b = stream.read()) != -1) {
-                // A mutant returning a constant (e.g. 0) instead of the byte
-                // fails on the very first value, before the 413 path can mask
-                // it; the count guard covers a mutant that still progresses.
-                assertThat(b).isEqualTo(content[reads] & 0xff);
-                if (++reads > content.length) {
-                    throw new AssertionError("read() did not make progress");
+            try (ServletInputStream stream = wrapped.getInputStream()) {
+                int reads = 0;
+                int b;
+                while ((b = stream.read()) != -1) {
+                    // A mutant returning a constant (e.g. 0) instead of the byte
+                    // fails on the very first value, before the 413 path can mask
+                    // it; the count guard covers a mutant that still progresses.
+                    assertThat(b).isEqualTo(content[reads] & 0xff);
+                    if (++reads > content.length) {
+                        throw new AssertionError("read() did not make progress");
+                    }
                 }
             }
             return null;
@@ -381,17 +404,17 @@ class RequestBodySizeLimitFilterTest {
         when(delegate.isFinished()).thenReturn(false, true);
         when(delegate.isReady()).thenReturn(true, false);
         ReadListener listener = mock(ReadListener.class);
-        RequestBodySizeLimitFilter.BoundedInputStream stream =
-                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 1024);
-
-        assertThat(stream.read()).isEqualTo(65);
-        assertThat(stream.read(new byte[3], 0, 3)).isEqualTo(2);
-        assertThat(stream.read(new byte[3], 0, 3)).isEqualTo(-1);
-        assertThat(stream.isFinished()).isFalse();
-        assertThat(stream.isFinished()).isTrue();
-        assertThat(stream.isReady()).isTrue();
-        assertThat(stream.isReady()).isFalse();
-        stream.setReadListener(listener);
+        try (RequestBodySizeLimitFilter.BoundedInputStream stream =
+                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 1024)) {
+            assertThat(stream.read()).isEqualTo(65);
+            assertThat(stream.read(new byte[3], 0, 3)).isEqualTo(2);
+            assertThat(stream.read(new byte[3], 0, 3)).isEqualTo(-1);
+            assertThat(stream.isFinished()).isFalse();
+            assertThat(stream.isFinished()).isTrue();
+            assertThat(stream.isReady()).isTrue();
+            assertThat(stream.isReady()).isFalse();
+            stream.setReadListener(listener);
+        }
 
         verify(delegate).setReadListener(listener);
     }
@@ -401,10 +424,10 @@ class RequestBodySizeLimitFilterTest {
     void shouldPassEndOfStreamWithoutCounting() throws Exception {
         ServletInputStream delegate = mock(ServletInputStream.class);
         when(delegate.read()).thenReturn(-1);
-        RequestBodySizeLimitFilter.BoundedInputStream stream =
-                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 0);
-
-        assertThat(stream.read()).isEqualTo(-1);
+        try (RequestBodySizeLimitFilter.BoundedInputStream stream =
+                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 0)) {
+            assertThat(stream.read()).isEqualTo(-1);
+        }
     }
 
     @Test
@@ -412,11 +435,11 @@ class RequestBodySizeLimitFilterTest {
     void shouldCountPositiveChunksAgainstTheCap() throws Exception {
         ServletInputStream delegate = mock(ServletInputStream.class);
         when(delegate.read(any(byte[].class), anyInt(), anyInt())).thenReturn(1);
-        RequestBodySizeLimitFilter.BoundedInputStream stream =
-                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 0);
-
-        assertThrows(RequestBodyTooLargeException.class,
-                () -> stream.read(new byte[1], 0, 1));
+        try (RequestBodySizeLimitFilter.BoundedInputStream stream =
+                new RequestBodySizeLimitFilter.BoundedInputStream(delegate, 0)) {
+            assertThrows(RequestBodyTooLargeException.class,
+                    () -> stream.read(new byte[1], 0, 1));
+        }
     }
 
     @Test

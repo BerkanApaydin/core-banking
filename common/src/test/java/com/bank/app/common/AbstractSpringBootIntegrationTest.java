@@ -55,7 +55,7 @@ public abstract class AbstractSpringBootIntegrationTest {
     }
 
     static {
-        var pg = TestDatabaseContainer.getInstance();
+        TestDatabaseContainer.getInstance();
     }
 
     @DynamicPropertySource

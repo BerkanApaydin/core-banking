@@ -91,7 +91,7 @@ class CreateAccountUseCaseImplTest {
         when(ibanGeneratorPort.generate()).thenReturn(generated);
         when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
             Account opening = invocation.getArgument(0);
-            return new Account(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+            return Account.rehydrate(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
                     opening.getBalance(), AccountStatus.ACTIVE);
         });
 
@@ -108,13 +108,13 @@ class CreateAccountUseCaseImplTest {
         stubClock();
         Iban first = Iban.fromTurkishBban("0000001234567890123456");
         Iban second = Iban.fromTurkishBban("0000001234567890123457");
-        Account existing = new Account(7L, new UserId(USER_ID), first, OWNER,
+        Account existing = Account.rehydrate(7L, new UserId(USER_ID), first, OWNER,
                 new Money(BigDecimal.ZERO, Currency.TRY), AccountStatus.ACTIVE);
         when(ibanGeneratorPort.generate()).thenReturn(first, second);
         when(loadAccountPort.findByIban(first)).thenReturn(Optional.of(existing));
         when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
             Account opening = invocation.getArgument(0);
-            return new Account(8L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+            return Account.rehydrate(8L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
                     opening.getBalance(), AccountStatus.ACTIVE);
         });
 
@@ -144,7 +144,7 @@ class CreateAccountUseCaseImplTest {
         // Kills the ConditionalsBoundary mutant (attempt < 5 vs <= 5):
         // exactly five generations must be attempted before giving up.
         Iban colliding = Iban.fromTurkishBban("0000001234567890123456");
-        Account existing = new Account(7L, new UserId(USER_ID), colliding, OWNER,
+        Account existing = Account.rehydrate(7L, new UserId(USER_ID), colliding, OWNER,
                 new Money(BigDecimal.ZERO, Currency.TRY), AccountStatus.ACTIVE);
         when(ibanGeneratorPort.generate()).thenReturn(colliding);
         when(loadAccountPort.findByIban(colliding)).thenReturn(Optional.of(existing));
@@ -175,7 +175,7 @@ class CreateAccountUseCaseImplTest {
         var request = new CreateAccountRequest(USER_ID, VALID_IBAN, OWNER, BigDecimal.ZERO, Currency.TRY);
         when(saveAccountPort.save(any(Account.class))).thenAnswer(invocation -> {
             Account opening = invocation.getArgument(0);
-            return new Account(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
+            return Account.rehydrate(1L, opening.getUserId(), opening.getIban(), opening.getOwnerName(),
                     opening.getBalance(), AccountStatus.ACTIVE);
         });
 
@@ -195,7 +195,7 @@ class CreateAccountUseCaseImplTest {
             stubClock();
             CreateAccountRequest request = validRequest();
             Iban iban = new Iban(request.iban());
-            Account savedAccount = new Account(1L, new UserId(USER_ID), iban, OWNER,
+            Account savedAccount = Account.rehydrate(1L, new UserId(USER_ID), iban, OWNER,
                     new Money(new BigDecimal("500.00"), Currency.TRY), AccountStatus.ACTIVE);
 
             doNothing().when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());
@@ -275,7 +275,7 @@ class CreateAccountUseCaseImplTest {
         void shouldThrowOnDuplicateIban() {
             CreateAccountRequest request = validRequest();
             Iban iban = new Iban(request.iban());
-            Account existingAccount = new Account(1L, new UserId(USER_ID), iban, "Eski Sahip",
+            Account existingAccount = Account.rehydrate(1L, new UserId(USER_ID), iban, "Eski Sahip",
                     new Money(new BigDecimal("100.00"), Currency.TRY), AccountStatus.ACTIVE);
 
             doNothing().when(accountAuthorizationService).authorizeUserAction(eq(USER_ID), anyString());

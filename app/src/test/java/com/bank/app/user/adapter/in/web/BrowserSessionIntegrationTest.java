@@ -180,10 +180,14 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/browser/logout").cookie(session, csrf)
                         .header(BrowserSessionCookies.CSRF_HEADER, "x".repeat(43)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/auth/browser/logout").cookie(session, csrf)
+        mockMvc.perform(post("/api/v1/auth/browser/logout").cookie(session, refresh, csrf)
                         .header(BrowserSessionCookies.CSRF_HEADER, csrf.getValue()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/v1/auth/browser/session").cookie(session, csrf))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/auth/browser/refresh")
+                        .cookie(refresh, csrf)
+                        .header(BrowserSessionCookies.CSRF_HEADER, csrf.getValue()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -264,12 +268,12 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
 
     @Test
     void cookieRefreshRequiresCsrf() throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/browser/login")
+        // Unknown user: login itself fails, but the refresh path shape is the point.
+        mockMvc.perform(post("/api/v1/auth/browser/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new AuthWebRequest("ghost", "GhostPass1234"))))
-                .andReturn();
-        // Unknown user: login itself fails, but the refresh path shape is the point.
+                .andExpect(status().isUnauthorized());
         // Use any refresh cookie value: missing CSRF must 403 before token checks.
         Cookie csrf = new Cookie("BANK_CSRF", "x".repeat(43));
         Cookie refresh = new Cookie("BANK_REFRESH", "whatever");

@@ -25,11 +25,7 @@ public class Transfer extends BaseAggregateRoot {
     private final LocalDateTime createdAt;
     private final Long version;
 
-    public Transfer(Long id, AccountId senderAccountId, AccountId receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt) {
-        this(id, senderAccountId, receiverAccountId, amount, status, createdAt, null);
-    }
-
-    public Transfer(Long id, AccountId senderAccountId, AccountId receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
+    private Transfer(Long id, AccountId senderAccountId, AccountId receiverAccountId, Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
         this.id = id;
         this.senderAccountId = Objects.requireNonNull(senderAccountId, "Sender account ID must not be null");
         this.receiverAccountId = Objects.requireNonNull(receiverAccountId, "Receiver account ID must not be null");
@@ -62,17 +58,19 @@ public class Transfer extends BaseAggregateRoot {
         if (Objects.equals(senderAccountId, receiverAccountId)) {
             throw new SameAccountTransferException(String.valueOf(senderAccountId));
         }
-        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock));
+        return new Transfer(null, senderAccountId, receiverAccountId, amount, TransferStatus.PENDING, LocalDateTime.now(clock), null);
     }
 
     /**
-     * L4: persistence rehydration entry point. The public constructors stay for
-     * backward compatibility (tests, mappers), but production rehydration should
-     * flow through here so construction sites are greppable and a future
-     * architecture test can pin them to persistence adapters. Behavior is
-     * identical to the all-state constructor: same-account and zero-amount
-     * invariants are re-validated so a corrupt row can never materialize.
+     * The only entry point for materializing persisted state. Same-account and
+     * zero-amount invariants are re-validated so a corrupt row can never
+     * materialize an illegal aggregate.
      */
+    public static Transfer rehydrate(Long id, AccountId senderAccountId, AccountId receiverAccountId,
+            Money amount, TransferStatus status, LocalDateTime createdAt) {
+        return rehydrate(id, senderAccountId, receiverAccountId, amount, status, createdAt, null);
+    }
+
     public static Transfer rehydrate(Long id, AccountId senderAccountId, AccountId receiverAccountId,
             Money amount, TransferStatus status, LocalDateTime createdAt, Long version) {
         return new Transfer(id, senderAccountId, receiverAccountId, amount, status, createdAt, version);

@@ -8,7 +8,6 @@ import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.AuditEventPort;
-import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.common.domain.exception.InvalidIbanException;
 import com.bank.app.transfer.application.dto.TransferRequest;
 import com.bank.app.transfer.application.dto.TransferResponse;
@@ -135,7 +134,7 @@ class PlaceTransferUseCaseImplTest {
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                        return Transfer.rehydrate(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
             stubBalanceAdjustment();
@@ -174,7 +173,7 @@ class PlaceTransferUseCaseImplTest {
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                        return Transfer.rehydrate(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
             stubBalanceAdjustment();
@@ -298,7 +297,7 @@ class PlaceTransferUseCaseImplTest {
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                        return Transfer.rehydrate(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
             doThrow(new RuntimeException("Account service unavailable"))
@@ -363,7 +362,7 @@ class PlaceTransferUseCaseImplTest {
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                        return Transfer.rehydrate(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     });
             stubBalanceAdjustment();
@@ -391,7 +390,7 @@ class PlaceTransferUseCaseImplTest {
             when(saveTransferPort.save(any(Transfer.class)))
                     .thenAnswer(invocation -> {
                         Transfer t = invocation.getArgument(0);
-                        return new Transfer(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
+                        return Transfer.rehydrate(42L, t.getSenderAccountId(), t.getReceiverAccountId(),
                                 t.getAmount(), t.getStatus(), t.getCreatedAt(), 1L);
                     })
                     .thenThrow(new RuntimeException("Database unavailable on completion save"));

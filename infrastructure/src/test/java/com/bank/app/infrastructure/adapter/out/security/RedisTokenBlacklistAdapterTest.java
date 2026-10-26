@@ -5,11 +5,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,7 +65,7 @@ class RedisTokenBlacklistAdapterTest {
         // network round trips on the shared Lettuce connection, on every
         // authenticated request).
         private void stubLookup(Long result) {
-            when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+            when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any(String.class)))
                     .thenReturn(result);
         }
 
@@ -108,7 +109,7 @@ class RedisTokenBlacklistAdapterTest {
 
             assertThat(adapter.isBlacklisted("x".repeat(2048))).isFalse();
 
-            verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("1"));
+            verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), eq("1"));
         }
 
         @Test
@@ -120,30 +121,30 @@ class RedisTokenBlacklistAdapterTest {
             assertThat(adapter.isBlacklisted(oversized)).isFalse();
             // The legacy key is not even part of the script's key list for an
             // oversized token: the script skips it via the flag argument.
-            verify(redisTemplate, times(1)).execute(any(DefaultRedisScript.class), anyList(), eq("0"));
+            verify(redisTemplate, times(1)).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), eq("0"));
         }
     }
 
     @Test
     @DisplayName("checks the legacy key at the exact 2048-character boundary")
     void shouldCheckLegacyAtTheExactBoundaryFromTopLevel() {
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any(String.class)))
                 .thenReturn(0L);
 
         assertThat(adapter.isBlacklisted("x".repeat(2048))).isFalse();
 
-        verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("1"));
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), eq("1"));
     }
 
     @Test
     @DisplayName("skips the legacy key above the 2048-character boundary")
     void shouldSkipLegacyAboveTheBoundaryFromTopLevel() {
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(String.class)))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any(String.class)))
                 .thenReturn(0L);
 
         assertThat(adapter.isBlacklisted("x".repeat(2049))).isFalse();
 
-        verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList(), eq("0"));
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), eq("0"));
     }
 
     @Nested

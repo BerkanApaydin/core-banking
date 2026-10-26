@@ -78,9 +78,9 @@ class AuditAtomicityIntegrationTest extends AbstractSpringBootIntegrationTest {
         // Unique IBANs per run: the shared container survives across reruns.
         String senderIban = uniqueIban();
         String receiverIban = uniqueIban();
-        Account sender = new Account(null, new UserId(senderUserId), new Iban(senderIban),
+        Account sender = Account.rehydrate(null, new UserId(senderUserId), new Iban(senderIban),
                 "Sender", Money.exact(new BigDecimal("100.00"), Currency.TRY), AccountStatus.ACTIVE);
-        Account receiver = new Account(null, new UserId(receiverUserId), new Iban(receiverIban),
+        Account receiver = Account.rehydrate(null, new UserId(receiverUserId), new Iban(receiverIban),
                 "Receiver", Money.exact(new BigDecimal("0.00"), Currency.TRY), AccountStatus.ACTIVE);
         // Direct JPA setup (use-case would also audit; setup must stay silent).
         AccountJpaMapper mapper =

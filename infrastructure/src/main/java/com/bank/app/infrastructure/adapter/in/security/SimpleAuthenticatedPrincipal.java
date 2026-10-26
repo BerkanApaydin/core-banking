@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.out.security;
+package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import org.springframework.security.core.GrantedAuthority;

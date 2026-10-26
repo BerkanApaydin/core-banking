@@ -100,7 +100,7 @@ class AuditActorLookupTest {
     void shouldKeepTheActorIdentityOfARowWrittenThroughTheDomainModel() {
         // A row built with an actor (the event-driven write path) must round
         // trip through the entity and back with its identity intact.
-        AuditLog written = new AuditLog(null, "bob", AuditAction.LOGIN_SUCCEEDED, "Logged in",
+        AuditLog written = AuditLog.rehydrate(null, "bob", AuditAction.LOGIN_SUCCEEDED, "Logged in",
                 TIMESTAMP, 42L);
 
         AuditLogJpaMapper mapper = new AuditLogJpaMapper();
@@ -112,7 +112,7 @@ class AuditActorLookupTest {
 
     @Test
     void shouldNotAttributeARowWrittenWithoutAnActorToAnyIdentity() {
-        AuditLog writtenWithoutActor = new AuditLog(null, "system", AuditAction.LOGIN_FAILED,
+        AuditLog writtenWithoutActor = AuditLog.rehydrate(null, "system", AuditAction.LOGIN_FAILED,
                 "Login failed", TIMESTAMP);
 
         AuditLogJpaMapper mapper = new AuditLogJpaMapper();

@@ -18,12 +18,8 @@ public class AuditLog {
      */
     private final Long actorUserId;
 
-    public AuditLog(Long id, String username, AuditAction action, String details, LocalDateTime timestamp) {
-        this(id, username, action, details, timestamp, null);
-    }
-
-    public AuditLog(Long id, String username, AuditAction action, String details, LocalDateTime timestamp,
-                    Long actorUserId) {
+    private AuditLog(Long id, String username, AuditAction action, String details, LocalDateTime timestamp,
+                     Long actorUserId) {
         this.id = id;
         this.username = Objects.requireNonNull(username, "Username must not be null");
         this.action = Objects.requireNonNull(action, "Action must not be null");
@@ -47,7 +43,35 @@ public class AuditLog {
     }
 
     public static AuditLog create(String username, AuditAction action, String details, Clock clock) {
-        return new AuditLog(null, username, action, details, LocalDateTime.now(clock));
+        return create(username, action, details, null, clock);
+    }
+
+    public static AuditLog create(String username, AuditAction action, String details, Long actorUserId,
+                                  Clock clock) {
+        Objects.requireNonNull(clock, "Clock must not be null");
+        return create(username, action, details, LocalDateTime.now(clock), actorUserId);
+    }
+
+    /**
+     * Creates a new log for a publisher-supplied timestamp. Used when the
+     * occurrence time comes from the event rather than a clock read here.
+     */
+    public static AuditLog create(String username, AuditAction action, String details,
+                                  LocalDateTime timestamp, Long actorUserId) {
+        return new AuditLog(null, username, action, details, timestamp, actorUserId);
+    }
+
+    /**
+     * The only entry point for materializing persisted audit history.
+     */
+    public static AuditLog rehydrate(Long id, String username, AuditAction action, String details,
+                                     LocalDateTime timestamp) {
+        return rehydrate(id, username, action, details, timestamp, null);
+    }
+
+    public static AuditLog rehydrate(Long id, String username, AuditAction action, String details,
+                                     LocalDateTime timestamp, Long actorUserId) {
+        return new AuditLog(id, username, action, details, timestamp, actorUserId);
     }
 
     public Long getId() {

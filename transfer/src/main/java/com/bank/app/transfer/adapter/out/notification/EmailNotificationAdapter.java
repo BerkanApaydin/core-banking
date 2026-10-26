@@ -1,6 +1,5 @@
 package com.bank.app.transfer.adapter.out.notification;
 
-import com.bank.app.transfer.application.port.out.SendNotificationPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -11,8 +10,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = "app.notification.email-enabled", havingValue = "true", matchIfMissing = true)
-public class EmailNotificationAdapter extends AbstractLoggingNotificationAdapter
-        implements SendNotificationPort {
+public class EmailNotificationAdapter extends AbstractLoggingNotificationAdapter {
 
     @Override
     protected String channel() {

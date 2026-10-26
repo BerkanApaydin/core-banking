@@ -28,7 +28,7 @@ class TransferEventConsumerEdgeCaseTest {
     void shouldHandleNotificationFailureGracefully() {
         TransferEventConsumer listener = new TransferEventConsumer(List.of(notificationPort));
 
-        Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferCompletedNotificationEvent event = TransferCompletedNotificationEvent.from(transfer);
 
         doThrow(new RuntimeException("Service unavailable"))
@@ -45,7 +45,7 @@ class TransferEventConsumerEdgeCaseTest {
         SendNotificationPort port2 = mock(SendNotificationPort.class);
         TransferEventConsumer listener = new TransferEventConsumer(List.of(port1, port2));
 
-        Transfer transfer = new Transfer(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(100L), new AccountId(200L), Money.of("100.00", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferCompletedNotificationEvent event = TransferCompletedNotificationEvent.from(transfer);
 
         listener.handleTransferCompleted(event);

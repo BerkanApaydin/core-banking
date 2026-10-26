@@ -17,11 +17,19 @@ class LayeringArchitectureTest extends ArchitectureTest {
                 .layer("Domain").definedBy("..domain..")
                 // account-api is the published language (application-level contract of the Account context)
                 .layer("Application").definedBy("..application..", "..account.api..")
+                // Framework-only RFC 7807 rendering shared by web adapters and
+                // platform filters. It is adapter-level, not domain/application,
+                // so it may be used by Adapter and Infrastructure only.
+                .layer("WebSupport").definedBy("com.bank.app.websupport..")
                 .layer("Adapter").definedBy("..adapter..")
                 .layer("Infrastructure").definedBy("..infrastructure..", "..bootstrap..", "..config..")
-                .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "Infrastructure")
+                .whereLayer("Domain").mayOnlyBeAccessedByLayers(
+                        "Application", "WebSupport", "Adapter", "Infrastructure")
                 .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
-                .whereLayer("Adapter").mayOnlyBeAccessedByLayers("Infrastructure")
+                .whereLayer("WebSupport").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
+                // WebSupport reuses the framework-free ProblemBody wire shape
+                // from the shared kernel's inbound-api package.
+                .whereLayer("Adapter").mayOnlyBeAccessedByLayers("WebSupport", "Infrastructure")
                 .whereLayer("Infrastructure").mayOnlyBeAccessedByLayers("Adapter")
                 .allowEmptyShould(false);
 

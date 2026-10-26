@@ -3,7 +3,7 @@
 ## Current state
 
 All Flyway migrations live in one resources-only module
-(`migrations/src/main/resources/db/migration/V1__…V60__.sql`), while the
+(`migrations/src/main/resources/db/migration/V1__…V64__.sql`), while the
 JPA entities they serve live in their bounded contexts (`account`,
 `transfer`, …). `common` no longer packages schema resources. The classpath
 location (`classpath:db/migration`) and every file name are unchanged, so

@@ -1,0 +1,7 @@
+app:
+  outbox:
+    # No background polling in tests: every context would otherwise spawn
+    # poller threads against the shared Testcontainers database and race
+    # tests that assert on outbox rows. Tests trigger processing explicitly
+    # (pollAndProcessEvents / processEvent) or mock the poller.
+    enabled: false

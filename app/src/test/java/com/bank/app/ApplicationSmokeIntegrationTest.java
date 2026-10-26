@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.cache.CacheManager;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -306,23 +307,24 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         assertThat(transfer.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         Long transferId = transfer.getBody().id();
 
-        ResponseEntity<Map> detail = restTemplate.exchange("/api/v1/transfers/" + transferId,
-                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+        ResponseEntity<Map<String, Object>> detail = restTemplate.exchange(
+                "/api/v1/transfers/" + transferId,
+                HttpMethod.GET, new HttpEntity<>(auth), new ParameterizedTypeReference<Map<String, Object>>() { });
         assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(detail.getBody().get("status")).isEqualTo("COMPLETED");
 
-        ResponseEntity<Map> history = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> history = restTemplate.exchange(
                 "/api/v1/transfers/history/" + senderId + "?page=0&size=20",
-                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+                HttpMethod.GET, new HttpEntity<>(auth), new ParameterizedTypeReference<Map<String, Object>>() { });
         assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        ResponseEntity<Map> report = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> report = restTemplate.exchange(
                 "/api/v1/transfers/report?accountId=" + senderId
                         // UTC frame like the application clock: a machine-local
                         // window would exclude fresh transfers off-UTC.
                         + "&startDate=" + LocalDateTime.now(ZoneOffset.UTC).minusHours(1)
                         + "&endDate=" + LocalDateTime.now(ZoneOffset.UTC).plusHours(1),
-                HttpMethod.GET, new HttpEntity<>(auth), Map.class);
+                HttpMethod.GET, new HttpEntity<>(auth), new ParameterizedTypeReference<Map<String, Object>>() { });
         assertThat(report.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Void> cancel = restTemplate.exchange("/api/v1/transfers/" + transferId + "/cancel",
@@ -398,9 +400,9 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
         assertThat(replay.getBody()).isNotNull();
         assertThat(replay.getBody().id()).isEqualTo(first.getBody().id());
 
-        ResponseEntity<Map> history = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> history = restTemplate.exchange(
                 "/api/v1/transfers/history/" + accountSender.getBody().id() + "?page=0&size=20",
-                HttpMethod.GET, new HttpEntity<>(headersSender), Map.class);
+                HttpMethod.GET, new HttpEntity<>(headersSender), new ParameterizedTypeReference<Map<String, Object>>() { });
         assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) history.getBody().get("totalElements")).longValue()).isEqualTo(1L);
 

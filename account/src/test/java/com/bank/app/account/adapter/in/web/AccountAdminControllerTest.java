@@ -1,7 +1,7 @@
 package com.bank.app.account.adapter.in.web;
 
 import com.bank.app.account.application.dto.SimulationFundingCapability;
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +32,7 @@ class AccountAdminControllerTest {
 
     @Test
     void suspendShouldReturnStatusBody() {
-        when(suspendAccountUseCase.suspend(9L)).thenReturn(new AccountInfo(9L, 100L, "TRY", "SUSPENDED"));
+        when(suspendAccountUseCase.suspend(9L)).thenReturn(new AccountView(9L, 100L, "TRY", "SUSPENDED"));
         var controller = new AccountAdminController(suspendAccountUseCase);
 
         var response = controller.suspendAccount(9L);

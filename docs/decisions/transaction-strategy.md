@@ -6,20 +6,17 @@ Two mechanisms coexist deliberately — this note records which to use where.
 
 `@TransactionalUseCase` / `@ReadOnlyUseCase` marker annotations are turned into
 transactions by `UseCaseTransactionAspect` (programmatic
-`PlatformTransactionManager` usage). The aspect centralizes three policies no
+`PlatformTransactionManager` usage). The aspect centralizes two policies no
 single `@Transactional` can express uniformly:
 
 - explicit 30s timeout (`app.transaction.timeout-seconds`) so hung
   `PESSIMISTIC_WRITE` row locks cannot exhaust the Hikari pool;
 - explicit `READ_COMMITTED` isolation (the locking strategy is pessimistic, so
-  `REPEATABLE_READ`/`SERIALIZABLE` would only add 40001/40003 retries);
-- `REQUIRES_NEW` for `@RequiresNewUseCase`-marked use cases (currently
-  `AuditLoggerUseCaseImpl`, which declares the marker in its own module) so
-  `AFTER_COMMIT` observers never join the business transaction. The legacy
-  `audit.application.usecase` package pointcut is kept as a fail-safe OR so a
-  missed annotation can never silently run without a transaction — but new
-  REQUIRES_NEW semantics must use the annotation, not the package literal
-  (see `BoundaryArchitectureTest.auditRequiresNewSemanticsMustBeAnnotated`).
+  `REPEATABLE_READ`/`SERIALIZABLE` would only add 40001/40003 retries).
+
+The former `@RequiresNewUseCase` marker was removed with the standalone audit
+use case; audit writes now join the caller transaction or are best-effort in
+authentication flows (see `audit-atomicity.md`).
 
 **Rule: application-layer code (`..application..`) must never use
 `@Transactional`** — enforced by
@@ -43,7 +40,7 @@ the guard owns its transaction, and a contended lock marks rollback-only.**
 ## Why not one mechanism?
 
 Moving use cases to `@Transactional` would scatter timeout/isolation policy
-across the 7 use-case classes with no compile-time exhaustiveness. Moving adapters to
+across the use-case classes with no compile-time exhaustiveness. Moving adapters to
 the aspect would force business-shaped markers (`@TransactionalUseCase`) onto
 infrastructure concerns (outbox polling, idempotency claims) that are not use
 cases. The split follows the layer, not the author.
@@ -52,6 +49,7 @@ cases. The split follows the layer, not the author.
 
 Two adapters needed transaction *visibility* without owning a boundary: AccountApiAdapter (defer cache eviction to AFTER_COMMIT) and TransferUseCaseRetryAspect (suppress retry inside an existing tx). They previously imported Spring transaction support classes directly, pinning bounded contexts to Spring.
 
-Since 2026-10 both go through TransactionBoundaryPort (common, framework-free: isTransactionActive, unAfterCommit, executeRequiresNew). The single Spring-backed implementation is SpringTransactionBoundaryAdapter (infrastructure/adapter/out/tx, optional PlatformTransactionManager so unit tests run the action directly). Persistence failure *types* (spring-dao, e.g. OptimisticLockingFailureException) stay shared: they are the failure taxonomy mapped centrally by the problem handlers, not transaction control.
+Since 2026-10 both go through TransactionBoundaryPort (common, framework-free: isTransactionActive,
+runAfterCommit, executeRequiresNew). The single Spring-backed implementation is SpringTransactionBoundaryAdapter (infrastructure/adapter/out/tx, optional PlatformTransactionManager so unit tests run the action directly). Persistence failure *types* (spring-dao, e.g. OptimisticLockingFailureException) stay shared: they are the failure taxonomy mapped centrally by the problem handlers, not transaction control.
 
-**Rule: no class under com.bank.app.account.., com.bank.app.transfer.., com.bank.app.user.. or com.bank.app.audit.. may access TransactionSynchronizationManager, TransactionSynchronization, TransactionTemplate, PlatformTransactionManager or TransactionDefinition** � enforced by CodingRulesArchitectureTest.noProgrammaticSpringTransactionsInBoundedContexts.
+**Rule: no class under com.bank.app.account.., com.bank.app.transfer.., com.bank.app.user.. or com.bank.app.audit.. may access TransactionSynchronizationManager, TransactionSynchronization, TransactionTemplate, PlatformTransactionManager or TransactionDefinition** — enforced by CodingRulesArchitectureTest.noProgrammaticSpringTransactionsInBoundedContexts.

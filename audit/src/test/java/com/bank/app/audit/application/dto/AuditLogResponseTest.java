@@ -24,7 +24,7 @@ class AuditLogResponseTest {
     @DisplayName("should map every field from the domain log")
     void shouldMapAllFields() {
         // Arrange
-        AuditLog log = new AuditLog(
+        AuditLog log = AuditLog.rehydrate(
                 10L, "alice", AuditAction.TRANSFER_EXECUTED, "Transfer completed", TIMESTAMP, 7L);
 
         // Act
@@ -43,7 +43,7 @@ class AuditLogResponseTest {
     @DisplayName("should preserve null identities for anonymous actors")
     void shouldPreserveNullIdentities() {
         // Arrange
-        AuditLog log = new AuditLog(
+        AuditLog log = AuditLog.rehydrate(
                 null, "system", AuditAction.LOGIN_FAILED, "Failed login", TIMESTAMP, null);
 
         // Act

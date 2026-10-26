@@ -1,6 +1,11 @@
 package com.bank.app.architecture;
 
+import com.tngtech.archunit.core.domain.Dependency;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RestController;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -53,14 +58,38 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
     void outboundAdaptersShouldDependOnOutPorts() {
         // Outbound adapters must program against abstractions: module-owned
         // out-ports or the account-api published language (which hosts the
-        // shared snapshot-cache contract).
+        // shared snapshot-cache contract). Inheriting an adapter base that
+        // implements the port is equally valid.
+        ArchCondition<JavaClass> programsAgainstAnOutPort = new ArchCondition<>(
+                "depend on an out-port or the account API") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                boolean dependsDirectly = item.getDirectDependenciesFromSelf().stream()
+                        .map(Dependency::getTargetClass)
+                        .anyMatch(PortsAndNamingArchitectureTest::isOutPortOrApi);
+                boolean implementsInherited = item.getAllRawInterfaces().stream()
+                        .anyMatch(PortsAndNamingArchitectureTest::isOutPortOrApi);
+                if (!dependsDirectly && !implementsInherited) {
+                    events.add(SimpleConditionEvent.violated(item,
+                            item.getDescription() + " does not depend on an out-port or the account API"));
+                }
+            }
+        };
+
         ArchRule rule = classes()
                 .that().resideInAnyPackage("..adapter.out..")
                 .and().haveSimpleNameEndingWith("Adapter")
-                .should().dependOnClassesThat().resideInAnyPackage("..port.out..", "com.bank.app.account.api..")
+                .should(programsAgainstAnOutPort)
                 .allowEmptyShould(false);
 
         rule.check(importedClasses);
+    }
+
+    private static boolean isOutPortOrApi(JavaClass type) {
+        String packageName = type.getPackageName();
+        return packageName.matches(".*\\.port\\.out(\\..*)?")
+                || packageName.equals("com.bank.app.account.api")
+                || packageName.startsWith("com.bank.app.account.api.");
     }
 
     @Test

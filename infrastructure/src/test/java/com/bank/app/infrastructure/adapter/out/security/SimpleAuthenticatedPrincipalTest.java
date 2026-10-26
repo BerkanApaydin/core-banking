@@ -1,5 +1,7 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.infrastructure.adapter.in.security.SimpleAuthenticatedPrincipal;
+
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

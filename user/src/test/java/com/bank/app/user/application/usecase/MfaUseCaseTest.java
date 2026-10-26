@@ -98,7 +98,7 @@ class MfaUseCaseTest {
     }
 
     private static User persistedUser(Long id, String username) {
-        return new User(new UserId(id), username, UserTestFactory.FIXTURE_HASH,
+        return User.rehydrate(new UserId(id), username, UserTestFactory.FIXTURE_HASH,
                 Role.ROLE_USER, null, null, 0L);
     }
 

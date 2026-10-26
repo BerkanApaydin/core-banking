@@ -19,13 +19,13 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.account.domain.exception.AccountClosedException;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
@@ -66,7 +66,7 @@ class SuspendAccountUseCaseImplTest {
         useCase = new SuspendAccountUseCaseImpl(loadAccountPort, saveAccountPort, userContextService,
                 clockProvider, domainEventPublisherService, auditEventPort, snapshotCache,
                 transactionBoundary);
-        activeAccount = new Account(1L, new UserId(10L), new Iban("TR450006100519786456841234"),
+        activeAccount = Account.rehydrate(1L, new UserId(10L), new Iban("TR450006100519786456841234"),
                 "Owner", Money.of("100.00", Currency.TRY), AccountStatus.ACTIVE);
     }
 
@@ -104,7 +104,7 @@ class SuspendAccountUseCaseImplTest {
             stubClockAndSave();
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(activeAccount));
 
-            AccountInfo result = useCase.suspend(1L);
+            AccountView result = useCase.suspend(1L);
 
             assertEquals(1L, result.id());
             assertEquals("SUSPENDED", result.status());
@@ -152,7 +152,7 @@ class SuspendAccountUseCaseImplTest {
             activeAccount.suspend(FIXED_CLOCK);
             when(loadAccountPort.findByIdForUpdate(1L)).thenReturn(Optional.of(activeAccount));
 
-            AccountInfo result = useCase.suspend(1L);
+            AccountView result = useCase.suspend(1L);
 
             assertEquals("SUSPENDED", result.status());
             verify(saveAccountPort).save(any(Account.class));
@@ -162,7 +162,7 @@ class SuspendAccountUseCaseImplTest {
         @Test
         void shouldRejectClosedAccountWithoutSideEffects() {
             asAdmin();
-            Account closed = new Account(2L, new UserId(10L), new Iban("TR180006100519786456841235"),
+            Account closed = Account.rehydrate(2L, new UserId(10L), new Iban("TR180006100519786456841235"),
                     "Owner", Money.of("0.00", Currency.TRY), AccountStatus.CLOSED);
             when(loadAccountPort.findByIdForUpdate(2L)).thenReturn(Optional.of(closed));
 

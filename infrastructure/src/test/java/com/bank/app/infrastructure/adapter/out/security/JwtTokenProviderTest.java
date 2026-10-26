@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.out.security;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.in.security.JwtProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,18 +84,6 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void shouldGenerateAccessTokenFromAdditionalClaims() {
-        String token = jwtTokenProvider.generateToken(
-                new java.util.HashMap<>(Map.of("role", "ROLE_ADMIN")), 9L, "claimUser");
-
-        var verified = jwtTokenProvider.verifyAndDecode(token);
-        assertNotNull(verified);
-        assertEquals("claimUser", verified.username());
-        assertEquals(9L, verified.userId());
-        assertEquals("ROLE_ADMIN", verified.role());
-    }
-
-    @Test
     void shouldRejectMalformedToken() {
         assertNull(jwtTokenProvider.verifyAndDecode("invalid-token"));
     }
@@ -144,17 +133,17 @@ class JwtTokenProviderTest {
 
     @Test
     void shouldVerifyAgainstInjectedClock() {
-        JwtTokenProvider provider = provider("test-issuer", "test-audience");
-        provider.setClockForTests(
-                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+        java.util.concurrent.atomic.AtomicReference<Clock> now =
+                new java.util.concurrent.atomic.AtomicReference<>(
+                        Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+        ClockProviderPort clockProvider = now::get;
+        JwtTokenProvider provider = provider("test-issuer", "test-audience", clockProvider);
         String token = provider.generateToken(1L, "testUser");
 
-        provider.setClockForTests(
-                Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC));
+        now.set(Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC));
         assertNotNull(provider.verifyAndDecode(token));
 
-        provider.setClockForTests(
-                Clock.fixed(Instant.parse("2026-01-03T00:00:00Z"), ZoneOffset.UTC));
+        now.set(Clock.fixed(Instant.parse("2026-01-03T00:00:00Z"), ZoneOffset.UTC));
         assertNull(provider.verifyAndDecode(token));
         assertEquals(0L, provider.getRemainingMs(token));
     }
@@ -485,15 +474,21 @@ class JwtTokenProviderTest {
     }
 
     private static JwtTokenProvider provider(String issuer, String audience) {
+        return provider(issuer, audience, Clock::systemUTC);
+    }
+
+    private static JwtTokenProvider provider(String issuer, String audience,
+            ClockProviderPort clockProvider) {
         return new JwtTokenProvider(new JwtProperties(
                 SECRET, 86400000L, 604800000L, true,
-                issuer, audience, "test-key", 30L, Map.of()));
+                issuer, audience, "test-key", 30L, Map.of()), clockProvider);
     }
 
     private static JwtTokenProvider providerWithRetiredKeys(Map<String, String> retiredKeys) {
         return new JwtTokenProvider(new JwtProperties(
                 SECRET, 86400000L, 604800000L, true,
-                "test-issuer", "test-audience", "test-key", 30L, retiredKeys));
+                "test-issuer", "test-audience", "test-key", 30L, retiredKeys),
+                Clock::systemUTC);
     }
 
     private static String tokenWithKeyId(String keyId, String secret) {

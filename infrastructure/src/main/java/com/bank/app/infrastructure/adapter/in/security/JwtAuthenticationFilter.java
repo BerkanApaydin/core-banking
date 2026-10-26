@@ -2,12 +2,13 @@ package com.bank.app.infrastructure.adapter.in.security;
 
 import com.bank.app.common.adapter.in.security.BrowserSessionCookies;
 import com.bank.app.common.domain.exception.ErrorCode;
-import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.application.port.out.TokenBlacklistPort;
+import com.bank.app.user.config.BrowserSessionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -51,37 +52,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             TokenBlacklistPort tokenBlacklistPort, LoadUserPort loadUserPort,
             ObjectMapper objectMapper,
             CsrfBindingPort csrfBinding,
-            BrowserSessionCookieProperties browserSession) {
+            BrowserSessionProperties browserSession) {
         this.objectMapper = objectMapper;
         this.browserSessionCookies = new BrowserSessionCookies(browserSession.secure());
         this.authenticator = new JwtRequestAuthenticator(jwtPort, tokenBlacklistPort,
                 loadUserPort, csrfBinding, browserSessionCookies);
-    }
-
-    // Isolated filter tests only (same package): falls back to the plain
-    // double-submit check (no server-side binding). Package-private so Spring
-    // can never select it for production wiring — prod must use the
-    // @Autowired constructor above with the HMAC-bound CsrfBindingPort.
-    JwtAuthenticationFilter(JwtPort jwtPort,
-            TokenBlacklistPort tokenBlacklistPort, LoadUserPort loadUserPort,
-            ObjectMapper objectMapper) {
-        this(jwtPort, tokenBlacklistPort, loadUserPort, objectMapper,
-                new PlainDoubleSubmitCsrfBinding(),
-                new BrowserSessionCookieProperties(false));
-    }
-
-    /** Test-only fallback: unsigned double-submit equality, no MAC binding. */
-    static final class PlainDoubleSubmitCsrfBinding
-            implements CsrfBindingPort {
-        @Override
-        public String issueCsrfToken(String bindingSubject) {
-            throw new UnsupportedOperationException("test fallback cannot mint bound tokens");
-        }
-
-        @Override
-        public boolean verifyCsrfToken(String header, String cookie, String bindingSubject) {
-            return BrowserSessionCookies.validCsrfPair(header, cookie);
-        }
     }
 
     @Override

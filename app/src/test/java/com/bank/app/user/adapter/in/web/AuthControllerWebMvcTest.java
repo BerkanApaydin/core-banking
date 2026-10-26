@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AuthController.class)
+@WebMvcTest({AuthController.class, RegistrationController.class, MfaController.class})
 @Import({ GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class, ApiVersionConfig.class })
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("AuthController Web MVC")

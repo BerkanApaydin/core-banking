@@ -20,7 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
 
-import java.time.Clock;
 import java.time.LocalDateTime;
 import com.bank.app.common.domain.AccountId;
 
@@ -95,7 +94,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void rejectsMissingVersionForExistingTransfer() {
-        var unversioned = new Transfer(301L, new AccountId(201L), new AccountId(202L), Money.of("10", Currency.TRY),
+        var unversioned = Transfer.rehydrate(301L, new AccountId(201L), new AccountId(202L), Money.of("10", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
         assertThrows(OptimisticLockingFailureException.class, () -> {
             transfers.save(unversioned);
@@ -105,7 +104,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void rejectsMissingVersionForExistingUser() {
-        var unversioned = new User(
+        var unversioned = User.rehydrate(
                 new UserId(101L), "version-test", "$2a$12$testencodedhash000000000000000000000001",
                 Role.ROLE_USER);
         assertThrows(OptimisticLockingFailureException.class, () -> users.save(unversioned));

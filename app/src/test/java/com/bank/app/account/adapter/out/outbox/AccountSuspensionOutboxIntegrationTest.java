@@ -5,9 +5,10 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
+import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.infrastructure.adapter.out.security.SimpleAuthenticatedPrincipal;
+import com.bank.app.infrastructure.adapter.in.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.bank.app.user.domain.Role;
@@ -116,7 +117,7 @@ class AccountSuspensionOutboxIntegrationTest extends AbstractSpringBootIntegrati
                 String.valueOf(account.id()));
         assertThat(rows).hasSize(1);
         assertThat(rows.getFirst())
-                .containsEntry("event_type", "AccountSuspendedEvent")
+                .containsEntry("event_type", AccountSuspendedEvent.class.getName())
                 .containsEntry("aggregate_type", "Account");
         assertThat((String) rows.getFirst().get("payload"))
                 .contains("\"accountId\":" + account.id());

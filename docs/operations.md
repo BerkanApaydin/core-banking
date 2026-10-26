@@ -110,7 +110,8 @@ Save the commands actually used, anonymized assertions, measured times, the two 
 ## Error responses (ProblemDetail map)
 
 All failures render as RFC 7807 `application/problem+json` via
-`ProblemDetailFactory`. Domain failures map through `BusinessErrorHttpMapper`
+`web-support`'s `ProblemDetailFactory`. Domain failures map through
+`web-support`'s `BusinessErrorHttpMapper`
 (exhaustiveness enforced at class-load: every `BusinessFailureKind` and every
 `ErrorCode` has an entry); persistence/security/request failures have their
 own handlers. Operator cheat-sheet:

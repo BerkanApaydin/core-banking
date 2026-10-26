@@ -39,7 +39,7 @@ public class UserJpaMapper {
         Role role = entity.getRole();
         EmailAddress email = entity.getEmail() != null ? new EmailAddress(entity.getEmail()) : null;
         PhoneNumber phone = entity.getPhone() != null ? new PhoneNumber(entity.getPhone()) : null;
-        User user = new User(
+        User user = User.rehydrate(
                 new UserId(entity.getId()),
                 entity.getUsername(),
                 entity.getPassword(),

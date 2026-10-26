@@ -49,7 +49,7 @@ class AccountPersistenceAdapterDuplicateIbanEdgeCaseTest {
     }
 
     private static Account newAccount() {
-        return new Account(null, new UserId(100L), IBAN, "Ahmet",
+        return Account.rehydrate(null, new UserId(100L), IBAN, "Ahmet",
                 Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
     }
 

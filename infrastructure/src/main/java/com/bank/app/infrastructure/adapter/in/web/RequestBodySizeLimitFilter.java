@@ -1,7 +1,7 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
 import com.bank.app.common.messages.MessageKeys;
-import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.bank.app.infrastructure.adapter.in.handler.RequestBodyTooLargeException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;

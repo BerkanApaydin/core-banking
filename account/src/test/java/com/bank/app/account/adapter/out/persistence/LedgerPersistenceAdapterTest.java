@@ -6,7 +6,6 @@ import com.bank.app.account.domain.TransactionRef;
 import com.bank.app.common.domain.Currency;
 import com.bank.app.common.domain.Money;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

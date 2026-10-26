@@ -65,6 +65,7 @@ class AccountEventOutboxRelayTest {
         @DisplayName("should return true for all supported event types")
         void shouldReturnTrueForSupportedEvents() {
             assertTrue(handler.supports("AccountCreatedEvent"));
+            assertTrue(handler.supports(AccountCreatedEvent.class.getName()));
             assertTrue(handler.supports("AccountDebitedEvent"));
             assertTrue(handler.supports("AccountCreditedEvent"));
             assertTrue(handler.supports("AccountSuspendedEvent"));

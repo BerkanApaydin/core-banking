@@ -31,6 +31,11 @@
         </dependency>
         <dependency>
             <groupId>com.bank</groupId>
+            <artifactId>web-support</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
             <artifactId>infrastructure</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -192,7 +197,7 @@
                                  BUNDLE rule was evaluated against this
                                  module's own classes only ("Analyzed bundle
                                  'app' with 6 classes") instead of the
-                                 nine-module aggregate.
+                                 ten-module aggregate.
                                  The real aggregate gate is the
                                  report-aggregate execution above plus
                                  scripts/check_aggregate_coverage.py (per-module

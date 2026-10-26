@@ -88,7 +88,7 @@ class DomainEventOutboxAdapterTest {
             assertEquals(TEST_PAYLOAD, entry.payload());
             assertEquals(AGGREGATE_TYPE, entry.aggregateType());
             assertEquals(AGGREGATE_ID, entry.aggregateId());
-            assertEquals(event.getClass().getSimpleName(), entry.eventType());
+            assertEquals(event.getClass().getName(), entry.eventType());
             assertNotNull(entry.id());
             assertEquals(0, entry.retryCount());
             assertFalse(entry.processed());

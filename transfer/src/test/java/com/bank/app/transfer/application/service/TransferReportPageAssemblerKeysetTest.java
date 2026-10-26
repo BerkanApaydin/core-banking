@@ -64,7 +64,7 @@ class TransferReportPageAssemblerKeysetTest {
     }
 
     private static Transfer transfer(long id, String amount, LocalDateTime createdAt) {
-        return new Transfer(id, new AccountId(1L), new AccountId(2L),
+        return Transfer.rehydrate(id, new AccountId(1L), new AccountId(2L),
                 Money.of(amount, Currency.TRY), TransferStatus.COMPLETED, createdAt);
     }
 

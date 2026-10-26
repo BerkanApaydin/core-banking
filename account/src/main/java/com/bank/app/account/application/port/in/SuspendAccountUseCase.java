@@ -1,6 +1,6 @@
 package com.bank.app.account.application.port.in;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 
 /**
  * Admin capability: suspends an account so it can neither send nor receive
@@ -13,5 +13,5 @@ public interface SuspendAccountUseCase {
     /**
      * @return the suspended account's current state
      */
-    AccountInfo suspend(Long accountId);
+    AccountView suspend(Long accountId);
 }

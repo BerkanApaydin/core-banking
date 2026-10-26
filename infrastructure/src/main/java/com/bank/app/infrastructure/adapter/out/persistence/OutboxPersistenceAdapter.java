@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Repository
@@ -42,7 +43,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
     private OutboxPersistenceAdapter(OutboxJpaRepository repository, OutboxProperties properties,
             ClockProviderPort clockProvider, TransactionTemplate retentionTransaction) {
         this.repository = repository;
-        this.clockProvider = clockProvider != null ? clockProvider : Clock::systemUTC;
+        this.clockProvider = Objects.requireNonNull(clockProvider, "clockProvider must not be null");
         this.backoffBaseSeconds = properties.retryBackoffBaseSeconds();
         this.backoffMaxSeconds = properties.retryBackoffMaxSeconds();
         this.retentionTransaction = retentionTransaction;
@@ -55,7 +56,7 @@ public class OutboxPersistenceAdapter implements OutboxPort {
      * {@code CodingRulesArchitectureTest}).
      */
     public OutboxPersistenceAdapter(OutboxJpaRepository repository) {
-        this(repository, new OutboxProperties(5, 50, 2, 2000L, 30, 4, 12, 30L), null);
+        this(repository, new OutboxProperties(5, 50, 2, 2000L, 30, 4, 12, 30L), Clock::systemUTC);
     }
 
     @Override

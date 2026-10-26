@@ -1,6 +1,7 @@
 package com.bank.app.transfer.adapter.out.outbox;
 
 import com.bank.app.common.application.outbox.IdempotentOutboxRelay;
+import com.bank.app.common.application.outbox.OutboxEventTypes;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
@@ -22,7 +23,7 @@ abstract class AbstractTransferOutboxRelay extends IdempotentOutboxRelay {
 
     @Override
     public final boolean supports(String candidate) {
-        return eventType.equals(candidate);
+        return OutboxEventTypes.matches(eventType, candidate);
     }
 
     @Override

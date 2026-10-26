@@ -1,11 +1,11 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.api.AccountSnapshotCache;
 import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.application.port.out.AuditEventPort;
@@ -64,7 +64,7 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
     }
 
     @Override
-    public AccountInfo suspend(Long accountId) {
+    public AccountView suspend(Long accountId) {
         Objects.requireNonNull(accountId, "Account ID must not be null");
         Long adminId = requireAdmin();
         Account account = loadAccountPort.findByIdForUpdate(accountId)
@@ -85,7 +85,7 @@ public class SuspendAccountUseCaseImpl implements SuspendAccountUseCase {
         // Same-class eviction (F-04): a stale ACTIVE snapshot must never
         // authorize this account again, not even within the cache TTL.
         evictSnapshotAfterCommit(saved.getId());
-        return new AccountInfo(saved.getId(), saved.getUserId().value(),
+        return new AccountView(saved.getId(), saved.getUserId().value(),
                 saved.getBalance().currency().name(), saved.getStatus().name());
     }
 

@@ -24,9 +24,10 @@ public class AuditEventPublisherAdapter implements AuditEventPort {
 
     @Override
     public void publish(AuditEvent event) {
-        // Mandatory audit persistence participates in the caller's transaction.
-        // A failed audit write must roll back a successful money movement.
-        saveAuditLogPort.save(new AuditLog(null, event.username(),
+        // Mandatory audit persistence joins the caller's transaction when one
+        // is active; a failed audit write must roll back a successful money
+        // movement. Without a caller transaction it uses the adapter's own.
+        saveAuditLogPort.save(AuditLog.create(event.username(),
                 AuditAction.fromString(event.action()), event.details(), event.occurredAt(),
                 event.actorUserId()));
         // ...then dispatch for AFTER_COMMIT observation (see AuditEventConsumer):

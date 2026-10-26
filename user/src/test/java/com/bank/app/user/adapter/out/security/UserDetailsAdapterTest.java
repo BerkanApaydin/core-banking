@@ -32,7 +32,7 @@ class UserDetailsAdapterTest {
     @Test
     void shouldLoadUserSuccessfully() {
         service = new UserDetailsAdapter(loadUserPort);
-        User user = new User(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
+        User user = User.rehydrate(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                 new EmailAddress("john@test.com"), new PhoneNumber("+905551234567"));
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));
@@ -49,7 +49,7 @@ class UserDetailsAdapterTest {
     @Test
     void shouldCarryTokenVersionFromUser() {
         service = new UserDetailsAdapter(loadUserPort);
-        User user = new User(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
+        User user = User.rehydrate(new UserId(100L), "john", "$2a$12$testpasshash00000000000000000000000001", Role.ROLE_USER,
                 null, null, null, 6L);
 
         when(loadUserPort.findByUsername("john")).thenReturn(Optional.of(user));

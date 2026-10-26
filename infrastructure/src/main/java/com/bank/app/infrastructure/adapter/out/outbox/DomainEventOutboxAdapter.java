@@ -62,7 +62,10 @@ public class DomainEventOutboxAdapter implements EventPublisherPort {
                     "Outbox payload exceeds " + MAX_PAYLOAD_CHARS + " chars for "
                             + event.getClass().getSimpleName());
         }
-        String eventType = event.getClass().getSimpleName();
+        // Fully qualified: two bounded contexts may legitimately declare the
+        // same simple event name. Old outbox rows with simple names remain
+        // readable through OutboxEventTypes.matches().
+        String eventType = event.getClass().getName();
         LocalDateTime now = LocalDateTime.now(clockProvider.clock());
         // D-1: outbox row ID comes from the ID port (seedable in tests),
         // never from a hidden UUID call inside the adapter.

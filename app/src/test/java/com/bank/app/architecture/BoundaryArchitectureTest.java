@@ -1,7 +1,6 @@
 package com.bank.app.architecture;
 
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
-import com.bank.app.common.application.port.in.RequiresNewUseCase;
 import com.bank.app.infrastructure.adapter.in.idempotency.IdempotencyAspect;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.Order;
@@ -9,7 +8,6 @@ import org.springframework.core.annotation.Order;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,17 +63,6 @@ class BoundaryArchitectureTest extends ArchitectureTest {
                         + clazz.getFullName());
             }
         }
-    }
-
-    @Test
-    void auditRequiresNewSemanticsMustBeAnnotated() {
-        // AV-1: REQUIRES_NEW is declared in the owning module via marker
-        // annotation, not hidden in an infrastructure package literal.
-        classes()
-                .that().haveSimpleName("AuditLoggerUseCaseImpl")
-                .should().beAnnotatedWith(RequiresNewUseCase.class)
-                .allowEmptyShould(false)
-                .check(importedClasses);
     }
 
     @Test

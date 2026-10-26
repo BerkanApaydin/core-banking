@@ -6,7 +6,6 @@ import com.bank.app.common.application.port.in.TransactionalUseCase;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.user.application.port.in.DisableMfaUseCase;
 import com.bank.app.user.application.port.out.LoadUserPort;
-import com.bank.app.user.application.port.out.MfaSecretEncryptorPort;
 import com.bank.app.user.application.port.out.MfaSecretPort;
 import com.bank.app.user.application.port.out.RefreshTokenPort;
 import com.bank.app.user.application.port.out.SaveUserPort;
@@ -24,7 +23,8 @@ import java.util.Objects;
  * MFA must never ride on a stale session alone) and a current TOTP code
  * (possession proof) are required.
  *
- * <p>The code check runs through {@link MfaCodeVerificationService}, which
+ * <p>
+ * The code check runs through {@link MfaCodeVerificationService}, which
  * owns the brute-force bound and the TOTP replay protection.
  */
 @TransactionalUseCase

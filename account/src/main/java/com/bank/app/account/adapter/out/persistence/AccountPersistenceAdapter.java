@@ -1,10 +1,10 @@
 package com.bank.app.account.adapter.out.persistence;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Iban;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -85,7 +85,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<AccountInfo> findInfoById(Long id) {
+    public Optional<AccountView> findInfoById(Long id) {
         if (id == null) {
             return Optional.empty();
         }
@@ -94,7 +94,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
     }
 
     @Override
-    public Optional<AccountInfo> findInfoByIban(Iban iban) {
+    public Optional<AccountView> findInfoByIban(Iban iban) {
         Objects.requireNonNull(iban, "IBAN must not be null");
         List<Object[]> rows = repository.findInfoByIban(Iban.normalize(iban.value()));
         return rows.isEmpty() ? Optional.empty() : Optional.of(toInfo(rows.get(0)));
@@ -114,8 +114,8 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
         return Map.copyOf(result);
     }
 
-    private static AccountInfo toInfo(Object[] row) {
-        return new AccountInfo(
+    private static AccountView toInfo(Object[] row) {
+        return new AccountView(
                 (Long) row[0],
                 (Long) row[1],
                 enumName(row[2]),
@@ -174,7 +174,7 @@ public class AccountPersistenceAdapter implements LoadAccountPort, SaveAccountPo
                 // caller-held aggregate plus a bumped version is the truth.
                 // Saves 1 SELECT per account write (2 per transfer).
                 Long bumped = account.getVersion() + 1;
-                return new Account(account.getId(), account.getUserId(), account.getIban(),
+                return Account.rehydrate(account.getId(), account.getUserId(), account.getIban(),
                         account.getOwnerName(), account.getBalance(), account.getStatus(), bumped);
             }
             // 0 rows: distinguish missing row vs concurrent write with a

@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.idempotency;
 
-import com.bank.app.infrastructure.adapter.in.handler.ProblemDetailFactory;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
@@ -35,7 +35,7 @@ final class IdempotencyResponseCodec {
             // so fail explicitly instead of returning wrong data with a 2xx.
             return ProblemDetailFactory.create(HttpStatus.INTERNAL_SERVER_ERROR,
                     "IDEMPOTENCY_REPLAY_UNAVAILABLE",
-                    "The original response is no longer available for replay.", null);
+                    "The original response is no longer available for replay.", (String) null);
         }
         HttpStatusCode status = result.responseStatus() != null
                 ? HttpStatusCode.valueOf(result.responseStatus())

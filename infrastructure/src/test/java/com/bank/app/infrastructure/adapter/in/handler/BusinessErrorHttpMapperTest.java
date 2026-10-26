@@ -11,6 +11,8 @@ import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
 import com.bank.app.user.domain.exception.TooManyFailedLoginAttemptsException;
 import com.bank.app.user.domain.exception.UserNotFoundException;
+import com.bank.app.websupport.BusinessErrorHttpMapper;
+import com.bank.app.websupport.ProblemDetailFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -86,10 +88,6 @@ class BusinessErrorHttpMapperTest {
                 Arguments.of(new CurrencyMismatchException("Different currencies"), 400, "CURRENCY_MISMATCH"),
                 Arguments.of(new AccountNotFoundException(42L), 404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new AccountNotFoundException("TR000"), 404, "ACCOUNT_NOT_FOUND_IBAN"),
-                // Fully qualified: simple-name collision with the published
-                // account.api.AccountNotFoundException (imported above).
-                Arguments.of(new com.bank.app.account.domain.exception.AccountNotFoundException(42L),
-                        404, "ACCOUNT_NOT_FOUND_ID"),
                 Arguments.of(new UserNotFoundException("Unknown user"), 404, "USER_NOT_FOUND"),
                 Arguments.of(new DuplicateIbanException("TR000"), 409, "DUPLICATE_IBAN"),
                 Arguments.of(new ConcurrentRequestException("Already running"), 409, "CONCURRENT_REQUEST"),

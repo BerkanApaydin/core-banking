@@ -1,8 +1,8 @@
 package com.bank.app.account.application.usecase;
 
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.common.domain.exception.InvalidIbanException;
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.GetAccountInfoQuery;
 import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.common.domain.Iban;
@@ -34,15 +34,15 @@ class GetAccountInfoQueryImplTest {
         getAccountInfoQuery = new GetAccountInfoQueryImpl(loadAccountPort);
     }
 
-    private AccountInfo info(Long id, Long userId, String currency, String status) {
-        return new AccountInfo(id, userId, currency, status);
+    private AccountView info(Long id, Long userId, String currency, String status) {
+        return new AccountView(id, userId, currency, status);
     }
 
     @Test
     void shouldGetAccountInfoSuccessfully() {
         when(loadAccountPort.findInfoById(1L)).thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
-        AccountInfo info = getAccountInfoQuery.getAccountInfo(1L);
+        AccountView info = getAccountInfoQuery.getAccountInfo(1L);
 
         assertEquals(1L, info.id());
         assertEquals(100L, info.userId());
@@ -63,7 +63,7 @@ class GetAccountInfoQueryImplTest {
         Iban iban = new Iban("TR770006200000000000000111");
         when(loadAccountPort.findInfoByIban(iban)).thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
-        AccountInfo info = getAccountInfoQuery.getAccountInfoForTransfer("TR770006200000000000000111");
+        AccountView info = getAccountInfoQuery.getAccountInfoForTransfer("TR770006200000000000000111");
 
         assertEquals(1L, info.id());
         assertEquals(100L, info.userId());
@@ -119,7 +119,7 @@ class GetAccountInfoQueryImplTest {
     void shouldGetAccountInfoWithSuspendedStatus() {
         when(loadAccountPort.findInfoById(1L)).thenReturn(Optional.of(info(1L, 100L, "TRY", "SUSPENDED")));
 
-        AccountInfo info = getAccountInfoQuery.getAccountInfo(1L);
+        AccountView info = getAccountInfoQuery.getAccountInfo(1L);
 
         assertEquals("SUSPENDED", info.status());
     }
@@ -136,7 +136,7 @@ class GetAccountInfoQueryImplTest {
         Iban iban = new Iban("TR770006200000000000000111");
         when(loadAccountPort.findInfoByIban(iban)).thenReturn(Optional.of(info(1L, 100L, "TRY", "SUSPENDED")));
 
-        AccountInfo info = getAccountInfoQuery.getAccountInfoForTransfer("TR770006200000000000000111");
+        AccountView info = getAccountInfoQuery.getAccountInfoForTransfer("TR770006200000000000000111");
 
         assertEquals("SUSPENDED", info.status());
     }
@@ -147,7 +147,7 @@ class GetAccountInfoQueryImplTest {
         when(loadAccountPort.findInfoByIban(normalizedIban))
                 .thenReturn(Optional.of(info(1L, 100L, "TRY", "ACTIVE")));
 
-        AccountInfo info = getAccountInfoQuery.getAccountInfoForTransfer("TR77 0006 2000 0000 0000 0001 11");
+        AccountView info = getAccountInfoQuery.getAccountInfoForTransfer("TR77 0006 2000 0000 0000 0001 11");
 
         assertEquals(1L, info.id());
         assertEquals("TRY", info.currency());

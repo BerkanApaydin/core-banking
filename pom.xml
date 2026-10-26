@@ -23,6 +23,9 @@
         <module>migrations</module>
         <!-- Shared kernel: stable, low-level, no BC dependencies -->
         <module>common</module>
+        <!-- Shared web rendering: depends only on common, used by BC web adapters
+             and platform filters; keeps Spring out of the shared kernel. -->
+        <module>web-support</module>
         <module>persistence</module>
         <module>account-api</module>
         <!-- Cross-cutting adapters: implement context-owned ports, so they

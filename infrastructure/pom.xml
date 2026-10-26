@@ -20,6 +20,11 @@
             <artifactId>common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.bank</groupId>
+            <artifactId>web-support</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- account: compile scope removed on purpose (Hexagon DIP — infrastructure
              must never depend on account internals; cross-context reads go via the
              account-api published language through transfer's ACL).

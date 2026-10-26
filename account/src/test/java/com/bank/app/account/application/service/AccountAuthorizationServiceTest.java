@@ -44,7 +44,7 @@ class AccountAuthorizationServiceTest {
         @Test
         @DisplayName("should authorize when user owns the account")
         void shouldAuthorizeWhenOwner() {
-            Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
+            Account account = Account.rehydrate(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
                     "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
 
             authorizationService.authorizeAccountOwner(account, "Not authorized");
@@ -63,9 +63,11 @@ class AccountAuthorizationServiceTest {
 
     @Test
     void shouldCheckQueryOwnershipWithoutExposingAnotherAccount() {
-        Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
+        Account account = Account.rehydrate(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
                 "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
-        when(userContextService.getCurrentUserId()).thenReturn(Optional.of(100L), Optional.of(200L));
+        when(userContextService.getCurrentUserId())
+                .thenReturn(Optional.of(100L))
+                .thenReturn(Optional.of(200L));
 
         assertThat(authorizationService.isCurrentUserOwner(account)).isTrue();
         assertThat(authorizationService.isCurrentUserOwner(account)).isFalse();
@@ -73,7 +75,7 @@ class AccountAuthorizationServiceTest {
 
     @Test
     void shouldStillRejectUnauthenticatedOwnershipChecks() {
-        Account account = new Account(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
+        Account account = Account.rehydrate(1L, new UserId(100L), new Iban("TR721111111111111111111111"),
                 "Owner", Money.of("1000", Currency.TRY), AccountStatus.ACTIVE);
         when(userContextService.getCurrentUserId()).thenReturn(Optional.empty());
 

@@ -177,6 +177,22 @@ class LogoutUseCaseImplTest {
     }
 
     @Test
+    @DisplayName("a verified access token with an unknown refresh token revokes only the presented row")
+    void shouldRevokeOnlyPresentedRowForVerifiedAccessAndUnknownRefresh() {
+        stubClock();
+        when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
+        when(jwtPort.verifyAndDecode("valid-jwt-token")).thenReturn(
+                new JwtPort.VerifiedToken("alice", 7L, "USER", "jti-1", 0L));
+        when(refreshTokenPort.findByTokenHash(TokenDigest.sha256Hex("unknown")))
+                .thenReturn(java.util.Optional.empty());
+
+        logoutUseCase.execute("Bearer valid-jwt-token", "unknown");
+
+        verify(refreshTokenPort).revoke(TokenDigest.sha256Hex("unknown"));
+        verify(refreshTokenPort, never()).revokeFamily(anyString(), anyLong());
+    }
+
+    @Test
     @DisplayName("an unverified access token with an unknown refresh token revokes only the presented row")
     void shouldRevokeOnlyPresentedRowForUnverifiedAccessAndUnknownRefresh() {
         stubClock();

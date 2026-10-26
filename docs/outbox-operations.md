@@ -25,8 +25,12 @@ notification channels via `TransferCompletedOutboxRelay` /
 `TransferCancelledOutboxRelay`; FAILED transfers publish `TransferFailedEvent`
 through `TransferFailedOutboxRelay` (dormant until an async reconciliation
 flow marks one), and user registrations through `UserEventOutboxRelay` — all
-at-least-once with the key lifecycle below. A durable consumer inbox and explicit replay state
-machine are needed before general replay can be automated.
+at-least-once with the key lifecycle below. New rows store the fully qualified
+event class name; rows written before that change keep the simple class name
+and remain readable through both forms. Every matching handler runs (each with
+its own dedup key), so a second consumer is not silently dropped. A durable
+consumer inbox and explicit replay state machine are needed before general
+replay can be automated.
 
 ## Key lifecycle
 

@@ -6,7 +6,6 @@ import com.bank.app.account.application.port.out.LoadAccountPort;
 import com.bank.app.account.application.port.out.SaveAccountPort;
 import com.bank.app.account.application.port.out.IbanGeneratorPort;
 import com.bank.app.account.domain.Account;
-import com.bank.app.account.domain.AccountStatus;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.service.AccountAuthorizationService;
@@ -74,7 +73,7 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
         Currency currency = request.currency();
 
         Money balance = Money.exact(request.initialBalance(), currency);
-        Account account = new Account(null, new UserId(request.userId()), iban, request.ownerName(), balance, AccountStatus.ACTIVE);
+        Account account = Account.create(new UserId(request.userId()), iban, request.ownerName(), balance);
 
         Account savedAccount = saveAccountPort.save(account);
 

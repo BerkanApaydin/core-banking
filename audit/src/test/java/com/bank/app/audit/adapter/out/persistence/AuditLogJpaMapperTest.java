@@ -31,7 +31,7 @@ class AuditLogJpaMapperTest {
         @DisplayName("should map valid AuditLog")
         void shouldMapValidAuditLog() {
             LocalDateTime now = LocalDateTime.now();
-            AuditLog auditLog = new AuditLog(1L, "testuser", AuditAction.ACCOUNT_CREATED, "details", now);
+            AuditLog auditLog = AuditLog.rehydrate(1L, "testuser", AuditAction.ACCOUNT_CREATED, "details", now);
 
             AuditLogJpaEntity entity = mapper.toJpaEntity(auditLog);
 

@@ -6,6 +6,7 @@ import com.bank.app.account.domain.AccountCreditedEvent;
 import com.bank.app.account.domain.AccountDebitedEvent;
 import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.application.outbox.IdempotentOutboxRelay;
+import com.bank.app.common.application.outbox.OutboxEventTypes;
 import com.bank.app.common.application.port.out.IdempotencyPort;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.OutboxPort.EventEntry;
@@ -56,12 +57,12 @@ public class AccountEventOutboxRelay extends IdempotentOutboxRelay {
 
     @Override
     public boolean supports(String eventType) {
-        return eventType != null && SUPPORTED_EVENTS.containsKey(eventType);
+        return resolveEventClass(eventType) != null;
     }
 
     @Override
     protected void deliver(EventEntry event) throws Exception {
-        Class<? extends DomainEvent> eventClass = SUPPORTED_EVENTS.get(event.eventType());
+        Class<? extends DomainEvent> eventClass = resolveEventClass(event.eventType());
         if (eventClass == null) {
             log.warn("Unsupported account event type: {}", event.eventType());
             return;
@@ -69,6 +70,15 @@ public class AccountEventOutboxRelay extends IdempotentOutboxRelay {
         DomainEvent domainEvent = objectMapper.readValue(event.payload(), eventClass);
         eventPublisher.publishEvent(domainEvent);
         log.debug("Published account event: type={}, id={}", event.eventType(), event.id());
+    }
+
+    private static Class<? extends DomainEvent> resolveEventClass(String eventType) {
+        if (eventType == null) {
+            return null;
+        }
+        Class<? extends DomainEvent> direct = SUPPORTED_EVENTS.get(eventType);
+        return direct != null ? direct
+                : SUPPORTED_EVENTS.get(OutboxEventTypes.simpleName(eventType));
     }
 
     @Override

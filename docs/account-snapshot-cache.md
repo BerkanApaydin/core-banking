@@ -155,7 +155,7 @@ quietly takes over, and a per-JVM `ConcurrentHashMap` starts serving all
 replicas. With HPA at up to six pods, an eviction on pod A never reaches pod B,
 so account status and currency reads go stale cluster-wide for up to the TTL —
 with nothing in the logs to indicate it. `ProductionConfigContractTest`
-(`app/src/test/java/com/bank/app/security/`) asserts both the literal value and
+(`app/src/test/java/com/bank/app/infrastructure/config/`) asserts both the literal value and
 the absence of a `${...}` placeholder, so this cannot regress silently.
 
 Two additional tripwires sit directly on the fallback: it logs a `WARN` on every

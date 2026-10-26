@@ -101,7 +101,7 @@ class CancelTransferUseCaseImplEdgeCaseTest {
     }
 
     private static Transfer completedTransferCreatedAt(LocalDateTime createdAt) {
-        return new Transfer(TRANSFER_ID, SENDER, RECEIVER, AMOUNT, TransferStatus.COMPLETED, createdAt);
+        return Transfer.rehydrate(TRANSFER_ID, SENDER, RECEIVER, AMOUNT, TransferStatus.COMPLETED, createdAt);
     }
 
     @Test
@@ -202,7 +202,7 @@ class CancelTransferUseCaseImplEdgeCaseTest {
     @DisplayName("should not refund a transfer that is still pending")
     void shouldNotRefundPendingTransfer() {
         stubClock();
-        Transfer transfer = new Transfer(TRANSFER_ID, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(TRANSFER_ID, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.PENDING, LocalDateTime.ofInstant(FIXED_CLOCK.instant(), ZoneOffset.UTC));
 
         when(loadTransferPort.findByIdForUpdate(TRANSFER_ID)).thenReturn(Optional.of(transfer));
@@ -221,7 +221,7 @@ class CancelTransferUseCaseImplEdgeCaseTest {
     @DisplayName("should not refund a transfer that has already failed")
     void shouldNotRefundFailedTransfer() {
         stubClock();
-        Transfer transfer = new Transfer(TRANSFER_ID, SENDER, RECEIVER, AMOUNT,
+        Transfer transfer = Transfer.rehydrate(TRANSFER_ID, SENDER, RECEIVER, AMOUNT,
                 TransferStatus.FAILED, LocalDateTime.ofInstant(FIXED_CLOCK.instant().minusSeconds(3600L), ZoneOffset.UTC));
 
         when(loadTransferPort.findByIdForUpdate(TRANSFER_ID)).thenReturn(Optional.of(transfer));

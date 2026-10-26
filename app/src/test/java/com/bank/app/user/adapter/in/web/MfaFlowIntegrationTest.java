@@ -7,7 +7,6 @@ import com.bank.app.infrastructure.adapter.out.security.CaffeineLoginAttemptAdap
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.bank.app.user.application.port.out.PasswordResetTokenPort;
-import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.Totp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

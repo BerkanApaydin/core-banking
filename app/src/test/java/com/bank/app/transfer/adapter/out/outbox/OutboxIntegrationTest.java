@@ -154,7 +154,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
         assertFalse(allOutboxEvents.isEmpty(), "Real EventPublisherPort should have saved outbox events");
 
         OutboxJpaEntity event = allOutboxEvents.stream()
-                .filter(e -> "TransferCompletedEvent".equals(e.getEventType()))
+                .filter(e -> TransferCompletedEvent.class.getName().equals(e.getEventType()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("TransferCompletedEvent not found in outbox"));
         assertNotNull(event.getAggregateType());

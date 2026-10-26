@@ -1,5 +1,6 @@
 package com.bank.app.user.application.usecase;
 
+import com.bank.app.common.application.exception.CsrfViolationException;
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.common.application.port.out.AuditEventPort;
 import com.bank.app.common.domain.event.AuditEvent;
@@ -9,6 +10,7 @@ import com.bank.app.user.domain.Role;
 import com.bank.app.user.domain.User;
 import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
@@ -53,6 +55,7 @@ class RefreshSessionUseCaseImplTest {
     @Mock private LoadUserPort loadUserPort;
     @Mock private ClockProviderPort clockProvider;
     @Mock private AuditEventPort auditEventPort;
+    @Mock private CsrfBindingPort csrfBindingPort;
 
     private RefreshSessionUseCase useCase;
 
@@ -63,7 +66,8 @@ class RefreshSessionUseCaseImplTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort);
+        useCase = new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider,
+                auditEventPort, csrfBindingPort);
     }
 
     private void stubClock() {
@@ -362,11 +366,11 @@ class RefreshSessionUseCaseImplTest {
     }
 
     private static User freshUser() {
-        return new User(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
+        return User.rehydrate(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER);
     }
 
     private static User versionedUser(long tokenVersion) {
-        return new User(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER, null, null, null, tokenVersion);
+        return User.rehydrate(new UserId(7L), "alice", "$2a$12$testencodedhash000000000000000000000001", Role.ROLE_USER, null, null, null, tokenVersion);
     }
 
     @Test
@@ -449,5 +453,50 @@ class RefreshSessionUseCaseImplTest {
                 .isExactlyInstanceOf(AuthenticationFailedException.class);
 
         verify(refreshTokenPort, never()).markRotated(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("should rotate with a valid browser CSRF pair")
+    void shouldRotateWithAValidCsrfPair() {
+        stubClock();
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(csrfBindingPort.verifyCsrfToken("header", "cookie", "7")).thenReturn(true);
+        when(refreshTokenPort.findByTokenHash(HASH)).thenReturn(Optional.of(stored()));
+        when(jwtPort.generateRefreshToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-refresh");
+        when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(freshUser()));
+        when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(0L);
+        when(jwtPort.generateToken(7L, "alice", "ROLE_USER", 0L)).thenReturn("new-access");
+        when(jwtPort.getRefreshExpirationMs()).thenReturn(604800000L);
+        when(jwtPort.getExpirationMs()).thenReturn(900000L);
+
+        AuthResponse response = useCase.executeWithCsrf(REFRESH, "header", "cookie");
+
+        assertThat(response.token()).isEqualTo("new-access");
+        assertThat(response.refreshToken()).isEqualTo("new-refresh");
+        assertThat(response.userId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("should reject a missing browser CSRF pair before decoding the token")
+    void shouldRejectMissingCsrfPairBeforeTokenWork() {
+        assertThatThrownBy(() -> useCase.executeWithCsrf(REFRESH, null, "csrf-cookie"))
+                .isExactlyInstanceOf(CsrfViolationException.class);
+
+        verify(jwtPort, never()).verifyAndDecode(anyString());
+        verify(refreshTokenPort, never()).findByTokenHash(anyString());
+    }
+
+    @Test
+    @DisplayName("should reject a CSRF pair that does not match the verified user")
+    void shouldRejectMismatchedCsrfAgainstVerifiedUserId() {
+        when(jwtPort.verifyAndDecode(REFRESH)).thenReturn(verified());
+        when(jwtPort.extractTokenType(REFRESH)).thenReturn("refresh");
+        when(csrfBindingPort.verifyCsrfToken("header", "cookie", "7")).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.executeWithCsrf(REFRESH, "header", "cookie"))
+                .isExactlyInstanceOf(CsrfViolationException.class);
+
+        verify(refreshTokenPort, never()).findByTokenHash(anyString());
     }
 }

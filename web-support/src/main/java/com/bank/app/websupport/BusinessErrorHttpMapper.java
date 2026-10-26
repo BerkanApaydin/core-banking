@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.in.handler;
+package com.bank.app.websupport;
 
 import com.bank.app.common.domain.exception.BusinessException;
 import com.bank.app.common.domain.exception.BusinessFailureKind;
@@ -79,19 +79,11 @@ public final class BusinessErrorHttpMapper {
         if (kind == null) {
             return HttpStatus.BAD_REQUEST;
         }
-        HttpStatus status = FAILURE_STATUSES.get(kind);
-        if (status == null) {
-            throw new IllegalStateException("No HTTP status mapped for failure kind: " + kind);
-        }
-        return status;
+        return FAILURE_STATUSES.get(kind);
     }
 
     public static HttpStatus toStatus(ErrorCode code) {
         Objects.requireNonNull(code, "Error code must not be null");
-        HttpStatus status = CODE_STATUSES.get(code);
-        if (status == null) {
-            throw new IllegalStateException("No HTTP status mapped for error code: " + code);
-        }
-        return status;
+        return CODE_STATUSES.get(code);
     }
 }

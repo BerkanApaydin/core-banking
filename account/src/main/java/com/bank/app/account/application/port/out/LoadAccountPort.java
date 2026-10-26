@@ -1,6 +1,6 @@
 package com.bank.app.account.application.port.out;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.domain.Account;
 import com.bank.app.common.domain.Iban;
 import java.util.Collection;
@@ -36,9 +36,9 @@ public interface LoadAccountPort {
      * NUMERIC balance, IBAN string and owner name are never hydrated just to
      * answer "may this principal touch this account?".
      */
-    Optional<AccountInfo> findInfoById(Long id);
+    Optional<AccountView> findInfoById(Long id);
 
-    Optional<AccountInfo> findInfoByIban(Iban iban);
+    Optional<AccountView> findInfoByIban(Iban iban);
 
     /**
      * Id-to-IBAN pairs for batch enrichment (transfer history/reports),

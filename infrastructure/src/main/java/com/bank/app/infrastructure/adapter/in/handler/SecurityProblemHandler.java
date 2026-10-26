@@ -1,7 +1,10 @@
 package com.bank.app.infrastructure.adapter.in.handler;
 
+import com.bank.app.common.application.exception.AuthenticationRequiredException;
+import com.bank.app.common.application.exception.CsrfViolationException;
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.common.messages.MessageKeys;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
 import com.bank.app.user.application.port.out.LoginAttemptStoreUnavailableException;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
@@ -40,6 +43,21 @@ public class SecurityProblemHandler {
         log.warn("Authentication failed: {}", ex.getClass().getSimpleName());
         String message = messages.resolveOrDefault(MessageKeys.AUTHENTICATION_FAILED, "Authentication failed.");
         return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
+    }
+
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<ProblemDetail> handleAuthenticationRequired(
+            AuthenticationRequiredException ex, WebRequest request) {
+        String message = messages.resolveOrDefault(MessageKeys.AUTHENTICATION_FAILED, "Authentication failed.");
+        return ProblemDetailFactory.create(ErrorCode.AUTHENTICATION_FAILED, message, request);
+    }
+
+    @ExceptionHandler(CsrfViolationException.class)
+    public ResponseEntity<ProblemDetail> handleCsrfViolation(
+            CsrfViolationException ex, WebRequest request) {
+        log.warn("CSRF validation failed");
+        String message = messages.resolveOrDefault(MessageKeys.ACCESS_DENIED, "Access denied.");
+        return ProblemDetailFactory.create(ErrorCode.ACCESS_DENIED, message, request);
     }
 
     @ExceptionHandler(LoginAttemptStoreUnavailableException.class)

@@ -45,7 +45,7 @@ class GetAccountsByUserQueryImplTest {
     }
 
     private Account account(Long id, Long userId, String iban, BigDecimal balance, AccountStatus status) {
-        return new Account(id, new UserId(userId), new Iban(iban), "Owner" + id, Money.of(balance, Currency.TRY),
+        return Account.rehydrate(id, new UserId(userId), new Iban(iban), "Owner" + id, Money.of(balance, Currency.TRY),
                 status);
     }
 

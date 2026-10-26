@@ -88,7 +88,8 @@ class DatabaseTokenBlacklistAdapterTest {
     void shouldReadSharedStateAndFailClosedOnIndeterminateResult() {
         String hash = TokenDigest.sha256Hex("token");
         when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(hash)))
-                .thenReturn(true, null);
+                .thenReturn(true)
+                .thenReturn((Boolean) null);
 
         assertThat(adapter.isBlacklisted("token")).isTrue();
         assertThatThrownBy(() -> adapter.isBlacklisted("token"))

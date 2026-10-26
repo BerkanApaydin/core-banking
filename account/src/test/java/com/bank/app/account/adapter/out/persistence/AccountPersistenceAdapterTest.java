@@ -2,7 +2,7 @@ package com.bank.app.account.adapter.out.persistence;
 
 import com.bank.app.account.domain.Account;
 import com.bank.app.account.domain.AccountStatus;
-import com.bank.app.account.domain.exception.AccountNotFoundException;
+import com.bank.app.account.api.AccountNotFoundException;
 import com.bank.app.account.domain.exception.DuplicateIbanException;
 import com.bank.app.common.domain.Iban;
 import com.bank.app.common.domain.Money;
@@ -44,7 +44,7 @@ class AccountPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveNewAccount() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
+        Account domainAccount = Account.rehydrate(null, new UserId(100L), iban, "Ahmet", Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         AccountJpaEntity savedEntity = new AccountJpaEntity(1L, 100L, iban.value(), "Ahmet", new BigDecimal("1000.00"), Currency.TRY, AccountStatus.ACTIVE, null);
 
         when(springDataRepo.save(any(AccountJpaEntity.class))).thenReturn(savedEntity);
@@ -62,7 +62,7 @@ class AccountPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldSaveExistingAccount() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
+        Account domainAccount = Account.rehydrate(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
 
         // Perf-1 bulk path: single versioned UPDATE, no SELECT, bumped version returned.
         when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
@@ -82,7 +82,7 @@ class AccountPersistenceAdapterTest {
     @DisplayName("7.1: should reject save on stale version without touching the database row")
     void shouldRejectStaleVersionOnSave() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
+        Account domainAccount = Account.rehydrate(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
 
         when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
                 .thenReturn(0);
@@ -97,7 +97,7 @@ class AccountPersistenceAdapterTest {
     @DisplayName("7.1: should throw AccountNotFoundException when the row is gone")
     void shouldThrowWhenRowMissingOnSave() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
+        Account domainAccount = Account.rehydrate(1L, new UserId(100L), iban, "Ahmet", Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE, 1L);
 
         when(springDataRepo.updateIfVersionMatch(1L, 1L, new BigDecimal("2000.00"), AccountStatus.ACTIVE, "Ahmet"))
                 .thenReturn(0);
@@ -119,7 +119,7 @@ class AccountPersistenceAdapterTest {
     void shouldThrowNotFoundForVersionLessMissingRow() {
         // Kills the NullReturnVals mutant on the legacy orElseThrow lambda.
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
+        Account domainAccount = Account.rehydrate(9L, new UserId(100L), iban, "Ahmet",
                 Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
         when(springDataRepo.countById(9L)).thenReturn(0L);
 
@@ -131,7 +131,7 @@ class AccountPersistenceAdapterTest {
     @DisplayName("legacy path: should reject blind write for version-less existing row")
     void shouldRejectBlindWriteForVersionLessExistingRow() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(9L, new UserId(100L), iban, "Ahmet",
+        Account domainAccount = Account.rehydrate(9L, new UserId(100L), iban, "Ahmet",
                 Money.of("2000.00", Currency.TRY), AccountStatus.ACTIVE);
         when(springDataRepo.countById(9L)).thenReturn(1L);
 
@@ -145,7 +145,7 @@ class AccountPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldTranslateDuplicateIbanViolation() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet",
+        Account domainAccount = Account.rehydrate(null, new UserId(100L), iban, "Ahmet",
                 Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         DataIntegrityViolationException violation = new DataIntegrityViolationException(
                 "duplicate", new java.sql.SQLException(
@@ -161,7 +161,7 @@ class AccountPersistenceAdapterTest {
     @SuppressWarnings("null")
     void shouldPropagateUnrelatedIntegrityViolation() {
         Iban iban = new Iban("TR770006200000000000000111");
-        Account domainAccount = new Account(null, new UserId(100L), iban, "Ahmet",
+        Account domainAccount = Account.rehydrate(null, new UserId(100L), iban, "Ahmet",
                 Money.of("1000.00", Currency.TRY), AccountStatus.ACTIVE);
         DataIntegrityViolationException violation = new DataIntegrityViolationException(
                 "not-null violation", new java.sql.SQLException("null value in column", "23502"));

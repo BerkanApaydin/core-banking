@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,32 +25,31 @@ import static org.mockito.Mockito.when;
 
 class SpringTransactionBoundaryAdapterTest {
 
-    private final SpringTransactionBoundaryAdapter withoutTxManager =
-            new SpringTransactionBoundaryAdapter(null);
+    private final SpringTransactionBoundaryAdapter adapter =
+            new SpringTransactionBoundaryAdapter(mock(PlatformTransactionManager.class));
 
     @Test
     void reportsNoTransactionOutsideOne() {
-        assertFalse(withoutTxManager.isTransactionActive());
+        assertFalse(adapter.isTransactionActive());
     }
 
     @Test
     void runsAfterCommitImmediatelyWithoutTransaction() {
         AtomicBoolean ran = new AtomicBoolean(false);
 
-        withoutTxManager.runAfterCommit(() -> ran.set(true));
+        adapter.runAfterCommit(() -> ran.set(true));
 
         assertTrue(ran.get());
     }
 
     @Test
-    void executesDirectlyWithoutTransactionManager() {
-        assertEquals("done", withoutTxManager.executeRequiresNew(() -> "done", 30));
+    void rejectsMissingTransactionManager() {
+        assertThrows(NullPointerException.class,
+                () -> new SpringTransactionBoundaryAdapter(null));
     }
 
     @Test
     void rejectsNonPositiveTimeout() {
-        SpringTransactionBoundaryAdapter adapter = new SpringTransactionBoundaryAdapter(null);
-
         assertThrows(IllegalArgumentException.class, () -> adapter.executeRequiresNew(() -> "x", 0));
     }
 
@@ -74,7 +74,6 @@ class SpringTransactionBoundaryAdapterTest {
 
     @Test
     void defersActionUntilAfterCommitInsideTransaction() {
-        SpringTransactionBoundaryAdapter adapter = new SpringTransactionBoundaryAdapter(null);
         TransactionSynchronizationManager.initSynchronization();
         try {
             TransactionSynchronizationManager.setActualTransactionActive(true);

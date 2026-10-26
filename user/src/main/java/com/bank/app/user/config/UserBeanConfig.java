@@ -9,6 +9,7 @@ import com.bank.app.user.application.port.in.DisableMfaUseCase;
 import com.bank.app.user.application.port.in.RequestPasswordResetUseCase;
 import com.bank.app.user.application.port.in.ConfirmPasswordResetUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.MfaAttemptPort;
@@ -94,8 +95,10 @@ public class UserBeanConfig {
     public RefreshSessionUseCase refreshSessionUseCase(JwtPort jwtPort, RefreshTokenPort refreshTokenPort,
                                                        LoadUserPort loadUserPort,
                                                        ClockProviderPort clockProvider,
-                                                       AuditEventPort auditEventPort) {
-        return new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort);
+                                                       AuditEventPort auditEventPort,
+                                                       CsrfBindingPort csrfBindingPort) {
+        return new RefreshSessionUseCaseImpl(jwtPort, refreshTokenPort, loadUserPort, clockProvider,
+                auditEventPort, csrfBindingPort);
     }
 
     @Bean

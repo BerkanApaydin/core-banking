@@ -182,13 +182,6 @@ class TransferControllerIntegrationTest extends AbstractSpringBootIntegrationTes
                                 new BigDecimal("200.00"),
                                 Currency.TRY);
 
-                var result = mockMvc.perform(post("/api/v1/transfers")
-                                .header("Authorization", "Bearer " + jwtToken)
-                                .header("Idempotency-Key", newIdempotencyKey())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andReturn();
-
                 mockMvc.perform(post("/api/v1/transfers")
                                 .header("Authorization", "Bearer " + jwtToken)
                                 .header("Idempotency-Key", newIdempotencyKey())

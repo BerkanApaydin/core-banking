@@ -8,6 +8,7 @@ import com.bank.app.user.application.port.out.JwtPort;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
 import com.bank.app.user.application.port.out.AuthenticationPort;
+import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.LoadUserPort;
 import com.bank.app.user.application.port.out.LoginAttemptPort;
 import com.bank.app.user.application.port.out.MfaAttemptPort;
@@ -43,6 +44,7 @@ class UserBeanConfigTest {
     @Mock private JwtPort jwtPort;
     @Mock private LoginAttemptPort loginAttemptPort;
     @Mock private RefreshTokenPort refreshTokenPort;
+    @Mock private CsrfBindingPort csrfBindingPort;
     @Mock private TokenBlacklistPort tokenBlacklistPort;
     @Mock private DomainEventPublisherService domainEventPublisherService;
     @Mock private ClockProviderPort clockProvider;
@@ -84,7 +86,8 @@ class UserBeanConfigTest {
     @Test
     void shouldCreateRefreshSessionUseCaseBean() {
         UserBeanConfig config = new UserBeanConfig();
-        assertNotNull(config.refreshSessionUseCase(jwtPort, refreshTokenPort, loadUserPort, clockProvider, auditEventPort));
+        assertNotNull(config.refreshSessionUseCase(jwtPort, refreshTokenPort, loadUserPort, clockProvider,
+                auditEventPort, csrfBindingPort));
     }
 
     @Test

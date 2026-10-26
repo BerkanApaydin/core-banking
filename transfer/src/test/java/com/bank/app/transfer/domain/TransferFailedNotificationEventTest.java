@@ -35,7 +35,7 @@ class TransferFailedNotificationEventTest {
 
     @Test
     void shouldCreateFromTransfer() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("500.00", Currency.TRY), TransferStatus.FAILED,
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L), Money.of("500.00", Currency.TRY), TransferStatus.FAILED,
                 LocalDateTime.now());
         TransferFailedNotificationEvent event = TransferFailedNotificationEvent.from(transfer);
 

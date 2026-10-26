@@ -10,6 +10,7 @@ import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -106,7 +107,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         // snapshot and its distributed index land together or not at all, so a
         // partial failure can never strand an un-indexed IBAN snapshot that
         // evictById would not reach.
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of(
                         "account-snapshot:iban-" + ibanKey,
                         "account-snapshot:idx:ibans-by-id:1")),
@@ -128,14 +129,14 @@ class RedisAccountSnapshotCacheAdapterTest {
     void shouldEvictByIdInSingleLuaRoundTrip() {
         // Index written by another pod is still visible because SMEMBERS runs
         // server-side inside the Lua script (no client-side read-then-delete).
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any()))
                 .thenReturn(5L);
 
         adapter.evictById(1L);
 
         // One EVAL with the base keys + the IBAN key prefix: 1 round trip on
         // the mutation hot path instead of SMEMBERS + DEL.
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of(
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",
@@ -149,14 +150,14 @@ class RedisAccountSnapshotCacheAdapterTest {
         // Eviction is the only thing standing between a committed mutation
         // and a stale snapshot, so a dropped connection must be retried
         // instead of silently leaving the entry alive for the whole TTL.
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any()))
                 .thenThrow(new RuntimeException("connection refused"))
                 .thenThrow(new RuntimeException("connection refused"))
                 .thenReturn(5L);
 
         adapter.evictById(1L);
 
-        verify(redisTemplate, times(3)).execute(any(DefaultRedisScript.class), anyList(), any());
+        verify(redisTemplate, times(3)).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any());
     }
 
     @Test
@@ -164,12 +165,12 @@ class RedisAccountSnapshotCacheAdapterTest {
         // Fail-open for the request path: a cache outage must never turn a
         // committed mutation into a 500. The failure is logged at ERROR so it
         // is visible to alerting.
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any()))
                 .thenThrow(new RuntimeException("connection refused"));
 
         assertDoesNotThrow(() -> adapter.evictById(1L));
 
-        verify(redisTemplate, times(3)).execute(any(DefaultRedisScript.class), anyList(), any());
+        verify(redisTemplate, times(3)).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any());
     }
 
     @Test
@@ -182,7 +183,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any()))
+            when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList(), any()))
                     .thenThrow(new RuntimeException("connection refused"));
 
             adapter.evictById(1L);
@@ -209,7 +210,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         adapter.putIbans(ids, ibans);
         // One EVAL with KEYS/ARGV aligned in ascending id order (TTL + values).
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:2")),
                 eq("60"), eq("TR1"), eq("TR2"));
     }
@@ -243,7 +244,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         adapter.putIbans(Set.of(1L, 2L, 3L), ibans);
 
-        verify(redisTemplate, never()).execute(any(DefaultRedisScript.class), anyList());
+        verify(redisTemplate, never()).execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList());
     }
 
     @Test
@@ -251,7 +252,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
         when(cursor.hasNext()).thenReturn(true, true, false);
         when(cursor.next()).thenReturn("k1", "k2");
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList()))
                 .thenThrow(new RuntimeException("unknown command 'UNLINK'"));
 
         adapter.evictAll();
@@ -265,7 +266,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
         when(cursor.hasNext()).thenReturn(true, false);
         when(cursor.next()).thenReturn("k1");
-        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(), anyList()))
                 .thenThrow(new RuntimeException("unknown command 'UNLINK'"));
         when(redisTemplate.delete(anyList()))
                 .thenThrow(new RuntimeException("connection refused"));
@@ -288,7 +289,7 @@ class RedisAccountSnapshotCacheAdapterTest {
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<List<String>> keysCaptor =
                 org.mockito.ArgumentCaptor.forClass(List.class);
-        verify(redisTemplate, times(2)).execute(any(DefaultRedisScript.class), keysCaptor.capture());
+        verify(redisTemplate, times(2)).execute(ArgumentMatchers.<RedisScript<Long>>any(), keysCaptor.capture());
         assertEquals(List.of(List.of("k1", "k2"), List.of("k3")), keysCaptor.getAllValues());
         verify(cursor).close();
     }
@@ -304,7 +305,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         adapter.putIbans(Set.of(1L, 2L, 3L, 4L), ibans);
 
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of("account-snapshot:iban-of:1", "account-snapshot:iban-of:4")),
                 eq("60"), eq("TR1"), eq("TR4"));
     }
@@ -319,7 +320,7 @@ class RedisAccountSnapshotCacheAdapterTest {
 
         // UNLINK, not DEL: DEL frees the values on the Redis main thread and
         // would block every other client of the broker for the whole batch.
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of("account-snapshot:id-1", "account-snapshot:iban-TR1")));
         verify(redisTemplate, never()).keys(anyString());
         verify(cursor).close();
@@ -329,7 +330,7 @@ class RedisAccountSnapshotCacheAdapterTest {
     void shouldDropIbanMappingOnEvictById() {
         adapter.evictById(1L);
 
-        verify(redisTemplate).execute(any(DefaultRedisScript.class),
+        verify(redisTemplate).execute(ArgumentMatchers.<RedisScript<Long>>any(),
                 eq(List.of(
                         "account-snapshot:id-1",
                         "account-snapshot:iban-of:1",

@@ -27,7 +27,7 @@ class EmailNotificationAdapterTest {
 
     @Test
     void shouldLogSuccessfullyOnNotify() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L),
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L),
                 Money.of("100.00", Currency.TRY),
                 TransferStatus.COMPLETED, LocalDateTime.now());
 
@@ -106,7 +106,7 @@ class EmailNotificationAdapterTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            Transfer transfer = new Transfer(7L, new AccountId(10L), new AccountId(20L),
+            Transfer transfer = Transfer.rehydrate(7L, new AccountId(10L), new AccountId(20L),
                     Money.of("100.00", Currency.TRY),
                     TransferStatus.COMPLETED, LocalDateTime.now());
             adapter.notifyTransferCompleted(TransferCompletedNotificationEvent.from(transfer));

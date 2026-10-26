@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.handler;
 
 import com.bank.app.common.domain.exception.ErrorCode;
 import com.bank.app.common.messages.MessageKeys;
+import com.bank.app.websupport.ProblemDetailFactory;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;

@@ -16,7 +16,7 @@ class AuditLogTest {
     @Test
     @DisplayName("should create with constructor and set all fields")
     void shouldCreateAuditLogWithConstructor() {
-        AuditLog log = new AuditLog(1L, "testuser", AuditAction.ACCOUNT_CREATED, "Account created",
+        AuditLog log = AuditLog.rehydrate(1L, "testuser", AuditAction.ACCOUNT_CREATED, "Account created",
                 LocalDateTime.of(2025, 1, 15, 10, 0));
 
         assertEquals(1L, log.getId());
@@ -31,7 +31,7 @@ class AuditLogTest {
     @Test
     @DisplayName("should carry the stable actor identity alongside the username snapshot (8.2)")
     void shouldCarryActorUserId() {
-        AuditLog log = new AuditLog(1L, "alice", AuditAction.LOGIN_SUCCEEDED, "Logged in",
+        AuditLog log = AuditLog.rehydrate(1L, "alice", AuditAction.LOGIN_SUCCEEDED, "Logged in",
                 LocalDateTime.of(2026, 1, 2, 3, 4), 7L);
 
         assertEquals("alice", log.getUsername());
@@ -54,34 +54,34 @@ class AuditLogTest {
     @DisplayName("should throw when username is null")
     void shouldThrowNullPointerExceptionWhenUsernameIsNull() {
         assertThrows(NullPointerException.class,
-                () -> new AuditLog(1L, null, AuditAction.ACCOUNT_CREATED, "details", LocalDateTime.now()));
+                () -> AuditLog.rehydrate(1L, null, AuditAction.ACCOUNT_CREATED, "details", LocalDateTime.now()));
     }
 
     @Test
     @DisplayName("should throw when action is null")
     void shouldThrowNullPointerExceptionWhenActionIsNull() {
         assertThrows(NullPointerException.class,
-                () -> new AuditLog(1L, "user", null, "details", LocalDateTime.now()));
+                () -> AuditLog.rehydrate(1L, "user", null, "details", LocalDateTime.now()));
     }
 
     @Test
     @DisplayName("should throw when details is null")
     void shouldThrowNullPointerExceptionWhenDetailsIsNull() {
         assertThrows(NullPointerException.class,
-                () -> new AuditLog(1L, "user", AuditAction.ACCOUNT_CREATED, null, LocalDateTime.now()));
+                () -> AuditLog.rehydrate(1L, "user", AuditAction.ACCOUNT_CREATED, null, LocalDateTime.now()));
     }
 
     @Test
     @DisplayName("should throw when timestamp is null")
     void shouldThrowNullPointerExceptionWhenTimestampIsNull() {
         assertThrows(NullPointerException.class,
-                () -> new AuditLog(1L, "user", AuditAction.ACCOUNT_CREATED, "details", null));
+                () -> AuditLog.rehydrate(1L, "user", AuditAction.ACCOUNT_CREATED, "details", null));
     }
 
     @Test
     @DisplayName("should accept null id for new records")
     void shouldAcceptNullId() {
-        AuditLog log = new AuditLog(null, "user", AuditAction.ACCOUNT_CREATED, "details", LocalDateTime.now());
+        AuditLog log = AuditLog.rehydrate(null, "user", AuditAction.ACCOUNT_CREATED, "details", LocalDateTime.now());
         assertNull(log.getId());
     }
 

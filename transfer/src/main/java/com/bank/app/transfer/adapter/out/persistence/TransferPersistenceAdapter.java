@@ -54,7 +54,7 @@ public class TransferPersistenceAdapter implements SaveTransferPort, LoadTransfe
                 transfer.getId(), transfer.getVersion(), transfer.getStatus());
         if (updated == 1) {
             Long bumped = transfer.getVersion() + 1;
-            return new Transfer(transfer.getId(), transfer.getSenderAccountId(),
+            return Transfer.rehydrate(transfer.getId(), transfer.getSenderAccountId(),
                     transfer.getReceiverAccountId(), transfer.getAmount(),
                     transfer.getStatus(), transfer.getCreatedAt(), bumped);
         }

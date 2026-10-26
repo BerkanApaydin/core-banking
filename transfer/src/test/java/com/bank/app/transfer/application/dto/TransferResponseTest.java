@@ -36,7 +36,7 @@ class TransferResponseTest {
 
     @Test
     void shouldCreateFromTransferWithFromMethod() {
-        Transfer transfer = new Transfer(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
+        Transfer transfer = Transfer.rehydrate(1L, new AccountId(10L), new AccountId(20L), Money.of("100", Currency.TRY), TransferStatus.COMPLETED, LocalDateTime.now());
         TransferResponse resp = TransferResponse.from(transfer, "TR111", "TR222");
         assertEquals(1L, resp.id());
         assertEquals(TransferStatus.COMPLETED, resp.status());

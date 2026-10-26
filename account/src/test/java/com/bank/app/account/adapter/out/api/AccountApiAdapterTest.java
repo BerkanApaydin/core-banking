@@ -1,6 +1,6 @@
 package com.bank.app.account.adapter.out.api;
 
-import com.bank.app.account.application.dto.AccountInfo;
+import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.GetAccountInfoQuery;
 import com.bank.app.account.application.port.in.AdjustAccountBalancesUseCase;
 import com.bank.app.account.api.AccountAdjustmentResult;
@@ -52,7 +52,7 @@ class AccountApiAdapterTest {
     @Test
     void shouldTranslateAccountInfoToSnapshot() {
         when(getAccountInfoQuery.getAccountInfo(1L))
-                .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+                .thenReturn(new AccountView(1L, 10L, "TRY", "ACTIVE"));
 
         AccountSnapshot snapshot = adapter.getSnapshotById(1L);
 
@@ -62,7 +62,7 @@ class AccountApiAdapterTest {
     @Test
     void shouldTranslateIbanLookupToSnapshot() {
         when(getAccountInfoQuery.getAccountInfoForTransfer("TR450006100519786456841234"))
-                .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+                .thenReturn(new AccountView(1L, 10L, "TRY", "ACTIVE"));
 
         AccountSnapshot snapshot = adapter.getSnapshotByIban("TR450006100519786456841234");
 
@@ -71,11 +71,9 @@ class AccountApiAdapterTest {
     }
 
     @Test
-    void shouldTranslateDomainNotFoundToPublishedLanguageById() {
-        // Fully qualified: simple-name collision with the published
-        // account.api.AccountNotFoundException (imported); Java cannot import both.
+    void shouldPropagatePublishedNotFoundById() {
         when(getAccountInfoQuery.getAccountInfo(999L))
-                .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException(999L));
+                .thenThrow(new AccountNotFoundException(999L));
 
         AccountNotFoundException ex = assertThrows(
                 AccountNotFoundException.class,
@@ -87,10 +85,9 @@ class AccountApiAdapterTest {
     }
 
     @Test
-    void shouldTranslateDomainNotFoundToPublishedLanguageByIban() {
-        // Fully qualified: same simple-name collision as above.
+    void shouldPropagatePublishedNotFoundByIban() {
         when(getAccountInfoQuery.getAccountInfoForTransfer("TR000"))
-                .thenThrow(new com.bank.app.account.domain.exception.AccountNotFoundException("TR000"));
+                .thenThrow(new AccountNotFoundException("TR000"));
 
         AccountNotFoundException ex = assertThrows(
                 AccountNotFoundException.class,
@@ -222,7 +219,7 @@ class AccountApiAdapterTest {
     @Test
     void shouldNotEvictOnReadPaths() {
         when(getAccountInfoQuery.getAccountInfo(1L))
-                .thenReturn(new AccountInfo(1L, 10L, "TRY", "ACTIVE"));
+                .thenReturn(new AccountView(1L, 10L, "TRY", "ACTIVE"));
 
         adapter.getSnapshotById(1L);
         adapter.getIbansForAccounts(Set.of(1L));
