@@ -24,6 +24,11 @@ public interface AuditLogJpaRepository extends JpaRepository<AuditLogJpaEntity, 
      * retention index ({@code idx_audit_logs_timestamp_id}, V40). The
      * transaction boundary is per batch, so the transaction-local maintenance
      * flag cannot leak on a pooled connection.
+     *
+     * <p>Since V67 the function deletes only the oldest hash-chain prefix:
+     * rows older than the cutoff are removed while their {@code chain_seq} is
+     * below the first retained row, so a backdated row behind newer rows waits
+     * for a later run instead of leaving an unverifiable gap.
      */
     @Transactional
     @Query(value = "SELECT delete_audit_logs_before(:cutoff, :batch)",

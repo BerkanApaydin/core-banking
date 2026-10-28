@@ -137,6 +137,29 @@ spec:
             severity: ticket
           annotations:
             summary: "Audit events are persisted but never observed after commit"
+        - alert: AuditChainBroken
+          # V67 tamper evidence: the nightly verifier recomputes the hash chain
+          # and flips this gauge to 1 when a row was rewritten, deleted from the
+          # middle, or removed from the head. A single nonzero value is a page:
+          # the audit trail is legal evidence (docs/decisions/audit-integrity.md).
+          expr: max(audit_chain_broken) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Audit hash chain is broken �?" do not delete evidence; snapshot the database and investigate"
+            runbook_url: "docs/decisions/audit-integrity.md"
+        - alert: AuditChainVerificationStale
+          # The daily 03:30 verifier stops updating this gauge if the job is
+          # disabled, crashloops, or the pod stops being scheduled. The chain
+          # can be silently unverified without this rule.
+          expr: time() - max(audit_chain_last_verified_epoch_seconds) > 172800
+          for: 1h
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Audit chain has not been verified in 48h"
+            runbook_url: "docs/decisions/audit-integrity.md"
         - alert: AuditDefaultPartitionNonEmpty
           # Partition-drift guard (partitioning.md step 5): rows in the DEFAULT
           # partition fell outside every pre-created range because

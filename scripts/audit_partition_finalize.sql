@@ -40,6 +40,7 @@ DROP TABLE audit_logs_legacy;
 -- timestamp indexes stay dropped per V52, not resurrected here).
 ALTER INDEX idx_audit_logs_timestamp_id_new RENAME TO idx_audit_logs_timestamp_id;
 ALTER INDEX idx_audit_logs_actor_timestamp_new RENAME TO idx_audit_logs_actor_timestamp;
+ALTER INDEX idx_audit_logs_chain_seq_new RENAME TO idx_audit_logs_chain_seq;
 
 COMMIT;
 

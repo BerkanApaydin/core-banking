@@ -38,6 +38,7 @@ is the single map: ID → file → one-sentence decision.
 | MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
 | I-09 | `docs/decisions/migration-ownership.md` | Focused follow-up to R-C07: Flyway resources live in the resources-only `migrations` module; owner headers and heavy-statement rules keep the future per-BC split safe. |
 | STAT-1 (2026-10) | `docs/decisions/static-analysis.md` | SpotBugs runs in `verify` (effort Max, threshold Medium, reviewed exclusions); Checkstyle/PMD/ErrorProne stay unwired until their engines exist in the offline cache. |
+| AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; F1 stays open for role separation/external anchoring. |
 
 ## Newly added decisions (this improvement round)
 

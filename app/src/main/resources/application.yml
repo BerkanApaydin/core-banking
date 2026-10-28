@@ -281,6 +281,10 @@ app:
     retention-enabled: ${AUDIT_RETENTION_ENABLED:true}
     retention-days: ${AUDIT_RETENTION_DAYS:365}
     retention-cron: ${AUDIT_RETENTION_CRON:0 0 4 * * 0}
+    # V67 tamper evidence: the job recomputes the hash chain and publishes
+    # audit.chain.broken / audit.chain.last_verified_epoch_seconds.
+    chain-verification-enabled: ${AUDIT_CHAIN_VERIFICATION_ENABLED:true}
+    chain-verification-cron: ${AUDIT_CHAIN_VERIFICATION_CRON:0 30 3 * * *}
   observability:
     backlog:
       enabled: ${BACKLOG_METRICS_ENABLED:true}

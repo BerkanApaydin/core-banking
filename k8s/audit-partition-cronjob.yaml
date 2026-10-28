@@ -1,0 +1,111 @@
+# F8 (partial): quarterly audit-partition maintenance without the application
+# holding DDL rights at runtime. The job uses the database maintenance
+# credential (the secret role must own audit_logs or hold CREATE on the
+# schema); psql itself runs unprivileged as uid 70.
+#
+# scripts/ensure_audit_partition.sql is idempotent and creates the current and
+# next half-year partitions, so running it on the first day of every quarter
+# at 03:00 UTC always leaves at least one future partition. The application's
+# retention job only DELETEs rows; when the oldest partitions are empty an
+# operator can switch to DROP PARTITION (docs/decisions/partitioning.md).
+#
+# Operator setup (once per release, alongside bank-flyway-migrations):
+#   kubectl create configmap bank-audit-maintenance-sql \
+#     --from-file=scripts/ensure_audit_partition.sql \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl apply -f k8s/audit-partition-cronjob.yaml
+#
+# The image is the same postgres:15-alpine used by the chart, pinned to the
+# multi-arch index digest; bump it together with the database image. psql runs
+# as the image's postgres user (uid 70), never as root.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bank-audit-partition-maintenance
+  labels:
+    app: bank-app
+    purpose: audit-maintenance
+spec:
+  schedule: "0 3 1 1,4,7,10 *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: bank-app
+            purpose: audit-maintenance
+        spec:
+          # Partition maintenance needs PostgreSQL/DNS only.
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: ensure-partition
+              image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+              command:
+                - psql
+                - -v
+                - ON_ERROR_STOP=1
+                - -f
+                - /sql/ensure_audit_partition.sql
+              env:
+                - name: PGHOST
+                  value: postgres
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  value: bank_db
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: bank-db-secret
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: bank-db-secret
+                      key: password
+                # DDL takes ACCESS EXCLUSIVE on the parent; fail fast instead of
+                # queueing every audit insert behind a stuck migration.
+                - name: PGOPTIONS
+                  value: "-c lock_timeout=10000 -c statement_timeout=60000"
+                - name: HOME
+                  value: /tmp
+              volumeMounts:
+                - name: maintenance-sql
+                  mountPath: /sql
+                  readOnly: true
+                - name: tmp-volume
+                  mountPath: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+          volumes:
+            - name: maintenance-sql
+              configMap:
+                name: bank-audit-maintenance-sql
+            - name: tmp-volume
+              emptyDir: {}

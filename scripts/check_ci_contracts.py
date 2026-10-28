@@ -248,6 +248,13 @@ def problems_for_deployment_contracts() -> list[str]:
     ):
         if not (ROOT / rel).is_file():
             problems.append(f"deployment contract file is missing: {rel}")
+    try:
+        cronjob = read("k8s/audit-partition-cronjob.yaml")
+        for token in ("kind: CronJob", "bank-audit-maintenance-sql", "ensure_audit_partition.sql"):
+            if token not in cronjob:
+                problems.append(f"k8s/audit-partition-cronjob.yaml lost: {token}")
+    except FileNotFoundError as exc:
+        problems.append(f"audit partition CronJob is missing: {exc}")
     return problems
 
 

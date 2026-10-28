@@ -24,6 +24,10 @@
 --     scripts/ensure_audit_partition.sql quarterly from the runbook).
 --   * Post-cutover, DELETE retention keeps working (cross-partition); the
 --     follow-up is switching it to DROP PARTITION (instant).
+--   * V67's audit hash-chain columns are copied and the chain trigger is
+--     recreated on the partitioned parent (triggers travel with the renamed
+--     legacy table, so a cutover that only recreated indexes would silently
+--     drop append-only/chain enforcement).
 
 SET lock_timeout = '30s';
 SET statement_timeout = '30min';
@@ -56,6 +60,9 @@ CREATE TABLE audit_logs_new (
     action "AuditAction" NOT NULL,
     username VARCHAR(255) NOT NULL,
     actor_user_id BIGINT,
+    chain_seq BIGINT NOT NULL,
+    prev_hash VARCHAR(64) NOT NULL,
+    row_hash VARCHAR(64) NOT NULL,
     CONSTRAINT audit_logs_new_pkey PRIMARY KEY ("timestamp", id)
 ) PARTITION BY RANGE ("timestamp");
 
@@ -74,9 +81,12 @@ CREATE TABLE audit_logs_p2027h2 PARTITION OF audit_logs_new
 CREATE TABLE audit_logs_default PARTITION OF audit_logs_new DEFAULT;
 
 -- 3. Backfill (explicit columns: legacy order is id, timestamp, details,
---    action, username, actor_user_id).
-INSERT INTO audit_logs_new (id, "timestamp", details, action, username, actor_user_id)
-    SELECT id, "timestamp", details, action, username, actor_user_id FROM audit_logs;
+--    action, username, actor_user_id, then the V67 chain columns).
+INSERT INTO audit_logs_new
+    (id, "timestamp", details, action, username, actor_user_id, chain_seq, prev_hash, row_hash)
+    SELECT id, "timestamp", details, action, username, actor_user_id,
+           chain_seq, prev_hash, row_hash
+      FROM audit_logs;
 
 -- 4. Atomic swap.
 ALTER TABLE audit_logs RENAME TO audit_logs_legacy;
@@ -85,6 +95,28 @@ ALTER TABLE audit_logs_new RENAME TO audit_logs;
 -- 5. Restart the new identity past the backfilled max (empty table -> 1).
 SELECT setval(pg_get_serial_sequence('audit_logs', 'id'),
     COALESCE((SELECT max(id) FROM audit_logs), 0));
+
+-- 5b. Re-point the chain head at the copied rows and recreate the guards on
+--     the new parent. Row triggers are cloned to every partition, including
+--     ones created later by ensure_audit_partition.sql.
+UPDATE audit_chain_state
+   SET last_seq = COALESCE((SELECT max(chain_seq) FROM audit_logs), 0),
+       last_hash = COALESCE((SELECT row_hash FROM audit_logs
+                              ORDER BY chain_seq DESC LIMIT 1), '')
+ WHERE id = 1;
+
+CREATE TRIGGER trg_audit_logs_append_only
+    BEFORE UPDATE OR DELETE ON audit_logs
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_logs_reject_mutation();
+CREATE TRIGGER trg_audit_logs_no_truncate
+    BEFORE TRUNCATE ON audit_logs
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION audit_logs_reject_truncate();
+CREATE TRIGGER trg_audit_logs_chain
+    BEFORE INSERT ON audit_logs
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_logs_assign_chain();
 
 -- 6. Recreate the query-surface indexes on the parent (auto-propagate to
 --    every partition). Suffixed _new: the legacy table (renamed below, kept
@@ -96,12 +128,14 @@ SELECT setval(pg_get_serial_sequence('audit_logs', 'id'),
 CREATE INDEX idx_audit_logs_timestamp_id_new ON audit_logs ("timestamp" DESC, id DESC);
 CREATE INDEX idx_audit_logs_actor_timestamp_new
     ON audit_logs (actor_user_id, "timestamp" DESC, id DESC);
+CREATE INDEX idx_audit_logs_chain_seq_new ON audit_logs (chain_seq);
 
 COMMIT;
 
 -- 7. Verify BEFORE finalizing (counts, PK, partitions).
 SELECT count(*) AS new_rows FROM audit_logs;
 SELECT count(*) AS legacy_rows FROM audit_logs_legacy;
+SELECT audit_logs_first_broken_chain_seq() AS first_broken_chain_seq;
 SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'audit_logs\_p%';
 SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'audit_logs';
 ANALYZE audit_logs;
