@@ -60,10 +60,10 @@ public class AccountController {
     }
 
     @PostMapping
-    @Idempotent
-    @Operation(summary = "Creates a new account", description = "Opens a new account with a server-generated simulation IBAN. Duplicate requests can be prevented with the Idempotency-Key header.")
-    @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = false,
-            description = "Optional de-duplication key; reuse returns the original response.")
+    @Idempotent(required = true)
+    @Operation(summary = "Creates a new account", description = "Opens a new account with a server-generated simulation IBAN. Idempotency-Key header is required so a retried request never opens a second account.")
+    @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true,
+            description = "De-duplication key; reuse with the same payload returns the original response.")
     public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountWebRequest webRequest) {
         CreateAccountRequest request = new CreateAccountRequest(
                 accountAuthorizationService.getCurrentUserId(), webRequest.ownerName(),

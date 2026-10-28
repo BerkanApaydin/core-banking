@@ -45,6 +45,7 @@ class AggregateVersioningIntegrationTest extends AbstractIntegrationTest {
     void seed() {
         // Child-first incl. ledger_entries (V29 FK): cleanup order must never
         // depend on test execution order.
+        enableLedgerMaintenance(entityManager);
         entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();

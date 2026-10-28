@@ -1,5 +1,6 @@
 package com.bank.app.common;
 
+import jakarta.persistence.EntityManager;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -28,5 +29,15 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.liquibase.enabled", () -> "false");
+    }
+
+    /**
+     * Test-only ledger cleanup: opts into the transaction-local maintenance
+     * flag that the V65 append-only trigger requires for DELETE. Must be
+     * called inside the same transaction that removes ledger rows.
+     */
+    protected void enableLedgerMaintenance(EntityManager entityManager) {
+        entityManager.createNativeQuery("SELECT set_config('app.ledger_maintenance', 'on', true)")
+                .getSingleResult();
     }
 }

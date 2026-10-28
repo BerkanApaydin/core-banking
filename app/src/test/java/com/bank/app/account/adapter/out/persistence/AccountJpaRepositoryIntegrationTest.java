@@ -40,6 +40,7 @@ class AccountJpaRepositoryIntegrationTest extends AbstractIntegrationTest {
         // (and the FK graph may exist on databases migrated before V22 dropped
         // the constraints), so cleanup order must never depend on test
         // execution order.
+        enableLedgerMaintenance(entityManager);
         entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM transfers").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM accounts").executeUpdate();

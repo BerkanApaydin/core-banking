@@ -97,7 +97,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "ownerName", "Flow Test",
                         "initialBalance", new BigDecimal("1000.00"),
                         "currency", "TRY"
-                ), headers),
+                ), accountHeaders(headers)),
                 AccountResponse.class);
         assertThat(accountResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(accountResponse.getBody()).isNotNull();
@@ -138,7 +138,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "ownerName", "Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
-                ), headersA), AccountResponse.class);
+                ), accountHeaders(headersA)), AccountResponse.class);
         assertThat(accountA.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<AccountResponse> accountB = restTemplate.exchange("/api/v1/accounts",
@@ -146,7 +146,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "ownerName", "Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
-                ), headersB), AccountResponse.class);
+                ), accountHeaders(headersB)), AccountResponse.class);
         assertThat(accountB.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         String senderIban = accountA.getBody().iban();
@@ -218,13 +218,13 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                 "ownerName", "Poor",
                 "initialBalance", new BigDecimal("100.00"),
                 "currency", "TRY"
-        ), headersSender), AccountResponse.class);
+        ), accountHeaders(headersSender)), AccountResponse.class);
 
         ResponseEntity<AccountResponse> richAccount = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST, new HttpEntity<>(Map.of(
                 "ownerName", "Rich",
                 "initialBalance", new BigDecimal("99999.00"),
                 "currency", "TRY"
-        ), headersReceiver), AccountResponse.class);
+        ), accountHeaders(headersReceiver)), AccountResponse.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
@@ -255,7 +255,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                         "ownerName", "HasAccount",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
-                ), headers), AccountResponse.class);
+                ), accountHeaders(headers)), AccountResponse.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
@@ -285,7 +285,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                          "ownerName", "Journey Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
-                ), auth), AccountResponse.class);
+                ), accountHeaders(auth)), AccountResponse.class);
         assertThat(sender.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<AccountResponse> receiver = restTemplate.exchange("/api/v1/accounts",
@@ -293,7 +293,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                          "ownerName", "Journey Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
-                ), auth), AccountResponse.class);
+                ), accountHeaders(auth)), AccountResponse.class);
         assertThat(receiver.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         Long senderId = sender.getBody().id();
 
@@ -368,7 +368,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                          "ownerName", "Replay Sender",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
-                ), headersSender), AccountResponse.class);
+                ), accountHeaders(headersSender)), AccountResponse.class);
         assertThat(accountSender.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<AccountResponse> accountReceiver = restTemplate.exchange("/api/v1/accounts",
@@ -376,7 +376,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                          "ownerName", "Replay Receiver",
                         "initialBalance", new BigDecimal("0"),
                         "currency", "TRY"
-                ), headersReceiver), AccountResponse.class);
+                ), accountHeaders(headersReceiver)), AccountResponse.class);
 
         HttpHeaders transferHeaders = new HttpHeaders();
         transferHeaders.setBearerAuth(loginSender.getBody().token());
@@ -431,7 +431,7 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
                          "ownerName", "Same",
                         "initialBalance", new BigDecimal("5000.00"),
                         "currency", "TRY"
-                ), headers), AccountResponse.class);
+                ), accountHeaders(headers)), AccountResponse.class);
 
         ResponseEntity<ProblemDetail> response = restTemplate.exchange("/api/v1/transfers",
                 HttpMethod.POST, new HttpEntity<>(Map.of(
@@ -445,11 +445,27 @@ class ApplicationSmokeIntegrationTest extends AbstractSpringBootIntegrationTest 
     }
 
     /**
+     * Builds account-create headers with a fresh idempotency key. Account
+     * creation requires the header; every POST needs its own key so a second
+     * account is actually opened instead of replaying the first response.
+     */
+    private static HttpHeaders accountHeaders(HttpHeaders authHeaders) {
+        HttpHeaders accountHeaders = new HttpHeaders();
+        String bearer = authHeaders.getFirst(HttpHeaders.AUTHORIZATION);
+        if (bearer != null) {
+            accountHeaders.set(HttpHeaders.AUTHORIZATION, bearer);
+        }
+        accountHeaders.set("Idempotency-Key", "account-" + UUID.randomUUID());
+        return accountHeaders;
+    }
+
+    /**
      * Builds transfer-call headers with a fresh idempotency key. The key must
      * differ from any key used on account creation: reusing an account-create
      * key would replay the cached account response instead of executing the
      * transfer.
-     */    private static HttpHeaders transferHeaders(HttpHeaders authHeaders) {
+     */
+    private static HttpHeaders transferHeaders(HttpHeaders authHeaders) {
         HttpHeaders transferHeaders = new HttpHeaders();
         String bearer = authHeaders.getFirst(HttpHeaders.AUTHORIZATION);
         if (bearer != null) {

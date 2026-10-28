@@ -74,6 +74,7 @@ class BrowserSessionIntegrationTest extends AbstractSpringBootIntegrationTest {
             return;
         }
         transactionTemplate.executeWithoutResult(status -> {
+            enableLedgerMaintenance(entityManager);
             for (String username : createdUsernames) {
                 entityManager.createNativeQuery("DELETE FROM ledger_entries WHERE account_id IN "
                                 + "(SELECT id FROM accounts WHERE user_id IN "

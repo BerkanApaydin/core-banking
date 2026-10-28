@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -107,6 +108,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
@@ -130,6 +132,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
@@ -144,6 +147,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isBadRequest())
@@ -162,6 +166,7 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
@@ -177,10 +182,25 @@ class AccountControllerIntegrationTest extends AbstractSpringBootIntegrationTest
 
                         mockMvc.perform(post("/api/v1/accounts")
                                         .header("Authorization", "Bearer " + jwtToken)
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andExpect(status().isCreated())
                                         .andExpect(jsonPath("$.iban", not(is("TR340006100519786457841326"))));
+                }
+
+                @Test
+                @DisplayName("should return 409 when Idempotency-Key is missing")
+                void shouldRequireIdempotencyKey() throws Exception {
+                        Map<String, Object> request = Map.of("ownerName", "No Key",
+                                        "initialBalance", new BigDecimal("100.00"), "currency", "TRY");
+
+                        mockMvc.perform(post("/api/v1/accounts")
+                                        .header("Authorization", "Bearer " + jwtToken)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isConflict())
+                                        .andExpect(jsonPath("$.code", is("IDEMPOTENCY_KEY_REQUIRED")));
                 }
         }
 

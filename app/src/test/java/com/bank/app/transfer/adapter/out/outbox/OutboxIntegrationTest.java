@@ -127,6 +127,7 @@ class OutboxIntegrationTest extends AbstractSpringBootIntegrationTest {
             entityManager.createQuery("delete from TransferJpaEntity").executeUpdate();
             // Ledger legs reference accounts (V29 FK): child-first, so cleanup
             // never depends on test execution order.
+            enableLedgerMaintenance(entityManager);
             entityManager.createNativeQuery("DELETE FROM ledger_entries").executeUpdate();
             entityManager.createQuery("delete from AccountJpaEntity").executeUpdate();
             entityManager.createQuery("delete from UserJpaEntity").executeUpdate();

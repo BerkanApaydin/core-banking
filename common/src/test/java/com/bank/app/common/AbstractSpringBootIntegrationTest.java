@@ -54,6 +54,16 @@ public abstract class AbstractSpringBootIntegrationTest {
                 .getSingleResult();
     }
 
+    /**
+     * Test-only ledger cleanup: opts into the transaction-local maintenance
+     * flag that the V65 append-only trigger requires for DELETE. Must be
+     * called inside the same transaction that removes ledger rows.
+     */
+    protected void enableLedgerMaintenance(EntityManager entityManager) {
+        entityManager.createNativeQuery("SELECT set_config('app.ledger_maintenance', 'on', true)")
+                .getSingleResult();
+    }
+
     static {
         TestDatabaseContainer.getInstance();
     }
