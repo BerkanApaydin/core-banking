@@ -281,6 +281,12 @@ app:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
     orphan-alarm-threshold: ${ORPHAN_ALARM_THRESHOLD:0}
+    # F2: the reconciliation query is a full-table GROUP BY over append-only
+    # ledger_entries. Six-hourly bounds detection latency (the old nightly
+    # cadence left up to 24h blind spots) while staying far below the 60s
+    # backlog scan load (PERF-1). The job also publishes
+    # ledger.reconciliation.last_success_epoch_seconds for the stale alert.
+    ledger-reconciliation-cron: ${LEDGER_RECONCILIATION_CRON:0 15 */6 * * *}
   audit:
     max-query-limit: ${AUDIT_MAX_QUERY_LIMIT:500}
     retention-enabled: ${AUDIT_RETENTION_ENABLED:true}

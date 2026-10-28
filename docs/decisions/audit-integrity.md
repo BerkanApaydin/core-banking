@@ -50,12 +50,22 @@ singleton chain head catches a removed suffix.
   5. skips the `prev_hash` check for the oldest retained row, because prefix
      retention intentionally removes its predecessor.
 - `delete_audit_logs_before(timestamp, batch)` runs `SECURITY DEFINER` with a
-  pinned `search_path` and rejects a cutoff newer than 30 days. It finds the
-  first retained row (`MIN(chain_seq) WHERE timestamp >= cutoff`) and deletes
-  only rows with a smaller `chain_seq`. A backdated row inserted behind newer
-  rows is therefore retained until every newer row has also fallen outside the
-  cutoff (or the whole retained chain ages out), instead of punching a hole in
-  the chain. This delays such rows; it does not lose the prefix guarantee.
+  pinned `search_path` and rejects a cutoff newer than 30 days. On the
+  non-partitioned parent it finds the first retained row (`MIN(chain_seq) WHERE
+  timestamp >= cutoff`) and deletes only rows with a smaller `chain_seq`. A
+  backdated row inserted behind newer rows is therefore retained until every
+  newer row has also fallen outside the cutoff (or the whole retained chain ages
+  out), instead of punching a hole in the chain. This delays such rows; it does
+  not lose the prefix guarantee.
+- V69 extends the same function for the partitioned parent. It parses each
+  child partition's upper bound and drops only partitions whose upper bound is
+  at or before the cutoff **and** whose rows form a true chain prefix
+  (`max(chain_seq)` in the candidates < `min(chain_seq)` in the retained rows).
+  A backdated high-`chain_seq` row in an old timestamp partition blocks the
+  drop; the function then falls back to the V67 prefix `DELETE`. Partition
+  drops are metadata operations and are not bounded by `p_batch`. The branch is
+  dormant until the one-time cutover moves `audit_logs` to a partitioned
+  parent.
 - `bank_app` has `SELECT`/`INSERT` on `audit_logs`, `SELECT` on
   `audit_chain_state`, and no `UPDATE`/`DELETE`/`TRUNCATE` or DDL. The
   capability roles are documented in
@@ -110,7 +120,9 @@ accidental operator mistakes, not against a determined database administrator.
   window and do not reset `audit_chain_state` to silence it. V68 revokes
   `EXECUTE` on the retention function from `PUBLIC`; a legacy non-owner
   retention role other than `bank_app` must be granted `EXECUTE` explicitly (or
-  moved to `bank_audit_maintenance`) before deployment.
+  moved to `bank_audit_maintenance`) before deployment. V69 adds the
+  partition-drop fast path, but only for partitions that are fully expired and
+  chain-prefix-safe; the backdated-row fallback still uses bounded DELETE.
 - A partition cutover must copy `chain_seq`/`prev_hash`/`row_hash`, recreate
   the append-only + chain triggers on the new parent, reset the state row, and
   reapply the audit/ledger grants and revokes; `scripts/audit_partition_cutover.sql`
@@ -150,5 +162,8 @@ append-only log — not weakening the chain. Measure before optimizing.
 - `LeastPrivilegeDatabaseRoleIntegrationTest` (10 tests) proves the runtime
   role cannot update/delete/truncate audit rows, cannot write the chain head
   or run DDL, and can still insert, verify, and call guarded retention.
-- Full `.\mvnw.cmd -B -ntp -o clean verify`: 3,774 tests (3,538 unit + 236 IT),
+- `AuditPartitionRetentionIntegrationTest` (2 tests) proves V69 drops a fully
+  expired partition and falls back to prefix `DELETE` when a backdated
+  high-`chain_seq` row blocks the drop.
+- Full `.\mvnw.cmd -B -ntp clean verify`: 3,779 tests (3,541 unit + 238 IT),
   0 failures/errors/skipped; aggregate coverage and SpotBugs gates passed.

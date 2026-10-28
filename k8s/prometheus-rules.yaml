@@ -84,15 +84,27 @@ spec:
           # Money invariant: legs sharing a transaction_ref must net to zero.
           # Any nonzero group is a page — it means a partial write escaped the
           # single-transaction ledger discipline (see docs/slo.md).
-          # Cadence note (PERF-1): the gauge is published by the nightly
+          # Cadence note (PERF-1): the gauge is published by the 6-hourly
           # LedgerReconciliationJob, not a minutely scan — detection latency
-          # is up to ~24h, but once flipped the gauge persists and pages here.
+          # is up to ~6h, but once flipped the gauge persists and pages here.
           expr: max(ledger_nonzero_transaction_refs) > 0
           for: 15m
           labels:
             severity: page
           annotations:
             summary: "Ledger legs do not net to zero — investigate unbalanced transaction_refs"
+            runbook_url: "docs/slo.md"
+        - alert: LedgerReconciliationStale
+          # A balanced gauge is only meaningful if the scan still runs. The
+          # last-success gauge stays at zero until the first successful scan
+          # and stops moving when the job is disabled, crashloops, or loses
+          # its advisory lock. 8h = one missed 6-hourly run + buffer.
+          expr: time() - max(ledger_reconciliation_last_success_epoch_seconds) > 28800
+          for: 1h
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Ledger reconciliation has not completed in 8h — imbalance detection is blind"
             runbook_url: "docs/slo.md"
         - alert: DatabaseOrphanAlarm
           # The counter carries NO `type` label (only the db_orphan_current
@@ -147,7 +159,7 @@ spec:
           labels:
             severity: page
           annotations:
-            summary: "Audit hash chain is broken �?" do not delete evidence; snapshot the database and investigate"
+            summary: "Audit hash chain is broken — do not delete evidence; snapshot the database and investigate"
             runbook_url: "docs/decisions/audit-integrity.md"
         - alert: AuditChainVerificationStale
           # The daily 03:30 verifier stops updating this gauge if the job is

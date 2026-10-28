@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.audit;
 
+import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import com.bank.app.infrastructure.testsupport.LogCapture;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,5 +133,53 @@ class LedgerReconciliationJobTest {
         assertThat(registry.get("ledger.nonzero_transaction_refs").gauge().value()).isEqualTo(0.0);
         assertThat(registry.counter("ledger.reconciliation.runs").count()).isEqualTo(1.0);
         assertThat(registry.counter("ledger.reconciliation.nonzero").count()).isEqualTo(0.0);
+    }
+
+    @Test
+    void shouldPublishLastSuccessTimestampOnEveryCompletedScan() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        Instant now = Instant.parse("2026-10-28T12:00:00Z");
+        ClockProviderPort clock = () -> Clock.fixed(now, ZoneOffset.UTC);
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry, clock);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+
+        job.reconcile();
+
+        assertThat(registry.get(LedgerReconciliationJob.LAST_SUCCESS_GAUGE).gauge().value())
+                .isEqualTo((double) now.getEpochSecond());
+        assertThat(registry.counter(LedgerReconciliationJob.FAILURES_COUNTER).count()).isZero();
+    }
+
+    @Test
+    void shouldAdvanceLastSuccessEvenWhenAnImbalanceIsDetected() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        Instant now = Instant.parse("2026-10-28T12:00:00Z");
+        ClockProviderPort clock = () -> Clock.fixed(now, ZoneOffset.UTC);
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry, clock);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(4L);
+
+        job.reconcile();
+
+        assertThat(registry.get(LedgerReconciliationJob.LAST_SUCCESS_GAUGE).gauge().value())
+                .as("the scan itself succeeded; the imbalance is a separate page alert")
+                .isEqualTo((double) now.getEpochSecond());
+        assertThat(registry.get("ledger.nonzero_transaction_refs").gauge().value()).isEqualTo(4.0);
+    }
+
+    @Test
+    void shouldLeaveLastSuccessAndCountFailuresWhenScanFails() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        Instant now = Instant.parse("2026-10-28T12:00:00Z");
+        ClockProviderPort clock = () -> Clock.fixed(now, ZoneOffset.UTC);
+        var job = new LedgerReconciliationJob(jdbc, AdvisorySchedulerLock.alwaysRun(), registry, clock);
+        when(jdbc.queryForObject(anyString(), eq(Long.class)))
+                .thenThrow(new RuntimeException("store unavailable"));
+
+        assertThatNoException().isThrownBy(job::reconcile);
+
+        assertThat(registry.get(LedgerReconciliationJob.LAST_SUCCESS_GAUGE).gauge().value())
+                .as("a failed scan must not look like a fresh successful one")
+                .isZero();
+        assertThat(registry.counter(LedgerReconciliationJob.FAILURES_COUNTER).count()).isEqualTo(1.0);
     }
 }

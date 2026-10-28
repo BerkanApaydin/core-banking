@@ -40,6 +40,8 @@ is the single map: ID → file → one-sentence decision.
 | STAT-1 (2026-10) | `docs/decisions/static-analysis.md` | SpotBugs runs in `verify` (effort Max, threshold Medium, reviewed exclusions); Checkstyle/PMD/ErrorProne stay unwired until their engines exist in the offline cache. |
 | AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; F1 stays open for external anchoring. |
 | LEAST-PRIV-1 (2026-10) | `docs/decisions/least-privilege-db-roles.md` | V68 + the provisioning script run the app as insert/select-only `bank_app`, split Flyway to the owner, guard retention with a 30-day floor, and flag an empty table with a non-zero chain head. |
+| OBS-1 (2026-10) | `application.yml`, `k8s/prometheus-rules.yaml` | Ledger reconciliation runs 6-hourly by default, publishes a last-success epoch gauge, and tickets after 8h without a completed scan; PERF-1 keeps the full-table scan out of the 60s loop. |
+| AUDIT-3 (2026-10) | `V69__audit_partition_aware_retention.sql`, `docs/decisions/partitioning.md` | Partitioned audit retention drops only fully expired, chain-prefix-safe partitions; a backdated high-`chain_seq` row blocks the drop and falls back to the V67 prefix DELETE. |
 
 ## Newly added decisions (this improvement round)
 
@@ -56,6 +58,7 @@ is the single map: ID → file → one-sentence decision.
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 - `static-analysis.md` (STAT-1: SpotBugs verify gate + reviewed exclusions; extended Python structural rules)
 - `least-privilege-db-roles.md` (LEAST-PRIV-1: runtime/owner split, append-only evidence grants, retention cutoff floor, empty-table chain signal)
+- `audit-integrity.md` (AUDIT-2/AUDIT-3: hash chain + verifier, prefix retention, partition-aware `DROP PARTITION` with backdated-row fallback)
 
 ## Operational decisions
 

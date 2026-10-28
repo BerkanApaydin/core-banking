@@ -103,8 +103,9 @@ disabled in the application and the migration Job is the only writer,
   recreated (for example by a partition cutover), re-run the carve-outs.
 - The application can still call retention for rows older than 30 days. A
   separate scheduler datasource/role is a future hardening step.
-- F2 reconciliation frequency and alert level are unchanged; this ADR covers
-  the privilege path only.
+- F2 reconciliation frequency and stale alert are handled by the 6-hourly
+  `LedgerReconciliationJob` and `LedgerReconciliationStale`; this ADR covers
+  the privilege path only. A separate scheduler datasource/role remains open.
 
 ## Operational rules
 
@@ -167,8 +168,8 @@ grant that role `EXECUTE` before applying V68, or move it to
   all rows, and assert the verifier returns `-1`; the rollback restores the
   committed chain.
 - Targeted run: 16/16 tests passed.
-- Full `.\mvnw.cmd -B -ntp -o clean verify`: 3,774 tests (3,538 unit + 236 IT),
-  0 failures/errors/skipped, 45 failsafe XML, aggregate coverage gates passed,
+- Full `.\mvnw.cmd -B -ntp clean verify`: 3,779 tests (3,541 unit + 238 IT),
+  0 failures/errors/skipped, 46 failsafe XML, aggregate coverage gates passed,
   SpotBugs 0.
-- `python scripts/check_migration_chain.py` reports V1–V68 contiguous;
+- `python scripts/check_migration_chain.py` reports V1–V69 contiguous;
   `check_migration_timeouts.py` is clean.

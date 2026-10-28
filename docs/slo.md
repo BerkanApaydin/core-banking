@@ -11,7 +11,7 @@ measured by the quarterly drill (`ops/restore-drill.sh`), not re-derived here.
 |---|---|---|
 | Transfer placement success | 99.9% of `POST /api/v1/transfers` → 2xx (excluding 4xx caller errors) | `http_server_requests_seconds_count{uri="/api/v1/transfers"}` |
 | Transfer placement latency | p99 < 2s | `http_server_requests_seconds` histogram, same selector |
-| No lost money movements | 100% — zero unexplained balance changes per reconciliation | Nightly-published gauge `ledger_nonzero_transaction_refs` (alert: `LedgerImbalance`, page on any nonzero group; detection latency up to ~24h by design, PERF-1); the nightly manual check (V29 query) remains the drill procedure |
+| No lost money movements | 100% — zero unexplained balance changes per reconciliation | `ledger_nonzero_transaction_refs` gauge (alert: `LedgerImbalance`, page on any nonzero group; detection latency up to ~6h by design, PERF-1) plus `ledger_reconciliation_last_success_epoch_seconds` (alert: `LedgerReconciliationStale`, ticket after 8h without a completed scan); the manual V29 check remains the drill procedure |
 | Outbox delivery | 100% — zero dead letters | `outbox_event_dead_letter_total` (alert: `OutboxDeadLetter`) |
 | Audit completeness | 100% — every transfer has legs + `TRANSFER_EXECUTED` row | `audit_event_consumed_total` tracks persisted rows (alert: `AuditDispatchStalled`) |
 | Auth availability | 99.9% of login attempts answered (2xx/4xx, not 5xx) | `http_server_requests_seconds_count{uri="/api/v1/auth/login"}` |
@@ -60,6 +60,8 @@ Out of scope for SLOs (no paging): report/history latency (best-effort reads),
   `app.outbox.worker-threads-per-partition` / `app.outbox.max-worker-threads`);
   beyond that, the
   `docs/decisions/kafka-readiness.md` trigger applies.
-- Reconciliation: `LedgerReconciliationJob` (03:30 cron) + `ledger.nonzero`
-  counter; nonzero pages (critical), drill procedure in
-  `docs/disaster-recovery.md`.
+- Reconciliation: `LedgerReconciliationJob` (6-hourly default, `0 15 */6 * * *`)
+  + `ledger.nonzero` counter; nonzero pages (critical). The
+  `ledger.reconciliation.last_success_epoch_seconds` gauge feeds
+  `LedgerReconciliationStale` (8h, ticket), so a stopped job is not mistaken
+  for a balanced ledger. Drill procedure in `docs/disaster-recovery.md`.

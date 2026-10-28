@@ -42,13 +42,19 @@ The cutover is scripted (no pg_partman dependency):
 - V67 interaction: the cutover script copies `chain_seq`/`prev_hash`/`row_hash`,
   recreates the append-only + hash-chain triggers on the new parent, re-points
   `audit_chain_state`, and prints `audit_logs_first_broken_chain_seq()`.
-  Prefix-only retention is partition-compatible: dropping the oldest
-  partition is the same "oldest chain prefix" operation as the DELETE path.
+- V69 implements partition-aware retention. `delete_audit_logs_before` parses
+  each child partition's upper bound and drops a partition only when its rows
+  are a true hash-chain prefix (`max(chain_seq)` in the candidate partitions <
+  `min(chain_seq)` in the retained rows). A backdated high-`chain_seq` row in an
+  old timestamp partition blocks the drop and falls back to the V67 prefix
+  DELETE, preserving the chain guarantee. Partition drops are metadata-only and
+  are not bounded by `p_batch`.
 - Drift signal: `BacklogMetricsReporter` exposes
   `audit.default_partition.rows`; `AuditDefaultPartitionNonEmpty` pages when
   rows accumulate in DEFAULT (missed ensure-job). Pre-cutover the gauge reads
   0 and the alert is quiet.
 
-Remaining follow-up (still open): switch `AuditRetentionScheduler` from
-cross-partition DELETE to DROP PARTITION (instant) once the oldest live
-partition is fully outside retention.
+Remaining follow-up (still open): run the one-time `audit_partition_cutover.sql`
+in production. The application still runs on the non-partitioned parent until
+that window; V69's `DROP PARTITION` branch activates only after the cutover.
+Ledger partitioning remains a separate follow-up.
