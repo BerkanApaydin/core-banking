@@ -4,7 +4,7 @@ import com.bank.app.account.application.dto.AccountResponse;
 import com.bank.app.bootstrap.OrphanIntegrityReporter;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Iban;
-import com.bank.app.infrastructure.adapter.out.metrics.BacklogMetricsReporter;
+import com.bank.app.infrastructure.adapter.in.metrics.BacklogMetricsReporter;
 import com.bank.app.transfer.application.dto.TransferResponse;
 import com.bank.app.transfer.domain.TransferStatus;
 import com.bank.app.user.application.dto.AuthRequest;

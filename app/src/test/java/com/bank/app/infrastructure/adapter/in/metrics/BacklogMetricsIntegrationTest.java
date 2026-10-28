@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.out.metrics;
+package com.bank.app.infrastructure.adapter.in.metrics;
 
 import com.bank.app.common.AbstractIntegrationTest;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;

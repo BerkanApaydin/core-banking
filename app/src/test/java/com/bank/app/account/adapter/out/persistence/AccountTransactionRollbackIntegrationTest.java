@@ -7,7 +7,7 @@ import com.bank.app.account.application.port.in.CreateAccountUseCase;
 import com.bank.app.account.application.dto.CreateAccountRequest;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.infrastructure.adapter.in.security.SimpleAuthenticatedPrincipal;
+import com.bank.app.infrastructure.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import org.junit.jupiter.api.BeforeEach;

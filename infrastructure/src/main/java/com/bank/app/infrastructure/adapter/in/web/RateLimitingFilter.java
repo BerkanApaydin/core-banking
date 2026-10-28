@@ -1,6 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.MessageSource;
@@ -25,13 +25,13 @@ import org.springframework.stereotype.Component;
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class RateLimitingFilter extends AbstractRateLimitingFilter {
 
-    private final ClientIpResolverPort clientIpResolver;
+    private final ClientIpResolver clientIpResolver;
 
     public RateLimitingFilter(RateLimiter rateLimiter,
                               MessageSource messageSource,
                               RateLimitProperties rateLimitProperties,
                               ObjectMapper objectMapper,
-                              ClientIpResolverPort clientIpResolver) {
+                              ClientIpResolver clientIpResolver) {
         super(rateLimiter, messageSource, rateLimitProperties, objectMapper);
         this.clientIpResolver = clientIpResolver;
     }

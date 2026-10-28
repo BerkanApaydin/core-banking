@@ -9,7 +9,7 @@ import com.bank.app.user.application.dto.AuthResponse;
 import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,12 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final LoginUserUseCase loginUserUseCase;
-    private final ClientIpResolverPort clientIpResolver;
+    private final ClientIpResolver clientIpResolver;
     private final LogoutUseCase logoutUseCase;
     private final RefreshSessionUseCase refreshSessionUseCase;
 
     public AuthController(LoginUserUseCase loginUserUseCase,
-                          ClientIpResolverPort clientIpResolver,
+                          ClientIpResolver clientIpResolver,
                           LogoutUseCase logoutUseCase,
                           RefreshSessionUseCase refreshSessionUseCase) {
         this.loginUserUseCase = loginUserUseCase;

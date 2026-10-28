@@ -2,11 +2,11 @@
 
 ## Decision
 
-`ProblemBody`, `PublicApiPaths`, `ApiVersion`, `@Idempotent` and
-`BrowserSessionCookies` stay in `common`
+`ProblemBody`, `PublicApiPaths`, `ApiVersion`, `@Idempotent`,
+`BrowserSessionCookies` and `ClientIpResolver` stay in `common`
 (`com.bank.app.common.adapter.in.*`). They are framework-free contracts and
-helpers consumed by every bounded context's inbound adapter; `common` is the
-shared kernel, so this is the dependency-correct home.
+helpers consumed by bounded-context inbound adapters; `common` is the shared
+kernel, so this is the dependency-correct home.
 
 ## Why not move them to infrastructure
 

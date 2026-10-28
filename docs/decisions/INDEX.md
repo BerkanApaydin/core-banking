@@ -13,7 +13,7 @@ is the single map: ID → file → one-sentence decision.
 | K12/D5 | Schedulers (`IdempotencyCleanupScheduler`, `OutboxRetentionScheduler`, `AuditRetentionScheduler`, `BacklogMetricsReporter`) | Advisory-lock single-flight; no tx, the lock guard owns the transaction. |
 | S6 | `AdjustAccountBalancesUseCaseImpl.auditMovement` | Audit row travels as one object (no loose id+balance primitives). |
 | D13/K14 | `JwtTokenProvider` | Typed properties; no `@Value` scatter. |
-| D14/S12 | `AccountApiAdapter` | Published language is implemented in `adapter.out`. |
+| D14/S12 | `AccountApiAdapter` | Published language is implemented by the provider as an inbound adapter (`adapter.in.api`); the consumer's ACL stays outbound. |
 | D22 | `application.yml`, compose | Tracing off by default in prod (no pointless localhost dial). |
 | G-1 | `docs/decisions/authorization-boundary.md` | Admin: URL boundary (`hasRole`) + use-case `hasRole`, two layers. |
 | G-2 | `docs/decisions/token-version.md` | Access stateless on non-admin paths (documented 15-min window); admin paths + refresh DB-checked (SEC-01). |

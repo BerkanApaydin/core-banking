@@ -24,7 +24,7 @@ import com.bank.app.user.application.port.in.RequestPasswordResetUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.in.RegisterUserUseCase;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +69,7 @@ class AuthControllerTest {
         @Mock
         private LoginUserUseCase loginUserUseCase;
         @Mock
-        private ClientIpResolverPort clientIpResolver;
+        private ClientIpResolver clientIpResolver;
         @Mock
         private LogoutUseCase logoutUseCase;
         @Mock

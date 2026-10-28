@@ -1,5 +1,6 @@
 package com.bank.app.architecture;
 
+import com.bank.app.account.api.AccountApi;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -90,6 +91,68 @@ class PortsAndNamingArchitectureTest extends ArchitectureTest {
         return packageName.matches(".*\\.port\\.out(\\..*)?")
                 || packageName.equals("com.bank.app.account.api")
                 || packageName.startsWith("com.bank.app.account.api.");
+    }
+
+    @Test
+    void inboundAdaptersShouldNotImplementOutPorts() {
+        // Inbound adapters drive the application; implementing an out-port would
+        // make a driving adapter also a driven dependency and invert the arrows.
+        ArchRule rule = classes()
+                .that().resideInAnyPackage("..adapter.in..")
+                .should(notImplementPort(".*\\.application\\.port\\.out(\\..*)?"))
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void outboundAdaptersShouldNotImplementInPorts() {
+        // Outbound adapters are driven by the application; an in-port
+        // implementation outside application.usecase belongs to no use case.
+        ArchRule rule = classes()
+                .that().resideInAnyPackage("..adapter.out..")
+                .should(notImplementPort(".*\\.application\\.port\\.in(\\..*)?"))
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void onlyUseCaseImplementationsShouldImplementInPorts() {
+        // Pins the inbound direction: adapters call in-ports, use cases
+        // implement them. Scheduled jobs and filters must not become use cases.
+        ArchRule rule = classes()
+                .that().resideOutsideOfPackage("..application.usecase..")
+                .should(notImplementPort(".*\\.application\\.port\\.in(\\..*)?"))
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    @Test
+    void publishedLanguageAdaptersShouldResideInInboundApiPackage() {
+        // Single in/out rule: an Open Host Service is an inbound contract for
+        // the provider bounded context. The provider-side adapter receives
+        // downstream calls, so it belongs in adapter.in.api; the consumer's
+        // ACL remains adapter.out. Direction is relative to the invoked core.
+        ArchRule rule = classes()
+                .that().implement(AccountApi.class)
+                .should().resideInAPackage("..adapter.in.api..")
+                .allowEmptyShould(false);
+
+        rule.check(importedClasses);
+    }
+
+    private static ArchCondition<JavaClass> notImplementPort(String packageRegex) {
+        return new ArchCondition<>("not implement a port matching " + packageRegex) {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                item.getAllRawInterfaces().stream()
+                        .filter(type -> type.getPackageName().matches(packageRegex))
+                        .forEach(port -> events.add(SimpleConditionEvent.violated(item,
+                                item.getDescription() + " implements " + port.getFullName())));
+            }
+        };
     }
 
     @Test

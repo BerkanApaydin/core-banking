@@ -13,7 +13,7 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.user.config.BrowserSessionProperties;
 import com.bank.app.user.config.SessionTokenLifetimeProperties;
 import jakarta.servlet.http.Cookie;
@@ -108,7 +108,7 @@ class BrowserAuthControllerWebMvcTest {
     private RefreshSessionUseCase refreshSessionUseCase;
 
     @MockitoBean
-    private ClientIpResolverPort clientIpResolver;
+    private ClientIpResolver clientIpResolver;
 
     @MockitoBean
     private CsrfBindingPort csrfBinding;

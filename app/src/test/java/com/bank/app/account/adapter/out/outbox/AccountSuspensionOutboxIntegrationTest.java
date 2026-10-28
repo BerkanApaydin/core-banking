@@ -8,7 +8,7 @@ import com.bank.app.account.application.port.in.SuspendAccountUseCase;
 import com.bank.app.account.domain.AccountSuspendedEvent;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import com.bank.app.common.domain.Currency;
-import com.bank.app.infrastructure.adapter.in.security.SimpleAuthenticatedPrincipal;
+import com.bank.app.infrastructure.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.adapter.out.persistence.UserJpaEntity;
 import com.bank.app.user.adapter.out.persistence.UserJpaRepository;
 import com.bank.app.user.domain.Role;

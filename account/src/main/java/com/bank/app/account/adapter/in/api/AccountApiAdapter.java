@@ -1,4 +1,4 @@
-package com.bank.app.account.adapter.out.api;
+package com.bank.app.account.adapter.in.api;
 
 import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.GetAccountInfoQuery;
@@ -16,11 +16,14 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Outbound API adapter (D14/S12): implements the {@code account-api} published
+ * Inbound API adapter (D14/S12): implements the {@code account-api} published
  * language (Open Host Service) by delegating to the account application ports.
- * It lives in {@code adapter.out} because the Account context <em>serves</em>
- * this contract outward — downstream contexts program against {@link AccountApi},
- * never against account use-cases or domain types.
+ * It lives in {@code adapter.in} because downstream contexts call <em>into</em>
+ * the Account context — this adapter receives that call and drives the account
+ * in-ports. The consumer side of the same boundary (for example transfer's
+ * {@code AccountAclAdapter}) is the outbound adapter; direction is always
+ * relative to the context whose core is invoked. Downstream contexts program
+ * against {@link AccountApi}, never against account use-cases or domain types.
  *
  * <p>Cache-invalidation ownership: every balance/status mutation performed here
  * evicts the involved snapshots through {@link AccountSnapshotCache} before

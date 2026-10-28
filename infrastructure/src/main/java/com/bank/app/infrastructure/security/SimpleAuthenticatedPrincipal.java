@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.in.security;
+package com.bank.app.infrastructure.security;
 
 import com.bank.app.common.application.port.out.AuthenticatedPrincipalPort;
 import org.springframework.security.core.GrantedAuthority;
@@ -12,6 +12,10 @@ import java.util.Collection;
  * The DB-backed login path uses the user module's own principal type; both are
  * consumed through {@link AuthenticatedPrincipalPort} so no adapter depends on a
  * concrete adapter class from another module.
+ *
+ * <p>Lives in a neutral infrastructure package (not under {@code adapter.in} or
+ * {@code adapter.out}): it is a security data object shared by both directions,
+ * and placing it under either adapter package would misstate its role.
  */
 public class SimpleAuthenticatedPrincipal extends User implements AuthenticatedPrincipalPort {
 

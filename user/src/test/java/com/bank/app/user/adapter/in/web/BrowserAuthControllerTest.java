@@ -10,7 +10,7 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.config.BrowserSessionProperties;
@@ -53,7 +53,7 @@ class BrowserAuthControllerTest {
     @Mock private LoginUserUseCase loginUserUseCase;
     @Mock private LogoutUseCase logoutUseCase;
     @Mock private RefreshSessionUseCase refreshSessionUseCase;
-    @Mock private ClientIpResolverPort clientIpResolver;
+    @Mock private ClientIpResolver clientIpResolver;
     @Mock private CsrfBindingPort csrfBinding;
     @Mock private UserContextService userContextService;
 

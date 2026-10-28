@@ -14,7 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.common.application.aspect.UseCaseAspectOrders;
 import com.bank.app.infrastructure.config.IdempotencyProperties;
 import com.bank.app.infrastructure.config.TransactionProperties;
@@ -35,7 +35,7 @@ public class IdempotencyAspect {
     public IdempotencyAspect(IdempotencyGuard idempotencyGuard,
             UserContextService userContextService,
             ObjectMapper objectMapper,
-            ClientIpResolverPort clientIpResolver,
+            ClientIpResolver clientIpResolver,
             PlatformTransactionManager transactionManager,
             TransactionProperties transactionProperties,
             IdempotencyProperties idempotencyProperties) {

@@ -1,7 +1,7 @@
 package com.bank.app.user.adapter.in.web;
 
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.account.domain.exception.DuplicateIbanException;

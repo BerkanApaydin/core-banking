@@ -6,7 +6,7 @@ import com.bank.app.infrastructure.adapter.in.web.RequestPathResolver;
 import com.bank.app.common.application.service.UserContextService;
 import com.bank.app.common.domain.exception.AuthorizationException;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,11 +19,11 @@ final class IdempotencyRequestResolver {
     private static final Pattern SAFE_KEY = Pattern.compile("[A-Za-z0-9\\-_.:]+");
 
     private final UserContextService userContextService;
-    private final ClientIpResolverPort clientIpResolver;
+    private final ClientIpResolver clientIpResolver;
     private final ObjectMapper objectMapper;
 
     IdempotencyRequestResolver(UserContextService userContextService,
-            ClientIpResolverPort clientIpResolver, ObjectMapper objectMapper) {
+            ClientIpResolver clientIpResolver, ObjectMapper objectMapper) {
         this.userContextService = userContextService;
         this.clientIpResolver = clientIpResolver;
         this.objectMapper = objectMapper;

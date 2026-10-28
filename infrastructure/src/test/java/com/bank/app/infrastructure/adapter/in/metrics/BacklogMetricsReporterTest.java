@@ -1,4 +1,4 @@
-package com.bank.app.infrastructure.adapter.out.metrics;
+package com.bank.app.infrastructure.adapter.in.metrics;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;

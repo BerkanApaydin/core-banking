@@ -20,14 +20,14 @@ class RateLimitingFilterTest {
     private CaffeineRateLimiter rateLimiter;
     private MessageSource messageSource;
     private RateLimitingFilter filter;
-    private ClientIpResolver clientIpResolver;
+    private TrustedProxyClientIpResolver clientIpResolver;
 
     @BeforeEach
     void setUp() {
         RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 120, 60000, 10000);
         rateLimiter = new CaffeineRateLimiter(props);
         messageSource = mock(MessageSource.class);
-        clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
+        clientIpResolver = new TrustedProxyClientIpResolver(new ProxyProperties(true));
         when(messageSource.getMessage(anyString(), any(), anyString(), any()))
                 .thenReturn("Too many requests sent. Please try again later.");
         ObjectMapper objectMapper = new ObjectMapper();

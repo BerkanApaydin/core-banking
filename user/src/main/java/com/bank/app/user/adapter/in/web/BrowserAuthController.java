@@ -13,7 +13,7 @@ import com.bank.app.user.application.port.in.LoginUserUseCase;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.RefreshSessionUseCase;
 import com.bank.app.user.application.port.out.AuthenticationBackendUnavailableException;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.bank.app.user.application.port.out.CsrfBindingPort;
 import com.bank.app.user.application.port.out.RevocationStoreUnavailableException;
 import com.bank.app.user.domain.exception.AuthenticationFailedException;
@@ -50,7 +50,7 @@ public class BrowserAuthController {
     private final LoginUserUseCase loginUserUseCase;
     private final LogoutUseCase logoutUseCase;
     private final RefreshSessionUseCase refreshSessionUseCase;
-    private final ClientIpResolverPort clientIpResolver;
+    private final ClientIpResolver clientIpResolver;
     private final CsrfBindingPort csrfBinding;
     private final BrowserSessionCookies cookies;
     private final UserContextService userContextService;
@@ -59,7 +59,7 @@ public class BrowserAuthController {
 
     public BrowserAuthController(LoginUserUseCase loginUserUseCase, LogoutUseCase logoutUseCase,
             RefreshSessionUseCase refreshSessionUseCase,
-            ClientIpResolverPort clientIpResolver,
+            ClientIpResolver clientIpResolver,
             CsrfBindingPort csrfBinding,
             UserContextService userContextService,
             BrowserSessionProperties browserSession,

@@ -48,7 +48,7 @@ class RateLimitingFilterBackendFailureTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RateLimitProperties props = new RateLimitProperties(null, null, 10, 10_000, 120, 60_000, 10000);
-    private final ClientIpResolver clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
+    private final TrustedProxyClientIpResolver clientIpResolver = new TrustedProxyClientIpResolver(new ProxyProperties(true));
 
     @BeforeEach
     void setUp() {

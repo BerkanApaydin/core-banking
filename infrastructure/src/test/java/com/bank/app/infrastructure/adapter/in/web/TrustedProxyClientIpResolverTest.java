@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("ClientIpResolver")
-class ClientIpResolverTest {
+@DisplayName("TrustedProxyClientIpResolver")
+class TrustedProxyClientIpResolverTest {
 
-    private final ClientIpResolver resolver = new ClientIpResolver(new ProxyProperties(true));
+    private final TrustedProxyClientIpResolver resolver = new TrustedProxyClientIpResolver(new ProxyProperties(true));
 
     @Nested
     @DisplayName("resolveClientIp")
@@ -115,7 +115,7 @@ class ClientIpResolverTest {
     @DisplayName("untrusted proxy headers (default)")
     class DistrustedHeaders {
 
-        private final ClientIpResolver distrusting = new ClientIpResolver(new ProxyProperties(false));
+        private final TrustedProxyClientIpResolver distrusting = new TrustedProxyClientIpResolver(new ProxyProperties(false));
 
         @Test
         @DisplayName("should ignore spoofable X-Forwarded-For and use remote address")

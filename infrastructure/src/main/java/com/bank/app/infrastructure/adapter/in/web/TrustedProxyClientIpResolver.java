@@ -1,14 +1,14 @@
 package com.bank.app.infrastructure.adapter.in.web;
 
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ClientIpResolver implements ClientIpResolverPort {
+public class TrustedProxyClientIpResolver implements ClientIpResolver {
 
     private final boolean trustForwardedHeaders;
 
-    public ClientIpResolver(ProxyProperties proxyProperties) {
+    public TrustedProxyClientIpResolver(ProxyProperties proxyProperties) {
         this.trustForwardedHeaders = proxyProperties.trustForwardedHeaders();
     }
 

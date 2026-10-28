@@ -1,5 +1,6 @@
 package com.bank.app.infrastructure.adapter.in.security;
 
+import com.bank.app.infrastructure.security.SimpleAuthenticatedPrincipal;
 import com.bank.app.user.application.port.out.JwtPort;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;

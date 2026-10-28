@@ -129,7 +129,7 @@ class CacheInvalidationArchitectureTest extends ArchitectureTest {
 
     /** The Account boundary adapter that owns cache invalidation. */
     private static final String ACCOUNT_BOUNDARY =
-            "com.bank.app.account.adapter.out.api.AccountApiAdapter";
+            "com.bank.app.account.adapter.in.api.AccountApiAdapter";
 
     private static DescribedPredicate<JavaClass> callBalanceMutationUseCase() {
         return new DescribedPredicate<>("call AdjustAccountBalancesUseCase") {

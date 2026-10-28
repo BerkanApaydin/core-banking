@@ -3,7 +3,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.domain.exception.ConcurrentRequestException;
 import com.bank.app.common.application.service.UserContextService;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -46,7 +46,7 @@ class IdempotencyAspectTest {
     private UserContextService userContextService;
 
     @Mock
-    private ClientIpResolverPort clientIpResolver;
+    private ClientIpResolver clientIpResolver;
 
     @Mock
     private ObjectMapper objectMapper;

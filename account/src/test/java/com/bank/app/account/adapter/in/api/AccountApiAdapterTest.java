@@ -1,4 +1,4 @@
-package com.bank.app.account.adapter.out.api;
+package com.bank.app.account.adapter.in.api;
 
 import com.bank.app.account.application.dto.AccountView;
 import com.bank.app.account.application.port.in.GetAccountInfoQuery;

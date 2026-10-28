@@ -6,7 +6,7 @@ import com.bank.app.infrastructure.adapter.in.handler.BusinessProblemHandler;
 import com.bank.app.infrastructure.adapter.in.handler.SecurityProblemHandler;
 import com.bank.app.infrastructure.adapter.in.handler.RequestProblemHandler;
 import com.bank.app.infrastructure.adapter.in.handler.ProblemMessageResolver;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.infrastructure.adapter.in.web.TrustedProxyClientIpResolver;
 import com.bank.app.infrastructure.adapter.in.web.ProxyProperties;
 import com.bank.app.user.application.port.in.LogoutUseCase;
 import com.bank.app.user.application.port.in.MfaStatusUseCase;
@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SuppressWarnings("null")
 @WebMvcTest(AuthController.class)
-@Import({GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class, ApiVersionConfig.class, ClientIpResolver.class})
+@Import({GlobalExceptionHandler.class, BusinessProblemHandler.class, SecurityProblemHandler.class, RequestProblemHandler.class, ProblemMessageResolver.class, ApiVersionConfig.class, TrustedProxyClientIpResolver.class})
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerIpResolverTest {
 

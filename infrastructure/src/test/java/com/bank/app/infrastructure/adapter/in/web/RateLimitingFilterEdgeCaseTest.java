@@ -30,7 +30,7 @@ class RateLimitingFilterEdgeCaseTest {
 
     private RateLimitingFilter filter;
     private ObjectMapper objectMapper;
-    private ClientIpResolver clientIpResolver;
+    private TrustedProxyClientIpResolver clientIpResolver;
 
     @BeforeEach
     void setUp() {
@@ -39,7 +39,7 @@ class RateLimitingFilterEdgeCaseTest {
         // RequestPathResolver relies on UrlPathHelper, which decodes it.
         when(request.getContextPath()).thenReturn("");
         objectMapper = new ObjectMapper();
-        clientIpResolver = new ClientIpResolver(new ProxyProperties(true));
+        clientIpResolver = new TrustedProxyClientIpResolver(new ProxyProperties(true));
         filter = new RateLimitingFilter(rateLimiter, messageSource,
                 new RateLimitProperties(null, null, 10, 10_000, 120, 60000, 10000), objectMapper, clientIpResolver);
     }

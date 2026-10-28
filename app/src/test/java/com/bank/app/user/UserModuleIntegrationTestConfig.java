@@ -1,7 +1,7 @@
 package com.bank.app.user;
 
 import com.bank.app.infrastructure.adapter.in.api.ApiVersionConfig;
-import com.bank.app.infrastructure.adapter.in.web.ClientIpResolver;
+import com.bank.app.infrastructure.adapter.in.web.TrustedProxyClientIpResolver;
 import com.bank.app.infrastructure.adapter.out.security.TokenBlacklistAdapter;
 import com.bank.app.infrastructure.adapter.in.security.SecurityConfig;
 import com.bank.app.infrastructure.adapter.out.security.JwtTokenProvider;
@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import;
     JpaAuditingConfig.class,
     GlobalExceptionHandler.class,
     TokenBlacklistAdapter.class,
-    ClientIpResolver.class,
+    TrustedProxyClientIpResolver.class,
     ApiVersionConfig.class
 })
 @SuppressWarnings("null")

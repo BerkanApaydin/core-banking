@@ -8,7 +8,9 @@ read needs.
 ## Today
 
 `transfer` reads account state exclusively through the `account-api`
-published language (`AccountApi` → `AccountApiAdapter`), with
+published language (`AccountApi` → the provider-side inbound
+`AccountApiAdapter`; transfer's `AccountAclAdapter` is the outbound side of
+the same boundary), with
 `AccountSnapshotCache` (Caffeine dev / Redis prod) in front. The snapshot is
 identity + status only (`AccountSnapshotContractTest` pins this) — balances
 are always re-read authoritatively under pessimistic locks in the mutation

@@ -2,7 +2,7 @@ package com.bank.app.infrastructure.adapter.in.idempotency;
 
 import com.bank.app.common.adapter.in.idempotency.Idempotent;
 import com.bank.app.common.application.service.UserContextService;
-import com.bank.app.user.application.port.out.ClientIpResolverPort;
+import com.bank.app.common.adapter.in.web.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ class IdempotencyRequestResolverPathTest {
     private UserContextService userContextService;
 
     @Mock
-    private ClientIpResolverPort clientIpResolver;
+    private ClientIpResolver clientIpResolver;
 
     private IdempotencyRequestResolver resolver;
     private Idempotent idempotent;
