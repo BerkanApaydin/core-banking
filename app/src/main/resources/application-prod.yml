@@ -12,6 +12,11 @@ spring:
   flyway:
     baseline-on-migrate: false
     validate-on-migrate: true
+    # Prod requires DB_PASSWORD; FLYWAY_* default to the datasource identity
+    # for single-role deployments and override independently for the
+    # least-privilege bank_app/bank_owner split.
+    user: ${FLYWAY_USER:${DB_USERNAME:bank_user}}
+    password: ${FLYWAY_PASSWORD:${DB_PASSWORD}}
 
 springdoc:
   api-docs:

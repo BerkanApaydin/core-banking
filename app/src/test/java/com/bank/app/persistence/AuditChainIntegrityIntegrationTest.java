@@ -148,6 +148,20 @@ class AuditChainIntegrityIntegrationTest extends AbstractSpringBootIntegrationTe
         });
     }
 
+    @Test
+    @DisplayName("an empty table with a non-zero chain head is reported as broken")
+    void emptyTableWithNonZeroHeadIsReported() {
+        inRolledBackTransaction(() -> {
+            insertAudit("wipe-seed", LocalDateTime.now());
+            enableAuditMaintenance();
+            jdbcTemplate.update("DELETE FROM audit_logs");
+
+            assertThat(verificationPort.findFirstBrokenChainSeq())
+                    .as("a total wipe must not look like a fresh, empty chain")
+                    .isEqualTo(OptionalLong.of(-1));
+        });
+    }
+
     private long insertAudit(String details, LocalDateTime timestamp) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO audit_logs (username, action, details, "timestamp")

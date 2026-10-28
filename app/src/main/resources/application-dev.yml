@@ -5,6 +5,11 @@ spring:
     password: ${DB_PASSWORD:bank_password}
     hikari:
       read-only: false
+  flyway:
+    # Keep the dev default aligned with the dev datasource password; a
+    # least-privilege local run can still override FLYWAY_USER/FLYWAY_PASSWORD.
+    user: ${FLYWAY_USER:${DB_USERNAME:bank_user}}
+    password: ${FLYWAY_PASSWORD:${DB_PASSWORD:bank_password}}
 
 app:
   demo:

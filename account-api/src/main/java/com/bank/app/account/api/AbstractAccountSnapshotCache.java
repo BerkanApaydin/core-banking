@@ -1,5 +1,6 @@
 package com.bank.app.account.api;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -204,28 +205,14 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
             return;
         }
         // Hold every affected stripe so an eviction of any of these accounts
-        // cannot interleave with this batch. Unique stripes are acquired in
-        // ascending order and released in reverse, matching evictAll's fixed
-        // order and preventing deadlock between concurrent batch writes.
+        // cannot interleave with this batch. withStripes deduplicates and sorts
+        // the indices, acquires them in ascending order and releases them in
+        // reverse, matching evictAll's fixed order and preventing deadlock
+        // between concurrent batch writes.
         int[] stripes = writes.keySet().stream()
                 .mapToInt(this::stripeIndex)
-                .distinct()
-                .sorted()
                 .toArray();
-        int acquired = 0;
-        try {
-            for (int stripe : stripes) {
-                accountLocks[stripe].lock();
-                acquired++;
-            }
-            writes.forEach(this::writeIbanMapping);
-        } finally {
-            // Release only the stripes actually acquired: an acquisition that
-            // fails mid-loop must not leave the already-taken stripes locked.
-            for (int i = acquired - 1; i >= 0; i--) {
-                accountLocks[stripes[i]].unlock();
-            }
-        }
+        withStripes(stripes, () -> writes.forEach(this::writeIbanMapping));
     }
 
     @Override
@@ -233,21 +220,42 @@ public abstract class AbstractAccountSnapshotCache implements AccountSnapshotCac
         // Global barrier: every stripe is held (fixed ascending order) so no
         // per-account or multi-account operation can interleave with the region
         // clear. Multi-stripe paths share this order, so no deadlock.
-        int acquired = 0;
-        try {
-            for (ReentrantLock lock : accountLocks) {
-                lock.lock();
-                acquired++;
-            }
+        withStripes(allStripes(), () -> {
             clearStorage();
             ibanKeysByAccount.clear();
+        });
+    }
+
+    private static int[] allStripes() {
+        int[] stripes = new int[LOCK_STRIPES];
+        for (int i = 0; i < stripes.length; i++) {
+            stripes[i] = i;
+        }
+        return stripes;
+    }
+
+    /**
+     * Normalizes the supplied stripe indices to a unique ascending sequence,
+     * then acquires them in that order and releases them in reverse, including
+     * when an acquisition or the guarded action fails. The nested try/finally
+     * keeps the lock/unlock pairing visible to static analysis.
+     */
+    private void withStripes(int[] stripes, Runnable action) {
+        int[] ordered = Arrays.stream(stripes).distinct().sorted().toArray();
+        withOrderedStripes(ordered, 0, action);
+    }
+
+    private void withOrderedStripes(int[] stripes, int index, Runnable action) {
+        if (index == stripes.length) {
+            action.run();
+            return;
+        }
+        ReentrantLock lock = accountLocks[stripes[index]];
+        lock.lock();
+        try {
+            withOrderedStripes(stripes, index + 1, action);
         } finally {
-            // Release only the stripes this thread actually acquired: if an
-            // acquisition fails mid-loop, the ones already taken must not
-            // stay locked forever.
-            for (int i = acquired - 1; i >= 0; i--) {
-                accountLocks[i].unlock();
-            }
+            lock.unlock();
         }
     }
 

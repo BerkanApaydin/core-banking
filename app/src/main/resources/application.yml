@@ -115,6 +115,11 @@ spring:
     # silent startup side effect. Fresh databases migrate normally with false.
     baseline-on-migrate: false
     validate-on-migrate: true
+    # Least-privilege deployments run the Hikari pool as bank_app while
+    # Flyway validates the schema as the owner (bank_owner). Both default to
+    # the datasource identity, so single-role deployments are unchanged.
+    user: ${FLYWAY_USER:${DB_USERNAME:bank_user}}
+    password: ${FLYWAY_PASSWORD:${DB_PASSWORD:}}
   data:
     redis:
       host: ${REDIS_HOST:localhost}

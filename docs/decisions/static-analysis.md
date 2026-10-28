@@ -35,8 +35,12 @@ Current exclusions:
 | `EI_EXPOSE_REP2` | Constructor injection shares long-lived ports/adapters by design; there is no setter or field injection in main sources. Collection-owning DTOs are fixed with defensive copies and remain covered by `EI_EXPOSE_REP`. |
 | `CT_CONSTRUCTOR_THROW` | Fail-fast validation in stateless Spring components; no finalizers or attacker-controlled subclasses. |
 | `EQ_DOESNT_OVERRIDE_EQUALS` | `CustomUserDetails` inherits Spring Security `User` identity semantics; changing equals/hashCode would alter `SecurityContext` behavior. |
-| `AbstractAccountSnapshotCache` / `UL_UNRELEASED_LOCK` | False positive: striped locks are acquired outside the try block and released by prefix in `finally`; SpotBugs cannot follow the acquired counter across the loop. |
 | `RequestBodySizeLimitFilter$BoundedRequestWrapper#getInputStream` / `EI_EXPOSE_REP` | Must return the same counting stream; recreating it would reset the byte cap. The stream is per-request, not shared state. |
+
+`AbstractAccountSnapshotCache` no longer needs an exclusion. Its striped-lock
+helper now normalizes the indices and keeps each `lock()`/`unlock()` pair in a
+nested `try/finally`, so SpotBugs can see the release path. The `account-api`
+report is 0 findings without a class-specific suppression.
 
 A finding that describes a real defect falls outside this table and must be
 fixed in code, not filtered. Exclusions are reviewed when the corresponding

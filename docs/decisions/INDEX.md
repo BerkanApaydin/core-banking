@@ -38,7 +38,8 @@ is the single map: ID → file → one-sentence decision.
 | MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
 | I-09 | `docs/decisions/migration-ownership.md` | Focused follow-up to R-C07: Flyway resources live in the resources-only `migrations` module; owner headers and heavy-statement rules keep the future per-BC split safe. |
 | STAT-1 (2026-10) | `docs/decisions/static-analysis.md` | SpotBugs runs in `verify` (effort Max, threshold Medium, reviewed exclusions); Checkstyle/PMD/ErrorProne stay unwired until their engines exist in the offline cache. |
-| AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; F1 stays open for role separation/external anchoring. |
+| AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; F1 stays open for external anchoring. |
+| LEAST-PRIV-1 (2026-10) | `docs/decisions/least-privilege-db-roles.md` | V68 + the provisioning script run the app as insert/select-only `bank_app`, split Flyway to the owner, guard retention with a 30-day floor, and flag an empty table with a non-zero chain head. |
 
 ## Newly added decisions (this improvement round)
 
@@ -54,6 +55,7 @@ is the single map: ID → file → one-sentence decision.
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 - `static-analysis.md` (STAT-1: SpotBugs verify gate + reviewed exclusions; extended Python structural rules)
+- `least-privilege-db-roles.md` (LEAST-PRIV-1: runtime/owner split, append-only evidence grants, retention cutoff floor, empty-table chain signal)
 
 ## Operational decisions
 

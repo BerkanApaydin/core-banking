@@ -437,6 +437,32 @@ class AbstractAccountSnapshotCacheTest {
     }
 
     @Test
+    void shouldReleaseEveryStripeWhenEvictAllFails() throws Exception {
+        FailingClearCache failing = new FailingClearCache();
+
+        assertThatThrownBy(failing::evictAll)
+                .isInstanceOf(IllegalStateException.class);
+
+        var done = new CountDownLatch(1);
+        Thread worker = daemonThread(() -> {
+            try {
+                failing.evictAll();
+            } catch (IllegalStateException expected) {
+                // The second call must reach clearStorage again; a leaked
+                // stripe would block before this exception.
+            } finally {
+                done.countDown();
+            }
+        });
+        worker.start();
+
+        assertThat(done.await(1, TimeUnit.SECONDS))
+                .as("a failed evict-all must release every stripe")
+                .isTrue();
+        worker.join(200);
+    }
+
+    @Test
     void shouldReleaseAccountLocksAfterEvictAllAndEvictById() throws Exception {
         cache.evictById(1L);
         cache.evictAll();

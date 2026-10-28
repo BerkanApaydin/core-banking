@@ -44,18 +44,6 @@
     </Match>
 
     <!--
-      False positive: AbstractAccountSnapshotCache acquires striped locks
-      outside the try block and releases exactly the acquired prefixes in
-      finally (the acquired counter is incremented immediately after each
-      successful lock()). SpotBugs cannot follow the counter across the loop.
-      Covered by the concurrency tests for putIbans/evictAll.
-    -->
-    <Match>
-        <Class name="com.bank.app.account.api.AbstractAccountSnapshotCache"/>
-        <Bug pattern="UL_UNRELEASED_LOCK"/>
-    </Match>
-
-    <!--
       The request-body limit wrapper must return the SAME counting stream on
       every getInputStream() call; recreating or copying it would reset the
       byte counter and let a caller read the cap again. The returned stream is
