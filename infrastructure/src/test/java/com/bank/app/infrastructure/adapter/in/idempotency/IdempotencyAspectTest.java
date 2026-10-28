@@ -160,6 +160,30 @@ class IdempotencyAspectTest {
         };
     }
 
+    private Idempotent requiredAnnotation() {
+        return new Idempotent() {
+            @Override
+            public String headerName() {
+                return "Idempotency-Key";
+            }
+
+            @Override
+            public boolean publicEndpoint() {
+                return false;
+            }
+
+            @Override
+            public boolean required() {
+                return true;
+            }
+
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return Idempotent.class;
+            }
+        };
+    }
+
     @Test
     void shouldProceedWhenRequestContextMissing() throws Throwable {
 
@@ -169,6 +193,15 @@ class IdempotencyAspectTest {
 
         assertEquals("OK", result);
         verify(joinPoint).proceed();
+    }
+
+    @Test
+    void shouldRejectNonHttpInvocationWhenKeyRequired() throws Throwable {
+        assertThrows(
+                IllegalStateException.class,
+                () -> aspect.handleIdempotency(joinPoint, requiredAnnotation()));
+
+        verify(joinPoint, never()).proceed();
     }
 
     @Test

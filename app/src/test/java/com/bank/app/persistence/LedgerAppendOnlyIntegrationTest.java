@@ -28,10 +28,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * F2 regression: V65 makes {@code ledger_entries} append-only in the database.
- * The adapter already refused updates/deletes in application code, but a bug
- * or a direct session could still rewrite the journal. These tests exercise
- * the trigger through raw JDBC, below the adapter.
+ * F2 regression: V65 makes {@code ledger_entries} append-only and V66 makes a
+ * deferred database check reject any {@code transaction_ref} whose legs do not
+ * net to zero at commit. The adapter already refused updates/deletes in
+ * application code, but a bug or a direct session could still rewrite the
+ * journal or post a single leg. These tests exercise the triggers through raw
+ * JDBC, below the adapter.
  */
 @SpringBootTest(classes = BankApplication.class)
 @DisplayName("Ledger append-only guard")
@@ -83,20 +85,30 @@ class LedgerAppendOnlyIntegrationTest extends AbstractSpringBootIntegrationTest 
         });
     }
 
-    private Long insertLedgerEntry() {
+    private Long insertBalancedPair() {
+        String transactionRef = UUID.randomUUID().toString();
+        return transactionTemplate.execute(status -> {
+            Long debitId = insertLeg(transactionRef, "DEBIT", new BigDecimal("10.00"));
+            insertLeg(transactionRef, "CREDIT", new BigDecimal("10.00"));
+            return debitId;
+        });
+    }
+
+    private Long insertLeg(String transactionRef, String direction, BigDecimal amount) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO ledger_entries
                     (id, transaction_ref, account_id, direction, amount, currency,
                      balance_after, business_at, created_at)
-                VALUES (nextval('ledger_entry_ids'), ?, ?, 'CREDIT', 10.00, 'TRY', 10.00, NOW(), NOW())
+                VALUES (nextval('ledger_entry_ids'), ?, ?, CAST(? AS "LedgerDirection"), ?,
+                        'TRY', ?, NOW(), NOW())
                 RETURNING id
-                """, Long.class, UUID.randomUUID().toString(), accountId);
+                """, Long.class, transactionRef, accountId, direction, amount, amount);
     }
 
     @Test
     @DisplayName("UPDATE is rejected by the database")
     void updateIsRejected() {
-        Long ledgerId = insertLedgerEntry();
+        Long ledgerId = insertBalancedPair();
 
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "UPDATE ledger_entries SET amount = amount + 1 WHERE id = ?", ledgerId))
@@ -107,7 +119,7 @@ class LedgerAppendOnlyIntegrationTest extends AbstractSpringBootIntegrationTest 
     @Test
     @DisplayName("DELETE without the maintenance flag is rejected")
     void deleteWithoutMaintenanceIsRejected() {
-        Long ledgerId = insertLedgerEntry();
+        Long ledgerId = insertBalancedPair();
 
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "DELETE FROM ledger_entries WHERE id = ?", ledgerId))
@@ -118,7 +130,7 @@ class LedgerAppendOnlyIntegrationTest extends AbstractSpringBootIntegrationTest 
     @Test
     @DisplayName("TRUNCATE is rejected")
     void truncateIsRejected() {
-        insertLedgerEntry();
+        insertBalancedPair();
 
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(
                 status -> jdbcTemplate.execute("TRUNCATE ledger_entries")))
@@ -127,9 +139,43 @@ class LedgerAppendOnlyIntegrationTest extends AbstractSpringBootIntegrationTest 
     }
 
     @Test
+    @DisplayName("a balanced transaction_ref pair commits")
+    void balancedTransactionRefIsAccepted() {
+        insertBalancedPair();
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_entries WHERE account_id = ?",
+                Integer.class, accountId);
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a transaction_ref with a missing leg is rejected at commit")
+    void unbalancedTransactionRefIsRejectedAtCommit() {
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status ->
+                insertLeg(UUID.randomUUID().toString(), "CREDIT", new BigDecimal("10.00"))))
+                .as("deferred trigger must reject a journal entry that does not net to zero")
+                .hasStackTraceContaining("does not net to zero");
+    }
+
+    @Test
+    @DisplayName("a transaction_ref with unequal legs is rejected at commit")
+    void unequalTransactionRefIsRejectedAtCommit() {
+        String transactionRef = UUID.randomUUID().toString();
+
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+            insertLeg(transactionRef, "DEBIT", new BigDecimal("10.00"));
+            insertLeg(transactionRef, "CREDIT", new BigDecimal("9.00"));
+        }))
+                .as("the trigger must sum both legs, not merely require two rows")
+                .hasStackTraceContaining("does not net to zero");
+    }
+
+    @Test
     @DisplayName("transaction-local maintenance flag allows test/archive deletes")
     void maintenanceFlagAllowsDelete() {
-        Long ledgerId = insertLedgerEntry();
+        Long ledgerId = insertBalancedPair();
 
         Integer deleted = transactionTemplate.execute(status -> {
             jdbcTemplate.queryForObject(

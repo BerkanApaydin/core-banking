@@ -1,4 +1,4 @@
-# Time Strategy: UTC-Only Timestamps (Kademe 1)
+# Time Strategy: UTC-Only Timestamps (Tier 1)
 
 **Decision:** Every `LocalDateTime` in this codebase means UTC. No exceptions.
 
@@ -11,10 +11,12 @@ us twice was never the type: it was two clocks (UTC production clock vs
 developer machines (Istanbul) while CI/prod agreed on UTC.
 
 **Rules (enforced, not advised):**
-1. Production code never calls `LocalDateTime.now()`, `Clock.systemDefaultZone()`
-   or `ZoneId.systemDefault()` — pinned by `CodingRulesArchitectureTest`
-   (`noBareNowInMainCode`, `noSystemDefaultZoneInMainCode`). All "now"s come
-   from the injected `ClockProviderPort` (UTC) or an explicit UTC clock.
+1. Production code never calls a zero-argument `now()` (`LocalDateTime`,
+   `Instant`, `LocalDate`, `LocalTime`, `OffsetDateTime`, `ZonedDateTime`),
+   `Clock.systemDefaultZone()` or `ZoneId.systemDefault()` - pinned by
+   `CodingRulesArchitectureTest` (`noBareNowInMainCode`,
+   `noSystemDefaultZoneInMainCode`). All "now"s come from the injected
+   `ClockProviderPort` (UTC) or an explicit UTC clock.
 2. Tests use UTC clocks. Deterministic unit tests pin `Clock.fixed(...)`; a
    live `Clock.systemUTC()` is reserved for tests that never compare two
    time sources (a hard-coded year assertion is a time bomb and is not

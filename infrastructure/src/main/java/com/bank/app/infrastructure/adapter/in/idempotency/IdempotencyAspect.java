@@ -52,16 +52,18 @@ public class IdempotencyAspect {
 
     // K5/D15: the 70-line handler is now claim → decide → execute.
     // P-2: non-HTTP invocations (no RequestContextHolder: scheduler, direct
-    // unit calls) bypass idempotency by design today — @Idempotent lives on
-    // web controllers which always have a request in production. Fail-fast
-    // would break direct use-case unit tests, so log-and-proceed with a
-    // grep-able tripwire instead; if a non-HTTP @Idempotent caller ever
-    // appears, this line is where to enforce rejection.
+    // unit calls) cannot carry an Idempotency-Key. Required keys fail closed
+    // so a wiring mistake cannot silently bypass protection; optional keys
+    // keep the grep-able log-and-proceed tripwire.
     @Around("@annotation(idempotent)")
     public Object handleIdempotency(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
-            log.warn("Idempotency bypassed: no HTTP request bound (non-HTTP caller); proceeding without claim");
+            if (idempotent.required()) {
+                throw new IllegalStateException(
+                        "Idempotency-Key is required, but no HTTP request context is bound");
+            }
+            log.warn("Idempotency bypassed: no HTTP request context bound; proceeding without claim");
             return joinPoint.proceed();
         }
         return switch (claimer.claim(attributes, idempotent, joinPoint.getArgs())) {

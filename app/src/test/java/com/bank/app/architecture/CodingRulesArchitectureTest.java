@@ -19,8 +19,13 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Set;
 
 /** Cross-cutting coding rules: DI hygiene + no blocking sleeps on request threads. */
@@ -67,12 +72,22 @@ class CodingRulesArchitectureTest extends ArchitectureTest {
 
     @Test
     void noBareNowInMainCode() {
-        // docs/decisions/time-strategy.md: every LocalDateTime is UTC, so the only
-        // legal "now" takes an explicit clock. Bare now() reads the server zone.
+        // docs/decisions/time-strategy.md: every timestamp uses the injected UTC
+        // clock, so the only legal "now" takes an explicit clock argument. Bare
+        // now() reads the server zone and can silently split the timeline.
+        assertNoBareNow(LocalDateTime.class);
+        assertNoBareNow(Instant.class);
+        assertNoBareNow(LocalDate.class);
+        assertNoBareNow(LocalTime.class);
+        assertNoBareNow(OffsetDateTime.class);
+        assertNoBareNow(ZonedDateTime.class);
+    }
+
+    private static void assertNoBareNow(Class<?> type) {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.bank.app..")
-                .should().callMethodWhere(zeroArgCall(LocalDateTime.class, "now",
-                        "use LocalDateTime.now(clock) with the injected UTC clock"))
+                .should().callMethodWhere(zeroArgCall(type, "now",
+                        "use " + type.getSimpleName() + ".now(clock) with the injected UTC clock"))
                 .allowEmptyShould(false);
         rule.check(importedClasses);
     }
