@@ -29,6 +29,10 @@ public final class TransferReportPageAssembler {
             boolean hasNext,
             String nextCursorCreatedAt,
             Long nextCursorId) {
+        public ReportPage {
+            transfers = transfers == null ? List.of() : List.copyOf(transfers);
+            responses = responses == null ? List.of() : List.copyOf(responses);
+        }
     }
 
     public static int clampSize(int requested, int maxPageSize) {

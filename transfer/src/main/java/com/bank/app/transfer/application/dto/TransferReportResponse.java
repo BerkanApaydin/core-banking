@@ -44,5 +44,6 @@ public record TransferReportResponse(
         Objects.requireNonNull(pageVolume);
         Objects.requireNonNull(currency);
         Objects.requireNonNull(transfers);
+        transfers = List.copyOf(transfers);
     }
 }

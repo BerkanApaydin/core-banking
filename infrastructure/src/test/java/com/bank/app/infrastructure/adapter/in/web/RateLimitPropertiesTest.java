@@ -2,6 +2,7 @@ package com.bank.app.infrastructure.adapter.in.web;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,6 +73,17 @@ class RateLimitPropertiesTest {
         assertEquals(10000, props.timeWindowMsFor("/api/v1/auth/register"));
         assertEquals(120, props.maxRequestsFor("/api/v1/transfers"));
         assertEquals(60000, props.timeWindowMsFor("/api/v1/accounts"));
+    }
+
+    @Test
+    void shouldNotExposeTheCallerOwnedPathList() {
+        List<String> source = new ArrayList<>(List.of("/api/v1/custom"));
+        RateLimitProperties props = new RateLimitProperties(source, "caffeine", 10, 10000, 120, 60000, 10000);
+
+        source.add("/api/v1/other");
+
+        assertEquals(List.of("/api/v1/custom"), props.paths());
+        assertThrows(UnsupportedOperationException.class, () -> props.paths().add("/x"));
     }
 
     @Test

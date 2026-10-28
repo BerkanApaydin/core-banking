@@ -100,6 +100,19 @@ class BusinessExceptionTest {
         }
 
         @Test
+        @DisplayName("should defensively copy message args on construction and access")
+        void shouldDefensivelyCopyArgs() {
+            Object[] args = {"arg1"};
+            BusinessException ex = new BusinessException("error.test", args, "Default") {};
+
+            args[0] = "changed";
+            assertThat(ex.getArgs()).containsExactly("arg1");
+
+            ex.getArgs()[0] = "mutated";
+            assertThat(ex.getArgs()).containsExactly("arg1");
+        }
+
+        @Test
         @DisplayName("abstract anonymous class should return empty string for error code")
         void shouldReturnEmptyErrorCodeForAnonymousClass() {
             BusinessException ex = new BusinessException("Test message") {};

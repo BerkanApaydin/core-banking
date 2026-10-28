@@ -45,9 +45,9 @@ class CorsConfigTest {
 
     @Test
     void shouldFailClosedWithoutAnNpeWhenOriginsAreNull() {
-        // There is no startup validation for a null list: the config is built
-        // with null origins, so every cross-origin request is denied silently.
-        // Recording the actual behaviour guards against a future NPE-at-boot.
+        // Null normalizes to the empty list: both mean "no origin is allowed",
+        // so every cross-origin request is denied silently. This guards
+        // against a future NPE-at-boot without weakening fail-closed behavior.
         CorsConfig corsConfig = new CorsConfig(new CorsProperties(null));
 
         CorsConfigurationSource source = corsConfig.corsConfigurationSource();
@@ -56,7 +56,7 @@ class CorsConfigTest {
         CorsConfiguration config = source.getCorsConfiguration(request);
 
         assertThat(config).isNotNull();
-        assertThat(config.getAllowedOrigins()).isNull();
+        assertThat(config.getAllowedOrigins()).isEmpty();
         assertThat(config.getAllowCredentials()).isTrue();
     }
 }

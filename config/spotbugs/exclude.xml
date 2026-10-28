@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs gate: config/spotbugs/exclude.xml
+
+  The gate runs with effort=Max and threshold=Medium from the root pom
+  (spotbugs-check execution bound to verify). Every exclusion below is a
+  deliberate false positive or an intentional design choice; add new entries
+  only with a reason and keep the list short. Findings that indicate a real
+  defect must be fixed in code, not filtered here.
+-->
+<FindBugsFilter>
+
+    <!--
+      Constructor injection deliberately shares long-lived collaborators
+      (ports, adapters, registries) with the component. There are no setters
+      or field injection in main sources; ownership transfer via constructor
+      is the Spring bean contract, not an accidental mutable-state leak.
+      DTOs/records that expose collection state are handled in code with
+      defensive copies and remain covered by EI_EXPOSE_REP.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      Constructors that validate their arguments throw on invalid input.
+      These are stateless Spring components or abstract skeletons with no
+      finalizers and no attacker-controlled subclass loading; the
+      finalizer-attack guidance behind CT_CONSTRUCTOR_THROW does not apply.
+      Startup validation is fail-fast by design.
+    -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!--
+      CustomUserDetails and the seeder principal extend Spring Security's
+      User, whose identity semantics are authentication-session based. The
+      subclasses intentionally inherit equals/hashCode; changing them would
+      alter SecurityContext behavior.
+    -->
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+
+    <!--
+      False positive: AbstractAccountSnapshotCache acquires striped locks
+      outside the try block and releases exactly the acquired prefixes in
+      finally (the acquired counter is incremented immediately after each
+      successful lock()). SpotBugs cannot follow the counter across the loop.
+      Covered by the concurrency tests for putIbans/evictAll.
+    -->
+    <Match>
+        <Class name="com.bank.app.account.api.AbstractAccountSnapshotCache"/>
+        <Bug pattern="UL_UNRELEASED_LOCK"/>
+    </Match>
+
+    <!--
+      The request-body limit wrapper must return the SAME counting stream on
+      every getInputStream() call; recreating or copying it would reset the
+      byte counter and let a caller read the cap again. The returned stream is
+      a per-request wrapper owned by the servlet container, not mutable state
+      shared across requests.
+    -->
+    <Match>
+        <Class name="com.bank.app.infrastructure.adapter.in.web.RequestBodySizeLimitFilter$BoundedRequestWrapper"/>
+        <Method name="getInputStream"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+</FindBugsFilter>

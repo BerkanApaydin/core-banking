@@ -15,6 +15,8 @@ public record PageResponse<T>(
         if (content == null) {
             throw new IllegalArgumentException("content must not be null");
         }
+        // Defensive copy: a record must not expose a caller-owned mutable list.
+        content = List.copyOf(content);
         if (page < 0) {
             throw new IllegalArgumentException("page must not be negative");
         }

@@ -56,6 +56,8 @@ public record RateLimitProperties(
                     PublicApiPaths.ACCOUNTS,
                     PublicApiPaths.TRANSFERS,
                     PublicApiPaths.ADMIN);
+        } else {
+            paths = List.copyOf(paths);
         }
         if (backend == null || backend.isBlank()) {
             backend = "caffeine";

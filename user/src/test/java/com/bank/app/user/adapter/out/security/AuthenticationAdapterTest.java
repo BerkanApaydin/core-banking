@@ -80,6 +80,19 @@ class AuthenticationAdapterTest {
     }
 
     @Test
+    void shouldRejectPrincipalWithNullIdAsServiceFailure() {
+        var principal = new CustomUserDetails(null, "user",
+                "$2a$12$testencodedhash000000000000000000000001",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+
+        assertThrows(AuthenticationBackendUnavailableException.class,
+                () -> new AuthenticationAdapter(authenticationManager)
+                        .authenticate("user", "$2a$12$testpasshash00000000000000000000000001"));
+    }
+
+    @Test
     void shouldRejectMissingOrUnknownAuthority() {
         var principal = new CustomUserDetails(42L, "user", "$2a$12$testencodedhash000000000000000000000001", List.of());
         for (var authorities : List.of(List.<SimpleGrantedAuthority>of(),

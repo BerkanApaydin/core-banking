@@ -112,7 +112,9 @@ public final class CacheBackendResolution {
     }
 
     private static long longProperty(Environment environment, String key, long defaultValue) {
-        Long value = environment.getProperty(key, Long.class, defaultValue);
+        // The two-argument overload is used deliberately: a custom Environment
+        // (or a test mock) may return null even when a default is supplied.
+        Long value = environment.getProperty(key, Long.class);
         return value == null ? defaultValue : value;
     }
 }

@@ -13,6 +13,9 @@ public interface LoadTransferPort {
 
     /** One page plus its exact total, served by a single range scan. */
     record HistoryPage(List<Transfer> items, long totalElements) {
+        public HistoryPage {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
     }
 
     HistoryPage findHistoryPage(Long accountId, int page, int size);

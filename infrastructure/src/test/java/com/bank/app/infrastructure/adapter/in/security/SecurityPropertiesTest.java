@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -103,6 +104,19 @@ class SecurityPropertiesTest {
             SecurityProperties props = new SecurityProperties(List.of("/custom/**"), 12, 31536000L);
 
             assertThat(props.whitelistPaths()).containsExactly("/custom/**");
+        }
+
+        @Test
+        @DisplayName("should not expose the caller-owned whitelist list")
+        void shouldDefensivelyCopyWhitelistPaths() {
+            List<String> source = new ArrayList<>(List.of("/custom/**"));
+            SecurityProperties props = new SecurityProperties(source, 12, 31536000L);
+
+            source.add("/other/**");
+
+            assertThat(props.whitelistPaths()).containsExactly("/custom/**");
+            assertThatThrownBy(() -> props.whitelistPaths().add("/x"))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
     }
 }

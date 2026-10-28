@@ -37,6 +37,7 @@ is the single map: ID → file → one-sentence decision.
 | LOCK-1 (2026-10) | `application.yml` (`DB_CONNECTION_TIMEOUT_MS`) | The connection wait must not be shorter than the use-case transaction budget: pool saturation becomes a 500 burst otherwise. |
 | MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
 | I-09 | `docs/decisions/migration-ownership.md` | Focused follow-up to R-C07: Flyway resources live in the resources-only `migrations` module; owner headers and heavy-statement rules keep the future per-BC split safe. |
+| STAT-1 (2026-10) | `docs/decisions/static-analysis.md` | SpotBugs runs in `verify` (effort Max, threshold Medium, reviewed exclusions); Checkstyle/PMD/ErrorProne stay unwired until their engines exist in the offline cache. |
 
 ## Newly added decisions (this improvement round)
 
@@ -51,6 +52,7 @@ is the single map: ID → file → one-sentence decision.
 - `shared-kernel-web-contracts.md` (R-C07: framework-free web contracts stay in `common`; a separate `web-support` module now hosts Spring-dependent RFC 7807 rendering, keeping the dependency arrow inward)
 - `projection-removal.md` (YAGNI: unused `transfer_daily_totals` dropped with its refresh pipeline, V48)
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
+- `static-analysis.md` (STAT-1: SpotBugs verify gate + reviewed exclusions; extended Python structural rules)
 
 ## Operational decisions
 

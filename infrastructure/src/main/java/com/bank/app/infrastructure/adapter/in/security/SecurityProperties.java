@@ -51,7 +51,9 @@ public record SecurityProperties(
 
     public SecurityProperties {
         if (whitelistPaths == null) {
-            whitelistPaths = DEFAULT_WHITELIST;
+            whitelistPaths = List.copyOf(DEFAULT_WHITELIST);
+        } else {
+            whitelistPaths = List.copyOf(whitelistPaths);
         }
         // Empty list = operator explicitly closed all public paths.
         // Fail-closed: do NOT fall back to defaults (K2/D2).

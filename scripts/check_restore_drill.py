@@ -35,7 +35,7 @@ REPORTER = (
     ROOT
     / "infrastructure"
     / "src" / "main" / "java" / "com" / "bank" / "app"
-    / "infrastructure" / "adapter" / "out" / "metrics"
+    / "infrastructure" / "adapter" / "in" / "metrics"
     / "BacklogMetricsReporter.java"
 )
 REQUIRED_TEMPLATE_FIELDS = [

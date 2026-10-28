@@ -2,6 +2,7 @@ package com.bank.app.transfer.application.dto;
 
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -52,6 +53,18 @@ class TransferReportResponseTest {
         assertNull(resp.nextCursorId());
         assertNull(resp.totalCount());
         assertNull(resp.totalVolume());
+    }
+
+    @Test
+    void shouldNotExposeTheCallerOwnedTransfersList() {
+        var source = new ArrayList<TransferResponse>();
+        TransferReportResponse resp = new TransferReportResponse(
+                1L, 0L, BigDecimal.ZERO, "TRY", source);
+
+        source.add(null);
+
+        assertTrue(resp.transfers().isEmpty());
+        assertThrows(UnsupportedOperationException.class, () -> resp.transfers().add(null));
     }
 
     @Test

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +56,24 @@ class PageResponseTest {
             assertThat(response.first()).isFalse();
             assertThat(response.last()).isTrue();
             assertThat(response.totalPages()).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("defensive copy")
+    class DefensiveCopy {
+
+        @Test
+        @DisplayName("should not expose the caller-owned content list")
+        void shouldNotExposeCallerOwnedList() {
+            List<String> source = new ArrayList<>(List.of("a"));
+            PageResponse<String> response = new PageResponse<>(source, 0, 10, 1, 1, true, true);
+
+            source.add("b");
+
+            assertThat(response.content()).containsExactly("a");
+            assertThatThrownBy(() -> response.content().add("c"))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
     }
 

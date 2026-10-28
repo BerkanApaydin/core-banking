@@ -19,7 +19,11 @@ public interface LoadAccountPort {
 
     List<Account> findByIdsForUpdate(Collection<Long> ids);
 
-    record AccountPage(List<Account> content, long total) {}
+    record AccountPage(List<Account> content, long total) {
+        public AccountPage {
+            content = content == null ? List.of() : List.copyOf(content);
+        }
+    }
 
     /**
      * Single paged listing (content + total from one repository page).

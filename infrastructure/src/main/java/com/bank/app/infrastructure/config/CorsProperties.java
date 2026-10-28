@@ -9,4 +9,10 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.security.cors")
 public record CorsProperties(
         @DefaultValue({"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080"}) List<String> allowedOrigins
-) {}
+) {
+    public CorsProperties {
+        // Null and empty both mean "no origin is allowed" (fail-closed); the
+        // canonical empty list keeps the record immutable on every path.
+        allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
+    }
+}

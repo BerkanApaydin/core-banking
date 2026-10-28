@@ -17,13 +17,13 @@ public abstract class BusinessException extends RuntimeException {
     protected BusinessException(String messageKey, Object[] args, String defaultMessage) {
         super(defaultMessage);
         this.messageKey = messageKey;
-        this.args = args;
+        this.args = args == null ? null : args.clone();
     }
 
     protected BusinessException(String messageKey, Object[] args, String defaultMessage, Throwable cause) {
         super(defaultMessage, cause);
         this.messageKey = messageKey;
-        this.args = args;
+        this.args = args == null ? null : args.clone();
     }
 
     public String getMessageKey() {
@@ -31,7 +31,7 @@ public abstract class BusinessException extends RuntimeException {
     }
 
     public Object[] getArgs() {
-        return args;
+        return args == null ? null : args.clone();
     }
 
     /** Describes the failure without imposing a transport-specific response. */

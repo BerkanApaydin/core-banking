@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Dependency-free static-analysis gate (audit follow-up).
 
-The build has no Checkstyle/SpotBugs/PMD plugin (and the offline build cache
-cannot resolve new Maven plugins), so structural hotspots are pinned here
-instead - same CI step as the other check_*.py gates:
+SpotBugs (effort=Max, threshold=Medium) runs in Maven verify and owns
+bytecode-level bug patterns. This script complements it with structural and
+style rules that SpotBugs does not check. Checkstyle/PMD remain unwired: their
+engine artifacts are not in the offline build cache; see
+docs/decisions/static-analysis.md.
 
 1. Long methods: no main-source method body longer than MAX_METHOD_LINES.
    (Motivation: JwtAuthenticationFilter.doFilterInternal grew to ~133 lines
@@ -15,6 +17,10 @@ instead - same CI step as the other check_*.py gates:
    from @ConfigurationProperties records, never inline literals in the
    adapters that consume them.
 3. No System.out/err or printStackTrace in main sources (logging only).
+4. No wildcard imports, ambient randomness/time (Math.random, new Random,
+   System.currentTimeMillis, new Date) or unbounded cached thread pools in
+   main sources. Inject Clock/SecureRandom (or use the documented policy)
+   instead so behavior stays testable and reproducible.
 
 Run: ``python scripts/check_code_health.py``
 Self-test: ``python scripts/check_code_health.py --self-test``
@@ -47,6 +53,23 @@ LITERAL_RULES = [
 ]
 
 PRINT_RE = re.compile(r"System\.(out|err)\.print|\.printStackTrace\s*\(")
+
+# Applied to every main-source file. Keep this list short and justified:
+# each rule must be clean on the current tree and catch a real class of bug.
+GLOBAL_RULES = [
+    (re.compile(r"^\s*import\s+[\w.]+\.\*\s*;", re.MULTILINE),
+     "wildcard import - list explicit imports so dependencies are reviewable"),
+    (re.compile(r"\bMath\.random\s*\("),
+     "Math.random is ambient and untestable - inject SecureRandom or use ThreadLocalRandom with a policy"),
+    (re.compile(r"\bnew\s+(?:java\.util\.)?Random\s*\("),
+     "unseeded Random - use SecureRandom for tokens or ThreadLocalRandom for jitter"),
+    (re.compile(r"\bSystem\.currentTimeMillis\s*\("),
+     "wall-clock call bypasses the injected Clock - use Clock/Instant"),
+    (re.compile(r"\bnew\s+(?:java\.util\.)?Date\s*\("),
+     "legacy Date bypasses java.time + Clock - use Instant with the injected Clock"),
+    (re.compile(r"\bExecutors\.newCachedThreadPool\b"),
+     "unbounded cached thread pool - size executors explicitly or use a virtual-thread executor"),
+]
 TYPE_RE = re.compile(r"\b(?:class|interface|enum|record)\s+[A-Za-z_$]")
 CONTROL_RE = re.compile(
     r"^(?:if|for|while|switch|catch|synchronized|try|do|return|throw|new|"
@@ -391,12 +414,16 @@ def main() -> int:
                 failures.append(f"{rel}: {why}")
         if PRINT_RE.search(text):
             failures.append(f"{rel}: System.out/err or printStackTrace in main sources (use logging)")
+        for pattern, why in GLOBAL_RULES:
+            if pattern.search(text):
+                failures.append(f"{rel}: {why}")
     if failures:
         print("static-analysis gate failures:", file=sys.stderr)
         for failure in failures:
             print(f"  {failure}", file=sys.stderr)
         return 1
-    print(f"static analysis ok (methods <= {MAX_METHOD_LINES} lines, no config literals, no stdout).")
+    print(f"static analysis ok (methods <= {MAX_METHOD_LINES} lines, no config literals, "
+          f"no stdout, no ambient randomness/time, no wildcard imports).")
     return 0
 
 

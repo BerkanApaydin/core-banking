@@ -41,9 +41,14 @@ public class AuthenticationAdapter implements AuthenticationPort {
                 // Fail-closed parse: unknown/blank authority strings throw with
                 // a standard message instead of bypassing Role validation.
                 Role role = Role.require(authenticated.getAuthorities().iterator().next().getAuthority());
+                if (principal.getId() == null) {
+                    // Explicit check: new UserId(null) would throw NPE, and
+                    // catching NPE here would mask unrelated programming bugs.
+                    throw new IllegalArgumentException("Principal id must not be null");
+                }
                 return new AuthenticatedUser(new UserId(principal.getId()), principal.getUsername(), role,
                         principal.getTokenVersion(), principal.isMfaEnabled());
-            } catch (IllegalArgumentException | NullPointerException invalidIdentity) {
+            } catch (IllegalArgumentException invalidIdentity) {
                 throw new AuthenticationServiceException("Authentication provider returned an invalid identity", invalidIdentity);
             }
         } catch (UsernameNotFoundException e) {

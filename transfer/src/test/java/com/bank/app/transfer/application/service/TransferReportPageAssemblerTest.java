@@ -95,4 +95,27 @@ class TransferReportPageAssemblerTest {
         assertNull(page.nextCursorCreatedAt());
         assertNull(page.nextCursorId());
     }
+
+    @Test
+    void shouldExposeImmutablePageLists() {
+        LocalDateTime start = LocalDateTime.now().minusDays(5);
+        LocalDateTime end = LocalDateTime.now();
+        ReportCriteria criteria = new ReportCriteria(1L, start, end);
+        TransferViewEnricher enricher = new TransferViewEnricher(accountAclPort);
+
+        Transfer t1 = Transfer.rehydrate(10L, new AccountId(1L), new AccountId(2L), Money.of("100.00", Currency.TRY),
+                TransferStatus.COMPLETED, start.plusDays(1));
+
+        when(loadTransferPort.findHistoryBetween(eq(1L), eq(start), eq(end), eq(0), eq(100)))
+                .thenReturn(List.of(t1));
+        when(accountAclPort.getIbansForAccounts(eq(Set.of(1L, 2L)))).thenReturn(Map.of(
+                1L, "TR770006200000000000000111",
+                2L, "TR870006200000000000000222"));
+
+        TransferReportPageAssembler.ReportPage page =
+                TransferReportPageAssembler.assemble(loadTransferPort, enricher, criteria, 100);
+
+        assertThrows(UnsupportedOperationException.class, () -> page.transfers().add(null));
+        assertThrows(UnsupportedOperationException.class, () -> page.responses().add(null));
+    }
 }
