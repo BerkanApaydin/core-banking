@@ -32,6 +32,8 @@ class LeastPrivilegeDatabaseRoleIntegrationTest {
 
     private static final String APP_ROLE = "bank_app";
     private static final String APP_PASSWORD = "least-privilege-test-password";
+    private static final String SCHEDULER_ROLE = "bank_scheduler";
+    private static final String SCHEDULER_PASSWORD = "least-privilege-scheduler-test-password";
 
     private static PostgreSQLContainer<?> postgres;
 
@@ -40,6 +42,7 @@ class LeastPrivilegeDatabaseRoleIntegrationTest {
         postgres = TestDatabaseContainer.getInstance();
         executeScript(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword(), readScript());
         executeAsOwner("ALTER ROLE " + APP_ROLE + " PASSWORD '" + APP_PASSWORD + "'");
+        executeAsOwner("ALTER ROLE " + SCHEDULER_ROLE + " PASSWORD '" + SCHEDULER_PASSWORD + "'");
     }
 
     @Test
@@ -132,6 +135,43 @@ class LeastPrivilegeDatabaseRoleIntegrationTest {
     }
 
     @Test
+    @DisplayName("scheduler role can read ledger entries and take its lock but cannot write or read audit")
+    void schedulerRoleIsNarrow() throws Exception {
+        try (Connection owner = ownerConnection()) {
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "ledger_entries", "SELECT")).isTrue();
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "ledger_entries", "INSERT")).isFalse();
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "ledger_entries", "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "ledger_entries", "DELETE")).isFalse();
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "ledger_entries", "TRUNCATE")).isFalse();
+            assertThat(hasTablePrivilege(owner, SCHEDULER_ROLE, "audit_logs", "SELECT")).isFalse();
+        }
+
+        try (Connection scheduler = schedulerConnection()) {
+            scheduler.setAutoCommit(false);
+            try (Statement statement = scheduler.createStatement()) {
+                try (ResultSet rows = statement.executeQuery("SELECT count(*) FROM ledger_entries")) {
+                    assertThat(rows.next()).isTrue();
+                }
+                try (ResultSet rows = statement.executeQuery(
+                        "SELECT pg_try_advisory_xact_lock(hashtext('ledger-reconciliation'))")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getBoolean(1)).isTrue();
+                }
+            } finally {
+                scheduler.rollback();
+            }
+        }
+
+        SQLException auditDenied = assertThrows(SQLException.class,
+                () -> executeAsScheduler("SELECT count(*) FROM audit_logs"));
+        assertThat(auditDenied.getSQLState()).isEqualTo("42501");
+
+        SQLException writeDenied = assertThrows(SQLException.class,
+                () -> executeAsScheduler("DELETE FROM ledger_entries"));
+        assertThat(writeDenied.getSQLState()).isEqualTo("42501");
+    }
+
+    @Test
     @DisplayName("runtime role has no schema DDL rights")
     void runtimeRoleHasNoDdl() throws Exception {
         assertSqlState("CREATE TABLE least_privilege_should_fail (id INT)", "42501");
@@ -196,6 +236,10 @@ class LeastPrivilegeDatabaseRoleIntegrationTest {
         execute(postgres.getJdbcUrl(), APP_ROLE, APP_PASSWORD, sql);
     }
 
+    private static void executeAsScheduler(String sql) throws SQLException {
+        execute(postgres.getJdbcUrl(), SCHEDULER_ROLE, SCHEDULER_PASSWORD, sql);
+    }
+
     private static void execute(String url, String user, String password, String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, user, password);
              Statement statement = connection.createStatement()) {
@@ -228,6 +272,10 @@ class LeastPrivilegeDatabaseRoleIntegrationTest {
 
     private static Connection appConnection() throws SQLException {
         return DriverManager.getConnection(postgres.getJdbcUrl(), APP_ROLE, APP_PASSWORD);
+    }
+
+    private static Connection schedulerConnection() throws SQLException {
+        return DriverManager.getConnection(postgres.getJdbcUrl(), SCHEDULER_ROLE, SCHEDULER_PASSWORD);
     }
 
     private static boolean hasTablePrivilege(Connection owner, String role, String table, String privilege)

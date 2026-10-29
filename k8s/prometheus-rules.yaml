@@ -136,6 +136,27 @@ spec:
             severity: page
           annotations:
             summary: "Audit persistence failed — money movements may lack their audit trail"
+        # F10: best-effort logout audit fell back to the durable retry outbox.
+        # The row is not lost, but the audit store is degraded; investigate
+        # before the outbox relay dead-letters the event.
+        - alert: AuditRetryEnqueued
+          expr: sum(increase(audit_retry_enqueued_total[1h])) by (action) > 0
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Logout audit fell back to the durable retry outbox"
+            runbook_url: "docs/decisions/audit-atomicity.md"
+        # The retry enqueue itself failed: the audit row for this action is
+        # lost. This is the only path that still drops a logout audit event.
+        - alert: AuditRetryEnqueueFailed
+          expr: sum(increase(audit_retry_failed_total[1h])) by (action) > 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: "Logout audit retry enqueue failed — audit row is lost"
+            runbook_url: "docs/decisions/audit-atomicity.md"
         # Liveness of the audit dispatch seam (K2 rewire): consumed must track
         # persisted rows. A flat consumed counter while transfers succeed means
         # the AFTER_COMMIT observation path is broken again.
@@ -171,6 +192,40 @@ spec:
             severity: ticket
           annotations:
             summary: "Audit chain has not been verified in 48h"
+            runbook_url: "docs/decisions/audit-integrity.md"
+        - alert: AuditAnchorMismatch
+          # F1 external anchor: the database head is behind a signed anchor,
+          # an anchored retained row was rewritten, or the anchor signature is
+          # invalid. A single event is a page: the database no longer proves
+          # continuity with evidence an external party already saw.
+          expr: sum(increase(audit_anchor_mismatches_total[1h])) > 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Audit anchor mismatch — freeze the database and preserve the anchor file"
+            runbook_url: "docs/decisions/audit-integrity.md"
+        - alert: AuditAnchorPublishFailures
+          # Disk/object-lock write failures or a missing audit_chain_state row
+          # leave the external anchor behind the database. The chain can still
+          # be verifiable internally, but external continuity is not refreshed.
+          expr: sum(increase(audit_anchor_failures_total[1h])) > 0
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Audit anchor publication is failing"
+            runbook_url: "docs/decisions/audit-integrity.md"
+        - alert: AuditAnchorStale
+          # Enabled-but-not-running guard: default schedule is 03:45 daily, so
+          # 30h tolerates one missed run plus verification margin. max() ignores
+          # follower replicas whose gauge never moves because of leader election.
+          expr: time() - max(audit_anchor_last_success_epoch_seconds) > 108000
+          for: 1h
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Audit anchor has not been published or checked in 30h"
             runbook_url: "docs/decisions/audit-integrity.md"
         - alert: AuditDefaultPartitionNonEmpty
           # Partition-drift guard (partitioning.md step 5): rows in the DEFAULT

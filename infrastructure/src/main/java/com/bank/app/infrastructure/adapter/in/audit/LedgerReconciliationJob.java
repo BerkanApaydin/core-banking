@@ -2,10 +2,12 @@ package com.bank.app.infrastructure.adapter.in.audit;
 
 import com.bank.app.common.application.port.out.ClockProviderPort;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
+import com.bank.app.infrastructure.config.SchedulerJdbcOperations;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -52,6 +54,13 @@ public class LedgerReconciliationJob {
     }
 
     @Autowired
+    public LedgerReconciliationJob(SchedulerJdbcOperations schedulerJdbc,
+            @Qualifier("schedulerLock") AdvisorySchedulerLock schedulerLock,
+            MeterRegistry meterRegistry,
+            ClockProviderPort clockProvider) {
+        this(schedulerJdbc.jdbcTemplate(), schedulerLock, meterRegistry, clockProvider);
+    }
+
     public LedgerReconciliationJob(JdbcTemplate jdbc,
             AdvisorySchedulerLock schedulerLock,
             MeterRegistry meterRegistry,

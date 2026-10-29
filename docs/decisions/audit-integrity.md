@@ -2,16 +2,20 @@
 
 **Status:** partially implemented (2026-10). F1 is reduced, not closed. V68 and
 `LEAST-PRIV-1` add the runtime/owner split, a 30-day retention floor, and an
-empty-table signal; an external anchor and KMS/HSM custody remain open.
+empty-table signal. The opt-in external signed anchor now exports the chain head
+outside the database; WORM/object-lock storage, KMS/HSM custody, and the
+owner/superuser boundary remain operational open items.
 
 **Decision:** every `audit_logs` row is linked to its predecessor by a SHA-256
 hash computed inside PostgreSQL. A nightly verifier recomputes the chain and
 publishes `audit.chain.broken`; retention deletes only the oldest chain prefix.
 The application runs as `bank_app` with `SELECT`/`INSERT` only on audit rows,
-while the chain trigger and retention function run as the owner. This detects
-direct `UPDATE`/`DELETE`/suffix-removal through the application role without
-requiring a WORM store, but it is **not** a substitute for an external anchor
-or KMS/HSM key custody.
+while the chain trigger and retention function run as the owner. An opt-in
+daily anchor job signs `(last_seq, last_hash)` with a dedicated HMAC key and
+appends it to a file outside the database. This detects direct
+`UPDATE`/`DELETE`/suffix-removal through the application role and continuity
+breaks that survive a database-only rollback, but it is **not** a substitute
+for a WORM sink or KMS/HSM key custody.
 
 ## Why
 
@@ -74,6 +78,25 @@ singleton chain head catches a removed suffix.
   (`app.audit.chain-verification-cron`, enabled by default) and publishes:
   - `audit.chain.broken` (0/1; page when 1);
   - `audit.chain.last_verified_epoch_seconds` (staleness alert after 48h).
+- `AuditAnchorPublisher` runs daily at 03:45
+  (`app.audit.anchor-cron`, **disabled by default**) under the
+  `audit-anchor` advisory lock. It reads the singleton
+  `audit_chain_state`, verifies the latest anchor signature, and appends a new
+  anchor only when the head advanced. `AuditChainHeadAdapter` reads the head,
+  a retained row hash, and the minimum retained sequence.
+- The anchor line is
+  `version|keyId|lastSeq|lastHash|publishedAtEpochSecond|signature`
+  (version `1`; HMAC-SHA256; base64url signature). `AuditAnchorSigner` uses a
+  dedicated key separate from the JWT key, supports a `key-id` plus
+  `retired-keys` map, and fails closed on an unknown key id or bad signature.
+- `FileAuditAnchorAdapter` appends with `O_APPEND`, an exclusive `FileLock`,
+  `force(true)`, and POSIX `rw-------` where supported. The path must point at
+  append-only/WORM storage controlled outside the database.
+- The publisher publishes:
+  - `audit.anchor.mismatches` (page when a mismatch occurs);
+  - `audit.anchor.failures` (ticket when publication fails);
+  - `audit.anchor.last_success_epoch_seconds` (staleness alert after 30h);
+  - `audit.anchor.last_seq` and `audit.anchor.published`.
 
 ## What it detects
 
@@ -82,18 +105,27 @@ singleton chain head catches a removed suffix.
 - deletion of a row from the middle of the retained chain;
 - deletion of the newest row(s) while older rows remain (state head mismatch);
 - a full `audit_logs` wipe while `audit_chain_state` still points at a
-  non-zero head (`-1`).
+  non-zero head (`-1`);
+- with the anchor enabled, a database head that is behind a signed anchor, a
+  same-sequence hash mismatch, a rewritten retained prefix row, an invalid
+  anchor signature, or an audit table that is empty while the head is non-zero.
+  The mismatch alarm is a page and the publisher refuses to re-anchor.
 
 ## What it does not detect
 
 - an actor who rewrites the whole chain **and** `audit_chain_state`
   consistently (database owner, superuser, `BYPASSRLS` role, or someone with
-  both table and function DDL);
+  both table and function DDL) **unless** the anchor is enabled and the actor
+  cannot also rewrite the external sink;
 - a full wipe of `audit_logs` + `audit_chain_state` cannot be distinguished
-  from a deliberately reset database: both report `-1`, and there is no
-  external anchor;
-- a compromised KMS/signing key (there is no signature/key yet; the hash is
-  unkeyed and recomputable by anyone).
+  from a deliberately reset database when no anchor exists: both report `-1`;
+  with an anchor, the publisher reports a mismatch instead of resetting it;
+- a compromised anchor HMAC key, or an actor who can replace the anchor file
+  with a validly signed alternative;
+- a non-WORM anchor file: deletion or truncation of the sink is outside the
+  application's control (the next run may create a fresh file if the mount
+  allows it). Production must use object-lock/WORM storage and KMS/HSM key
+  custody.
 
 **F1 remains open** for the owner/superuser case and the external anchor:
 periodic export of `(last_seq, last_hash)` to object-lock storage or a
@@ -106,8 +138,14 @@ accidental operator mistakes, not against a determined database administrator.
 ## Operational rules
 
 - **Do not "repair" a broken chain in place.** Snapshot the database, preserve
-  `audit_logs` + `audit_chain_state`, and treat the alert as a security
-  incident. Rebuilding hashes destroys the evidence.
+  `audit_logs` + `audit_chain_state` + the external anchor file, and treat the
+  alert as a security incident. Rebuilding hashes destroys the evidence.
+- Do not re-anchor after `AuditAnchorMismatch`. Freeze writes, preserve the
+  anchor sink, and compare the last valid anchor with the database backup.
+- Enable the anchor only after `AUDIT_ANCHOR_FILE` points at a WORM/object-lock
+  mount and `AUDIT_ANCHOR_SECRET` is a dedicated 32-byte base64 key. Keep the
+  key out of `JWT_SECRET`; rotate via `key-id`/`retired-keys` and keep old keys
+  verifiable until the anchors they signed are outside the retention window.
 - Run the verifier manually with:
   `SELECT audit_logs_first_broken_chain_seq();`
   `NULL` means healthy at that instant; a number is the first suspect
@@ -140,6 +178,13 @@ drained (the Flyway Job already precedes the Deployment). The backfill is one
 `UPDATE` per row: on a large table, budget the maintenance window and watch
 `statement_timeout` (V67 sets 10 minutes) before applying in production.
 
+The anchor job is opt-in and has no migration. Roll it out after the database
+chain is healthy: mount the WORM path, set `AUDIT_ANCHOR_ENABLED=true` and the
+key material, run one job manually, verify the new line with the public
+verification procedure, then leave the default 03:45 schedule in place. If the
+anchor is enabled but the sink is not durable, the app reports failures but
+cannot make an ordinary filesystem immutable.
+
 ## Cost
 
 The chain serializes audit inserts on one state row. That is deliberate: the
@@ -147,7 +192,9 @@ hash must be computed against the latest committed head, and a gap-free
 sequence requires a single writer. Audit volume is bounded by money/auth
 events, not by reads; if the write-heavy path ever makes this row hot, the
 next step is batching audit events per transaction or moving the anchor to an
-append-only log — not weakening the chain. Measure before optimizing.
+append-only log — not weakening the chain. Measure before optimizing. The
+anchor adds one read of the singleton head, one read of a retained row, and one
+small append per day; the cost is negligible compared with the verifier.
 
 ## Verification
 
@@ -155,10 +202,21 @@ append-only log — not weakening the chain. Measure before optimizing.
 - `AuditChainVerificationSchedulerTest` covers the two gauges; a failed
   verification leaves the last-success timestamp unchanged, so the 48h
   staleness alert (not a healthy 0) covers the gap.
-- `AuditChainIntegrityIntegrationTest` (6 tests) covers chained inserts,
+- `AuditAnchorTest` (7 tests) covers canonical payload/line validation.
+- `AuditAnchorSignerTest` (6 tests) covers sign/verify, tamper, unknown key,
+  retired key, invalid base64, and short key rejection.
+- `FileAuditAnchorAdapterTest` (3 tests) covers append/latest, missing file,
+  and corrupt-line fail-closed behaviour.
+- `AuditAnchorPropertiesTest` (4 tests) covers disabled/enabled validation and
+  key-id/retired-key collisions.
+- `AuditAnchorPublisherTest` (12 tests) covers new/genesis head, already
+  anchored, DB-behind-anchor, same-sequence hash mismatch, retained-prefix
+  rewrite, pruned/missing prefix, empty table, invalid signature, missing
+  state, and sink failure.
+- `AuditChainIntegrityIntegrationTest` (7 tests) covers chained inserts,
   rewrite detection, middle deletion, head deletion, prefix-only retention,
-  and an empty table with a non-zero head against real PostgreSQL (V68 runs
-  through Flyway in Testcontainers).
+  chain-head adapter reads, and an empty table with a non-zero head against
+  real PostgreSQL (V68 runs through Flyway in Testcontainers).
 - `LeastPrivilegeDatabaseRoleIntegrationTest` (10 tests) proves the runtime
   role cannot update/delete/truncate audit rows, cannot write the chain head
   or run DDL, and can still insert, verify, and call guarded retention.

@@ -263,7 +263,7 @@ class LogoutUseCaseImplTest {
 
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals("alice", auditCaptor.getValue().username());
     }
 
@@ -303,7 +303,7 @@ class LogoutUseCaseImplTest {
 
         var auditCaptor = ArgumentCaptor
                 .forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals("LOGOUT", auditCaptor.getValue().action());
         assertEquals("alice", auditCaptor.getValue().username());
     }
@@ -321,7 +321,7 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute("Bearer bogus");
 
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals("system", auditCaptor.getValue().username());
     }
 
@@ -344,7 +344,7 @@ class LogoutUseCaseImplTest {
         verify(refreshTokenPort).revokeFamily("family-9", 7L);
         verifyNoInteractions(tokenBlacklistPort);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals("alice", auditCaptor.getValue().username());
     }
 
@@ -358,7 +358,7 @@ class LogoutUseCaseImplTest {
         logoutUseCase.execute(null, null);
 
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals("system", auditCaptor.getValue().username());
     }
 
@@ -367,8 +367,7 @@ class LogoutUseCaseImplTest {
     void shouldLogoutWhenAuditStoreDown() {
         stubClock();
         when(jwtPort.getRemainingMs("valid-jwt-token")).thenReturn(3600000L);
-        doThrow(new RuntimeException("audit down")).when(auditEventPort)
-                .publish(any(AuditEvent.class));
+        doThrow(new RuntimeException("audit down")).when(auditEventPort).publishBestEffort(any(AuditEvent.class));
 
         logoutUseCase.execute("Bearer valid-jwt-token");
 
@@ -393,7 +392,7 @@ class LogoutUseCaseImplTest {
 
         verify(refreshTokenPort).revokeFamily("family-1", 7L);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals(7L, auditCaptor.getValue().actorUserId());
     }
 
@@ -416,7 +415,7 @@ class LogoutUseCaseImplTest {
         verify(refreshTokenPort, never()).revoke(anyString());
         verify(tokenBlacklistPort).blacklist("valid-jwt-token", 3600000L);
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertEquals(7L, auditCaptor.getValue().actorUserId());
     }
 

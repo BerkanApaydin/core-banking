@@ -18,6 +18,14 @@
 --   DB_USERNAME=bank_app          DB_PASSWORD=<app secret>
 --   FLYWAY_USER=<owner>           FLYWAY_PASSWORD=<owner secret>
 --
+-- Optionally point the reconciliation scheduler at its own role:
+--
+--   SCHEDULER_DB_URL=jdbc:postgresql://<host>:5432/bank_db
+--   SCHEDULER_DB_USERNAME=bank_scheduler
+--   SCHEDULER_DB_PASSWORD=<scheduler secret>
+--
+-- Without SCHEDULER_DB_URL the scheduler reuses the primary bank_app pool.
+--
 -- The application keeps Flyway enabled for validation; spring.flyway.user
 -- makes that validation connect as the owner while the Hikari pool connects as
 -- bank_app. If the app runs with Flyway disabled and the migration Job is the
@@ -50,6 +58,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bank_ledger_maintenance') THEN
         EXECUTE 'CREATE ROLE bank_ledger_maintenance NOLOGIN';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bank_scheduler') THEN
+        EXECUTE 'CREATE ROLE bank_scheduler LOGIN';
+    END IF;
 END $$;
 
 -- 2. Session contract: the runtime role mirrors the owner's 30s statement
@@ -57,18 +68,23 @@ END $$;
 ALTER ROLE bank_app SET statement_timeout = '30s';
 ALTER ROLE bank_app SET idle_in_transaction_session_timeout = '60s';
 ALTER ROLE bank_app SET timezone = 'UTC';
+ALTER ROLE bank_scheduler SET statement_timeout = '30s';
+ALTER ROLE bank_scheduler SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE bank_scheduler SET timezone = 'UTC';
 
 -- 3. Connect + schema usage. PUBLIC keeps its default USAGE; CREATE is not
 --    granted to the runtime role.
 DO $$
 BEGIN
     EXECUTE format('GRANT CONNECT ON DATABASE %I TO bank_app', current_database());
+    EXECUTE format('GRANT CONNECT ON DATABASE %I TO bank_scheduler', current_database());
 END $$;
 GRANT USAGE ON SCHEMA public TO bank_app;
 GRANT USAGE ON SCHEMA public TO bank_audit_writer;
 GRANT USAGE ON SCHEMA public TO bank_audit_reader;
 GRANT USAGE ON SCHEMA public TO bank_audit_maintenance;
 GRANT USAGE ON SCHEMA public TO bank_ledger_maintenance;
+GRANT USAGE ON SCHEMA public TO bank_scheduler;
 REVOKE CREATE ON SCHEMA public FROM bank_app;
 
 -- 4. Baseline DML for the whole schema, then carve out the evidence tables.
@@ -82,6 +98,11 @@ GRANT SELECT, INSERT ON audit_logs TO bank_app;
 
 REVOKE ALL PRIVILEGES ON ledger_entries FROM bank_app;
 GRANT SELECT, INSERT ON ledger_entries TO bank_app;
+
+-- The scheduler reads ledger_entries for reconciliation and takes a
+-- transaction-scoped advisory lock. It has no write access to any table.
+REVOKE ALL PRIVILEGES ON ledger_entries FROM bank_scheduler;
+GRANT SELECT ON ledger_entries TO bank_scheduler;
 
 -- The chain head is updated only by the SECURITY DEFINER trigger; the runtime
 -- role may read it for the nightly verifier but must never write it directly.
@@ -155,5 +176,5 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- 10. Make the post-condition explicit in the psql log.
 DO $$
 BEGIN
-    RAISE NOTICE 'least-privilege roles ready: bank_app (runtime), bank_audit_writer, bank_audit_reader, bank_audit_maintenance, bank_ledger_maintenance';
+    RAISE NOTICE 'least-privilege roles ready: bank_app (runtime), bank_scheduler (reconciliation), bank_audit_writer, bank_audit_reader, bank_audit_maintenance, bank_ledger_maintenance';
 END $$;

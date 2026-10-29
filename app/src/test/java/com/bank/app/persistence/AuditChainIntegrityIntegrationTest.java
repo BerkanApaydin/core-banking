@@ -1,6 +1,8 @@
 package com.bank.app.persistence;
 
 import com.bank.app.BankApplication;
+import com.bank.app.audit.adapter.out.persistence.AuditChainHeadAdapter;
+import com.bank.app.audit.application.dto.AuditChainHead;
 import com.bank.app.audit.application.port.out.AuditChainVerificationPort;
 import com.bank.app.common.AbstractSpringBootIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +16,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.OptionalLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +37,7 @@ class AuditChainIntegrityIntegrationTest extends AbstractSpringBootIntegrationTe
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final AuditChainVerificationPort verificationPort;
+    private final AuditChainHeadAdapter chainHeadAdapter;
 
     @Autowired
     AuditChainIntegrityIntegrationTest(JdbcTemplate jdbcTemplate,
@@ -44,6 +48,7 @@ class AuditChainIntegrityIntegrationTest extends AbstractSpringBootIntegrationTe
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.verificationPort = verificationPort;
+        this.chainHeadAdapter = new AuditChainHeadAdapter(jdbcTemplate);
     }
 
     @Test
@@ -145,6 +150,26 @@ class AuditChainIntegrityIntegrationTest extends AbstractSpringBootIntegrationTe
                     .as("the backdated tail waits until the newer rows also expire")
                     .isEqualTo(1);
             assertThat(verificationPort.findFirstBrokenChainSeq()).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("chain head adapter exposes the head and retained prefix")
+    void chainHeadAdapterExposesHeadAndPrefix() {
+        inRolledBackTransaction(() -> {
+            long firstId = insertAudit("anchor-head-a", LocalDateTime.now());
+            long secondId = insertAudit("anchor-head-b", LocalDateTime.now());
+
+            ChainRow first = load(firstId);
+            ChainRow second = load(secondId);
+
+            Optional<AuditChainHead> head = chainHeadAdapter.findHead();
+            assertThat(head).contains(new AuditChainHead(second.chainSeq(), second.rowHash()));
+            assertThat(chainHeadAdapter.findRowHash(first.chainSeq()))
+                    .contains(first.rowHash());
+            OptionalLong minRetained = chainHeadAdapter.findMinChainSeq();
+            assertThat(minRetained).isPresent();
+            assertThat(minRetained.getAsLong()).isLessThanOrEqualTo(first.chainSeq());
         });
     }
 

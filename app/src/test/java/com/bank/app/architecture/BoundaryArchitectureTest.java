@@ -7,6 +7,7 @@ import org.springframework.core.annotation.Order;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Set;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,12 +47,13 @@ class BoundaryArchitectureTest extends ArchitectureTest {
     @Test
     void auditDomainFromInfrastructureOnlyThroughEventBridge() {
         // AV-3: the common->audit translation (AuditAction/AuditLog) is pinned
-        // to the single bridge adapter; no other infrastructure class may
-        // reach into audit.domain.
-        var bridge = "AuditEventPublisherAdapter";
+        // to the audit event bridge adapters; no other infrastructure class
+        // may reach into audit.domain. The synchronous publisher and the
+        // deferred outbox relay are the two sanctioned bridge paths.
+        var auditBridges = Set.of("AuditEventPublisherAdapter", "AuditRetryOutboxRelay");
         var auditDomain = importedClasses.stream()
                 .filter(c -> c.getPackageName().contains("infrastructure"))
-                .filter(c -> !c.getSimpleName().equals(bridge))
+                .filter(c -> !auditBridges.contains(c.getSimpleName()))
                 .toList();
         assertScopeNotEmpty("infrastructure classes", !auditDomain.isEmpty());
         for (var clazz : auditDomain) {
@@ -59,7 +61,7 @@ class BoundaryArchitectureTest extends ArchitectureTest {
                     .anyMatch(dep -> dep.getTargetClass().getPackageName().contains("audit.domain"));
             if (touchesAuditDomain) {
                 throw new AssertionError(
-                        "Only AuditEventPublisherAdapter may depend on audit.domain, found: "
+                        "Only audit bridge adapters may depend on audit.domain, found: "
                         + clazz.getFullName());
             }
         }

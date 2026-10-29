@@ -1,6 +1,8 @@
 # LEAST-PRIV-1: Least-privilege database roles for audit and ledger
 
-**Status:** partially implemented (2026-10). F1/F2 are reduced, not closed.
+**Status:** partially implemented (2026-10). F1 is reduced, not closed. F2's
+runtime and scheduler paths are implemented; the owner/superuser scenario
+remains open.
 
 **Decision:** run the application as `bank_app`, a login role with
 `SELECT`/`INSERT` on the append-only evidence tables and no DDL. Flyway keeps
@@ -35,12 +37,21 @@ application paths without changing the application code.
 | `bank_audit_reader` | audit read capability | `SELECT` on `audit_logs` and `audit_chain_state`; verifier `EXECUTE` |
 | `bank_audit_maintenance` | retention operator | `SELECT` on audit tables; `EXECUTE` on the retention function |
 | `bank_ledger_maintenance` | ledger archive/test cleanup | `SELECT, DELETE` on `ledger_entries`; no `UPDATE` |
+| `bank_scheduler` | reconciliation scheduler login | `SELECT` on `ledger_entries`; no writes, no DDL |
 
 The companion script `scripts/provision_least_privilege_roles.sql` creates the
 roles, grants the baseline DML, carves the evidence tables back to
 insert/select-only, grants enum/sequence usage, and sets the runtime session
 contract (`statement_timeout=30s`, `idle_in_transaction_session_timeout=60s`,
 `timezone=UTC`). It is idempotent and does not store a password.
+
+`bank_scheduler` is the optional second login used by
+`LedgerReconciliationJob`. Set `SCHEDULER_DB_URL`,
+`SCHEDULER_DB_USERNAME=bank_scheduler` and `SCHEDULER_DB_PASSWORD` to route the
+reconciliation read and its advisory lock through a separate read-only Hikari
+pool (`SchedulerDataSourceConfig`). When `SCHEDULER_DB_URL` is unset the job
+falls back to the primary `bank_app` pool, so single-role deployments are
+unchanged.
 
 V68 hardens the privileged entry points:
 
@@ -101,11 +112,12 @@ disabled in the application and the migration Job is the only writer,
 - `ALTER DEFAULT PRIVILEGES` grants ordinary CRUD on future tables to
   `bank_app`. If `audit_logs`, `ledger_entries`, or `audit_chain_state` are
   recreated (for example by a partition cutover), re-run the carve-outs.
-- The application can still call retention for rows older than 30 days. A
-  separate scheduler datasource/role is a future hardening step.
+- The application can still call retention for rows older than 30 days.
 - F2 reconciliation frequency and stale alert are handled by the 6-hourly
   `LedgerReconciliationJob` and `LedgerReconciliationStale`; this ADR covers
-  the privilege path only. A separate scheduler datasource/role remains open.
+  the privilege path. The optional `bank_scheduler` datasource is implemented,
+  but a deployment that leaves `SCHEDULER_DB_URL` unset still runs the job on
+  the primary `bank_app` pool.
 
 ## Operational rules
 
@@ -125,11 +137,23 @@ disabled in the application and the migration Job is the only writer,
 3. Deploy with `DB_USERNAME=bank_app`, `DB_PASSWORD=<app secret>`,
    `FLYWAY_USER=<owner>`, `FLYWAY_PASSWORD=<owner secret>`.
 
-4. Re-run the script after a migration batch that adds tables, and after any
+4. (Optional) set the scheduler password out of band and point the job at it:
+
+   ```sql
+   ALTER ROLE bank_scheduler PASSWORD '<from-secret-manager>';
+   ```
+
+   ```bash
+   SCHEDULER_DB_URL='jdbc:postgresql://<host>:5432/bank_db?options=-c%20TimeZone%3DUTC'
+   SCHEDULER_DB_USERNAME=bank_scheduler
+   SCHEDULER_DB_PASSWORD='<from-secret-manager>'
+   ```
+
+5. Re-run the script after a migration batch that adds tables, and after any
    partition cutover or evidence-table recreation. Default privileges cover
    new tables, but the explicit revokes are per table.
 
-5. Verify the post-condition:
+6. Verify the post-condition:
 
    ```sql
    SELECT has_table_privilege('bank_app', 'audit_logs', 'UPDATE');   -- false
@@ -138,7 +162,7 @@ disabled in the application and the migration Job is the only writer,
    SELECT has_table_privilege('bank_app', 'ledger_entries', 'DELETE'); -- false
    ```
 
-6. A partition cutover must recreate the audit/ledger triggers and reapply the
+7. A partition cutover must recreate the audit/ledger triggers and reapply the
    grants/revokes; see `docs/decisions/partitioning.md` and
    `scripts/audit_partition_cutover.sql`.
 
@@ -158,18 +182,21 @@ grant that role `EXECUTE` before applying V68, or move it to
 
 ## Verification
 
-- `LeastPrivilegeDatabaseRoleIntegrationTest` (10 tests) provisions the roles in
+- `LeastPrivilegeDatabaseRoleIntegrationTest` (11 tests) provisions the roles in
   the shared Testcontainers database and checks table privileges, audit/ledger
-  append-only behavior, chain insert, verifier execution, retention guard and
-  capability-role boundaries. Row-writing checks run in rolled-back
-  transactions.
+  append-only behavior, chain insert, verifier execution, retention guard,
+  capability-role boundaries, and the `bank_scheduler` path (`SELECT` on
+  `ledger_entries`, advisory lock, no audit access, no ledger writes).
+  Row-writing checks run in rolled-back transactions.
 - `AuditChainIntegrityIntegrationTest` (6 tests) now includes
   `emptyTableWithNonZeroHeadIsReported`: insert a row in a transaction, delete
   all rows, and assert the verifier returns `-1`; the rollback restores the
   committed chain.
-- Targeted run: 16/16 tests passed.
-- Full `.\mvnw.cmd -B -ntp clean verify`: 3,779 tests (3,541 unit + 238 IT),
-  0 failures/errors/skipped, 46 failsafe XML, aggregate coverage gates passed,
-  SpotBugs 0.
+- Targeted run (29 Oct 2026): `LeastPrivilegeDatabaseRoleIntegrationTest`
+  11/11 and `SchedulerDataSourceIntegrationTest` 1/1 passed. The earlier
+  combined 16/16 run predates the scheduler tests.
+- Full `.\mvnw.cmd -B -ntp -T 1 clean verify` (29 Oct 2026): 3,828 tests
+  (3,587 unit + 241 IT), 0 failures/errors/skipped, 47 failsafe XML, aggregate
+  coverage gates passed, SpotBugs 0.
 - `python scripts/check_migration_chain.py` reports V1–V69 contiguous;
   `check_migration_timeouts.py` is clean.

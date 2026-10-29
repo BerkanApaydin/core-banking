@@ -56,4 +56,24 @@
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
+    <!--
+      SchedulerDataSource and SchedulerJdbcOperations are thin wrappers that
+      deliberately expose their underlying long-lived scheduler resource. They
+      must not be registered as DataSource/JdbcTemplate beans directly because
+      that would suppress Boot's primary auto-configuration. The returned
+      objects are Spring-managed infrastructure, not caller-owned mutable
+      state.
+    -->
+    <Match>
+        <Class name="com.bank.app.infrastructure.config.SchedulerDataSource"/>
+        <Method name="dataSource"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <Match>
+        <Class name="com.bank.app.infrastructure.config.SchedulerJdbcOperations"/>
+        <Method name="jdbcTemplate"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
 </FindBugsFilter>

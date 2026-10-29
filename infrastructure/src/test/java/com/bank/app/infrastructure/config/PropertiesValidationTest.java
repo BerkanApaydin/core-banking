@@ -90,4 +90,24 @@ class PropertiesValidationTest {
         assertThatThrownBy(() -> new IdempotencyProperties(24, "   ", 3, 500))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void shouldTreatBlankSchedulerUrlAsNotConfigured() {
+        var unset = new SchedulerDataSourceProperties(" ", "bank_scheduler", "pw", 2, true);
+        var configured = new SchedulerDataSourceProperties(
+                "jdbc:postgresql://localhost:5432/bank_db", "bank_scheduler", "pw", 2, true);
+
+        assertThat(unset.configured()).isFalse();
+        assertThat(configured.configured()).isTrue();
+    }
+
+    @Test
+    void shouldRejectNonPositiveSchedulerPoolSize() {
+        assertThatThrownBy(() -> new SchedulerDataSourceProperties(
+                "jdbc:postgresql://localhost:5432/bank_db", "bank_scheduler", "pw", 0, true))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new SchedulerDataSourceProperties(
+                "jdbc:postgresql://localhost:5432/bank_db", "bank_scheduler", "pw", -1, true))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

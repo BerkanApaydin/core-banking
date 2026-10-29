@@ -81,6 +81,31 @@ spec:
                 secretKeyRef:
                   name: bank-db-secret
                   key: password
+            # F2: optional separate scheduler datasource/role. The whole block
+            # stays unset unless bank-scheduler-db-secret exists, so the app
+            # falls back to the primary pool. Create it with:
+            # kubectl create secret generic bank-scheduler-db-secret \
+            #   --from-literal=url='jdbc:postgresql://postgres:5432/bank_db?options=-c%20TimeZone%3DUTC' \
+            #   --from-literal=username=bank_scheduler \
+            #   --from-literal=password='<from-secret-manager>'
+            - name: SCHEDULER_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bank-scheduler-db-secret
+                  key: url
+                  optional: true
+            - name: SCHEDULER_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: bank-scheduler-db-secret
+                  key: username
+                  optional: true
+            - name: SCHEDULER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bank-scheduler-db-secret
+                  key: password
+                  optional: true
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

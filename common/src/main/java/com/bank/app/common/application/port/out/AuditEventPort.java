@@ -21,5 +21,19 @@ import com.bank.app.common.domain.event.AuditEvent;
  * {@code UseCaseTransactionAspect}.
  */
 public interface AuditEventPort {
+    /**
+     * Mandatory audit write. The caller treats a failure as fatal: a failed
+     * audit write rolls back the surrounding transaction (money movement).
+     */
     void publish(AuditEvent event);
+
+    /**
+     * Best-effort audit write for authentication lifecycle events
+     * (docs/decisions/audit-atomicity.md mode 2). The production adapter
+     * persists synchronously and, when that write fails, queues a durable
+     * outbox retry instead of dropping the audit row. Implementations must not
+     * fail the caller because authentication already succeeded/failed on its
+     * own terms.
+     */
+    void publishBestEffort(AuditEvent event);
 }

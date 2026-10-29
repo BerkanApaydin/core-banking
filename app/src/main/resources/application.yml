@@ -277,6 +277,18 @@ app:
       enabled: ${IDEMPOTENCY_REAPER_ENABLED:true}
       cron: ${IDEMPOTENCY_REAPER_CRON:0 */5 * * * *}
       older-than: ${IDEMPOTENCY_REAPER_OLDER_THAN:PT15M}
+  scheduler:
+    # F2: optional separate datasource/role for maintenance schedulers. Leave
+    # url unset to reuse the primary pool (existing deployments unchanged).
+    # A least-privilege deployment points this at bank_scheduler, a LOGIN role
+    # with SELECT on ledger_entries only; the reconciliation job then reads
+    # and takes its advisory lock without the runtime role's identity.
+    datasource:
+      url: ${SCHEDULER_DB_URL:}
+      username: ${SCHEDULER_DB_USERNAME:}
+      password: ${SCHEDULER_DB_PASSWORD:}
+      maximum-pool-size: ${SCHEDULER_DB_MAX_POOL_SIZE:2}
+      read-only: true
   integrity:
     enabled: ${ORPHAN_CHECK_ENABLED:true}
     orphan-check-cron: ${ORPHAN_CHECK_CRON:0 0 3 * * *}
@@ -296,6 +308,17 @@ app:
     # audit.chain.broken / audit.chain.last_verified_epoch_seconds.
     chain-verification-enabled: ${AUDIT_CHAIN_VERIFICATION_ENABLED:true}
     chain-verification-cron: ${AUDIT_CHAIN_VERIFICATION_CRON:0 30 3 * * *}
+    # F1 external anchor: disabled by default. Enable only when AUDIT_ANCHOR_FILE
+    # points at append-only/WORM storage outside the database and
+    # AUDIT_ANCHOR_SECRET is a dedicated 32-byte base64 key (not the JWT key).
+    anchor-cron: ${AUDIT_ANCHOR_CRON:0 45 3 * * *}
+    anchor:
+      enabled: ${AUDIT_ANCHOR_ENABLED:false}
+      file: ${AUDIT_ANCHOR_FILE:}
+      key-id: ${AUDIT_ANCHOR_KEY_ID:audit-anchor-v1}
+      secret: ${AUDIT_ANCHOR_SECRET:}
+      # retired-keys:
+      #   anchor-v0: ${AUDIT_ANCHOR_RETIRED_KEY_ANCHOR_V0:}
   observability:
     backlog:
       enabled: ${BACKLOG_METRICS_ENABLED:true}

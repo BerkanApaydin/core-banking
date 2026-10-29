@@ -185,11 +185,13 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     /**
      * Session-termination audit (K11/D4). Best-effort like login: revocation
      * already happened above, so an audit-store outage must not turn logout
-     * into a 500 — the client already dropped its cookies.
+     * into a 500 — the client already dropped its cookies. The production
+     * adapter queues a durable retry when the synchronous write fails (F10).
      */
     private void auditLogout(String username, Long actorUserId) {
         try {
-            auditEventPort.publish(new AuditEvent(AuditEvent.LOGOUT, "User logged out; tokens revoked.",
+            auditEventPort.publishBestEffort(new AuditEvent(AuditEvent.LOGOUT,
+                    "User logged out; tokens revoked.",
                     LocalDateTime.now(clockProvider.clock()), username, actorUserId));
         } catch (Exception auditFailure) {
             log.warn("Logout audit write failed: failureType={}",

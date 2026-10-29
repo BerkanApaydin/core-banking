@@ -22,7 +22,7 @@ is the single map: ID → file → one-sentence decision.
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
 | T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
 | K19 | `docs/decisions/api-versioning.md` | URL versioning via `@ApiVersion` + additive-change rules; published language evolves by addition only. |
-| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout/MFA/reset), observe-after-commit (dispatch). |
+| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout/MFA/reset), observe-after-commit (dispatch). Logout uses `publishBestEffort` with a `REQUIRES_NEW` retry outbox (`AuditRetryOutboxRelay`); other auth flows still use plain best-effort. |
 | K17 | `docs/decisions/cross-bc-read-model.md` | Transfer reads account via published language + snapshot cache; projection direction when that stops being enough. |
 | — | `docs/decisions/dependency-review.md` | OSV gate on the SBOM + accepted risks in the allowlist, re-reviewed on Boot upgrades. |
 | — | `docs/decisions/infrastructure-split.md` | Roadmap: split `infrastructure` into web/security/outbox/observability modules. |
@@ -38,8 +38,8 @@ is the single map: ID → file → one-sentence decision.
 | MANIFEST-1 (2026-10) | `scripts/check_k8s_manifest_contract.py` | The Kubernetes manifest is compared against the app's prod preconditions in CI (a missing `CORS_ALLOWED_ORIGINS` deploys a CrashLoopBackOff). |
 | I-09 | `docs/decisions/migration-ownership.md` | Focused follow-up to R-C07: Flyway resources live in the resources-only `migrations` module; owner headers and heavy-statement rules keep the future per-BC split safe. |
 | STAT-1 (2026-10) | `docs/decisions/static-analysis.md` | SpotBugs runs in `verify` (effort Max, threshold Medium, reviewed exclusions); Checkstyle/PMD/ErrorProne stay unwired until their engines exist in the offline cache. |
-| AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; F1 stays open for external anchoring. |
-| LEAST-PRIV-1 (2026-10) | `docs/decisions/least-privilege-db-roles.md` | V68 + the provisioning script run the app as insert/select-only `bank_app`, split Flyway to the owner, guard retention with a 30-day floor, and flag an empty table with a non-zero chain head. |
+| AUDIT-2 (2026-10) | `docs/decisions/audit-integrity.md` | V67 links audit rows with a DB-side SHA-256 chain, a nightly verifier + `audit.chain.broken` gauge, and prefix-only retention; the opt-in daily HMAC anchor exports the head outside the database. WORM/KMS custody and the owner/superuser boundary remain open. |
+| LEAST-PRIV-1 (2026-10) | `docs/decisions/least-privilege-db-roles.md` | V68 + the provisioning script run the app as insert/select-only `bank_app`, add a separate `bank_scheduler` role with `SELECT` only on `ledger_entries`, split Flyway to the owner, guard retention with a 30-day floor, and flag an empty table with a non-zero chain head. |
 | OBS-1 (2026-10) | `application.yml`, `k8s/prometheus-rules.yaml` | Ledger reconciliation runs 6-hourly by default, publishes a last-success epoch gauge, and tickets after 8h without a completed scan; PERF-1 keeps the full-table scan out of the 60s loop. |
 | AUDIT-3 (2026-10) | `V69__audit_partition_aware_retention.sql`, `docs/decisions/partitioning.md` | Partitioned audit retention drops only fully expired, chain-prefix-safe partitions; a backdated high-`chain_seq` row blocks the drop and falls back to the V67 prefix DELETE. |
 
@@ -58,7 +58,7 @@ is the single map: ID → file → one-sentence decision.
 - `arch-test-hardening.md` (ArchUnit round: invocation-not-wiring auth checks, 4-way adapter symmetry, adapter→infra ban, `Transfer.create` gate, infra→account guard; `user-api`/`audit-api` extraction deliberately deferred)
 - `static-analysis.md` (STAT-1: SpotBugs verify gate + reviewed exclusions; extended Python structural rules)
 - `least-privilege-db-roles.md` (LEAST-PRIV-1: runtime/owner split, append-only evidence grants, retention cutoff floor, empty-table chain signal)
-- `audit-integrity.md` (AUDIT-2/AUDIT-3: hash chain + verifier, prefix retention, partition-aware `DROP PARTITION` with backdated-row fallback)
+- `audit-integrity.md` (AUDIT-2/AUDIT-3: hash chain + verifier, opt-in external HMAC anchor, prefix retention, partition-aware `DROP PARTITION` with backdated-row fallback)
 
 ## Operational decisions
 
