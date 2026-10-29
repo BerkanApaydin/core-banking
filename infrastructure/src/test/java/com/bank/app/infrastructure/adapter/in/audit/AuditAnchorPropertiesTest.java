@@ -1,5 +1,8 @@
 package com.bank.app.infrastructure.adapter.in.audit;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,7 +13,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("AuditAnchorProperties")
 class AuditAnchorPropertiesTest {
 
-    private static final String SECRET = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    // Derived at runtime (same helper as AuditAnchorSignerTest) so the fixture
+    // never lands in the source as a secret-shaped Base64 literal, which the
+    // gitleaks generic-api-key rule reports. See docs/decisions/secret-management.md.
+    private static final String SECRET = secret("properties-anchor-key");
 
     @Test
     @DisplayName("should allow missing file and secret while disabled")
@@ -52,5 +58,10 @@ class AuditAnchorPropertiesTest {
                 true, "anchor.log", "anchor-v1", SECRET, Map.of("anchor-v1", SECRET)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retired keys");
+    }
+
+    private static String secret(String value) {
+        byte[] key = Arrays.copyOf(value.getBytes(StandardCharsets.UTF_8), 32);
+        return Base64.getEncoder().encodeToString(key);
     }
 }

@@ -7,9 +7,12 @@ import com.bank.app.audit.application.dto.AuditAnchor;
 import com.bank.app.infrastructure.adapter.out.audit.AuditAnchorSigner;
 import com.bank.app.infrastructure.adapter.out.scheduling.AdvisorySchedulerLock;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -32,7 +35,10 @@ class AuditAnchorPublisherTest {
     private static final String HASH = "a".repeat(64);
     private static final String OTHER_HASH = "b".repeat(64);
     private static final String OLD_HASH = "c".repeat(64);
-    private static final String SECRET = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    // Derived at runtime (same helper as AuditAnchorSignerTest) so the fixture
+    // never lands in the source as a secret-shaped Base64 literal, which the
+    // gitleaks generic-api-key rule reports. See docs/decisions/secret-management.md.
+    private static final String SECRET = secret("publisher-anchor-key");
     private static final Instant NOW = Instant.parse("2026-10-29T03:45:00Z");
     private static final Instant EARLIER = Instant.parse("2026-10-28T03:45:00Z");
 
@@ -233,5 +239,10 @@ class AuditAnchorPublisherTest {
 
     private double gauge(String name) {
         return meterRegistry.get(name).gauge().value();
+    }
+
+    private static String secret(String value) {
+        byte[] key = Arrays.copyOf(value.getBytes(StandardCharsets.UTF_8), 32);
+        return Base64.getEncoder().encodeToString(key);
     }
 }

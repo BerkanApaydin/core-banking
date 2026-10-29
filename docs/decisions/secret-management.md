@@ -30,7 +30,15 @@ without them:
   (generic-api-key false positives). All are delimited so they cannot match
   inside a longer real key. `scripts/check_compose_jwt_default.py` fails CI if
   the marker drifts between the code constant, `application-dev.yml`,
-  `docker-compose.yml` and the allowlist.
+  `docker-compose.yml` and the allowlist. New key-shaped test fixtures are not
+  allowlisted: `AuditAnchorSignerTest`, `AuditAnchorPropertiesTest`,
+  `AuditAnchorPublisherTest` and `FileAuditAnchorAdapterTest` derive their
+  32-byte HMAC key at runtime (`secret(String)` = `Arrays.copyOf(..., 32)` +
+  Base64), so no secret-shaped literal reaches the scanner. The one retired
+  exception is the synthetic anchor key `MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlh
+  YmNkZWY=` (Base64 of `0123456789abcdef` twice): it is allowlisted only
+  because it still exists in published history (commit `d1e35a72`), never
+  because a literal may be committed again.
 
 ## Demo seed credentials (R-C06)
 

@@ -5,6 +5,8 @@ import com.bank.app.infrastructure.adapter.in.audit.AuditAnchorProperties;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +22,10 @@ class FileAuditAnchorAdapterTest {
     private static final String HASH = "a".repeat(64);
     private static final String OTHER_HASH = "b".repeat(64);
     private static final String SIGNATURE = "A".repeat(43);
-    private static final String SECRET = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    // Derived at runtime (same helper as AuditAnchorSignerTest) so the fixture
+    // never lands in the source as a secret-shaped Base64 literal, which the
+    // gitleaks generic-api-key rule reports. See docs/decisions/secret-management.md.
+    private static final String SECRET = secret("file-anchor-key");
 
     @TempDir
     Path tempDir;
@@ -71,5 +76,10 @@ class FileAuditAnchorAdapterTest {
 
     private static AuditAnchor anchor(long seq, String hash, long publishedAt) {
         return new AuditAnchor(1, "anchor-v1", seq, hash, publishedAt, SIGNATURE);
+    }
+
+    private static String secret(String value) {
+        byte[] key = Arrays.copyOf(value.getBytes(StandardCharsets.UTF_8), 32);
+        return Base64.getEncoder().encodeToString(key);
     }
 }
