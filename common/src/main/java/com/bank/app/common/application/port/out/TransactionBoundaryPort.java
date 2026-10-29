@@ -12,13 +12,14 @@ import java.util.function.Supplier;
  * control lives behind this port; the single Spring-based implementation sits
  * in {@code infrastructure} next to the other transaction machinery.
  *
- * <p>Deliberately narrow: reads ({@link #isTransactionActive}), commit hooks
- * ({@link #runAfterCommit}) and row-scoped work ({@link #executeRequiresNew}).
- * Use-case demarcation itself stays with the {@code @TransactionalUseCase}
- * markers and {@code UseCaseTransactionAspect} — this port is for adapters
- * that need to <em>observe</em> the boundary (deferred cache eviction,
- * retry suppression) or persist one row independently, not to open business
- * transactions.
+ * <p>Deliberately narrow: reads ({@link #isTransactionActive}), commit and
+ * completion hooks ({@link #runAfterCommit}, {@link #runAfterCompletion}) and
+ * row-scoped work ({@link #executeRequiresNew}). Use-case demarcation itself
+ * stays with the {@code @TransactionalUseCase} markers and
+ * {@code UseCaseTransactionAspect} — this port is for adapters that need to
+ * <em>observe</em> the boundary (deferred cache eviction, retry suppression,
+ * best-effort audit after completion) or persist one row independently, not to
+ * open business transactions.
  *
  * <p>Persistence failure <em>types</em> ({@code OptimisticLockingFailureException}
  * et al.) are intentionally NOT abstracted here: they are the shared failure
@@ -39,6 +40,14 @@ public interface TransactionBoundaryPort {
      * snapshots).
      */
     void runAfterCommit(Runnable action);
+
+    /**
+     * Runs {@code action} after the current transaction completes, whether it
+     * committed or rolled back. When no transaction is active the action runs
+     * immediately. Used for best-effort effects that must survive a rejected
+     * business flow (e.g. authentication audit rows).
+     */
+    void runAfterCompletion(Runnable action);
 
     /**
      * Runs {@code action} in its own transaction with the given timeout, and

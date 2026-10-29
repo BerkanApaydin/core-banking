@@ -299,7 +299,7 @@ class LoginUserUseCaseImplTest {
             verify(passwordEncoderPort).matches(eq(PASSWORD), any());
             // Kills the auditLogin VoidMethodCall mutant on the unknown-user path.
             var captor = ArgumentCaptor.forClass(AuditEvent.class);
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             // No IP: no failure counting must happen (kills the recordFailure
             // Negate mutant for the null-IP branch).
@@ -413,7 +413,7 @@ class LoginUserUseCaseImplTest {
             assertThatThrownBy(() -> loginUserUseCase.execute(new AuthRequest(USERNAME, PASSWORD)))
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
-            verify(auditEventPort).publish(any(AuditEvent.class));
+            verify(auditEventPort).publishBestEffort(any(AuditEvent.class));
         }
 
         @Test
@@ -469,7 +469,7 @@ class LoginUserUseCaseImplTest {
             loginUserUseCase.execute(request);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_SUCCEEDED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
             // Kills the Negate mutant on (clientIp != null): without IP the
@@ -495,7 +495,7 @@ class LoginUserUseCaseImplTest {
             loginUserUseCase.execute(request, CLIENT_IP);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_SUCCEEDED");
             assertThat(captor.getValue().details()).contains("from IP " + CLIENT_IP);
         }
@@ -512,7 +512,7 @@ class LoginUserUseCaseImplTest {
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
             assertThat(captor.getValue().actorUserId()).isNull();
@@ -531,7 +531,7 @@ class LoginUserUseCaseImplTest {
                     .isExactlyInstanceOf(AuthenticationFailedException.class);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             assertThat(captor.getValue().actorUserId()).isEqualTo(100L);
         }
@@ -549,7 +549,7 @@ class LoginUserUseCaseImplTest {
             when(jwtPort.getExpirationMs()).thenReturn(900000L);
             when(clockProvider.clock()).thenReturn(FIXED_CLOCK);
             doThrow(new RuntimeException("audit down")).when(auditEventPort)
-                    .publish(any(AuditEvent.class));
+                    .publishBestEffort(any(AuditEvent.class));
 
             var response = loginUserUseCase.execute(request);
 
@@ -572,7 +572,7 @@ class LoginUserUseCaseImplTest {
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
             verifyNoInteractions(authenticationPort);
@@ -591,7 +591,7 @@ class LoginUserUseCaseImplTest {
                     .isExactlyInstanceOf(TooManyFailedLoginAttemptsException.class);
 
             var captor = auditCaptor();
-            verify(auditEventPort).publish(captor.capture());
+            verify(auditEventPort).publishBestEffort(captor.capture());
             assertThat(captor.getValue().action()).isEqualTo("LOGIN_FAILED");
             assertThat(captor.getValue().username()).isEqualTo(USERNAME);
             verifyNoInteractions(authenticationPort);

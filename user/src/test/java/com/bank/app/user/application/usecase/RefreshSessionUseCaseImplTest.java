@@ -413,7 +413,7 @@ class RefreshSessionUseCaseImplTest {
         // Kills the audit-publish VoidMethodCall mutant on the stale-generation
         // path: the rejection must leave a TOKEN_REVOKED audit row.
         var auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
-        verify(auditEventPort).publish(auditCaptor.capture());
+        verify(auditEventPort).publishBestEffort(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo("TOKEN_REVOKED");
     }
 
@@ -427,7 +427,7 @@ class RefreshSessionUseCaseImplTest {
         when(loadUserPort.findByUsernameForUpdate("alice")).thenReturn(Optional.of(versionedUser(2L)));
         when(jwtPort.extractTokenVersion(REFRESH)).thenReturn(1L);
         doThrow(new IllegalStateException("audit store down"))
-                .when(auditEventPort).publish(any());
+                .when(auditEventPort).publishBestEffort(any());
 
         // best-effort-auth (ADR): the audit gap is logged, never surfaced as
         // a 500 on a session that must simply be rejected.

@@ -140,7 +140,7 @@ public class RequestPasswordResetUseCaseImpl implements RequestPasswordResetUseC
         try {
             // Same audit row for known and unknown identifiers: the audit
             // trail must not become an enumeration oracle either.
-            auditEventPort.publish(new AuditEvent(AuditEvent.PASSWORD_RESET_REQUESTED,
+            auditEventPort.publishBestEffort(new AuditEvent(AuditEvent.PASSWORD_RESET_REQUESTED,
                     "Password reset requested.", now, identifier.isEmpty() ? "system" : identifier, userId));
         } catch (Exception ignored) {
             // Best-effort like login audit.

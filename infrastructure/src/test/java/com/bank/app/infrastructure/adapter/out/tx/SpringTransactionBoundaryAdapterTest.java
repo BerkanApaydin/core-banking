@@ -43,6 +43,15 @@ class SpringTransactionBoundaryAdapterTest {
     }
 
     @Test
+    void runsAfterCompletionImmediatelyWithoutTransaction() {
+        AtomicBoolean ran = new AtomicBoolean(false);
+
+        adapter.runAfterCompletion(() -> ran.set(true));
+
+        assertTrue(ran.get());
+    }
+
+    @Test
     void rejectsMissingTransactionManager() {
         assertThrows(NullPointerException.class,
                 () -> new SpringTransactionBoundaryAdapter(null));
@@ -85,6 +94,24 @@ class SpringTransactionBoundaryAdapterTest {
 
             TransactionSynchronizationManager.getSynchronizations()
                     .forEach(sync -> sync.afterCommit());
+            assertTrue(ran.get());
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+    }
+
+    @Test
+    void defersActionUntilAfterCompletionInsideTransaction() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+
+            AtomicBoolean ran = new AtomicBoolean(false);
+            adapter.runAfterCompletion(() -> ran.set(true));
+            assertFalse(ran.get(), "hook must not run before completion");
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(sync -> sync.afterCompletion(1));
             assertTrue(ran.get());
         } finally {
             TransactionSynchronizationManager.clear();

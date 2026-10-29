@@ -204,6 +204,11 @@ class TransferUseCaseRetryAspectTest {
                 }
 
                 @Override
+                public void runAfterCompletion(Runnable action) {
+                    action.run();
+                }
+
+                @Override
                 public <T> T executeRequiresNew(Supplier<T> action, int timeoutSeconds) {
                     return action.get();
                 }

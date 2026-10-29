@@ -1,14 +1,18 @@
 package com.bank.app.infrastructure.adapter.out.event;
 
 import com.bank.app.common.application.port.out.AuditEventPort;
+import com.bank.app.common.application.port.out.TransactionBoundaryPort;
 import com.bank.app.common.domain.event.AuditEvent;
 import com.bank.app.audit.application.port.out.SaveAuditLogPort;
 import com.bank.app.audit.domain.AuditAction;
 import com.bank.app.audit.domain.AuditLog;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Objects;
+import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Primary;
 import org.springframework.lang.Nullable;
@@ -20,26 +24,30 @@ public class AuditEventPublisherAdapter implements AuditEventPort {
 
     private static final Logger log = LoggerFactory.getLogger(AuditEventPublisherAdapter.class);
 
+    private static final int DEFAULT_BEST_EFFORT_TIMEOUT_SECONDS = 30;
+
     private final SaveAuditLogPort saveAuditLogPort;
     private final ApplicationEventPublisher eventPublisher;
     private final AuditRetryOutboxAdapter retryOutboxAdapter;
     private final MeterRegistry meterRegistry;
-
-    public AuditEventPublisherAdapter(SaveAuditLogPort saveAuditLogPort,
-            ApplicationEventPublisher eventPublisher,
-            AuditRetryOutboxAdapter retryOutboxAdapter) {
-        this(saveAuditLogPort, eventPublisher, retryOutboxAdapter, null);
-    }
+    private final TransactionBoundaryPort transactionBoundary;
+    private final Executor bestEffortExecutor;
 
     @Autowired
     public AuditEventPublisherAdapter(SaveAuditLogPort saveAuditLogPort,
             ApplicationEventPublisher eventPublisher,
             AuditRetryOutboxAdapter retryOutboxAdapter,
-            @Nullable MeterRegistry meterRegistry) {
+            @Nullable MeterRegistry meterRegistry,
+            TransactionBoundaryPort transactionBoundary,
+            @Qualifier("auditBestEffortExecutor") Executor bestEffortExecutor) {
         this.saveAuditLogPort = saveAuditLogPort;
         this.eventPublisher = eventPublisher;
         this.retryOutboxAdapter = retryOutboxAdapter;
         this.meterRegistry = meterRegistry;
+        this.transactionBoundary = Objects.requireNonNull(
+                transactionBoundary, "TransactionBoundaryPort must not be null");
+        this.bestEffortExecutor = Objects.requireNonNull(
+                bestEffortExecutor, "Best-effort executor must not be null");
     }
 
     @Override
@@ -56,8 +64,36 @@ public class AuditEventPublisherAdapter implements AuditEventPort {
 
     @Override
     public void publishBestEffort(AuditEvent event) {
+        if (!transactionBoundary.isTransactionActive()) {
+            writeBestEffort(event);
+            return;
+        }
+        // A best-effort row must not join the caller's transaction: the auth
+        // flow may already have thrown (stale refresh, failed MFA) and roll
+        // back. Writing it in REQUIRES_NEW while that caller still holds its
+        // connection would double connection demand and can deadlock a small
+        // pool under concurrency. Submit after completion instead: the caller
+        // never waits for a second connection, and the single-thread executor
+        // serializes the audit transaction.
+        transactionBoundary.runAfterCompletion(() -> submitBestEffort(event));
+    }
+
+    private void submitBestEffort(AuditEvent event) {
         try {
-            persist(event);
+            bestEffortExecutor.execute(() -> writeBestEffort(event));
+        } catch (RuntimeException rejected) {
+            increment("audit.best_effort.rejected", event);
+            log.error("Best-effort audit executor rejected event; audit row is lost: action={}, failureType={}",
+                    event.action(), rejected.getClass().getSimpleName());
+        }
+    }
+
+    private void writeBestEffort(AuditEvent event) {
+        try {
+            transactionBoundary.executeRequiresNew(() -> {
+                persist(event);
+                return null;
+            }, DEFAULT_BEST_EFFORT_TIMEOUT_SECONDS);
         } catch (RuntimeException writeFailure) {
             log.warn("Best-effort audit write failed; queueing durable retry: action={}, failureType={}",
                     event.action(), writeFailure.getClass().getSimpleName());

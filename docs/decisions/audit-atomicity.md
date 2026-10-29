@@ -17,28 +17,34 @@ user-visible contract.
 
 ## 2. `best-effort-auth` — login / logout / refresh / MFA / reset lifecycle
 
-`LoginUserUseCaseImpl.auditLogin` and the other authentication call sites catch
-every audit failure and only log a warning. An audit-store outage must not lock
-users out of login or turn logout into a 500 after revocation already happened.
-The gap is observable (warn logs); it is not silent.
+All authentication audit call sites use `AuditEventPort.publishBestEffort`
+(`LoginUserUseCaseImpl`, the stale-generation rejection in
+`RefreshSessionUseCaseImpl`, `RequestPasswordResetUseCaseImpl`,
+`ConfirmPasswordResetUseCaseImpl`, `EnableMfaUseCaseImpl` for enable/disable,
+`MfaReauthenticationService` for re-auth failures, and `LogoutUseCaseImpl`).
+The refresh-family theft path deliberately stays on mandatory `publish`: the
+revoke and its audit row must commit or roll back together (K11/D4).
 
-Logout additionally uses the durable variant:
-`LogoutUseCaseImpl.auditLogout` calls `AuditEventPort.publishBestEffort`.
-`AuditEventPublisherAdapter` first tries the normal synchronous write; when that
-fails it enqueues the `AuditEvent` through `AuditRetryOutboxAdapter`
-(`REQUIRES_NEW`) and logs. `AuditRetryOutboxRelay` replays the outbox row with
-the standard retry/dead-letter policy and writes the audit row through
-`SaveAuditLogPort`. A dispatch failure after a successful row write is only
-logged: the row is already durable and must not be duplicated by a retry.
-The fallback is observable through `audit.retry.enqueued` / `audit.retry.failed`
-(tagged by action); `AuditRetryEnqueued` is a ticket and
-`AuditRetryEnqueueFailed` is a page because the latter is the only path that
-still loses the audit row.
+`publishBestEffort` never lets an audit failure change the auth outcome. With an
+active caller transaction it defers the write until that transaction completes
+and submits it to the single-thread `auditBestEffortExecutor`; the executor
+opens the audit transaction with `REQUIRES_NEW`. Deferring matters because a
+synchronous `REQUIRES_NEW` write while the caller still holds its connection
+doubles connection demand and can deadlock a small pool under concurrent auth
+requests. Without a caller transaction the write runs synchronously in
+`REQUIRES_NEW`.
 
-The remaining authentication call sites still use the plain `publish` inside
-their own catch block and therefore have no durable retry yet. Migrating them to
-`publishBestEffort` is a follow-up, one call site at a time; the port method is
-already available so the retry outbox type is shared.
+If the audit write fails, the adapter enqueues the `AuditEvent` through
+`AuditRetryOutboxAdapter` (`REQUIRES_NEW`) and logs. `AuditRetryOutboxRelay`
+replays the outbox row with the standard retry/dead-letter policy and writes the
+audit row through `SaveAuditLogPort`. A dispatch failure after a successful row
+write is only logged: the row is already durable and must not be duplicated by a
+retry. The fallback is observable through `audit.retry.enqueued` /
+`audit.retry.failed` (tagged by action); `AuditRetryEnqueued` is a ticket and
+`AuditRetryEnqueueFailed` is a page. Executor queue rejection is the remaining
+loss path: it increments `audit.best_effort.rejected` (`AuditBestEffortRejected`,
+page) and logs an error, but it does not fall back to a synchronous write (that
+would reintroduce the pool amplification).
 
 ## 3. `observe-after-commit` — dispatch seam, writes nothing
 
@@ -53,18 +59,19 @@ via mode 1 before this listener ever runs.
 
 The former `AuditLoggerUseCaseImpl`/`@RequiresNewUseCase` path was removed in
 the 2026-10 module-boundary refactor. `AuditEventPublisherAdapter` is now the
-single synchronous audit writer: it joins the caller's transaction when one is
-active (mode 1) and is invoked best-effort from authentication flows (mode 2).
-The retry outbox is the only deferred writer (`AuditRetryOutboxRelay`), and its
-enqueue deliberately opens `REQUIRES_NEW` so the retry row survives a failing
-caller transaction. `GetAuditLogsQueryImpl` remains read-only; no audit use case
-opens its own `REQUIRES_NEW` transaction (see
-`docs/decisions/transaction-strategy.md`).
+single audit-row writer: it joins the caller's transaction when one is active
+(mode 1); mode 2 either runs on the after-completion executor or, without a
+caller transaction, synchronously. `AuditRetryOutboxRelay` is the only replay
+path, and its enqueue deliberately opens `REQUIRES_NEW` so the retry row
+survives a failing caller transaction. `GetAuditLogsQueryImpl` remains
+read-only; no audit use case opens its own `REQUIRES_NEW` transaction — the
+adapter does, either on the after-completion executor for mode 2 or inside the
+retry enqueue (see `docs/decisions/transaction-strategy.md`).
 
 ## Rule of thumb
 
 Adding a new audit call site? Money movement → mode 1 (pass through the
-caller's transaction, no catch). Authentication lifecycle → mode 2 (catch +
-warn, never fail the user flow; prefer `publishBestEffort` when the event must
-survive an audit-store outage). Post-commit reaction → mode 3 (observe only,
-never write).
+caller's transaction, no catch). Authentication lifecycle → mode 2
+(`publishBestEffort`; catch + warn, never fail the user flow). The refresh-family
+theft revoke stays mandatory same-tx because it mutates security state.
+Post-commit reaction → mode 3 (observe only, never write).

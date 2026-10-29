@@ -88,7 +88,7 @@ public class MfaReauthenticationService {
 
     private void auditFailure(Long userId, String username, String operation) {
         try {
-            auditEventPort.publish(new AuditEvent(AuditEvent.MFA_REAUTH_FAILED,
+            auditEventPort.publishBestEffort(new AuditEvent(AuditEvent.MFA_REAUTH_FAILED,
                     operation + " re-authentication failed.",
                     LocalDateTime.now(clockProvider.clock()), username, userId));
         } catch (Exception auditFailure) {

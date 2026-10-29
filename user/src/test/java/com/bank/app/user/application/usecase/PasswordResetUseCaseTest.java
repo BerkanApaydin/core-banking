@@ -113,7 +113,7 @@ class PasswordResetUseCaseTest {
             assertThat(token.getValue()).isNotEqualTo(issued.getValue().tokenHash());
             assertThat(TokenDigest.sha256Hex(token.getValue())).isEqualTo(issued.getValue().tokenHash());
             var audit = ArgumentCaptor.forClass(AuditEvent.class);
-            verify(auditEventPort).publish(audit.capture());
+            verify(auditEventPort).publishBestEffort(audit.capture());
             assertThat(audit.getValue().action()).isEqualTo(AuditEvent.PASSWORD_RESET_REQUESTED);
             assertThat(audit.getValue().username()).isEqualTo("alice");
             assertThat(audit.getValue().actorUserId()).isEqualTo(7L);
@@ -209,7 +209,7 @@ class PasswordResetUseCaseTest {
 
             verify(resetTokenPort, never()).issue(any());
             verify(notificationPort, never()).sendPasswordResetToken(any(), any(), any());
-            verify(auditEventPort).publish(any());
+            verify(auditEventPort).publishBestEffort(any());
         }
 
         @Test
@@ -220,7 +220,7 @@ class PasswordResetUseCaseTest {
             verifyNoInteractions(loadUserPort);
             verifyNoInteractions(resetTokenPort);
             verifyNoInteractions(notificationPort);
-            verify(auditEventPort).publish(any());
+            verify(auditEventPort).publishBestEffort(any());
         }
 
         @Test
@@ -236,7 +236,7 @@ class PasswordResetUseCaseTest {
 
             verifyNoInteractions(resetTokenPort);
             verifyNoInteractions(notificationPort);
-            verify(auditEventPort).publish(any());
+            verify(auditEventPort).publishBestEffort(any());
         }
 
         @Test
@@ -250,7 +250,7 @@ class PasswordResetUseCaseTest {
             request.execute("alice");
 
             verify(resetTokenPort).issue(any());
-            verify(auditEventPort).publish(any());
+            verify(auditEventPort).publishBestEffort(any());
         }
 
         @Test
@@ -258,7 +258,7 @@ class PasswordResetUseCaseTest {
         void shouldSwallowAuditFailure() {
             when(loadUserPort.findByUsernameForUpdate("ghost")).thenReturn(Optional.empty());
             doThrow(new IllegalStateException("audit down"))
-                    .when(auditEventPort).publish(any());
+                    .when(auditEventPort).publishBestEffort(any());
 
             request.execute("ghost");
 
@@ -297,7 +297,7 @@ class PasswordResetUseCaseTest {
             assertThat(user.getTokenVersion()).isEqualTo(versionBefore + 1);
             verify(resetTokenPort).deleteByUserId(7L);
             var audit = ArgumentCaptor.forClass(AuditEvent.class);
-            verify(auditEventPort).publish(audit.capture());
+            verify(auditEventPort).publishBestEffort(audit.capture());
             assertThat(audit.getValue().action()).isEqualTo(AuditEvent.PASSWORD_RESET_COMPLETED);
             assertThat(audit.getValue().username()).isEqualTo("alice");
             assertThat(audit.getValue().actorUserId()).isEqualTo(7L);

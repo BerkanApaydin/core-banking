@@ -54,6 +54,20 @@ public class SpringTransactionBoundaryAdapter implements TransactionBoundaryPort
     }
 
     @Override
+    public void runAfterCompletion(Runnable action) {
+        if (!isTransactionActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                action.run();
+            }
+        });
+    }
+
+    @Override
     public <T> T executeRequiresNew(Supplier<T> action, int timeoutSeconds) {
         if (timeoutSeconds <= 0) {
             throw new IllegalArgumentException("timeoutSeconds must be positive: " + timeoutSeconds);

@@ -188,15 +188,15 @@ grant that role `EXECUTE` before applying V68, or move it to
   capability-role boundaries, and the `bank_scheduler` path (`SELECT` on
   `ledger_entries`, advisory lock, no audit access, no ledger writes).
   Row-writing checks run in rolled-back transactions.
-- `AuditChainIntegrityIntegrationTest` (6 tests) now includes
+- `AuditChainIntegrityIntegrationTest` (7 tests) now includes
   `emptyTableWithNonZeroHeadIsReported`: insert a row in a transaction, delete
   all rows, and assert the verifier returns `-1`; the rollback restores the
   committed chain.
 - Targeted run (29 Oct 2026): `LeastPrivilegeDatabaseRoleIntegrationTest`
   11/11 and `SchedulerDataSourceIntegrationTest` 1/1 passed. The earlier
   combined 16/16 run predates the scheduler tests.
-- Full `.\mvnw.cmd -B -ntp -T 1 clean verify` (29 Oct 2026): 3,828 tests
-  (3,587 unit + 241 IT), 0 failures/errors/skipped, 47 failsafe XML, aggregate
+- Full `.\mvnw.cmd -B -ntp -T 2 clean verify` (29 Oct 2026): 3,876 tests
+  (3,632 unit + 244 IT), 0 failures/errors/skipped, 47 failsafe XML, aggregate
   coverage gates passed, SpotBugs 0.
 - `python scripts/check_migration_chain.py` reports V1–V69 contiguous;
   `check_migration_timeouts.py` is clean.

@@ -105,7 +105,7 @@ public class EnableMfaUseCaseImpl implements EnableMfaUseCase {
     static void audit(AuditEventPort auditEventPort, String action, User user, String details,
             ClockProviderPort clockProvider) {
         try {
-            auditEventPort.publish(new AuditEvent(action, details,
+            auditEventPort.publishBestEffort(new AuditEvent(action, details,
                     LocalDateTime.now(clockProvider.clock()),
                     user.getUsername(), user.getId() != null ? user.getId().value() : null));
         } catch (Exception ignored) {

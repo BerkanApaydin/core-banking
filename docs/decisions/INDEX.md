@@ -22,7 +22,7 @@ is the single map: ID → file → one-sentence decision.
 | T-12 | `docs/decisions/partitioning.md` | Audit/ledger monthly partitioning roadmap (V45 preparation). |
 | T-13 | `docs/decisions/account-locking.md` | Balance mutation keeps ordered pessimistic read-lock + optimistic versioned write; each side has a defined job, neither may be dropped alone. |
 | K19 | `docs/decisions/api-versioning.md` | URL versioning via `@ApiVersion` + additive-change rules; published language evolves by addition only. |
-| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money), best-effort-auth (login/logout/MFA/reset), observe-after-commit (dispatch). Logout uses `publishBestEffort` with a `REQUIRES_NEW` retry outbox (`AuditRetryOutboxRelay`); other auth flows still use plain best-effort. |
+| — | `docs/decisions/audit-atomicity.md` | Three audit write modes: mandatory-same-tx (money + refresh-theft revoke), best-effort-auth (login/logout/refresh/MFA/reset via `publishBestEffort`), observe-after-commit (dispatch). Best-effort auth writes run after caller completion on a single-thread executor; failures use a `REQUIRES_NEW` retry outbox (`AuditRetryOutboxRelay`), and executor rejection is metered but loses the row. |
 | K17 | `docs/decisions/cross-bc-read-model.md` | Transfer reads account via published language + snapshot cache; projection direction when that stops being enough. |
 | — | `docs/decisions/dependency-review.md` | OSV gate on the SBOM + accepted risks in the allowlist, re-reviewed on Boot upgrades. |
 | — | `docs/decisions/infrastructure-split.md` | Roadmap: split `infrastructure` into web/security/outbox/observability modules. |

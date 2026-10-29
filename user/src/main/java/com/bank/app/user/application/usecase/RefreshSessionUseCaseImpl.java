@@ -140,7 +140,7 @@ public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
             // (docs/decisions/audit-atomicity.md). An audit-store outage must
             // not replace the contract's 401 with a 500.
             try {
-                auditEventPort.publish(new AuditEvent(AuditEvent.TOKEN_REVOKED,
+                auditEventPort.publishBestEffort(new AuditEvent(AuditEvent.TOKEN_REVOKED,
                         "Stale refresh token generation rejected; re-authentication required.",
                         LocalDateTime.now(clockProvider.clock()), verified.username(),
                         verified.userId()));

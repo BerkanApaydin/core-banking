@@ -136,7 +136,7 @@ spec:
             severity: page
           annotations:
             summary: "Audit persistence failed — money movements may lack their audit trail"
-        # F10: best-effort logout audit fell back to the durable retry outbox.
+        # Best-effort auth audit fell back to the durable retry outbox.
         # The row is not lost, but the audit store is degraded; investigate
         # before the outbox relay dead-letters the event.
         - alert: AuditRetryEnqueued
@@ -145,17 +145,28 @@ spec:
           labels:
             severity: ticket
           annotations:
-            summary: "Logout audit fell back to the durable retry outbox"
+            summary: "Auth audit fell back to the durable retry outbox"
             runbook_url: "docs/decisions/audit-atomicity.md"
         # The retry enqueue itself failed: the audit row for this action is
-        # lost. This is the only path that still drops a logout audit event.
+        # lost.
         - alert: AuditRetryEnqueueFailed
           expr: sum(increase(audit_retry_failed_total[1h])) by (action) > 0
           for: 1m
           labels:
             severity: page
           annotations:
-            summary: "Logout audit retry enqueue failed — audit row is lost"
+            summary: "Auth audit retry enqueue failed — audit row is lost"
+            runbook_url: "docs/decisions/audit-atomicity.md"
+        # The best-effort executor queue rejected the after-completion task.
+        # There is no synchronous fallback (it would reintroduce pool
+        # amplification), so the audit row for this action is lost.
+        - alert: AuditBestEffortRejected
+          expr: sum(increase(audit_best_effort_rejected_total[1h])) by (action) > 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: "Auth audit executor queue rejected event — audit row is lost"
             runbook_url: "docs/decisions/audit-atomicity.md"
         # Liveness of the audit dispatch seam (K2 rewire): consumed must track
         # persisted rows. A flat consumed counter while transfers succeed means

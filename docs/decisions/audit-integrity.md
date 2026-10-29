@@ -127,13 +127,16 @@ singleton chain head catches a removed suffix.
   allows it). Production must use object-lock/WORM storage and KMS/HSM key
   custody.
 
-**F1 remains open** for the owner/superuser case and the external anchor:
-periodic export of `(last_seq, last_hash)` to object-lock storage or a
-KMS-backed signature. The ordinary runtime-role path is now closed by
+**F1 remains open** only for the owner/superuser case and WORM/KMS custody. The
+opt-in HMAC anchor exists and exports `(last_seq, last_hash)` outside the
+database, but production must place the sink on object-lock/WORM storage and
+keep the HMAC key in KMS/HSM. The ordinary runtime-role path is closed by
 `LEAST-PRIV-1`: `bank_app` has no direct `UPDATE`/`DELETE`/`TRUNCATE` on audit
-rows, no write access to `audit_chain_state`, and no DDL. Until an external
-anchor exists this is evidence against ordinary application-path tampering and
-accidental operator mistakes, not against a determined database administrator.
+rows, no write access to `audit_chain_state`, and no DDL. Until the sink and key
+custody are production-grade, this is evidence against ordinary
+application-path tampering and accidental operator mistakes, not against a
+determined database administrator who can also rewrite the sink or steal the
+key.
 
 ## Operational rules
 
@@ -217,11 +220,12 @@ small append per day; the cost is negligible compared with the verifier.
   rewrite detection, middle deletion, head deletion, prefix-only retention,
   chain-head adapter reads, and an empty table with a non-zero head against
   real PostgreSQL (V68 runs through Flyway in Testcontainers).
-- `LeastPrivilegeDatabaseRoleIntegrationTest` (10 tests) proves the runtime
+- `LeastPrivilegeDatabaseRoleIntegrationTest` (11 tests) proves the runtime
   role cannot update/delete/truncate audit rows, cannot write the chain head
-  or run DDL, and can still insert, verify, and call guarded retention.
+  or run DDL, can still insert, verify, and call guarded retention, and the
+  scheduler role can only read ledger entries and take the advisory lock.
 - `AuditPartitionRetentionIntegrationTest` (2 tests) proves V69 drops a fully
   expired partition and falls back to prefix `DELETE` when a backdated
   high-`chain_seq` row blocks the drop.
-- Full `.\mvnw.cmd -B -ntp clean verify`: 3,779 tests (3,541 unit + 238 IT),
-  0 failures/errors/skipped; aggregate coverage and SpotBugs gates passed.
+- Full `.\mvnw.cmd -B -ntp -T 2 clean verify`: 3,876 tests (3,632 unit + 244
+  IT), 0 failures/errors/skipped; aggregate coverage and SpotBugs gates passed.

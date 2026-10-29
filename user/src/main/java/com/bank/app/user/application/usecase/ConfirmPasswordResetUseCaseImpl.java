@@ -81,7 +81,7 @@ public class ConfirmPasswordResetUseCaseImpl implements ConfirmPasswordResetUseC
 
     private void audit(User user, LocalDateTime now) {
         try {
-            auditEventPort.publish(new AuditEvent(AuditEvent.PASSWORD_RESET_COMPLETED,
+            auditEventPort.publishBestEffort(new AuditEvent(AuditEvent.PASSWORD_RESET_COMPLETED,
                     "Password reset completed; outstanding sessions retired.", now,
                     user.getUsername(), user.getId() != null ? user.getId().value() : null));
         } catch (Exception ignored) {

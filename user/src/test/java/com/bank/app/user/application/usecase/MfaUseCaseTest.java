@@ -144,7 +144,7 @@ class MfaUseCaseTest {
             // R-U08: enrolment has no second factor, so a successful password
             // step-up clears the shared verification budget.
             verify(mfaAttemptPort).reset(7L);
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_ENABLED.equals(event.action())
                             && "alice".equals(event.username())
                             && Long.valueOf(7L).equals(event.actorUserId())));
@@ -231,7 +231,7 @@ class MfaUseCaseTest {
             // audited, not silently discarded.
             verify(mfaAttemptPort).recordFailure(7L);
             verify(mfaAttemptPort, never()).reset(anyLong());
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_REAUTH_FAILED.equals(event.action())
                             && "alice".equals(event.username())
                             && Long.valueOf(7L).equals(event.actorUserId())));
@@ -261,7 +261,7 @@ class MfaUseCaseTest {
             when(authenticationPort.authenticate("alice", "nope"))
                     .thenThrow(new AuthenticationFailedException());
             doThrow(new IllegalStateException("audit down"))
-                    .when(auditEventPort).publish(any());
+                    .when(auditEventPort).publishBestEffort(any());
 
             assertThatThrownBy(() -> enable.execute(7L, "nope"))
                     .isInstanceOf(InvalidMfaCodeException.class);
@@ -293,7 +293,7 @@ class MfaUseCaseTest {
             assertThat(user.getTokenVersion()).isEqualTo(1L);
             verify(saveUserPort).save(user);
             verify(refreshTokenPort).revokeAllForUser(7L);
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_ENABLED.equals(event.action())
                             && event.details().contains("confirmed")
                             && "alice".equals(event.username())
@@ -388,7 +388,7 @@ class MfaUseCaseTest {
             verify(mfaAttemptPort).recordFailure(7L);
             // A correct code path owns the reset; a failed password never does.
             verify(mfaAttemptPort, never()).reset(anyLong());
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_REAUTH_FAILED.equals(event.action())));
         }
 
@@ -479,7 +479,7 @@ class MfaUseCaseTest {
             verify(mfaSecretPort).deleteSecret(7L);
             verify(mfaSecretPort).recordAcceptedTotpCounter(eq(7L), anyLong());
             verify(refreshTokenPort).revokeAllForUser(7L);
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_DISABLED.equals(event.action())
                             && "alice".equals(event.username())
                             && Long.valueOf(7L).equals(event.actorUserId())));
@@ -591,7 +591,7 @@ class MfaUseCaseTest {
             verify(saveUserPort, never()).save(any());
             verify(mfaAttemptPort).recordFailure(7L);
             verify(mfaAttemptPort, never()).reset(anyLong());
-            verify(auditEventPort).publish(argThat(event ->
+            verify(auditEventPort).publishBestEffort(argThat(event ->
                     AuditEvent.MFA_REAUTH_FAILED.equals(event.action())));
         }
 

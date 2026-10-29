@@ -256,7 +256,7 @@ public class LoginUserUseCaseImpl implements LoginUserUseCase {
      */
     private void auditLogin(String action, String username, Long userId, String details) {
         try {
-            auditEventPort.publish(new AuditEvent(action, details,
+            auditEventPort.publishBestEffort(new AuditEvent(action, details,
                     LocalDateTime.now(clockProvider.clock()),
                     username != null && !username.isBlank() ? username : "system",
                     userId));
